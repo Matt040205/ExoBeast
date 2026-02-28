@@ -249,6 +249,13 @@ MonoBehaviour:
   rotationSpeed: 13
   cameraController: {fileID: 0}
   modelPivot: {fileID: 7315494051637842559}
+  aimRig: {fileID: 0}
+  aimConstraint: {fileID: 0}
+  aimLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+  eventoPassos: event:/SFX/Passos
+  isDashing: 0
   isGrounded: 0
   canDoubleJump: 0
   isFloating: 0
@@ -270,6 +277,14 @@ MonoBehaviour:
   firePoint: {fileID: 3294448804810150574}
   projectileVisualPrefab: {fileID: 9104921844974723845, guid: f14f768e29c3c2c4ca827c7d1b39d783, type: 3}
   impactEffectPrefab: {fileID: 0}
+  aimTarget: {fileID: 0}
+  aimTargetDistance: 20
+  tipoDeSom: Arma
+  eventoTiroUnicoArma: event:/SFX/Atirar
+  eventoTiroContinuoArma: event:/SFX/Atirar_segurando
+  eventoRecargaArma: event:/SFX/Recarga Arma
+  eventoTiroUnicoArco: event:/SFX/Arco
+  eventoTiroContinuoArco: event:/SFX/Arco
   maxDistance: 100
   hitLayers:
     serializedVersion: 2
@@ -294,6 +309,8 @@ MonoBehaviour:
   shootingSystem: {fileID: 4461165537539138510}
   meleeSystem: {fileID: -5728898866971823336}
   healthSystem: {fileID: -5441518424919623612}
+  meleeWeaponModel: {fileID: 0}
+  rangedWeaponModel: {fileID: 0}
 --- !u!114 &-5441518424919623612
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -309,7 +326,12 @@ MonoBehaviour:
   characterData: {fileID: 11400000, guid: 8eb457e248c385043bf118efaf313b53, type: 2}
   currentHealth: 0
   isRegenerating: 0
-  respawnPoint: {fileID: 0}
+  damageMultiplier: 1
+  speedMultiplier: 1
+  damageResistance: 0
+  isBuffed: 0
+  isCountering: 0
+  respawnPointNameOrTag: RespawnPoint
 --- !u!114 &-5728898866971823336
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -324,13 +346,34 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterData: {fileID: 0}
   attackPoint: {fileID: 0}
-  attackRange: 2
-  attackAngle: 90
   hitLayers:
     serializedVersion: 2
     m_Bits: 0
-  isAttacking: 0
-  attackCooldown: 0
+  currentWeaponType: 0
+  swordStats:
+    attackRange: 2
+    attackAngle: 90
+    animationSpeed: 1
+    damageHit1: 15
+    damageHit2: 15
+    damageHit3: 20
+    damageHit4: 30
+    sfxHit1: 
+    sfxHit2: 
+    sfxHit3: 
+    sfxHit4: 
+  hammerStats:
+    attackRange: 2
+    attackAngle: 90
+    animationSpeed: 1
+    damageHit1: 15
+    damageHit2: 15
+    damageHit3: 20
+    damageHit4: 30
+    sfxHit1: 
+    sfxHit2: 
+    sfxHit3: 
+    sfxHit4: 
 --- !u!114 &-6047549214317172513
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -356,6 +399,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   characterData: {fileID: 11400000, guid: 8eb457e248c385043bf118efaf313b53, type: 2}
+  ultimateChargeThreshold: 100
+  currentUltimateCharge: 0
 --- !u!114 &-8271029888155451222
 MonoBehaviour:
   m_ObjectHideFlags: 0

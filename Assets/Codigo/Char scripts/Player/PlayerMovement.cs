@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Animations.Rigging;
+using UnityEngine.InputSystem;
 using System.Collections;
 using FMODUnity;
 using FMOD.Studio;
@@ -50,14 +51,14 @@ public class PlayerMovement : MonoBehaviour
     public float jumpHeightModifier = 1f;
 
     private bool jaMoveuTutorial = false;
-
-    // --- REFERÊNCIA NOVA ---
     private PlayerHealthSystem healthSystem;
+
+    private Vector2 inputMove;
+    private bool inputRun;
 
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
-        // Tenta pegar o HealthSystem para ler o Buff de Velocidade
         healthSystem = GetComponent<PlayerHealthSystem>();
 
         if (modelPivot != null)
@@ -109,9 +110,54 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    public void OnMove(InputAction.CallbackContext ctx)
+    {
+        inputMove = ctx.ReadValue<Vector2>();
+    }
+
+    public void OnRun(InputAction.CallbackContext ctx)
+    {
+        inputRun = ctx.ReadValueAsButton();
+    }
+
+    public void OnJump(InputAction.CallbackContext ctx)
+    {
+        if (!ctx.started) return;
+        if (GetComponent<MergulhoTintaLogic>() != null) return;
+        if (PauseControl.isPaused || BuildManager.isBuildingMode || isFloating || isDashing) return;
+
+        if (isGrounded)
+        {
+            velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity) * jumpHeightModifier;
+            isGrounded = false;
+            if (animator != null) animator.SetTrigger("Jump");
+            StopFootstepSound();
+        }
+        else if (canDoubleJump && !hasDoubleJumped)
+        {
+            velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity) * jumpHeightModifier;
+            hasDoubleJumped = true;
+            if (animator != null) animator.SetTrigger("Jump");
+            StopFootstepSound();
+        }
+    }
+
+    public void OnAim(InputAction.CallbackContext ctx)
+    {
+        bool aimingInput = ctx.ReadValueAsButton();
+        if (aimingInput != isAiming)
+        {
+            isAiming = aimingInput;
+            if (animator != null) animator.SetBool("isAiming", isAiming);
+            StopAllCoroutines();
+            StartCoroutine(FadeRigWeight(isAiming ? 1f : 0f));
+        }
+    }
+
     private void Update()
     {
         isGrounded = controller.isGrounded;
+        if (isGrounded) hasDoubleJumped = false;
 
         if (PauseControl.isPaused || BuildManager.isBuildingMode || isDashing)
         {
@@ -119,8 +165,6 @@ public class PlayerMovement : MonoBehaviour
             StopFootstepSound();
             return;
         }
-
-        HandleAiming();
 
         if (isFloating)
         {
@@ -132,16 +176,10 @@ public class PlayerMovement : MonoBehaviour
         else
         {
             HandleMovement();
-            HandleJump();
             ApplyGravity();
         }
 
         if (animator != null) animator.SetBool("isGrounded", isGrounded);
-    }
-
-    private void OnDestroy()
-    {
-        if (passosSoundInstance.isValid()) passosSoundInstance.release();
     }
 
     private void LateUpdate()
@@ -165,50 +203,13 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    private void HandleAiming()
-    {
-        if (animator == null) return;
-        bool aimingInput = Input.GetButton("Fire2");
-
-        if (aimingInput != isAiming)
-        {
-            isAiming = aimingInput;
-            animator.SetBool("isAiming", isAiming);
-            StartCoroutine(FadeRigWeight(isAiming ? 1f : 0f));
-        }
-    }
-
-    private IEnumerator FadeRigWeight(float targetWeight)
-    {
-        if (aimRig == null) yield break;
-        float time = 0f;
-        float startWeight = aimRig.weight;
-        float duration = 0.2f;
-        while (time < duration)
-        {
-            aimRig.weight = Mathf.Lerp(startWeight, targetWeight, time / duration);
-            time += Time.deltaTime;
-            yield return null;
-        }
-        aimRig.weight = targetWeight;
-    }
-
     private void HandleMovement()
     {
-        float horizontal = Input.GetAxis("Horizontal");
-        float vertical = Input.GetAxis("Vertical");
+        direction = new Vector3(inputMove.x, 0f, inputMove.y);
+        currentSpeed = inputRun ? runSpeed : walkSpeed;
 
-        direction = new Vector3(horizontal, 0f, vertical);
-
-        currentSpeed = Input.GetKey(KeyCode.LeftShift) ? runSpeed : walkSpeed;
-
-        // --- APLICAÇÃO DO BUFF DE VELOCIDADE ---
         float finalSpeed = currentSpeed;
-        if (healthSystem != null)
-        {
-            finalSpeed *= healthSystem.speedMultiplier;
-        }
-        // ---------------------------------------
+        if (healthSystem != null) finalSpeed *= healthSystem.speedMultiplier;
 
         if (direction.sqrMagnitude > 0.01f)
         {
@@ -227,8 +228,8 @@ public class PlayerMovement : MonoBehaviour
 
                 if (animator != null)
                 {
-                    animator.SetFloat("AimMoveX", horizontal, 0.1f, Time.deltaTime);
-                    animator.SetFloat("AimMoveY", vertical, 0.1f, Time.deltaTime);
+                    animator.SetFloat("AimMoveX", inputMove.x, 0.1f, Time.deltaTime);
+                    animator.SetFloat("AimMoveY", inputMove.y, 0.1f, Time.deltaTime);
                 }
             }
             else
@@ -238,17 +239,13 @@ public class PlayerMovement : MonoBehaviour
 
                 if (animator != null)
                 {
-                    float animSpeed = (Input.GetKey(KeyCode.LeftShift) ? 1.0f : 0.5f) * direction.magnitude;
-                    // Ajuste opcional: animar mais rápido se estiver buffado
+                    float animSpeed = (inputRun ? 1.0f : 0.5f) * direction.magnitude;
                     if (healthSystem != null && healthSystem.speedMultiplier > 1.1f) animSpeed *= 1.2f;
-
                     animator.SetFloat("MovementSpeed", animSpeed, 0.1f, Time.deltaTime);
                 }
             }
 
-            // Usa a finalSpeed (com buff) aqui
             controller.Move(moveDir.normalized * finalSpeed * Time.deltaTime);
-
             if (isGrounded) PlayFootstepSound();
             else StopFootstepSound();
         }
@@ -265,36 +262,26 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
-    private void HandleJump()
-    {
-        if (GetComponent<MergulhoTintaLogic>() != null) return;
-
-        if (isGrounded) hasDoubleJumped = false;
-
-        if (Input.GetButtonDown("Jump"))
-        {
-            if (isGrounded)
-            {
-                velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity) * jumpHeightModifier;
-                isGrounded = false;
-                if (animator != null) animator.SetTrigger("Jump");
-                StopFootstepSound();
-            }
-            else if (canDoubleJump && !hasDoubleJumped)
-            {
-                velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity) * jumpHeightModifier;
-                hasDoubleJumped = true;
-                if (animator != null) animator.SetTrigger("Jump");
-                StopFootstepSound();
-            }
-        }
-    }
-
     private void ApplyGravity()
     {
         if (isGrounded && velocity.y < 0) velocity.y = -2f;
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
+    }
+
+    private IEnumerator FadeRigWeight(float targetWeight)
+    {
+        if (aimRig == null) yield break;
+        float time = 0f;
+        float startWeight = aimRig.weight;
+        float duration = 0.2f;
+        while (time < duration)
+        {
+            aimRig.weight = Mathf.Lerp(startWeight, targetWeight, time / duration);
+            time += Time.deltaTime;
+            yield return null;
+        }
+        aimRig.weight = targetWeight;
     }
 
     private void PlayFootstepSound()
@@ -313,6 +300,11 @@ public class PlayerMovement : MonoBehaviour
             passosSoundInstance.stop(FMOD.Studio.STOP_MODE.ALLOWFADEOUT);
             isPlayingFootsteps = false;
         }
+    }
+
+    private void OnDestroy()
+    {
+        if (passosSoundInstance.isValid()) passosSoundInstance.release();
     }
 
     public Transform GetModelPivot() => modelPivot;

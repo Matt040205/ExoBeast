@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using FMODUnity;
 using System.Collections.Generic;
 
@@ -43,20 +44,18 @@ public class PlayerShooting : MonoBehaviour
     private Camera mainCamera;
     private Animator animator;
 
-    // Referência ao Health System para pegar o Buff de Dano
     private PlayerHealthSystem playerHealth;
-
     private bool hasNextShotBonus = false;
     private float nextShotDamageBonus = 1f;
     private float nextShotAreaBonus = 1f;
+
+    private bool fireInputHeld;
 
     void Start()
     {
         currentAmmo = characterData.magazineSize;
         cameraController = FindObjectOfType<CameraController>();
         mainCamera = Camera.main;
-
-        // Pega a referência do sistema de vida/buffs
         playerHealth = GetComponent<PlayerHealthSystem>();
 
         PlayerMovement playerMovement = GetComponent<PlayerMovement>();
@@ -68,12 +67,23 @@ public class PlayerShooting : MonoBehaviour
         }
 
         projectilePool = ProjectilePool.Instance;
-
         if (projectilePool != null && projectileVisualPrefab != null)
         {
             projectilePool.projectilePrefab = this.projectileVisualPrefab;
             projectilePool.InitializePool();
         }
+    }
+
+    public void OnFire(InputAction.CallbackContext ctx)
+    {
+        if (ctx.started || ctx.performed) fireInputHeld = true;
+        else if (ctx.canceled) fireInputHeld = false;
+    }
+
+    public void OnReload(InputAction.CallbackContext ctx)
+    {
+        if (ctx.performed && !isReloading && currentAmmo < characterData.magazineSize)
+            StartReload();
     }
 
     void Update()
@@ -84,21 +94,25 @@ public class PlayerShooting : MonoBehaviour
 
         if (isReloading) return;
 
-        HandleInput();
-    }
-
-    void HandleInput()
-    {
-        bool fireInput = characterData.fireMode == FireMode.FullAuto ? Input.GetButton("Fire1") : Input.GetButtonDown("Fire1");
-
-        if (fireInput && Time.time >= nextShotTime)
-        {
-            if (currentAmmo > 0) Shoot();
-            else StartReload();
-        }
+        HandleShootingLogic();
 
         if (Input.GetKeyDown(KeyCode.R) && currentAmmo < characterData.magazineSize)
             StartReload();
+    }
+
+    void HandleShootingLogic()
+    {
+        bool canShoot = characterData.fireMode == FireMode.FullAuto ? fireInputHeld : fireInputHeld && Time.time >= nextShotTime;
+
+        if (fireInputHeld && Time.time >= nextShotTime)
+        {
+            if (currentAmmo > 0)
+            {
+                Shoot();
+                if (characterData.fireMode != FireMode.FullAuto) fireInputHeld = false;
+            }
+            else StartReload();
+        }
     }
 
     void UpdateAimTargetPosition()
@@ -127,15 +141,12 @@ public class PlayerShooting : MonoBehaviour
     void Shoot()
     {
         if (animator != null) animator.SetTrigger("Shoot");
-
         PlayShootSound();
 
         if (modelPivot != null)
             firePoint.rotation = Quaternion.LookRotation(GetShotDirection());
 
         Vector3 shotDirection = GetShotDirection();
-
-        // Calcula o dano (agora inclui o buff da torre)
         float finalDamage = CalculateDamage(out bool isCritical);
 
         SpawnProjectile(finalDamage, isCritical, shotDirection);
@@ -171,12 +182,7 @@ public class PlayerShooting : MonoBehaviour
             isCritical = true;
         }
 
-        // --- APLICA O BUFF DA TORRE ---
-        if (playerHealth != null)
-        {
-            finalDamage *= playerHealth.damageMultiplier;
-        }
-        // ------------------------------
+        if (playerHealth != null) finalDamage *= playerHealth.damageMultiplier;
 
         if (hasNextShotBonus)
         {
@@ -193,19 +199,12 @@ public class PlayerShooting : MonoBehaviour
         if (projectilePool != null)
         {
             GameObject visualProjectile = projectilePool.GetProjectile(firePoint.position, Quaternion.LookRotation(direction));
-
             if (visualProjectile != null)
             {
                 ProjectileVisual visualScript = visualProjectile.GetComponent<ProjectileVisual>();
                 if (visualScript != null)
                 {
-                    visualScript.Initialize(
-                      damage,
-                      isCritical,
-                      characterData.armorPenetration,
-                      playerHealth,
-                      direction
-                    );
+                    visualScript.Initialize(damage, isCritical, characterData.armorPenetration, playerHealth, direction);
                 }
             }
         }
@@ -215,7 +214,6 @@ public class PlayerShooting : MonoBehaviour
     {
         Ray ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
         RaycastHit hit;
-
         if (Physics.Raycast(ray, out hit, maxDistance, hitLayers))
             return (hit.point - firePoint.position).normalized;
         else
@@ -225,15 +223,12 @@ public class PlayerShooting : MonoBehaviour
     void StartReload()
     {
         if (isReloading) return;
-
         float multiplier = 3.0f / characterData.reloadSpeed;
-
         if (animator != null)
         {
             animator.SetFloat("ReloadSpeedMultiplier", multiplier);
             animator.SetTrigger("Reload");
         }
-
         if (tipoDeSom == "Arma" && !string.IsNullOrEmpty(eventoRecargaArma))
             RuntimeManager.PlayOneShot(eventoRecargaArma, transform.position);
 
