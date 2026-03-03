@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
 
 namespace ExoBeasts.Multiplayer.Core
 {
@@ -30,18 +31,17 @@ namespace ExoBeasts.Multiplayer.Core
         }
 
         /// <summary>
-        /// Iniciar como Host (servidor + cliente)
-        /// Chamado quando o jogador cria um lobby e inicia a partida
+        /// Iniciar como Host (servidor + cliente simultaneamente).
+        /// Chamado quando o jogador cria um lobby e inicia a partida.
         /// </summary>
         public void StartAsHost()
         {
             Debug.Log($"[HostManager] Iniciando como Host (P2P) na porta {hostPort}...");
 
-            // TODO: Configurar UnityTransport
-            // var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-            // transport.SetConnectionData("0.0.0.0", hostPort);
+            var transport = NetworkManager.Singleton?.GetComponent<UnityTransport>();
+            if (transport != null)
+                transport.SetConnectionData("0.0.0.0", hostPort);
 
-            // Iniciar como Host (servidor + cliente)
             if (NetworkManager.Singleton != null)
             {
                 bool success = NetworkManager.Singleton.StartHost();
@@ -58,7 +58,31 @@ namespace ExoBeasts.Multiplayer.Core
         }
 
         /// <summary>
-        /// Parar de ser Host
+        /// Iniciar como Client: conecta ao Host via IP.
+        /// Chamado quando o jogador entra em um lobby e a partida comeca.
+        /// </summary>
+        /// <param name="hostIp">IP do Host (obtido via Lobby EOS)</param>
+        /// <param name="port">Porta do Host (0 usa o hostPort padrao)</param>
+        public void StartAsClient(string hostIp, ushort port = 0)
+        {
+            if (port == 0) port = hostPort;
+
+            if (NetworkManager.Singleton == null)
+            {
+                Debug.LogError("[HostManager] NetworkManager ausente. Nao e possivel conectar como Client.");
+                return;
+            }
+
+            var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+            if (transport != null)
+                transport.SetConnectionData(hostIp, port);
+
+            Debug.Log($"[HostManager] Iniciando como Client -> {hostIp}:{port}...");
+            NetworkManager.Singleton.StartClient();
+        }
+
+        /// <summary>
+        /// Para de ser Host e encerra o servidor local.
         /// </summary>
         public void StopHost()
         {

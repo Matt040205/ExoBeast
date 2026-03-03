@@ -31,7 +31,7 @@
 - Um jogador atua como **Host** (servidor + cliente simultaneamente)
 - O Host processa toda a lógica autoritativa do jogo
 - Outros jogadores conectam diretamente ao Host
-- Epic Lobby Service gerencia matchmaking e conexões
+- Epic Lobby Service gerencia matchmaking e conexões iniciais
 - NAT Traversal facilitado pelo Epic P2P Service
 
 **Vantagens do P2P:**
@@ -46,252 +46,191 @@
 
 ---
 
-## FASE 1: Fundacao e Configuracao
+## Pacotes Instalados (versoes reais)
 
-### 1.1 Configuracao no Epic Developer Portal
+| Pacote | Versao | Status |
+|--------|--------|--------|
+| `com.unity.netcode.gameobjects` | 1.12.0 | ✅ Instalado e funcional |
+| `com.unity.transport` | 2.4.0 | ✅ Instalado e funcional |
+| `com.unity.multiplayer.tools` | 2.2.1 | ✅ Instalado |
+| `com.unity.multiplayer.center` | 1.0.0 | ✅ Instalado |
+| `com.playeveryware.eos` | local | ✅ Instalado e funcional |
 
-**URL:** https://dev.epicgames.com/portal
+---
 
-**Passos:**
-1. Criar conta de desenvolvedor Epic
-2. Criar nova Organizacao
-3. Criar novo Produto "ExoBeasts"
-4. Na aba **Product Settings**:
-   - Anotar: Product ID
-   - Anotar: Sandbox ID (usar Development para testes)
-5. Na aba **Clients**:
-   - Criar novo Client
-   - Tipo: GameClient
-   - Anotar: Client ID e Client Secret
-6. Na aba **Deployments**:
-   - Criar Deployment para Development sandbox
-   - Anotar: Deployment ID
-7. Na aba **Game Services**:
-   - Ativar: **Lobbies** (OBRIGATORIO)
-   - Ativar: **Peer-to-peer** (OBRIGATORIO para P2P - NAT traversal)
-   - ~~Game Server Hosting (EGSH)~~ - NÃO necessário para P2P
-8. Na aba **Brand Settings**:
-   - Configurar nome e logo (obrigatorio para auth)
+## FASE 1: Fundacao e Configuracao — ✅ CONCLUIDA
 
-### 1.2 Instalacao de Pacotes Unity
+### 1.1 Configuracao no Epic Developer Portal — ✅
 
-**Modificar:** `Packages/manifest.json`
+- [x] Conta de desenvolvedor Epic criada
+- [x] Produto "ExoBeasts" configurado
+- [x] Credenciais (ProductId, SandboxId, ClientId, DeploymentId) obtidas
+- [x] Servico **Lobbies** ativado
+- [x] Servico **Peer-to-peer** ativado (NAT traversal)
+- [x] Arquivo `EOSCredentials.json` configurado na raiz do projeto
+- [x] Arquivo no `.gitignore` (nao comitado)
+
+### 1.2 Instalacao de Pacotes Unity — ✅
+
+Todos os pacotes estao em `Packages/manifest.json`:
 
 ```json
-{
-  "dependencies": {
-    "com.unity.netcode.gameobjects": "2.2.1",
-    "com.unity.transport": "2.4.0",
-    "com.unity.multiplayer.tools": "2.2.1",
-    // ... demais pacotes existentes
-  }
-}
+"com.unity.netcode.gameobjects": "1.12.0",
+"com.unity.transport": "2.4.0",
+"com.unity.multiplayer.tools": "2.2.1",
+"com.playeveryware.eos": "file:com.playeveryware.eos"
 ```
 
-**Epic Online Services Plugin:**
-- Opcao recomendada: PlayEveryWare EOS Plugin
-- GitHub: https://github.com/PlayEveryWare/eos_plugin_for_unity
-- Importar via .unitypackage ou git URL
+### 1.3 Estrutura de Pastas — ✅
 
-### 1.3 Estrutura de Pastas
+Todos os scripts base criados em `Assets/Codigo/Multiplayer/`:
 
 ```
-Assets/Codigo/Multiplayer/
-  Core/
-    NetworkBootstrap.cs           # Inicializacao geral
-    EOSManager.cs                 # Wrapper do SDK Epic
-    EOSConfig.cs                  # ScriptableObject para configuracoes (carrega de arquivo externo)
-  Auth/
-    EOSAuthenticator.cs           # Login/logout
-    SessionManager.cs             # Gerencia sessao do usuario
-  Lobby/
-    LobbyManager.cs               # CRUD de lobbies
-    LobbyUI.cs                    # Interface de lobbies
-    LobbyData.cs                  # Structs de dados
-  GameServer/
-    GameServerManager.cs          # Logica do Host (para P2P)
-    MatchManager.cs               # Gerencia partida
-    PlayerRegistry.cs             # Registro de jogadores conectados
-  Sync/
-    NetworkedPlayerController.cs  # Controller de rede do jogador
-    NetworkedCurrency.cs          # Moedas sincronizadas
-    NetworkedBuilding.cs          # Torres sincronizadas
-    NetworkedHorde.cs             # Waves sincronizadas
+Multiplayer/
+├── Core/
+│   ├── NetworkBootstrap.cs        ✅ Implementado (StartHost/StartClient reais)
+│   ├── EOSManager.cs              ✅ Implementado (wrapper PlayEveryWare)
+│   ├── EOSConfig.cs               ✅ Implementado (carrega credenciais do arquivo)
+│   ├── HostManager.cs             ✅ Implementado (StartAsHost + StartAsClient)
+│   └── WindowsPlatformSpecifics.cs ✅ Implementado
+├── Auth/
+│   ├── EOSAuthenticator.cs        ✅ Implementado (Device ID - funcional)
+│   └── SessionManager.cs          ✅ Implementado
+├── Lobby/
+│   ├── LobbyManager.cs            🚧 Estrutura criada (EOS calls = TODO)
+│   ├── LobbyUI.cs                 🚧 Estrutura criada
+│   ├── LobbyData.cs               ✅ Implementado (structs)
+│   └── LobbyItemUI.cs             🚧 Estrutura criada
+├── GameServer/
+│   ├── GameServerManager.cs       🚧 Estrutura criada
+│   ├── MatchManager.cs            🚧 Estrutura criada
+│   └── PlayerRegistry.cs          🚧 Estrutura criada
+├── Sync/
+│   ├── NetworkedPlayerController.cs 🚧 Estrutura criada
+│   ├── NetworkedCurrency.cs        🚧 Estrutura criada
+│   ├── NetworkedBuilding.cs        🚧 Estrutura criada
+│   └── NetworkedHorde.cs           🚧 Estrutura criada
+└── Testing/
+    ├── EOSAuthTest.cs              ✅ Funcional (testado)
+    └── NetworkConnectionTest.cs    ✅ Implementado e testado (Host/Client LAN)
 ```
 
-### 1.4 Cenas do Projeto
+### 1.4 Cenas do Projeto — ✅ Parcial
 
-**Cenas existentes (manter):**
-- MenuScene.unity - Menu principal
-- EscolherPersonagem.unity - Selecao de personagem
-- CenaMapaTeste.unity - Gameplay
-
-**Cenas novas (criar):**
-- NetworkBootstrap.unity - Inicializacao de rede
-- LobbyScene.unity - Sistema de lobbies
-- ~~DedicatedServer.unity~~ - NÃO necessário para P2P
-
-**Fluxo de cenas P2P:**
-```
-[NetworkBootstrap] -> [MenuScene] -> [LobbyScene] -> [EscolherPersonagem] -> [CenaMapaTeste]
-                          |              |                                         |
-                          |              v                                         v
-                          |         (Criar/Entrar Lobby)                    (Host ou Client)
-                          v
-                    (Login EOS)
-```
-
-**Diferença para P2P:**
-- Host executa NetworkManager.StartHost() ao iniciar partida
-- Clientes executam NetworkManager.StartClient() após receber dados de conexão
-- Mesma cena é usada por Host e Clientes
+- [x] `EOSAuthTest.unity` — cena de teste de autenticacao EOS
+- [x] `NetworkTest.unity` — cena de teste de conexao P2P (criada nesta sprint)
+- [ ] `LobbyScene.unity` — aguardando Fase 3
+- [ ] `NetworkBootstrap.unity` — aguardando integracao com menu
 
 ---
 
-## FASE 2: Autenticacao
+## FASE 2: Autenticacao — ✅ CONCLUIDA (Device ID)
 
-### 2.1 EOSManager (Singleton Principal)
+### 2.1 EOSManagerWrapper — ✅
 
-**Arquivo:** `Assets/Codigo/Multiplayer/Core/EOSManager.cs`
+**Arquivo:** `Core/EOSManager.cs`
 
-Responsabilidades:
-- Inicializar SDK da Epic no Awake
-- Manter referencia ao PlatformInterface
-- Chamar Tick() no Update (obrigatorio)
-- Shutdown no OnApplicationQuit
+- [x] Wrapper para PlayEveryWare EOSManager
+- [x] Expoe `ConnectInterface`, `AuthInterface`, `PlatformInterface`
+- [x] Carrega credenciais via `EOSConfig`
+- [x] Singleton com DontDestroyOnLoad
 
-### 2.2 EOSAuthenticator
+### 2.2 EOSAuthenticator — ✅
 
-**Arquivo:** `Assets/Codigo/Multiplayer/Auth/EOSAuthenticator.cs`
+**Arquivo:** `Auth/EOSAuthenticator.cs`
 
-**Metodos de login:**
-1. `LoginWithDevAuthTool(string credentialName)` - Para desenvolvimento
-2. `LoginWithDeviceId()` - Login anonimo
-3. `LoginWithEpicAccount()` - Para producao
+**Metodo implementado:** Device ID (login anonimo)
+- [x] `LoginWithDeviceId()` — cria Device ID unico por maquina
+- [x] Fluxo: CreateDeviceId → Login → (se novo) CreateUser → sucesso
+- [x] Armazena `ProductUserId` localmente
+- [x] Dispara `OnLoginSuccess` / `OnLoginFailed`
+- [x] Integrado com `SessionManager`
 
-**Fluxo de autenticacao:**
-```
-1. EOSAuthenticator.LoginWithDevAuthTool()
-2. Epic SDK -> Connect Interface -> Login
-3. Recebe ProductUserId (PUID)
-4. Armazena PUID localmente
-5. Dispara evento OnLoginSuccess
-6. UI navega para LobbyScene
-```
+**Testado:** Login funcional confirmado em `EOSAuthTest.unity`
 
-### 2.3 DevAuthTool Setup
+### 2.3 SessionManager — ✅
 
-**Ferramenta:** `SDK/Tools/EOS_DevAuthTool.exe`
+**Arquivo:** `Auth/SessionManager.cs`
 
-**Configuracao:**
-1. Executar EOS_DevAuthTool.exe
-2. Definir porta (default: 7878)
-3. Criar credencial no portal Epic
-4. Logar na ferramenta
-5. Usar nome da credencial no jogo
+- [x] Armazena userId, displayName, lobbyId, matchId
+- [x] `StartSession()` / `EndSession()`
+- [x] Singleton com DontDestroyOnLoad
 
-### 2.4 UI de Login
+### 2.4 UI de Login — 🚧 Pendente
 
-**Modificar:** MenuScene.unity
-
-Elementos:
-- Panel: LoginPanel
-  - InputField: CredentialName (texto)
-  - Button: LoginDevAuth
-  - Button: LoginAnonymous
-  - Text: StatusMessage
-  - Spinner: LoadingIndicator
+- [ ] UI formal em `MenuScene.unity` (atualmente usando OnGUI de debug)
+- Aguardando integracao com fluxo de menu principal
 
 ---
 
-## FASE 3: Sistema de Lobby
+## SPRINT: Validacao de Rede Basica — ✅ CONCLUIDA
 
-### 3.1 Estrutura de Dados
+> Sprint da equipe: validar que NGO + UnityTransport funcionam entre instancias.
 
-**Arquivo:** `Assets/Codigo/Multiplayer/Lobby/LobbyData.cs`
+- [x] **Pacote de Netcode instalado** — NGO 1.12.0 confirmado
+- [x] **NetworkManager configurado na cena** — NetworkTest.unity com NetworkManager + UnityTransport
+- [x] **Sistema basico Host/Client** — `NetworkConnectionTest.cs` com Host e Client funcionais
+- [x] **Teste de conexao entre instancias com Prefabs genericos** — 2 instancias conectadas via MPPM (Multiplayer Play Mode), capsulas spawnando corretamente
 
-```csharp
-[System.Serializable]
-public class LobbyInfo
-{
-    public string lobbyId;
-    public string lobbyName;
-    public string hostDisplayName;
-    public int currentPlayers;
-    public int maxPlayers;        // 4
-    public string mapName;
-    public bool isPublic;
-}
+**Como testar:**
+- `Window → Package Manager` → instalar `com.unity.multiplayer.playmode`
+- Ou: Build + Editor (Host no .exe, Client no Editor)
+- Cena: `NetworkTest.unity`
+- Script: `Testing/NetworkConnectionTest.cs` (UI via OnGUI, sem Canvas necessario)
+- Troca de cena sincronizada: campo `Game Scene Name` no Inspector
 
-[System.Serializable]
-public class LobbyMember
-{
-    public string productUserId;
-    public string displayName;
-    public int selectedCharacterIndex;  // Indice do personagem escolhido
-    public bool isReady;
-}
+---
 
-public enum LobbyState
-{
-    WaitingForPlayers,
-    SelectingCharacters,
-    StartingMatch,
-    InGame
-}
-```
+## FASE 3: Sistema de Lobby — 🚧 PROXIMA FASE
 
-### 3.2 LobbyManager
+### 3.1 Estrutura de Dados — ✅ Definida
 
-**Arquivo:** `Assets/Codigo/Multiplayer/Lobby/LobbyManager.cs`
+**Arquivo:** `Lobby/LobbyData.cs` — structs ja implementadas:
+- `LobbyInfo` (id, nome, host, players, mapa, publico, estado)
+- `LobbyMember` (userId, displayName, characterIndex, isReady)
+- `LobbySettings`, `LobbySearchFilter`
+- `LobbyState` enum, `MemberAttributes` constants
 
-**Funcionalidades:**
-- `CreateLobby(LobbySettings settings)` - Criar sala
-- `SearchLobbies(SearchFilter filter)` - Buscar salas
-- `JoinLobby(string lobbyId)` - Entrar em sala
-- `LeaveLobby()` - Sair da sala
-- `SetMemberAttribute(string key, string value)` - Ex: personagem escolhido
-- `SetReady(bool ready)` - Marcar como pronto
-- `StartMatch()` - Iniciar partida (solicita servidor)
+### 3.2 LobbyManager — 🚧 TODO (estrutura pronta)
 
-**Atributos do Lobby (Epic):**
-```
-"LOBBY_NAME" = "Sala do Joao"
-"MAP_NAME" = "CenaMapaTeste"
-"MAX_PLAYERS" = "4"
-"IS_PUBLIC" = "true"
-"LOBBY_STATE" = "WaitingForPlayers"
-```
+**Arquivo:** `Lobby/LobbyManager.cs`
 
-### 3.3 Fluxo de Matchmaking P2P
+**Metodos com estrutura criada, chamadas EOS pendentes:**
+
+| Metodo | Status | O que falta |
+|--------|--------|-------------|
+| `CreateLobby(settings)` | 🚧 Simulado | Chamar `LobbyInterface.CreateLobby()` real |
+| `SearchLobbies(filter)` | 🚧 Simulado | Chamar `LobbyInterface.CreateLobbySearch()` |
+| `JoinLobby(lobbyId)` | 🚧 TODO | Implementar `LobbyInterface.JoinLobby()` |
+| `LeaveLobby()` | 🚧 Parcial | Chamar `LobbyInterface.LeaveLobby()` |
+| `SetMemberAttribute(key, value)` | 🚧 TODO | Implementar `UpdateLobbyMember()` |
+| `StartMatch()` | 🚧 TODO | Coordenar Host.StartAsHost() + enviar conexao para clients |
+
+### 3.3 Fluxo de Matchmaking P2P — Planejado
 
 ```
 1. Host cria lobby via Epic Lobby Service
-2. Outros jogadores encontram e entram no lobby
-3. Todos selecionam personagens
+2. Outros jogadores buscam e entram no lobby
+3. Todos selecionam personagens (atributo do membro)
 4. Todos marcam "Pronto"
 5. Host clica "Iniciar Partida"
-6. Host inicia NetworkManager.StartHost()
-   - Host se torna servidor E cliente simultaneamente
-   - Unity Transport usa Epic P2P para NAT traversal
-7. LobbyManager envia dados de conexão P2P para membros do lobby
-8. Clientes recebem dados e conectam ao Host via Epic P2P
-9. Clientes iniciam NetworkManager.StartClient()
-10. Host carrega cena de jogo
-11. Clientes carregam cena automaticamente (Network Scene Management)
-12. Partida começa com Host como autoridade
+6. Host chama HostManager.StartAsHost()
+   └─ transport.SetConnectionData("0.0.0.0", porta)
+   └─ NetworkManager.StartHost()
+7. LobbyManager guarda IP:Porta do Host como atributo do lobby
+8. Clients leem IP:Porta do lobby e chamam HostManager.StartAsClient(ip)
+   └─ transport.SetConnectionData(ip, porta)
+   └─ NetworkManager.StartClient()
+9. Host carrega cena via NetworkManager.SceneManager.LoadScene()
+10. Clients sao transportados automaticamente (Network Scene Management)
 ```
 
-**Diferenças importantes do P2P:**
-- ✅ Sem necessidade de servidor dedicado/EGSH
-- ✅ Epic P2P Service facilita conexão (NAT Traversal automático)
-- ✅ Configuração mais simples
-- ⚠️ Host deve ter conexão estável (é o servidor)
-- ⚠️ Host desconectar = fim da partida (sem Host Migration)
+> **Nota:** O fluxo de rede (passos 6-10) ja foi validado na Sprint de Rede Basica.
+> O que falta e apenas a parte do Lobby EOS (passos 1-8).
 
-### 3.4 UI de Lobby
+### 3.4 UI de Lobby — 🚧 Pendente
 
-**Nova Cena:** LobbyScene.unity
+**Nova Cena:** `LobbyScene.unity`
 
 **Panel: CreateLobbyPanel**
 - InputField: LobbyName
@@ -316,95 +255,57 @@ public enum LobbyState
 
 ---
 
-## FASE 4: Configuração P2P e Host
+## FASE 4: Configuracao P2P — 🚧 Parcialmente Concluida
 
-### 4.1 Configuração do Host (P2P)
+### 4.1 Host e Client — ✅ Implementado
 
-**No P2P, não há build separado:**
-- Host e Clientes usam o mesmo build/executável
-- Diferença é apenas o modo de inicialização:
-  - **Host:** `NetworkManager.StartHost()` (servidor + cliente)
-  - **Client:** `NetworkManager.StartClient()` (apenas cliente)
+**Arquivo:** `Core/HostManager.cs`
 
-**Detecção de Host:**
 ```csharp
-public bool IsHost()
+// Ja implementado e testado:
+public void StartAsHost()
 {
-    return NetworkManager.Singleton != null &&
-           NetworkManager.Singleton.IsHost;
+    transport.SetConnectionData("0.0.0.0", hostPort);
+    NetworkManager.Singleton.StartHost();
 }
 
-public bool IsClient()
+public void StartAsClient(string hostIp, ushort port = 0)
 {
-    return NetworkManager.Singleton != null &&
-           NetworkManager.Singleton.IsClient;
+    transport.SetConnectionData(hostIp, port);
+    NetworkManager.Singleton.StartClient();
 }
 ```
 
-### 4.2 GameServerManager (Adaptado para P2P)
+### 4.2 GameServerManager — 🚧 Estrutura criada
 
-**Arquivo:** `Assets/Codigo/Multiplayer/GameServer/GameServerManager.cs`
+**Arquivo:** `GameServer/GameServerManager.cs`
 
-**Responsabilidades (apenas no Host):**
-- Iniciar NetworkManager.StartHost() quando criar lobby
-- Aguardar conexões de clientes via Epic P2P
+Responsabilidades (apenas no Host):
+- Iniciar partida quando todos estiverem prontos
 - Validar jogadores conectados
 - Gerenciar estado da partida
-- Processar toda lógica de jogo (dano, spawn, etc)
-- Enviar atualizações para clientes
+- Processar lógica autoritativa
 
-**Diferenças do Dedicated Server:**
-- ✅ Host também é um jogador (tem personagem)
-- ✅ Host processa input local E input remoto
-- ✅ Sem necessidade de build headless
+### 4.3 Epic P2P Service — 🚧 Pendente
 
-### 4.3 Epic P2P Service (Substituindo EGSH)
+**Objetivo:** Substituir UnityTransport padrao por EOS P2P Transport para NAT Traversal automatico.
 
-**Configuração no Portal:**
-1. Game Services > Peer-to-peer
-2. Ativar serviço
-3. Configurar NAT traversal (automático)
+**Configuracao no Portal:**
+- Game Services > Peer-to-peer > Ativar
 
-**No Código:**
+**No Codigo (a implementar na Fase 3/4):**
 ```csharp
-// Host cria lobby e inicia como Host
-public void StartMatchAsHost()
-{
-    // Configurar Unity Transport com Epic P2P
-    var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-    // TODO: Configurar transport para usar Epic P2P
-
-    // Iniciar como Host
-    NetworkManager.Singleton.StartHost();
-
-    Debug.Log("Host iniciado - aguardando conexões P2P");
-}
-
-// Clientes conectam ao Host via lobby
-public void JoinMatchAsClient(string lobbyId)
-{
-    // Obter dados de conexão do lobby
-    var connectionData = GetP2PConnectionDataFromLobby(lobbyId);
-
-    // Configurar transport
-    var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-    // TODO: Configurar com dados do Host
-
-    // Conectar ao Host
-    NetworkManager.Singleton.StartClient();
-
-    Debug.Log("Conectando ao Host via Epic P2P");
-}
+// Configurar EOS P2P Transport ao inves de UDP simples
+// Isso resolve conexoes entre jogadores em redes diferentes (NAT)
 ```
 
-**Epic P2P facilita:**
-- ✅ NAT Traversal automático (resolve problemas de firewall/router)
-- ✅ Relay servers da Epic (fallback se P2P direto falhar)
-- ✅ Conexões seguras e criptografadas
+> **Nota:** Na Sprint atual usamos UnityTransport UDP direto (funciona em LAN).
+> Para conexoes via internet (jogadores em redes diferentes), precisaremos
+> configurar o EOS P2P Transport para NAT traversal automatico.
 
 ---
 
-## FASE 5: Sincronizacao de Gameplay
+## FASE 5: Sincronizacao de Gameplay — 🚧 PENDENTE
 
 ### 5.1 Player Prefab Networked
 
@@ -414,62 +315,28 @@ public void JoinMatchAsClient(string lobbyId)
 1. `NetworkObject`
 2. `NetworkTransform`
    - Sync Position X/Y/Z: true
-   - Sync Rotation Y: true (apenas rotacao horizontal)
+   - Sync Rotation Y: true
    - Interpolate: true
 3. `NetworkAnimator`
-   - Animator: referencia ao Animator do modelo
-4. `NetworkedPlayerController` (novo script)
+4. `NetworkedPlayerController` (script em Sync/)
 
-### 5.2 NetworkedPlayerController
+### 5.2 NetworkedPlayerController — 🚧 Estrutura criada
 
-**Arquivo:** `Assets/Codigo/Multiplayer/Sync/NetworkedPlayerController.cs`
+**Arquivo:** `Sync/NetworkedPlayerController.cs`
 
 ```csharp
-using Unity.Netcode;
-
 public class NetworkedPlayerController : NetworkBehaviour
 {
-    // Referencias aos sistemas locais
-    private PlayerMovement movement;
-    private PlayerHealthSystem health;
-    private PlayerShooting shooting;
-    private PlayerCombatManager combat;
-    private CommanderAbilityController abilities;
-
-    // Dados sincronizados
     public NetworkVariable<float> NetworkHealth = new(writePerm: NetworkVariableWritePermission.Server);
     public NetworkVariable<int> NetworkAmmo = new(writePerm: NetworkVariableWritePermission.Server);
     public NetworkVariable<int> CharacterIndex = new(writePerm: NetworkVariableWritePermission.Owner);
 
     public override void OnNetworkSpawn()
     {
-        // Buscar componentes
-        movement = GetComponent<PlayerMovement>();
-        health = GetComponent<PlayerHealthSystem>();
-        shooting = GetComponent<PlayerShooting>();
-        combat = GetComponent<PlayerCombatManager>();
-        abilities = GetComponent<CommanderAbilityController>();
-
-        // Desabilitar input para jogadores que nao sao donos
         if (!IsOwner)
-        {
-            movement.enabled = false;  // Outros jogadores nao controlam este
-        }
+            movement.enabled = false; // Outros jogadores nao controlam este
 
-        // Sincronizar vida inicial
-        if (IsServer)
-        {
-            NetworkHealth.Value = health.currentHealth;
-        }
-
-        // Escutar mudancas
         NetworkHealth.OnValueChanged += OnHealthChanged;
-    }
-
-    private void OnHealthChanged(float oldValue, float newValue)
-    {
-        health.currentHealth = newValue;
-        health.OnHealthChanged?.Invoke();
     }
 }
 ```
@@ -478,282 +345,122 @@ public class NetworkedPlayerController : NetworkBehaviour
 
 **Arquivo:** `Assets/Codigo/Char scripts/Player/PlayerMovement.cs`
 
-**Mudancas:**
 ```csharp
-// Adicionar no topo:
-using Unity.Netcode;
-
 // Mudar heranca:
-public class PlayerMovement : NetworkBehaviour  // Era: MonoBehaviour
+public class PlayerMovement : NetworkBehaviour
 
-// No Update(), adicionar verificacao:
+// No Update():
 private void Update()
 {
-    // CRITICO: Apenas o dono processa input
-    if (!IsOwner) return;
-
-    // ... resto do codigo existente
+    if (!IsOwner) return; // CRITICO: apenas dono processa input
+    // ... resto do codigo
 }
 ```
 
 ### 5.4 Modificacoes em PlayerHealthSystem.cs
 
-**Arquivo:** `Assets/Codigo/Char scripts/Player/PlayerHealthSystem.cs`
-
-**Mudancas:**
 ```csharp
-using Unity.Netcode;
-
 public class PlayerHealthSystem : NetworkBehaviour
 {
-    // Vida sincronizada (apenas servidor escreve)
     public NetworkVariable<float> networkHealth = new(
         writePerm: NetworkVariableWritePermission.Server
     );
 
-    // Propriedade para manter compatibilidade
-    public float currentHealth
-    {
-        get => networkHealth.Value;
-        set
-        {
-            if (IsServer) networkHealth.Value = value;
-        }
-    }
-
-    // Dano - chamar via ServerRpc
     [ServerRpc(RequireOwnership = false)]
-    public void TakeDamageServerRpc(float damage, ulong attackerId)
-    {
-        // Servidor calcula dano
-        float finalDamage = damage * (1f - damageResistance);
-        networkHealth.Value -= finalDamage;
-
-        if (networkHealth.Value <= 0)
-        {
-            DieServerRpc();
-        }
-    }
-
-    [ServerRpc]
-    private void DieServerRpc()
-    {
-        // Servidor processa morte
-        networkHealth.Value = characterData.maxHealth;
-        RespawnClientRpc();
-    }
+    public void TakeDamageServerRpc(float damage, ulong attackerId) { ... }
 
     [ClientRpc]
-    private void RespawnClientRpc()
-    {
-        // Todos os clientes veem o respawn
-        // Teletransportar para spawn point
-    }
+    private void RespawnClientRpc() { ... }
 }
 ```
 
 ### 5.5 Sincronizacao de Combate
 
-**PlayerShooting.cs:**
 ```csharp
-// Quando atirar (apenas owner):
+// PlayerShooting.cs:
 if (IsOwner && Input.GetButton("Fire1"))
-{
     ShootServerRpc(targetPosition, damage);
-}
 
 [ServerRpc]
-private void ShootServerRpc(Vector3 target, float damage)
-{
-    // Servidor processa o tiro
-    // Servidor spawna projetil (NetworkObject)
-    // Servidor aplica dano se acertar
-}
-```
-
-**MeleeCombatSystem.cs:**
-```csharp
-// Quando atacar (apenas owner):
-if (IsOwner)
-{
-    MeleeAttackServerRpc(damage, targets);
-}
-
-[ServerRpc]
-private void MeleeAttackServerRpc(float damage, ulong[] targetNetworkIds)
-{
-    // Servidor valida e aplica dano
-}
+private void ShootServerRpc(Vector3 target, float damage) { ... }
 ```
 
 ### 5.6 Sincronizacao de Moedas (CurrencyManager)
 
-**Arquivo:** `Assets/Codigo/Managers/CurrencyManager.cs`
-
 ```csharp
-using Unity.Netcode;
-
 public class CurrencyManager : NetworkBehaviour
 {
-    public static CurrencyManager Instance;
-
-    // Moedas por jogador (Dictionary nao funciona direto, usar alternativa)
-    // Ou moedas compartilhadas pelo time:
     public NetworkVariable<int> TeamGeodites = new(writePerm: NetworkVariableWritePermission.Server);
     public NetworkVariable<int> TeamDarkEther = new(writePerm: NetworkVariableWritePermission.Server);
 
     [ServerRpc(RequireOwnership = false)]
-    public void AddGeoditeServerRpc(int amount)
-    {
-        TeamGeodites.Value += amount;
-    }
+    public void AddGeoditeServerRpc(int amount) { ... }
 
     [ServerRpc(RequireOwnership = false)]
-    public void SpendGeoditeServerRpc(int amount, ServerRpcParams rpcParams = default)
-    {
-        if (TeamGeodites.Value >= amount)
-        {
-            TeamGeodites.Value -= amount;
-            // Aprovar compra
-            ApproveSpendClientRpc(rpcParams.Receive.SenderClientId);
-        }
-        else
-        {
-            // Rejeitar compra
-            RejectSpendClientRpc(rpcParams.Receive.SenderClientId);
-        }
-    }
+    public void SpendGeoditeServerRpc(int amount, ServerRpcParams rpcParams = default) { ... }
 }
 ```
 
 ### 5.7 Sincronizacao de Torres (BuildManager)
 
-**Arquivo:** `Assets/Codigo/Tower scripts/BuildManager.cs`
-
 ```csharp
-using Unity.Netcode;
-
-public class BuildManager : NetworkBehaviour
+[ServerRpc(RequireOwnership = false)]
+public void PlaceTowerServerRpc(int towerIndex, Vector3 position, Quaternion rotation)
 {
-    [ServerRpc(RequireOwnership = false)]
-    public void PlaceTowerServerRpc(int towerIndex, Vector3 position, Quaternion rotation)
-    {
-        // Servidor valida posicao
-        // Servidor verifica moedas
-        // Servidor spawna torre (NetworkObject)
-        GameObject tower = Instantiate(towerPrefabs[towerIndex], position, rotation);
-        tower.GetComponent<NetworkObject>().Spawn();
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    public void PlaceTrapServerRpc(int trapIndex, Vector3 position, Quaternion rotation)
-    {
-        // Similar ao tower
-    }
+    GameObject tower = Instantiate(towerPrefabs[towerIndex], position, rotation);
+    tower.GetComponent<NetworkObject>().Spawn();
 }
 ```
 
 ### 5.8 Sincronizacao de Waves (HordeManager)
 
-**Arquivo:** `Assets/Codigo/Managers/HordeManager.cs`
-
 ```csharp
-using Unity.Netcode;
-
 public class HordeManager : NetworkBehaviour
 {
     public NetworkVariable<int> CurrentWave = new();
     public NetworkVariable<int> EnemiesRemaining = new();
 
-    // Apenas servidor controla spawn de inimigos
     public override void OnNetworkSpawn()
     {
-        if (IsServer)
-        {
-            StartCoroutine(SpawnWaves());
-        }
-    }
-
-    private IEnumerator SpawnWaves()
-    {
-        // Servidor spawna inimigos
-        // Inimigos sao NetworkObjects
-        // Clientes recebem automaticamente
-    }
-
-    private void SpawnEnemy(Vector3 position)
-    {
-        if (!IsServer) return;
-
-        GameObject enemy = EnemyPoolManager.Instance.GetPooledEnemy();
-        enemy.transform.position = position;
-        enemy.GetComponent<NetworkObject>().Spawn();
+        if (IsServer) StartCoroutine(SpawnWaves()); // Apenas servidor spawna
     }
 }
 ```
 
 ### 5.9 Sincronizacao de Habilidades
 
-**Arquivo:** `Assets/Codigo/Char scripts/JP/CommanderAbilityController.cs`
-
 ```csharp
-using Unity.Netcode;
-
-public class CommanderAbilityController : NetworkBehaviour
+public void UseAbility1()
 {
-    // Cooldowns sao locais (cada cliente rastreia os seus)
-    // Efeitos das habilidades sao processados no servidor
-
-    public void UseAbility1()
-    {
-        if (!IsOwner) return;
-        if (IsOnCooldown(ability1)) return;
-
-        UseAbilityServerRpc(1);
-        StartCooldown(ability1);
-    }
-
-    [ServerRpc]
-    private void UseAbilityServerRpc(int abilityIndex)
-    {
-        // Servidor processa efeito da habilidade
-        // Ex: dano em area, buff, spawn de objeto, etc
-
-        // Notifica todos os clientes para visual/audio
-        PlayAbilityEffectClientRpc(abilityIndex);
-    }
-
-    [ClientRpc]
-    private void PlayAbilityEffectClientRpc(int abilityIndex)
-    {
-        // Todos os clientes reproduzem efeito visual/sonoro
-    }
+    if (!IsOwner) return;
+    if (IsOnCooldown(ability1)) return;
+    UseAbilityServerRpc(1);
+    StartCooldown(ability1);
 }
+
+[ServerRpc]
+private void UseAbilityServerRpc(int abilityIndex) { ... }
+
+[ClientRpc]
+private void PlayAbilityEffectClientRpc(int abilityIndex) { ... }
 ```
 
 ---
 
-## FASE 6: Polimento e Testes
+## FASE 6: Polimento e Testes — 🚧 PENDENTE
 
-### 6.1 ParrelSync para Testes Locais
+### 6.1 Ferramentas de Teste
 
-**Instalacao:**
+**Multiplayer Play Mode (MPPM)** — recomendado para desenvolvimento:
 ```
-Window > Package Manager > + > Add package from git URL
-https://github.com/VeriorPies/ParrelSync.git?path=/ParrelSync
+Window → Package Manager → Add by name: com.unity.multiplayer.playmode
+Window → Multiplayer → Multiplayer Play Mode
 ```
-
-**Uso:**
-1. ParrelSync > Clones Manager
-2. Create New Clone
-3. Abrir o clone em outra instancia do Unity
-4. Original: Rodar como servidor
-5. Clone: Rodar como cliente
+> Ja utilizado com sucesso na Sprint de Rede Basica.
 
 ### 6.2 Tratamento de Desconexao
 
 ```csharp
-// No NetworkManager
 NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
 NetworkManager.Singleton.OnServerStopped += OnServerStopped;
 
@@ -761,77 +468,78 @@ private void OnClientDisconnect(ulong clientId)
 {
     if (clientId == NetworkManager.Singleton.LocalClientId)
     {
-        // Eu fui desconectado
         ShowMessage("Desconectado do servidor");
         ReturnToMenu();
     }
 }
-
-private void OnServerStopped(bool wasHost)
-{
-    // Servidor parou
-    ShowMessage("Servidor encerrado");
-    ReturnToMenu();
-}
 ```
 
-### 6.3 Interpolacao e Suavizacao
+### 6.3 Configuracao de NetworkTransform
 
-**NetworkTransform Config:**
 - Position Threshold: 0.001
 - Rotation Threshold: 0.01
-- Scale Threshold: 0.01
 - Interpolate: true
 - Use Quaternion Sync: true
 - Use Unreliable Deltas: true (melhor para movimento)
 
-### 6.4 Lag Compensation
+### 6.4 Lag Compensation (Futuro)
 
-Para combate responsivo:
 ```csharp
-// Cliente envia timestamp com acoes
 [ServerRpc]
 void ShootServerRpc(Vector3 direction, float clientTimestamp)
 {
-    // Servidor usa timestamp para compensar latencia
     float latency = NetworkManager.Singleton.LocalTime.Time - clientTimestamp;
-    // Rollback de posicoes de inimigos para o momento do tiro
+    // Rollback de posicoes para o momento do tiro
 }
 ```
 
-### 6.5 Checklist de Verificacao
+---
 
-**Fase 1 - Setup:**
-- [ ] Conta Epic Developer criada
-- [ ] Produto configurado no portal
-- [ ] Credenciais anotadas
-- [ ] NGO instalado no Unity
-- [ ] EOS Plugin instalado
-- [ ] Projeto compila sem erros
+## Checklist Geral de Verificacao
 
-**Fase 2 - Auth:**
-- [ ] DevAuthTool funcionando
-- [ ] Login no jogo funciona
-- [ ] PUID exibido no console
-- [ ] UI de login completa
+### Fase 1 - Setup
+- [x] Conta Epic Developer criada
+- [x] Produto configurado no portal (Lobbies + P2P ativos)
+- [x] NGO 1.12.0 instalado
+- [x] EOS Plugin (PlayEveryWare) instalado
+- [x] Projeto compila sem erros
+- [x] Estrutura de pastas criada
 
-**Fase 3 - Lobby:**
-- [ ] Criar lobby funciona
+### Fase 2 - Auth
+- [x] EOS SDK inicializa corretamente
+- [x] Login com Device ID funcional
+- [x] ProductUserId exibido no console
+- [x] SessionManager armazena dados da sessao
+- [ ] UI de login integrada ao MenuScene (OnGUI temporario em uso)
+
+### Sprint - Rede Basica
+- [x] NetworkManager configurado na cena
+- [x] UnityTransport configurado no NetworkManager
+- [x] Player Prefab (capsula) com NetworkObject + NetworkTransform
+- [x] Host inicia com StartHost() funcional
+- [x] Client conecta com StartClient() funcional
+- [x] Capsula spawna para cada jogador conectado
+- [x] Troca de cena sincronizada via NGO SceneManager
+- [x] Testado com 2 instancias (MPPM ou Build+Editor)
+
+### Fase 3 - Lobby
+- [ ] Criar lobby via EOS funciona
 - [ ] Buscar lobbies funciona
 - [ ] Entrar em lobby funciona
 - [ ] Sair de lobby funciona
-- [ ] Lista de membros atualiza
+- [ ] Lista de membros atualiza em tempo real
 - [ ] Status "pronto" funciona
-- [ ] UI de lobby completa
+- [ ] Host inicia partida quando todos prontos
+- [ ] Clients recebem IP do Host via lobby
+- [ ] UI de lobby completa (LobbyScene.unity)
 
-**Fase 4 - Dedicated Server:**
-- [ ] Build de servidor compila
-- [ ] Servidor inicia sem erros
-- [ ] Cliente conecta ao servidor
-- [ ] EGSH configurado (se usando)
-- [ ] Alocacao de servidor funciona
+### Fase 4 - P2P
+- [x] HostManager.StartAsHost() funcional (LAN)
+- [x] HostManager.StartAsClient() funcional (LAN)
+- [ ] EOS P2P Transport configurado (para conexoes via internet / NAT)
+- [ ] Teste entre maquinas em redes diferentes (internet)
 
-**Fase 5 - Gameplay:**
+### Fase 5 - Gameplay
 - [ ] Spawn de jogadores funciona
 - [ ] Movimento sincronizado
 - [ ] Combate ranged sincronizado
@@ -845,121 +553,75 @@ void ShootServerRpc(Vector3 direction, float clientTimestamp)
 - [ ] Habilidades sincronizadas
 - [ ] Ultimate sincronizado
 
-**Fase 6 - Polimento:**
-- [ ] Desconexao tratada
-- [ ] Movimento suave
-- [ ] Sem erros no console
-- [ ] Funciona em 2+ maquinas
-- [ ] Performance aceitavel
+### Fase 6 - Polimento
+- [ ] Desconexao tratada (volta ao menu)
+- [ ] Movimento suave com interpolacao
+- [ ] Sem erros no console em sessao completa
+- [ ] Funciona entre maquinas em redes diferentes
+- [ ] Performance aceitavel (4 jogadores, 1 wave)
 
 ---
 
-## Cronograma Sugerido (8 semanas)
+## Cronograma Atualizado
 
-### Semana 1-2: Fundacao
-- Criar conta Epic
-- Configurar portal
-- Instalar pacotes
-- Criar estrutura de pastas
-- Testar inicializacao do SDK
+### ✅ Concluido
+- **Semana 1-2:** Fundacao (Epic Portal, Pacotes, Estrutura)
+- **Semana 3:** Autenticacao (Device ID funcional)
+- **Sprint extra:** Rede basica validada (NGO + Transport + Host/Client)
 
-### Semana 3: Autenticacao
-- Implementar EOSManager
-- Implementar EOSAuthenticator
-- Criar UI de login
-- Testar DevAuthTool
-
-### Semana 4: Lobby
-- Implementar LobbyManager
-- Criar/buscar/entrar lobbies
-- Criar UI de lobby
-- Testar fluxo completo
-
-### Semana 5: Dedicated Server
-- Configurar build de servidor
-- Implementar GameServerManager
-- Configurar EGSH
-- Testar servidor local
-
-### Semana 6: Gameplay Basico
-- Networkar Player Prefab
-- Modificar PlayerMovement
-- Modificar PlayerHealthSystem
-- Testar movimento e vida
-
-### Semana 7: Gameplay Completo
-- Sincronizar combate
-- Sincronizar moedas
-- Sincronizar torres
-- Sincronizar inimigos
-- Sincronizar habilidades
-
-### Semana 8: Polimento
-- Tratamento de erros
-- Otimizacao de rede
-- Testes em multiplas maquinas
-- Preparar para apresentacao
+### 🚧 Em andamento / Proximo
+- **Semana 4:** Lobby System (implementar chamadas EOS reais no LobbyManager)
+- **Semana 5:** P2P Transport + integracao Lobby → Rede
+- **Semana 6:** Gameplay basico (Player Networked + movimento + vida)
+- **Semana 7:** Gameplay completo (combate, moedas, torres, inimigos)
+- **Semana 8:** Polimento, testes entre redes, preparacao para apresentacao
 
 ---
 
-## Arquivos a Serem Criados
+## Proximos Passos Imediatos
+
+1. **Implementar LobbyManager com chamadas EOS reais**
+   - `LobbyInterface.CreateLobby()` em `CreateLobby()`
+   - `LobbyInterface.CreateLobbySearch()` em `SearchLobbies()`
+   - `LobbyInterface.JoinLobby()` em `JoinLobby()`
+   - Referencia: https://dev.epicgames.com/docs/game-services/lobbies
+
+2. **Criar LobbyScene.unity** com UI de lista e sala
+
+3. **Configurar EOS P2P Transport** para conexoes via internet
+   - Necessario para testar entre redes diferentes (fora da LAN)
+   - Referencia: https://dev.epicgames.com/docs/game-services/p-2-p
+
+4. **Integrar fluxo completo:** Login → Lobby → Host/Client → Cena de jogo
+
+5. **Criar UI de Login formal** em MenuScene.unity (substituir OnGUI de debug)
+
+---
+
+## Arquivos a Serem Modificados (Fase 5)
 
 ```
-Assets/Codigo/Multiplayer/
-  Core/
-    NetworkBootstrap.cs
-    EOSManager.cs
-    DedicatedServerManager.cs
-  Auth/
-    EOSAuthenticator.cs
-    SessionManager.cs
-  Lobby/
-    LobbyManager.cs
-    LobbyUI.cs
-    LobbyData.cs
-    LobbyItemUI.cs
-  GameServer/
-    GameServerManager.cs
-    MatchManager.cs
-    PlayerRegistry.cs
-  Sync/
-    NetworkedPlayerController.cs
-    NetworkedCurrency.cs
-    NetworkedBuilding.cs
-    NetworkedHorde.cs
-
-Assets/Scenes/
-  NetworkBootstrap.unity
-  LobbyScene.unity
-  DedicatedServer.unity
-```
-
-## Arquivos a Serem Modificados
-
-```
-Packages/manifest.json                              # Adicionar NGO, Transport
-
-Assets/Scenes/MenuScene.unity                       # UI de login
-
 Assets/Codigo/Char scripts/Player/
-  PlayerMovement.cs                                 # NetworkBehaviour, IsOwner
-  PlayerHealthSystem.cs                             # NetworkVariable, ServerRpc
-  PlayerShooting.cs                                 # ServerRpc para dano
-  MeleeCombatSystem.cs                              # ServerRpc para dano
+  PlayerMovement.cs          # NetworkBehaviour, IsOwner check
+  PlayerHealthSystem.cs      # NetworkVariable, TakeDamageServerRpc
+  PlayerShooting.cs          # ShootServerRpc
+  MeleeCombatSystem.cs       # MeleeAttackServerRpc
 
 Assets/Codigo/Char scripts/JP/
-  CommanderAbilityController.cs                     # ServerRpc para habilidades
+  CommanderAbilityController.cs  # UseAbilityServerRpc
 
 Assets/Codigo/Managers/
-  CurrencyManager.cs                                # NetworkVariable
-  HordeManager.cs                                   # Servidor controla spawns
-  PauseControl.cs                                   # Pausar nao funciona em rede (remover ou adaptar)
+  CurrencyManager.cs         # NetworkVariable (Geodites, DarkEther)
+  HordeManager.cs            # Servidor controla spawn de inimigos
+  PauseControl.cs            # Pausar nao funciona em rede (adaptar)
 
 Assets/Codigo/Tower scripts/
-  BuildManager.cs                                   # ServerRpc para construir
+  BuildManager.cs            # PlaceTowerServerRpc, PlaceTrapServerRpc
 
 Assets/Modelos/PreFab/Entidades/
-  Player 1.prefab                                   # NetworkObject, NetworkTransform, etc.
+  Player 1.prefab            # Adicionar NetworkObject, NetworkTransform
+  [prefabs de inimigos]      # Adicionar NetworkObject
+  [prefabs de torres]        # Adicionar NetworkObject
 ```
 
 ---
@@ -968,18 +630,9 @@ Assets/Modelos/PreFab/Entidades/
 
 | Risco | Probabilidade | Impacto | Mitigacao |
 |-------|---------------|---------|-----------|
-| EGSH complexo demais | Media | Alto | Comecar com servidor local, migrar depois |
-| Bugs de sincronizacao | Alta | Medio | Testar incrementalmente, usar logs |
-| Latencia alta | Media | Medio | Interpolacao, client-side prediction |
-| EOS SDK complicado | Media | Alto | Usar PlayEveryWare wrapper |
-| Prazo apertado | Baixa | Alto | Priorizar funcionalidades core |
-
----
-
-## Proximos Passos Imediatos
-
-1. **Criar conta no Epic Developer Portal** (tarefa externa)
-2. **Instalar Netcode for GameObjects** via Package Manager
-3. **Baixar e importar PlayEveryWare EOS Plugin**
-4. **Criar cena NetworkBootstrap** com inicializacao basica
-5. **Testar se SDK Epic inicializa** (verificar console)
+| NAT Traversal falha em algumas redes | Media | Alto | EOS P2P Relay (fallback automatico) |
+| Bugs de sincronizacao | Alta | Medio | Testar incrementalmente com MPPM |
+| Latencia alta | Media | Medio | Interpolacao no NetworkTransform |
+| EOS Lobby SDK complexo | Media | Alto | Testar cada operacao isoladamente |
+| Host desconecta durante partida | Baixa | Alto | Tratar OnServerStopped (voltar ao menu) |
+| Prazo apertado | Media | Alto | Priorizar: Lobby → P2P basico → Gameplay |
