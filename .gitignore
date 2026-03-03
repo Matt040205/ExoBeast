@@ -69,6 +69,12 @@ crashlytics-build.properties
 
 # Temporary auto-generated Android Assets
 /[Aa]ssets/[Ss]treamingAssets/aa.meta
+<<<<<<< HEAD
+<<<<<<< Updated upstream
+/[Aa]ssets/[Ss]treamingAssets/aa/*
+=======
+=======
+>>>>>>> origin/main
 /[Aa]ssets/[Ss]treamingAssets/aa/*
 
 # =========================
@@ -79,4 +85,21 @@ crashlytics-build.properties
 /[Aa]ssets/Plugins/FMOD/OnImport/
 
 # Ignora logs de runtime do FMOD
+<<<<<<< HEAD
 fmod_editor.log
+
+# =========================
+# EPIC ONLINE SERVICES - CREDENCIAIS (ADICIONADO)
+# =========================
+# CRITICO: Nunca commitar credenciais reais!
+EOSCredentials.json
+**/EOSCredentials.json
+.env
+**/.env
+
+# Arquivos temporarios do Claude
+tmpclaude-*
+>>>>>>> Stashed changes
+=======
+fmod_editor.log
+>>>>>>> origin/main

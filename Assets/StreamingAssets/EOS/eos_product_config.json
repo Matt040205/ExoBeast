@@ -1,0 +1,38 @@
+{
+  "ProductName": "ExoBeasts",
+  "ProductId": "4769da91dd6f4ce49ca1da7390f4bc3d",
+  "ProductVersion": "1.0.0",
+  "imported": true,
+  "Clients": [
+    {
+      "Value": {
+        "ClientId": "xyza7891upF0LpJWCbzc7EO1cxID4apK",
+        "ClientSecret": "9I9DLUDLApMv5Bt3w3qSt1bAfQ6GAs+McGN3k+YWL6w",
+        "EncryptionKey": "d0ec89b49a38fe7ab496feb1ad1539caaad9a01068944c26414f4c73de9289d9"
+      },
+      "Name": "Default"
+    }
+  ],
+  "Environments": {
+    "Deployments": [
+      {
+        "Value": {
+          "SandboxId": {
+            "Value": "88105ce09d0f409383c6b94b940a1699"
+          },
+          "DeploymentId": "fdf5dd695e48430daab741607f663e31"
+        },
+        "Name": "Default"
+      }
+    ],
+    "Sandboxes": [
+      {
+        "Value": {
+          "Value": "88105ce09d0f409383c6b94b940a1699"
+        },
+        "Name": "Default"
+      }
+    ]
+  },
+  "schemaVersion": "1.0"
+}

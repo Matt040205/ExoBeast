@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e77f3e75205b164c99b102ec8a7f2da, type: 3}
+  m_Name: EOSConfig_Main
+  m_EditorClassIdentifier: 
+  ProductId: 4769da91dd6f4ce49ca1da7390f4bc3d
+  SandboxId: 88105ce09d0f409383c6b94b940a1699
+  DeploymentId: fdf5dd695e48430daab741607f663e31
+  ClientId: xyza7891upF0LpJWCbzc7EO1cxID4apK
+  ClientSecret: 9I9DLUDLApMv5Bt3w3qSt1bAfQ6GAs+McGN3k+YWL6w
+  EncryptionKey: d0ec89b49a38fe7ab496feb1ad1539caaad9a01068944c26414f4c73de9289d9
+  credentialsFilePath: EOSCredentials.json

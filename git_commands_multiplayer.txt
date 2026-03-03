@@ -1,0 +1,82 @@
+# ========================================
+# Comandos Git - Branch Multiplayer
+# ========================================
+# Execute esses comandos em ordem para criar e popular a branch Multiplayer
+# mantendo a main intacta
+
+# 1. Verificar estado atual (deve estar na main)
+git status
+
+# 2. Criar arquivo de credenciais ANTES de fazer qualquer commit
+# IMPORTANTE: Crie EOSCredentials.json na raiz com suas credenciais reais
+# Use EOSCredentials.json.example como template
+
+# 3. Verificar que EOSCredentials.json está sendo ignorado
+git status
+# EOSCredentials.json NÃO deve aparecer na lista!
+
+# 4. Adicionar todos os arquivos novos (menos os ignorados)
+git add .
+
+# 5. Verificar o que será commitado
+git status
+# Certifique-se que EOSCredentials.json NÃO está na lista!
+
+# 6. Criar a branch Multiplayer a partir da main
+git checkout -b Multiplayer
+
+# 7. Fazer commit das mudanças na branch Multiplayer
+git commit -m "feat: Sistema multiplayer P2P completo
+
+- Implementada arquitetura P2P com Unity Netcode for GameObjects
+- Integração com Epic Online Services (Lobbies + P2P)
+- Sistema seguro de credenciais (não commitado)
+- 17 scripts base implementados:
+  * Core: NetworkBootstrap, EOSManager, EOSConfig, HostManager
+  * Auth: EOSAuthenticator, SessionManager
+  * Lobby: LobbyManager, LobbyUI, LobbyData, LobbyItemUI
+  * GameServer: GameServerManager, MatchManager, PlayerRegistry
+  * Sync: NetworkedPlayerController, Currency, Building, Horde
+- Documentação completa em português
+- Cenas: NetworkBootstrap, LobbyScene
+- Pacotes adicionados: Netcode, Transport, Multiplayer Tools
+- .gitignore atualizado para proteger credenciais
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+# 8. Verificar que o commit foi criado
+git log -1
+
+# 9. Enviar branch Multiplayer para o GitHub
+git push -u origin Multiplayer
+
+# 10. Voltar para a branch main (se quiser)
+git checkout main
+
+# 11. Verificar que a main está limpa (sem as mudanças)
+git status
+
+# ========================================
+# IMPORTANTE - SEGURANÇA
+# ========================================
+# Antes de executar os comandos acima:
+# 1. ✅ Criar EOSCredentials.json na raiz
+# 2. ✅ Verificar que está no .gitignore
+# 3. ✅ Nunca adicionar credenciais ao Git
+# 4. ✅ git status ANTES de cada commit
+
+# ========================================
+# Para trabalhar na branch Multiplayer depois:
+# ========================================
+# git checkout Multiplayer
+# (fazer mudanças)
+# git add .
+# git commit -m "descrição"
+# git push
+
+# ========================================
+# Para mesclar Multiplayer na main (futuro):
+# ========================================
+# git checkout main
+# git merge Multiplayer
+# git push
