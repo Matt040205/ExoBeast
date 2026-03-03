@@ -1083,7 +1083,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4810200277711100742, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_Enabled
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4894534141516350885, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_Weight
@@ -1109,6 +1109,10 @@ PrefabInstance:
       propertyPath: m_Data.m_DampRotation
       value: 0.001
       objectReference: {fileID: 0}
+    - target: {fileID: 5783181433193836938, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: statusBase
+      value: 
+      objectReference: {fileID: 11400000, guid: 7dc5598ea1fd57444b7f91fc784d054b, type: 2}
     - target: {fileID: 6099578788305256835, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_LocalPosition.x
       value: 0.24312592

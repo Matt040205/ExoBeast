@@ -1,11 +1,8 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using FMODUnity;
 
-public enum WeaponType
-{
-    Sword,
-    Hammer
-}
+public enum WeaponType { Sword, Hammer }
 
 [System.Serializable]
 public class WeaponConfig
@@ -53,43 +50,32 @@ public class MeleeCombatSystem : MonoBehaviour
         UpdateCurrentStats();
     }
 
+    public void OnFire(InputAction.CallbackContext ctx)
+    {
+        if (ctx.performed && !PauseControl.isPaused && !BuildManager.isBuildingMode)
+        {
+            anim.SetTrigger("Attack");
+        }
+    }
+
     void Update()
     {
         UpdateCurrentStats();
 
-        if (Input.GetButtonDown("Fire1"))
-        {
-            anim.SetTrigger("Attack");
-        }
-
         if (overrideAttackSpeed.HasValue)
-        {
             anim.speed = overrideAttackSpeed.Value;
-        }
         else
-        {
             anim.speed = currentStats.animationSpeed;
-        }
     }
 
     void OnDisable()
     {
-        if (anim != null)
-        {
-            anim.speed = 1.0f;
-        }
+        if (anim != null) anim.speed = 1.0f;
     }
 
     private void UpdateCurrentStats()
     {
-        if (currentWeaponType == WeaponType.Sword)
-        {
-            currentStats = swordStats;
-        }
-        else
-        {
-            currentStats = hammerStats;
-        }
+        currentStats = (currentWeaponType == WeaponType.Sword) ? swordStats : hammerStats;
     }
 
     private void DetectHits(float damageToApply, string fmodEvent)
@@ -110,38 +96,19 @@ public class MeleeCombatSystem : MonoBehaviour
             if (angleToTarget < currentAngle / 2)
             {
                 EnemyHealthSystem enHealth = target.GetComponent<EnemyHealthSystem>();
-                if (enHealth != null)
-                {
-                    enHealth.TakeDamage(damageToApply);
-                }
+                if (enHealth != null) enHealth.TakeDamage(damageToApply);
             }
         }
     }
 
-    public void AnimEvent_Hit1()
-    {
-        DetectHits(currentStats.damageHit1, currentStats.sfxHit1);
-    }
-
-    public void AnimEvent_Hit2()
-    {
-        DetectHits(currentStats.damageHit2, currentStats.sfxHit2);
-    }
-
-    public void AnimEvent_Hit3()
-    {
-        DetectHits(currentStats.damageHit3, currentStats.sfxHit3);
-    }
-
-    public void AnimEvent_Hit4()
-    {
-        DetectHits(currentStats.damageHit4, currentStats.sfxHit4);
-    }
+    public void AnimEvent_Hit1() => DetectHits(currentStats.damageHit1, currentStats.sfxHit1);
+    public void AnimEvent_Hit2() => DetectHits(currentStats.damageHit2, currentStats.sfxHit2);
+    public void AnimEvent_Hit3() => DetectHits(currentStats.damageHit3, currentStats.sfxHit3);
+    public void AnimEvent_Hit4() => DetectHits(currentStats.damageHit4, currentStats.sfxHit4);
 
     void OnDrawGizmosSelected()
     {
         if (attackPoint == null) return;
-
         WeaponConfig statsToDraw = (currentWeaponType == WeaponType.Sword) ? swordStats : hammerStats;
         if (statsToDraw == null) return;
 
@@ -150,12 +117,9 @@ public class MeleeCombatSystem : MonoBehaviour
 
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(attackPoint.position, currentRange);
-
         Vector3 leftBound = Quaternion.Euler(0, -currentAngle / 2, 0) * attackPoint.forward * currentRange;
         Vector3 rightBound = Quaternion.Euler(0, currentAngle / 2, 0) * attackPoint.forward * currentRange;
-
         Gizmos.DrawLine(attackPoint.position, attackPoint.position + leftBound);
         Gizmos.DrawLine(attackPoint.position, attackPoint.position + rightBound);
-        Gizmos.DrawLine(attackPoint.position + leftBound, attackPoint.position + rightBound);
     }
 }
