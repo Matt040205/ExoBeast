@@ -24,6 +24,13 @@ public class PlayerMovement : MonoBehaviour
     public MultiAimConstraint aimConstraint;
     public LayerMask aimLayerMask;
 
+    [Header("Ground Check & Landing")]
+    [Tooltip("Coloque aqui as Layers que representam o Chão no seu jogo!")]
+    public LayerMask groundMask;
+    [Tooltip("Tamanho do raio que prevê o chão. Aumente se o pivô do player for na barriga.")]
+    public float landingRaycastDistance = 1.2f;
+    private bool isAboutToLand;
+
     [Header("FMOD")]
     [EventRef] public string eventoPassos = "event:/SFX/Passos";
     private EventInstance passosSoundInstance;
@@ -31,7 +38,7 @@ public class PlayerMovement : MonoBehaviour
 
     [HideInInspector] public bool isDashing = false;
 
-    private bool isAiming = false;
+    public bool isAiming = false;
     private Transform aimTarget;
 
     private CharacterController controller;
@@ -130,14 +137,32 @@ public class PlayerMovement : MonoBehaviour
         {
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity) * jumpHeightModifier;
             isGrounded = false;
-            if (animator != null) animator.SetTrigger("Jump");
+
+            if (animator != null)
+            {
+                // A SOLUÇÃO: Limpa qualquer ordem de ataque, tiro ou recarga que tenha ficado presa no Animator!
+                animator.ResetTrigger("Attack");
+                animator.ResetTrigger("Shoot");
+                animator.ResetTrigger("Reload");
+
+                // Agora sim, manda o pulo livremente
+                animator.SetTrigger("Jump");
+            }
             StopFootstepSound();
         }
         else if (canDoubleJump && !hasDoubleJumped)
         {
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity) * jumpHeightModifier;
             hasDoubleJumped = true;
-            if (animator != null) animator.SetTrigger("Jump");
+
+            if (animator != null)
+            {
+                animator.ResetTrigger("Attack");
+                animator.ResetTrigger("Shoot");
+                animator.ResetTrigger("Reload");
+
+                animator.SetTrigger("Jump");
+            }
             StopFootstepSound();
         }
     }
@@ -179,7 +204,28 @@ public class PlayerMovement : MonoBehaviour
             ApplyGravity();
         }
 
-        if (animator != null) animator.SetBool("isGrounded", isGrounded);
+        if (animator != null)
+        {
+            animator.SetBool("isGrounded", isGrounded);
+            animator.SetFloat("yVelocity", velocity.y);
+
+            if (!isGrounded && velocity.y < 0)
+            {
+                isAboutToLand = Physics.Raycast(transform.position, Vector3.down, landingRaycastDistance, groundMask);
+                Debug.DrawRay(transform.position, Vector3.down * landingRaycastDistance, Color.red);
+            }
+            else
+            {
+                isAboutToLand = false;
+            }
+
+            if (isGrounded)
+            {
+                isAboutToLand = true;
+            }
+
+            animator.SetBool("isAboutToLand", isAboutToLand);
+        }
     }
 
     private void LateUpdate()

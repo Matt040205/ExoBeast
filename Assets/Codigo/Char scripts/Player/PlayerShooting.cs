@@ -76,12 +76,18 @@ public class PlayerShooting : MonoBehaviour
 
     public void OnFire(InputAction.CallbackContext ctx)
     {
+        // Impede que a arma tente atirar enquanto a Ultimate da Katana estiver ativada
+        if (!this.enabled) return;
+
         if (ctx.started || ctx.performed) fireInputHeld = true;
         else if (ctx.canceled) fireInputHeld = false;
     }
 
     public void OnReload(InputAction.CallbackContext ctx)
     {
+        // TRAVA DE SEGURANÇA: Impede que a arma recarregue se a Ultimate (Katana) estiver ativada
+        if (!this.enabled) return;
+
         if (ctx.performed && !isReloading && currentAmmo < characterData.magazineSize)
             StartReload();
     }

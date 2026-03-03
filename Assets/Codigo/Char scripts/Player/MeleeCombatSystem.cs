@@ -10,7 +10,7 @@ public class WeaponConfig
     [Header("Atributos Físicos")]
     public float attackRange = 2f;
     public float attackAngle = 90f;
-    public float animationSpeed = 1f;
+    public float animationSpeed = 1f; // Aqui você define o quão rápida é a Katana!
 
     [Header("Danos do Combo")]
     public float damageHit1 = 15f;
@@ -52,6 +52,10 @@ public class MeleeCombatSystem : MonoBehaviour
 
     public void OnFire(InputAction.CallbackContext ctx)
     {
+        // A MÁGICA CONTRA O BUG DE ESTADO PRESO:
+        // Se a Ultimate acabou (script desativado), ignora o Input System completamente!
+        if (!this.enabled) return;
+
         if (ctx.performed && !PauseControl.isPaused && !BuildManager.isBuildingMode)
         {
             anim.SetTrigger("Attack");
@@ -62,15 +66,19 @@ public class MeleeCombatSystem : MonoBehaviour
     {
         UpdateCurrentStats();
 
-        if (overrideAttackSpeed.HasValue)
-            anim.speed = overrideAttackSpeed.Value;
-        else
-            anim.speed = currentStats.animationSpeed;
+        // A MÁGICA CONTRA A CORRIDA DO THE FLASH:
+        // Em vez de acelerar o Animator inteiro, passamos a velocidade para uma variável.
+        if (anim != null)
+        {
+            float targetSpeed = overrideAttackSpeed.HasValue ? overrideAttackSpeed.Value : currentStats.animationSpeed;
+            anim.SetFloat("AttackSpeedMultiplier", targetSpeed);
+        }
     }
 
     void OnDisable()
     {
-        if (anim != null) anim.speed = 1.0f;
+        // Quando a Ultimate acaba, garante que a velocidade de ataque volte ao normal
+        if (anim != null) anim.SetFloat("AttackSpeedMultiplier", 1.0f);
     }
 
     private void UpdateCurrentStats()
