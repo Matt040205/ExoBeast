@@ -24,6 +24,9 @@ public class PlayerMovement : MonoBehaviour
     public MultiAimConstraint aimConstraint;
     public LayerMask aimLayerMask;
 
+    // !! MUDANÇA: Voltou a ser público. Arraste o "AimTarget_Fixo" aqui no Inspector do Prefab!
+    public Transform aimTarget;
+
     [Header("Ground Check & Landing")]
     [Tooltip("Coloque aqui as Layers que representam o Chão no seu jogo!")]
     public LayerMask groundMask;
@@ -39,7 +42,6 @@ public class PlayerMovement : MonoBehaviour
     [HideInInspector] public bool isDashing = false;
 
     public bool isAiming = false;
-    private Transform aimTarget;
 
     private CharacterController controller;
     private Vector3 velocity;
@@ -85,16 +87,8 @@ public class PlayerMovement : MonoBehaviour
             cameraController = Camera.main.transform;
         }
 
-        GameObject aimTargetObj = new GameObject(name + " AimTarget");
-        aimTarget = aimTargetObj.transform;
-
-        if (aimConstraint != null)
-        {
-            var sourceObjects = aimConstraint.data.sourceObjects;
-            sourceObjects.Clear();
-            sourceObjects.Add(new WeightedTransform(aimTarget, 1f));
-            aimConstraint.data.sourceObjects = sourceObjects;
-        }
+        // O Rigging agora já vem perfeitamente montado do seu Prefab!
+        // Não precisamos mais criar objetos dinâmicos ou chamar o RigBuilder.Build()
 
         if (aimRig != null) aimRig.weight = 0f;
 
@@ -140,12 +134,10 @@ public class PlayerMovement : MonoBehaviour
 
             if (animator != null)
             {
-                // A SOLUÇÃO: Limpa qualquer ordem de ataque, tiro ou recarga que tenha ficado presa no Animator!
                 animator.ResetTrigger("Attack");
                 animator.ResetTrigger("Shoot");
                 animator.ResetTrigger("Reload");
 
-                // Agora sim, manda o pulo livremente
                 animator.SetTrigger("Jump");
             }
             StopFootstepSound();
@@ -170,10 +162,16 @@ public class PlayerMovement : MonoBehaviour
     public void OnAim(InputAction.CallbackContext ctx)
     {
         bool aimingInput = ctx.ReadValueAsButton();
+
         if (aimingInput != isAiming)
         {
             isAiming = aimingInput;
-            if (animator != null) animator.SetBool("isAiming", isAiming);
+
+            if (animator != null)
+            {
+                animator.SetBool("isAiming", isAiming);
+            }
+
             StopAllCoroutines();
             StartCoroutine(FadeRigWeight(isAiming ? 1f : 0f));
         }
@@ -204,6 +202,15 @@ public class PlayerMovement : MonoBehaviour
             ApplyGravity();
         }
 
+        if (aimTarget != null && cameraController != null)
+        {
+            Ray ray = new Ray(cameraController.position, cameraController.forward);
+            if (Physics.Raycast(ray, out RaycastHit hit, 999f, aimLayerMask))
+                aimTarget.position = hit.point;
+            else
+                aimTarget.position = ray.GetPoint(100f);
+        }
+
         if (animator != null)
         {
             animator.SetBool("isGrounded", isGrounded);
@@ -212,7 +219,6 @@ public class PlayerMovement : MonoBehaviour
             if (!isGrounded && velocity.y < 0)
             {
                 isAboutToLand = Physics.Raycast(transform.position, Vector3.down, landingRaycastDistance, groundMask);
-                Debug.DrawRay(transform.position, Vector3.down * landingRaycastDistance, Color.red);
             }
             else
             {
@@ -232,18 +238,12 @@ public class PlayerMovement : MonoBehaviour
     {
         if (PauseControl.isPaused || BuildManager.isBuildingMode || isFloating || isDashing) return;
 
-        if (aimTarget != null)
-        {
-            Ray ray = new Ray(cameraController.position, cameraController.forward);
-            if (Physics.Raycast(ray, out RaycastHit hit, 999f, aimLayerMask))
-                aimTarget.position = hit.point;
-            else
-                aimTarget.position = ray.GetPoint(100f);
-        }
-
         if (isAiming || direction.sqrMagnitude > 0.01f)
         {
-            if (isAiming) targetAngle = cameraController.eulerAngles.y;
+            if (isAiming && cameraController != null)
+            {
+                targetAngle = cameraController.eulerAngles.y;
+            }
             float angle = Mathf.SmoothDampAngle(modelPivot.eulerAngles.y, targetAngle, ref rotationVelocity, 0.1f);
             modelPivot.rotation = Quaternion.Euler(0f, angle, 0f);
         }
@@ -310,7 +310,16 @@ public class PlayerMovement : MonoBehaviour
 
     private void ApplyGravity()
     {
-        if (isGrounded && velocity.y < 0) velocity.y = -2f;
+        if (isGrounded && velocity.y < 0)
+        {
+            velocity.y = -2f;
+
+            if (animator != null)
+            {
+                animator.ResetTrigger("Jump");
+            }
+        }
+
         velocity.y += gravity * Time.deltaTime;
         controller.Move(velocity * Time.deltaTime);
     }

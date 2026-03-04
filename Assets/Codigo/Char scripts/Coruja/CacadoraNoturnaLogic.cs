@@ -9,19 +9,12 @@ public class CacadoraNoturnaLogic : MonoBehaviour
     public GameObject beamVisualPrefab;
     public float visualDuration = 0.5f;
 
-    // !! MUDANÇA 1 !!
-    // Adicionamos um delay para esperar a animação
-    [Header("Sincronia da Animação")]
-    public float animationDelay = 0.5f; // Ajuste este valor no Inspector!
-
     private float damage;
     private float range;
     private float width;
     private GameObject caster;
     private LayerMask visualRaycastMask;
 
-    // !! MUDANÇA 2 !!
-    // Referência para o Animator
     private Animator anim;
 
     public void StartUltimateEffect(GameObject caster, float damage, float range, float width)
@@ -35,10 +28,18 @@ public class CacadoraNoturnaLogic : MonoBehaviour
         LayerMask playerLayer = LayerMask.GetMask("Player");
         visualRaycastMask = ~(enemyLayer | playerLayer);
 
-        // Pega o Animator do seu personagem ("caster")
         if (caster != null)
         {
             this.anim = caster.GetComponentInChildren<Animator>();
+
+            // !! A CONEXÃO PERFEITA !!
+            // Assim que a magia nasce, ela procura o Proxy no personagem e avisa: 
+            // "Ei, eu sou a magia atual. Quando a animação pedir, dispare A MIM!"
+            AnimationEventProxy proxy = caster.GetComponentInChildren<AnimationEventProxy>();
+            if (proxy != null)
+            {
+                proxy.magiaAtualDaCacadora = this;
+            }
         }
 
         if (effectParticles != null)
@@ -46,45 +47,29 @@ public class CacadoraNoturnaLogic : MonoBehaviour
             effectParticles.Play();
         }
 
-        // !! MUDANÇA 3 !!
-        // Disparamos o "gatilho" da animação.
         if (this.anim != null)
         {
-            // (Você ainda precisa criar este Trigger no seu Animator)
             this.anim.SetTrigger("CacadoraUltimate");
         }
 
-        // Em vez de chamar o dano direto, iniciamos a Coroutine com delay
-        StartCoroutine(FireBeamAfterDelay());
-
-        // O código original de dano foi removido daqui
-        // ApplyBeamDamage();  // <-- REMOVIDO
-        // if (beamVisualPrefab != null) // <-- REMOVIDO
-        // {
-        //     StartCoroutine(ShowBeamVisual()); // <-- REMOVIDO
-        // }
-
-        // Aumentei o tempo de destruição para dar tempo de tudo acontecer
-        Destroy(gameObject, visualDuration + animationDelay + 1.0f);
+        Destroy(gameObject, visualDuration + 3.0f);
     }
 
-    // !! MUDANÇA 4 !!
-    // Esta Coroutine espera o delay da animação e DEPOIS executa seu código
-    private IEnumerator FireBeamAfterDelay()
+    public void AnimEvent_FireBeam()
     {
-        // 1. Espera o tempo do "animationDelay"
-        yield return new WaitForSeconds(animationDelay);
+        Debug.Log("[CAÇADORA] Evento de Animação recebido! Disparando raio na sincronia perfeita!");
 
-        // 2. Agora, executa o SEU código original que funciona
-        Debug.Log("Delay terminado. Disparando raio!");
         ApplyBeamDamage();
 
         if (beamVisualPrefab != null)
         {
             StartCoroutine(ShowBeamVisual());
         }
+        else
+        {
+            Debug.LogWarning("[CAÇADORA] O visual não apareceu porque o 'beamVisualPrefab' está vazio no Inspector da Magia!");
+        }
     }
-
 
     private IEnumerator ShowBeamVisual()
     {
