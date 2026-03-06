@@ -1,18 +1,27 @@
 using System;
 using System.Collections.Generic;
 
+/// <summary>
+/// ── LobbyData ────────────────────────────────────────
+/// Estruturas de dados e constantes para o sistema de lobby EOS.
+///
+///  ▸ LobbyInfo: estado do lobby (id, nome, jogadores, host, estado)
+///  ▸ LobbyMember: representacao de membro (userId, displayName, isReady, isHost)
+///  ▸ LobbySettings: configuracoes para criar um novo lobby
+///  ▸ LobbySearchFilter: filtros para busca
+///  ▸ LobbyAttributes / MemberAttributes: constantes de chave EOS
+/// ─────────────────────────────────────────────────────
+/// </summary>
+
 namespace ExoBeasts.Multiplayer.Lobby
 {
-    /// <summary>
-    /// Estruturas de dados para o sistema de lobby
-    /// </summary>
-
     [Serializable]
     public class LobbyInfo
     {
         public string lobbyId;
         public string lobbyName;
         public string hostDisplayName;
+        public string hostProductUserId;
         public int currentPlayers;
         public int maxPlayers = 4;
         public string mapName;
@@ -37,7 +46,7 @@ namespace ExoBeasts.Multiplayer.Lobby
     {
         public string productUserId;
         public string displayName;
-        public int selectedCharacterIndex = -1; // -1 = nenhum personagem selecionado
+        public int selectedCharacterIndex = -1;
         public bool isReady;
         public bool isHost;
 
@@ -63,10 +72,10 @@ namespace ExoBeasts.Multiplayer.Lobby
     [Serializable]
     public enum LobbyState
     {
-        WaitingForPlayers,      // Aguardando jogadores entrarem
-        SelectingCharacters,    // Jogadores selecionando personagens
-        StartingMatch,          // Iniciando partida (alocando servidor)
-        InGame                  // Partida em andamento
+        WaitingForPlayers,
+        SelectingCharacters,
+        StartingMatch,
+        InGame
     }
 
     [Serializable]
@@ -101,9 +110,6 @@ namespace ExoBeasts.Multiplayer.Lobby
         }
     }
 
-    /// <summary>
-    /// Atributos do lobby que serao armazenados no Epic Lobby Service
-    /// </summary>
     public static class LobbyAttributes
     {
         public const string LOBBY_NAME = "LOBBY_NAME";
@@ -116,9 +122,6 @@ namespace ExoBeasts.Multiplayer.Lobby
         public const string SERVER_PORT = "SERVER_PORT";
     }
 
-    /// <summary>
-    /// Atributos de membro do lobby
-    /// </summary>
     public static class MemberAttributes
     {
         public const string DISPLAY_NAME = "DISPLAY_NAME";

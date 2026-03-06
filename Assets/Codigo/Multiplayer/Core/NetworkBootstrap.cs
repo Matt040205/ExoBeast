@@ -5,10 +5,14 @@ using Unity.Netcode.Transports.UTP;
 namespace ExoBeasts.Multiplayer.Core
 {
     /// <summary>
-    /// Responsavel pela inicializacao geral do sistema de rede.
-    /// Registra callbacks do NetworkManager e pode iniciar Host/Client automaticamente.
+    /// ── NetworkBootstrap ─────────────────────────────────
+    /// Ponto de entrada para inicializacao do NGO (Netcode for GameObjects).
     ///
-    /// Coloque este script na cena NetworkBootstrap.unity junto com o NetworkManager.
+    ///  ▸ Registra callbacks do NetworkManager (Connected, Disconnected, ServerStarted)
+    ///  ▸ StartHost(): configura UnityTransport em 0.0.0.0 e inicia como Host P2P
+    ///  ▸ StartClient(ip): conecta ao Host no IP fornecido
+    ///  ▸ autoStartHost / autoStartClient: flags para testes rapidos no Editor
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class NetworkBootstrap : MonoBehaviour
     {
@@ -29,10 +33,6 @@ namespace ExoBeasts.Multiplayer.Core
 
         [Tooltip("Porta de rede usada por Host e Client")]
         [SerializeField] private ushort networkPort = 7777;
-
-        // ---------------------------------------------------------------
-        // Unity lifecycle
-        // ---------------------------------------------------------------
 
         private void Awake()
         {
@@ -60,10 +60,6 @@ namespace ExoBeasts.Multiplayer.Core
             }
         }
 
-        // ---------------------------------------------------------------
-        // Inicializacao
-        // ---------------------------------------------------------------
-
         private void InitializeNetworking()
         {
             if (NetworkManager.Singleton == null)
@@ -79,10 +75,6 @@ namespace ExoBeasts.Multiplayer.Core
 
             Debug.Log("[NetworkBootstrap] Callbacks de rede registrados com sucesso.");
         }
-
-        // ---------------------------------------------------------------
-        // Acoes de rede
-        // ---------------------------------------------------------------
 
         /// <summary>
         /// Inicia como Host P2P: este jogador e servidor + cliente simultaneamente.
@@ -108,7 +100,6 @@ namespace ExoBeasts.Multiplayer.Core
         /// Inicia como Client: conecta ao Host.
         /// Chamado pelo LobbyManager quando o jogador entra numa sala.
         /// </summary>
-        /// <param name="hostIp">IP do Host. Se vazio, usa clientConnectIp do Inspector.</param>
         public void StartClient(string hostIp = null)
         {
             if (NetworkManager.Singleton == null)
@@ -127,9 +118,7 @@ namespace ExoBeasts.Multiplayer.Core
             NetworkManager.Singleton.StartClient();
         }
 
-        /// <summary>
-        /// Para a conexao atual (Host ou Client).
-        /// </summary>
+        /// <summary>Para a conexao atual (Host ou Client).</summary>
         public void Shutdown()
         {
             Debug.Log("[NetworkBootstrap] Encerrando conexao de rede...");
@@ -137,19 +126,12 @@ namespace ExoBeasts.Multiplayer.Core
                 NetworkManager.Singleton.Shutdown();
         }
 
-        /// <summary>
-        /// DEPRECATED: Dedicated Server nao e usado no modelo P2P.
-        /// Use StartHost() para o jogador que hospeda a partida.
-        /// </summary>
+        /// <summary>DEPRECATED: Use StartHost() no modelo P2P.</summary>
         public void StartServer()
         {
             Debug.LogWarning("[NetworkBootstrap] StartServer() esta deprecated! " +
                              "No modelo P2P use StartHost() - o host e servidor e cliente ao mesmo tempo.");
         }
-
-        // ---------------------------------------------------------------
-        // Callbacks internos
-        // ---------------------------------------------------------------
 
         private void OnServerStarted()
         {

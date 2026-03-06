@@ -6,18 +6,14 @@ using UnityEngine.SceneManagement;
 namespace ExoBeasts.Multiplayer.Testing
 {
     /// <summary>
-    /// Script de teste de conexao P2P basica via Unity Netcode for GameObjects.
+    /// ── NetworkConnectionTest ────────────────────────────
+    /// Teste de conexao P2P basica via NGO + UnityTransport, sem EOS Lobby.
     ///
-    /// Valida que dois builds conseguem se conectar (Host/Client) via LAN
-    /// usando apenas NGO + UnityTransport, SEM dependencia do EOS Lobby.
-    ///
-    /// Uso:
-    ///   - Adicione este script num GameObject na cena de teste
-    ///   - Certifique-se que NetworkManager (com UnityTransport) esta na cena
-    ///   - Build 1: clique "Iniciar como HOST"
-    ///   - Build 2: coloque o IP do Host, clique "Entrar como CLIENT"
-    ///
-    /// A UI de debug (OnGUI) aparece automaticamente - sem Canvas necessario.
+    ///  ▸ StartAsHost(): escuta em 0.0.0.0 na porta configurada
+    ///  ▸ StartAsClient(): conecta ao IP:porta do Inspector/OnGUI
+    ///  ▸ LoadGameScene(): carrega cena para todos via NetworkSceneManager (apenas Host)
+    ///  ▸ OnGUI de debug sem Canvas — cena: Network Test.unity
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class NetworkConnectionTest : MonoBehaviour
     {
@@ -32,15 +28,10 @@ namespace ExoBeasts.Multiplayer.Testing
         [Tooltip("Nome da cena a carregar apos conexao. Vazio = nao troca de cena.")]
         [SerializeField] private string gameSceneName = "";
 
-        // Estado interno
         private string _statusMessage = "Pronto para conectar";
         private NetworkRole _currentRole = NetworkRole.None;
 
         private enum NetworkRole { None, Host, Client }
-
-        // ---------------------------------------------------------------
-        // Unity lifecycle
-        // ---------------------------------------------------------------
 
         private void Start()
         {
@@ -68,10 +59,6 @@ namespace ExoBeasts.Multiplayer.Testing
                 NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
             }
         }
-
-        // ---------------------------------------------------------------
-        // Acoes de rede
-        // ---------------------------------------------------------------
 
         /// <summary>
         /// Inicia como Host P2P: este jogador e servidor + cliente ao mesmo tempo.
@@ -150,13 +137,8 @@ namespace ExoBeasts.Multiplayer.Testing
 
             Debug.Log($"[NetworkConnectionTest] Carregando cena '{gameSceneName}' para todos os clientes...");
 
-            // LoadScene do SceneManager do NGO sincroniza a troca para todos os conectados
             NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
         }
-
-        // ---------------------------------------------------------------
-        // Callbacks do NetworkManager
-        // ---------------------------------------------------------------
 
         private void OnServerStarted()
         {
@@ -197,10 +179,6 @@ namespace ExoBeasts.Multiplayer.Testing
             }
         }
 
-        // ---------------------------------------------------------------
-        // GUI de debug (sem Canvas necessario)
-        // ---------------------------------------------------------------
-
         private void OnGUI()
         {
             GUILayout.BeginArea(new Rect(10, 10, 420, 520));
@@ -209,7 +187,6 @@ namespace ExoBeasts.Multiplayer.Testing
             GUILayout.Label("=== Teste de Conexao P2P - ExoBeasts ===");
             GUILayout.Space(5);
 
-            // Status atual
             GUILayout.Label($"Status: {_statusMessage}");
             GUILayout.Label($"Modo:   {_currentRole}");
 
@@ -233,7 +210,6 @@ namespace ExoBeasts.Multiplayer.Testing
 
             if (!isRunning)
             {
-                // Campos de configuracao
                 GUILayout.Label("IP do Host (preencha no CLIENT):");
                 serverIp = GUILayout.TextField(serverIp, GUILayout.Width(220));
 
@@ -257,7 +233,6 @@ namespace ExoBeasts.Multiplayer.Testing
                 if (GUILayout.Button("Parar / Desconectar", GUILayout.Height(35)))
                     Stop();
 
-                // Botao de troca de cena (apenas Host, apenas se cena definida)
                 if (NetworkManager.Singleton.IsHost && !string.IsNullOrEmpty(gameSceneName))
                 {
                     GUILayout.Space(10);
@@ -278,10 +253,6 @@ namespace ExoBeasts.Multiplayer.Testing
             GUILayout.EndVertical();
             GUILayout.EndArea();
         }
-
-        // ---------------------------------------------------------------
-        // Helper
-        // ---------------------------------------------------------------
 
         private UnityTransport GetTransport()
         {

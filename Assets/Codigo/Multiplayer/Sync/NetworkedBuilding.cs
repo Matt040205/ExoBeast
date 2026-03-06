@@ -4,8 +4,14 @@ using Unity.Netcode;
 namespace ExoBeasts.Multiplayer.Sync
 {
     /// <summary>
-    /// Componente de rede para torres e armadilhas
-    /// Sincroniza construcao, upgrade e destruicao
+    /// ── NetworkedBuilding ────────────────────────────────
+    /// Sincroniza estado de torres e armadilhas em rede.
+    ///
+    ///  ▸ NetworkVariables: Type, Level, Health, IsActive (server-write)
+    ///  ▸ TakeDamageServerRpc: dano de inimigos, destroi ao chegar a 0
+    ///  ▸ UpgradeServerRpc: incrementa Level (max 3), notifica via ClientRpc
+    ///  ▸ RepairServerRpc: restaura Health ate o maximo
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class NetworkedBuilding : NetworkBehaviour
     {
@@ -34,25 +40,14 @@ namespace ExoBeasts.Multiplayer.Sync
             NetworkVariableWritePermission.Server
         );
 
-        // Referencia ao componente local (se houver)
-        // TODO: Adicionar referencia aos componentes de torre quando existirem
-        // private TowerBase towerComponent;
-        // private TrapBase trapComponent;
-
         public override void OnNetworkSpawn()
         {
             Debug.Log($"[NetworkedBuilding] Spawned - Type: {Type.Value}, Level: {Level.Value}");
 
-            // Buscar componentes locais
-            // towerComponent = GetComponent<TowerBase>();
-            // trapComponent = GetComponent<TrapBase>();
-
-            // Escutar mudancas
             Level.OnValueChanged += OnLevelChanged;
             Health.OnValueChanged += OnHealthChanged;
             IsActive.OnValueChanged += OnActiveChanged;
 
-            // Sincronizar valores iniciais se for servidor
             if (IsServer)
             {
                 InitializeServerData();
@@ -61,24 +56,17 @@ namespace ExoBeasts.Multiplayer.Sync
 
         private void InitializeServerData()
         {
-            // TODO: Sincronizar dados iniciais dos componentes locais
-            // if (towerComponent != null)
-            // {
-            //     Health.Value = towerComponent.maxHealth;
-            // }
         }
 
         private void OnLevelChanged(int oldValue, int newValue)
         {
             Debug.Log($"[NetworkedBuilding] Level mudou: {oldValue} -> {newValue}");
-            // TODO: Atualizar visual do upgrade
         }
 
         private void OnHealthChanged(float oldValue, float newValue)
         {
             Debug.Log($"[NetworkedBuilding] Vida mudou: {oldValue} -> {newValue}");
 
-            // Verificar se foi destruido
             if (newValue <= 0 && oldValue > 0)
             {
                 OnBuildingDestroyed();
@@ -88,12 +76,8 @@ namespace ExoBeasts.Multiplayer.Sync
         private void OnActiveChanged(bool oldValue, bool newValue)
         {
             Debug.Log($"[NetworkedBuilding] Ativo mudou: {oldValue} -> {newValue}");
-            // TODO: Habilitar/desabilitar funcionalidade
         }
 
-        /// <summary>
-        /// Receber dano (chamado por inimigos)
-        /// </summary>
         [ServerRpc(RequireOwnership = false)]
         public void TakeDamageServerRpc(float damage, ulong attackerId)
         {
@@ -108,16 +92,12 @@ namespace ExoBeasts.Multiplayer.Sync
             }
         }
 
-        /// <summary>
-        /// Fazer upgrade da construcao
-        /// </summary>
         [ServerRpc(RequireOwnership = false)]
         public void UpgradeServerRpc(ServerRpcParams rpcParams = default)
         {
             if (!IsServer) return;
 
-            // Verificar se pode fazer upgrade
-            if (Level.Value >= 3) // Max level
+            if (Level.Value >= 3)
             {
                 Debug.LogWarning("[NetworkedBuilding] Nivel maximo atingido");
                 return;
@@ -125,8 +105,6 @@ namespace ExoBeasts.Multiplayer.Sync
 
             Level.Value++;
             Debug.Log($"[NetworkedBuilding] Upgrade para nivel {Level.Value}");
-
-            // Notificar todos os clientes
             OnBuildingUpgradedClientRpc(Level.Value);
         }
 
@@ -134,8 +112,6 @@ namespace ExoBeasts.Multiplayer.Sync
         private void OnBuildingUpgradedClientRpc(int newLevel)
         {
             Debug.Log($"[NetworkedBuilding] Efeito de upgrade para nivel {newLevel}");
-            // TODO: Reproduzir efeito visual de upgrade
-            // TODO: Atualizar modelo 3D
         }
 
         private void DestroyBuilding()
@@ -144,41 +120,32 @@ namespace ExoBeasts.Multiplayer.Sync
 
             Debug.Log("[NetworkedBuilding] Construcao destruida");
             IsActive.Value = false;
-
-            // Notificar clientes
             OnBuildingDestroyedClientRpc();
 
-            // Despawnar e destruir
             if (NetworkObject != null && NetworkObject.IsSpawned)
             {
                 NetworkObject.Despawn();
-                Destroy(gameObject, 2f); // Delay para animacao
+                Destroy(gameObject, 2f);
             }
         }
 
         private void OnBuildingDestroyed()
         {
             Debug.Log("[NetworkedBuilding] Building destruido localmente");
-            // TODO: Reproduzir animacao de destruicao
         }
 
         [ClientRpc]
         private void OnBuildingDestroyedClientRpc()
         {
             Debug.Log("[NetworkedBuilding] Efeito de destruicao");
-            // TODO: Reproduzir efeito de explosao
-            // TODO: Reproduzir som de destruicao
         }
 
-        /// <summary>
-        /// Reparar construcao
-        /// </summary>
         [ServerRpc(RequireOwnership = false)]
         public void RepairServerRpc(float amount)
         {
             if (!IsServer) return;
 
-            float maxHealth = 100f; // TODO: Obter do componente local
+            float maxHealth = 100f;
             Health.Value = Mathf.Min(maxHealth, Health.Value + amount);
             Debug.Log($"[NetworkedBuilding] Reparado: +{amount}. Vida: {Health.Value}");
         }
@@ -193,9 +160,9 @@ namespace ExoBeasts.Multiplayer.Sync
 
     public enum BuildingType
     {
-        Tower,      // Torre de defesa
-        Trap,       // Armadilha
-        Wall,       // Muro/Barricada
-        Special     // Construcao especial
+        Tower,
+        Trap,
+        Wall,
+        Special
     }
 }

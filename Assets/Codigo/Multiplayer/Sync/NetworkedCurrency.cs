@@ -5,8 +5,15 @@ using System;
 namespace ExoBeasts.Multiplayer.Sync
 {
     /// <summary>
-    /// Sistema de moedas sincronizado em rede
-    /// Moedas sao compartilhadas por todo o time
+    /// ── NetworkedCurrency ────────────────────────────────
+    /// Moedas do time sincronizadas em rede (Geodites e DarkEther).
+    ///
+    ///  ▸ NetworkVariables server-write: TeamGeodites, TeamDarkEther
+    ///  ▸ Add/Spend ServerRpcs: ganho e gasto com validacao servidor
+    ///  ▸ Aprovacao/rejeicao via ClientRpc para feedback do solicitante
+    ///  ▸ HasEnoughGeodites/DarkEther: check local para UI imediata
+    ///  ▸ Singleton
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class NetworkedCurrency : NetworkBehaviour
     {
@@ -26,7 +33,6 @@ namespace ExoBeasts.Multiplayer.Sync
             NetworkVariableWritePermission.Server
         );
 
-        // Eventos para UI reagir
         public event Action<int> OnGeoditesChanged;
         public event Action<int> OnDarkEtherChanged;
 
@@ -42,7 +48,6 @@ namespace ExoBeasts.Multiplayer.Sync
 
         public override void OnNetworkSpawn()
         {
-            // Escutar mudancas
             TeamGeodites.OnValueChanged += OnGeoditesValueChanged;
             TeamDarkEther.OnValueChanged += OnDarkEtherValueChanged;
 
@@ -61,9 +66,6 @@ namespace ExoBeasts.Multiplayer.Sync
             OnDarkEtherChanged?.Invoke(newValue);
         }
 
-        /// <summary>
-        /// Adicionar Geodites (qualquer cliente pode chamar)
-        /// </summary>
         [ServerRpc(RequireOwnership = false)]
         public void AddGeoditesServerRpc(int amount, ServerRpcParams rpcParams = default)
         {
@@ -73,9 +75,6 @@ namespace ExoBeasts.Multiplayer.Sync
             Debug.Log($"[NetworkedCurrency] +{amount} Geodites. Total: {TeamGeodites.Value}");
         }
 
-        /// <summary>
-        /// Adicionar Dark Ether
-        /// </summary>
         [ServerRpc(RequireOwnership = false)]
         public void AddDarkEtherServerRpc(int amount, ServerRpcParams rpcParams = default)
         {
@@ -85,9 +84,6 @@ namespace ExoBeasts.Multiplayer.Sync
             Debug.Log($"[NetworkedCurrency] +{amount} DarkEther. Total: {TeamDarkEther.Value}");
         }
 
-        /// <summary>
-        /// Tentar gastar Geodites (com validacao no servidor)
-        /// </summary>
         [ServerRpc(RequireOwnership = false)]
         public void SpendGeoditesServerRpc(int amount, ServerRpcParams rpcParams = default)
         {
@@ -100,21 +96,16 @@ namespace ExoBeasts.Multiplayer.Sync
                 TeamGeodites.Value -= amount;
                 Debug.Log($"[NetworkedCurrency] -{amount} Geodites. Restante: {TeamGeodites.Value}");
 
-                // Aprovar compra
                 OnPurchaseApprovedClientRpc(clientId, PurchaseType.Geodites, amount);
             }
             else
             {
                 Debug.LogWarning($"[NetworkedCurrency] Geodites insuficientes! Necessario: {amount}, Disponivel: {TeamGeodites.Value}");
 
-                // Rejeitar compra
                 OnPurchaseRejectedClientRpc(clientId, PurchaseType.Geodites);
             }
         }
 
-        /// <summary>
-        /// Tentar gastar Dark Ether
-        /// </summary>
         [ServerRpc(RequireOwnership = false)]
         public void SpendDarkEtherServerRpc(int amount, ServerRpcParams rpcParams = default)
         {
@@ -139,26 +130,19 @@ namespace ExoBeasts.Multiplayer.Sync
         [ClientRpc]
         private void OnPurchaseApprovedClientRpc(ulong clientId, PurchaseType type, int amount)
         {
-            // Apenas o cliente que fez a compra processa isso
             if (NetworkManager.Singleton.LocalClientId != clientId) return;
 
             Debug.Log($"[NetworkedCurrency] Compra aprovada: {type} x{amount}");
-            // TODO: Executar acao de compra (spawnar torre, etc)
         }
 
         [ClientRpc]
         private void OnPurchaseRejectedClientRpc(ulong clientId, PurchaseType type)
         {
-            // Apenas o cliente que tentou comprar processa isso
             if (NetworkManager.Singleton.LocalClientId != clientId) return;
 
             Debug.LogWarning($"[NetworkedCurrency] Compra rejeitada: {type}");
-            // TODO: Mostrar mensagem de erro na UI
         }
 
-        /// <summary>
-        /// Verificar se ha moedas suficientes (local check apenas para UI)
-        /// </summary>
         public bool HasEnoughGeodites(int amount)
         {
             return TeamGeodites.Value >= amount;

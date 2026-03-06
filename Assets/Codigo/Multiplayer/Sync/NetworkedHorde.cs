@@ -5,8 +5,16 @@ using System.Collections;
 namespace ExoBeasts.Multiplayer.Sync
 {
     /// <summary>
-    /// Gerencia o sistema de hordas/waves sincronizado
-    /// Apenas o servidor controla spawn de inimigos
+    /// ── NetworkedHorde ───────────────────────────────────
+    /// Gerencia o sistema de waves de inimigos sincronizado em rede.
+    ///
+    ///  ▸ Apenas o servidor controla spawn, contagem e progressao
+    ///  ▸ NetworkVariables: CurrentWave, EnemiesRemaining, EnemiesSpawned, IsWaveActive
+    ///  ▸ OnEnemyKilledServerRpc: notificacao de morte (RequireOwnership = false)
+    ///  ▸ ForceStartNextWaveServerRpc: disponivel para debug/testes
+    ///  ▸ SpawnEnemy(): placeholder — aguarda pool de inimigos (Fase 5)
+    ///  ▸ Singleton — acessivel via NetworkedHorde.Instance
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class NetworkedHorde : NetworkBehaviour
     {
@@ -43,9 +51,6 @@ namespace ExoBeasts.Multiplayer.Sync
             NetworkVariableWritePermission.Server
         );
 
-        // TODO: Adicionar referencia ao pool de inimigos quando existir
-        // private EnemyPoolManager enemyPool;
-
         private void Awake()
         {
             if (_instance != null && _instance != this)
@@ -61,11 +66,9 @@ namespace ExoBeasts.Multiplayer.Sync
             if (IsServer)
             {
                 Debug.Log("[NetworkedHorde] Sistema de hordas inicializado no servidor");
-                // Aguardar alguns segundos antes de iniciar primeira wave
                 StartCoroutine(StartFirstWaveDelayed());
             }
 
-            // Escutar mudancas
             CurrentWave.OnValueChanged += OnWaveChanged;
             EnemiesRemaining.OnValueChanged += OnEnemiesRemainingChanged;
         }
@@ -76,9 +79,6 @@ namespace ExoBeasts.Multiplayer.Sync
             StartNextWave();
         }
 
-        /// <summary>
-        /// Iniciar proxima wave
-        /// </summary>
         private void StartNextWave()
         {
             if (!IsServer) return;
@@ -91,17 +91,12 @@ namespace ExoBeasts.Multiplayer.Sync
             EnemiesSpawned.Value = 0;
 
             Debug.Log($"[NetworkedHorde] Iniciando Wave {CurrentWave.Value} com {enemyCount} inimigos");
-
-            // Notificar clientes
             OnWaveStartedClientRpc(CurrentWave.Value, enemyCount);
-
-            // Iniciar spawn de inimigos
             StartCoroutine(SpawnWaveEnemies(enemyCount));
         }
 
         private int CalculateEnemyCount(int wave)
         {
-            // Formula simples: aumentar 20% a cada wave
             return Mathf.RoundToInt(baseEnemiesPerWave * Mathf.Pow(1.2f, wave - 1));
         }
 
@@ -113,7 +108,6 @@ namespace ExoBeasts.Multiplayer.Sync
             {
                 SpawnEnemy();
                 EnemiesSpawned.Value++;
-
                 yield return new WaitForSeconds(spawnInterval);
             }
 
@@ -123,41 +117,17 @@ namespace ExoBeasts.Multiplayer.Sync
         private void SpawnEnemy()
         {
             if (!IsServer) return;
-
-            // TODO: Obter inimigo do pool
-            // GameObject enemy = enemyPool.GetPooledEnemy();
-            // if (enemy == null)
-            // {
-            //     Debug.LogWarning("[NetworkedHorde] Pool de inimigos vazio!");
-            //     return;
-            // }
-
-            // TODO: Posicionar inimigo em spawn point
-            // Vector3 spawnPos = GetRandomSpawnPoint();
-            // enemy.transform.position = spawnPos;
-
-            // Spawnar na rede
-            // var networkObject = enemy.GetComponent<NetworkObject>();
-            // if (networkObject != null)
-            // {
-            //     networkObject.Spawn();
-            // }
-
             Debug.Log("[NetworkedHorde] Inimigo spawnado (placeholder)");
         }
 
-        /// <summary>
-        /// Chamar quando um inimigo for morto
-        /// </summary>
         [ServerRpc(RequireOwnership = false)]
         public void OnEnemyKilledServerRpc()
         {
             if (!IsServer) return;
 
-            EnemiesRemaining.Value--;
+            EnemiesRemaining.Value = Mathf.Max(0, EnemiesRemaining.Value - 1);
             Debug.Log($"[NetworkedHorde] Inimigo morto. Restantes: {EnemiesRemaining.Value}");
 
-            // Verificar se wave acabou
             if (EnemiesRemaining.Value <= 0 && IsWaveActive.Value)
             {
                 OnWaveCompleted();
@@ -170,11 +140,7 @@ namespace ExoBeasts.Multiplayer.Sync
 
             IsWaveActive.Value = false;
             Debug.Log($"[NetworkedHorde] Wave {CurrentWave.Value} completa!");
-
-            // Notificar clientes
             OnWaveCompletedClientRpc(CurrentWave.Value);
-
-            // Iniciar proxima wave apos delay
             StartCoroutine(WaitAndStartNextWave());
         }
 
@@ -185,24 +151,18 @@ namespace ExoBeasts.Multiplayer.Sync
             StartNextWave();
         }
 
-        // Client RPCs
         [ClientRpc]
         private void OnWaveStartedClientRpc(int waveNumber, int enemyCount)
         {
             Debug.Log($"[NetworkedHorde] Wave {waveNumber} iniciada! {enemyCount} inimigos chegando");
-            // TODO: Mostrar UI de nova wave
-            // TODO: Reproduzir som de alerta
         }
 
         [ClientRpc]
         private void OnWaveCompletedClientRpc(int waveNumber)
         {
             Debug.Log($"[NetworkedHorde] Wave {waveNumber} completa!");
-            // TODO: Mostrar UI de wave completa
-            // TODO: Reproduzir som de vitoria
         }
 
-        // Callbacks
         private void OnWaveChanged(int oldValue, int newValue)
         {
             Debug.Log($"[NetworkedHorde] Wave mudou: {oldValue} -> {newValue}");
@@ -210,16 +170,13 @@ namespace ExoBeasts.Multiplayer.Sync
 
         private void OnEnemiesRemainingChanged(int oldValue, int newValue)
         {
-            // Atualizar UI de progresso
             if (newValue == 0 && oldValue > 0)
             {
                 Debug.Log("[NetworkedHorde] Todos os inimigos foram eliminados!");
             }
         }
 
-        /// <summary>
-        /// Forcar inicio de proxima wave (para testes)
-        /// </summary>
+        /// <summary>Forcar inicio de proxima wave (para testes).</summary>
         [ServerRpc(RequireOwnership = false)]
         public void ForceStartNextWaveServerRpc()
         {

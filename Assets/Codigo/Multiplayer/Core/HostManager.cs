@@ -5,8 +5,14 @@ using Unity.Netcode.Transports.UTP;
 namespace ExoBeasts.Multiplayer.Core
 {
     /// <summary>
-    /// Gerencia a logica do Host em modo P2P
-    /// Host = Servidor + Cliente ao mesmo tempo
+    /// ── HostManager ──────────────────────────────────────
+    /// Gerencia o estado do Host P2P (servidor + cliente simultaneamente).
+    ///
+    ///  ▸ StartAsHost(): configura UnityTransport e inicia NGO Host
+    ///  ▸ StartAsClient(ip, port): conecta ao host remoto
+    ///  ▸ StopHost(): encerra NGO e limpa estado
+    ///  ▸ Singleton com DontDestroyOnLoad
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class HostManager : MonoBehaviour
     {
@@ -61,8 +67,6 @@ namespace ExoBeasts.Multiplayer.Core
         /// Iniciar como Client: conecta ao Host via IP.
         /// Chamado quando o jogador entra em um lobby e a partida comeca.
         /// </summary>
-        /// <param name="hostIp">IP do Host (obtido via Lobby EOS)</param>
-        /// <param name="port">Porta do Host (0 usa o hostPort padrao)</param>
         public void StartAsClient(string hostIp, ushort port = 0)
         {
             if (port == 0) port = hostPort;
@@ -81,9 +85,7 @@ namespace ExoBeasts.Multiplayer.Core
             NetworkManager.Singleton.StartClient();
         }
 
-        /// <summary>
-        /// Para de ser Host e encerra o servidor local.
-        /// </summary>
+        /// <summary>Para de ser Host e encerra o servidor local.</summary>
         public void StopHost()
         {
             if (!isHost) return;
@@ -103,32 +105,18 @@ namespace ExoBeasts.Multiplayer.Core
             return isHost && NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost;
         }
 
-        public int GetMaxPlayers()
-        {
-            return maxPlayers;
-        }
+        public int GetMaxPlayers() => maxPlayers;
+        public ushort GetHostPort() => hostPort;
 
-        public ushort GetHostPort()
-        {
-            return hostPort;
-        }
-
-        /// <summary>
-        /// Obter numero de jogadores conectados (incluindo o host)
-        /// </summary>
         public int GetConnectedPlayersCount()
         {
             if (NetworkManager.Singleton == null || !isHost) return 0;
-
             return (int)NetworkManager.Singleton.ConnectedClients.Count;
         }
 
         private void OnApplicationQuit()
         {
-            if (isHost)
-            {
-                StopHost();
-            }
+            if (isHost) StopHost();
         }
     }
 }

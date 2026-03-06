@@ -5,8 +5,15 @@ using System.Collections.Generic;
 namespace ExoBeasts.Multiplayer.GameServer
 {
     /// <summary>
-    /// Gerencia a logica do servidor dedicado
-    /// Apenas executa no servidor, nao nos clientes
+    /// ── GameServerManager ────────────────────────────────
+    /// Gerencia conexoes de clientes no servidor durante a partida.
+    ///
+    ///  ▸ Roda apenas no servidor (OnNetworkSpawn verifica IsServer)
+    ///  ▸ Registra / remove jogadores ao conectar / desconectar
+    ///  ▸ Valida vagas antes de aceitar conexao
+    ///  ▸ NotifyPlayerJoinedClientRpc / NotifyPlayerLeftClientRpc
+    ///  ▸ Singleton
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class GameServerManager : NetworkBehaviour
     {
@@ -42,7 +49,6 @@ namespace ExoBeasts.Multiplayer.GameServer
         {
             Debug.Log("[GameServerManager] Inicializando servidor de jogo...");
 
-            // Registrar callbacks de conexao
             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
 
@@ -54,7 +60,6 @@ namespace ExoBeasts.Multiplayer.GameServer
         {
             Debug.Log($"[GameServerManager] Cliente conectado: {clientId}");
 
-            // Validar se ha espaco
             if (connectedPlayers.Count >= maxConnectedPlayers)
             {
                 Debug.LogWarning($"[GameServerManager] Servidor cheio! Desconectando cliente {clientId}");
@@ -62,7 +67,6 @@ namespace ExoBeasts.Multiplayer.GameServer
                 return;
             }
 
-            // Registrar jogador
             var playerData = new PlayerData
             {
                 clientId = clientId,
@@ -73,7 +77,6 @@ namespace ExoBeasts.Multiplayer.GameServer
             connectedPlayers.Add(clientId, playerData);
             Debug.Log($"[GameServerManager] Jogadores conectados: {connectedPlayers.Count}/{maxConnectedPlayers}");
 
-            // Notificar outros jogadores
             NotifyPlayerJoinedClientRpc(clientId, playerData.displayName);
         }
 
@@ -86,15 +89,12 @@ namespace ExoBeasts.Multiplayer.GameServer
                 connectedPlayers.Remove(clientId);
                 Debug.Log($"[GameServerManager] Jogadores restantes: {connectedPlayers.Count}");
 
-                // Notificar outros jogadores
                 NotifyPlayerLeftClientRpc(clientId);
             }
 
-            // Se todos desconectaram, encerrar servidor
             if (connectedPlayers.Count == 0)
             {
                 Debug.Log("[GameServerManager] Todos os jogadores desconectaram. Encerrando servidor...");
-                // TODO: Encerrar servidor gracefully
             }
         }
 
@@ -110,9 +110,6 @@ namespace ExoBeasts.Multiplayer.GameServer
             Debug.Log($"[GameServerManager] Notificacao: Jogador {clientId} saiu");
         }
 
-        /// <summary>
-        /// Validar se um jogador pode realizar uma acao
-        /// </summary>
         public bool ValidatePlayerAction(ulong clientId, string action)
         {
             if (!IsServer) return false;
@@ -123,13 +120,9 @@ namespace ExoBeasts.Multiplayer.GameServer
                 return false;
             }
 
-            // TODO: Adicionar validacoes especificas por acao
             return true;
         }
 
-        /// <summary>
-        /// Obter dados de um jogador conectado
-        /// </summary>
         public PlayerData GetPlayerData(ulong clientId)
         {
             if (connectedPlayers.ContainsKey(clientId))
@@ -139,9 +132,6 @@ namespace ExoBeasts.Multiplayer.GameServer
             return null;
         }
 
-        /// <summary>
-        /// Obter todos os jogadores conectados
-        /// </summary>
         public Dictionary<ulong, PlayerData> GetAllPlayers()
         {
             return connectedPlayers;
@@ -162,9 +152,6 @@ namespace ExoBeasts.Multiplayer.GameServer
         }
     }
 
-    /// <summary>
-    /// Dados de um jogador conectado
-    /// </summary>
     [System.Serializable]
     public class PlayerData
     {
