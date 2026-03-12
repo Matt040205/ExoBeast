@@ -48,6 +48,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -7511558181221131132, guid: 4df4cae5cb288c44fbd7d25e63f0d61f, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 947a398a98364f944ae8fb69682a9009, type: 2}
     - target: {fileID: 919132149155446097, guid: 4df4cae5cb288c44fbd7d25e63f0d61f, type: 3}
       propertyPath: m_Name
       value: Pedra04
