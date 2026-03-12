@@ -33,20 +33,22 @@ Multiplayer/
 │
 ├── Lobby/
 │   ├── LobbyData.cs              ✅ Structs (LobbyInfo, LobbyMember, etc.)
-│   ├── LobbyManager.cs           🚧 Estrutura pronta, chamadas EOS pendentes
-│   ├── LobbyUI.cs                🚧 Estrutura criada
-│   └── LobbyItemUI.cs            🚧 Estrutura criada
+│   ├── LobbyManager.cs           ✅ Chamadas EOS reais (Create, Search, Join, Leave, StartMatch)
+│   ├── LobbyUI.cs                ✅ Canvas UI principal do lobby
+│   └── LobbyItemUI.cs            ✅ Item da lista de lobbies
 │
 ├── GameServer/
-│   ├── GameServerManager.cs      🚧 Estrutura criada
+│   ├── GameServerManager.cs      ✅ Gerencia conexoes do servidor
 │   ├── MatchManager.cs           🚧 Estrutura criada
-│   └── PlayerRegistry.cs         🚧 Estrutura criada
+│   └── PlayerRegistry.cs         ✅ Mapeia clientId → GameObject
 │
 ├── Sync/
 │   ├── NetworkedPlayerController.cs 🚧 Estrutura criada
 │   ├── NetworkedCurrency.cs         🚧 Estrutura criada
 │   ├── NetworkedBuilding.cs         🚧 Estrutura criada
-│   └── NetworkedHorde.cs            🚧 Estrutura criada
+│   ├── NetworkedHorde.cs            ✅ Wave system sincronizado (server-authoritative)
+│   ├── NetworkedEnemy.cs            ✅ Wrapper de rede para inimigos (saude, morte, IA so no servidor)
+│   └── PlayerNetworkSetup.cs        ✅ Habilita/desabilita controles por papel de rede (owner vs remoto)
 │
 ├── Testing/
 │   ├── EOSAuthTest.cs            ✅ Teste de autenticacao EOS (funcional)
@@ -129,26 +131,45 @@ Resumo: crie `EOSCredentials.json` na **raiz do projeto** (nao em Assets!) e pre
 - [x] Capsulas spawnando corretamente para cada jogador
 - [x] Troca de cena sincronizada via NGO SceneManager testada
 
-### 🚧 Proxima: Fase 3 - Lobby System
-- [ ] LobbyManager com chamadas EOS reais (CreateLobby, JoinLobby, Search)
-- [ ] LobbyScene.unity com UI completa
-- [ ] Atributos de membro (personagem, ready)
-- [ ] Host inicia partida → clients recebem IP → conectam
+### ✅ Fase 3: Lobby System (Concluido — Marco 2026)
+- [x] LobbyManager com chamadas EOS reais (CreateLobby, JoinLobby, Search, Leave, StartMatch)
+- [x] LobbyScene.unity com UI de placeholder (LobbyPlaceholderUI.cs via OnGUI)
+- [x] Atributos de membro: DISPLAY_NAME, SESSION_TOKEN, READY
+- [x] Host inicia partida → publica SERVER_ADDRESS → clients detectam e chamam StartClient()
+- [x] Sistema hibrido de identidade ClientId + ProductUserId (anti-colisao MPPM)
+- [x] MppmHelper.cs — deteccao de clone MPPM via args de linha de comando
+- [x] PlayerIdentityBridge.cs — ponte NGO ClientId ↔ EOS ProductUserId via ServerRpc
 
-### 🔲 Fase 4: P2P via Internet
+### ✅ Sprint: NavMesh na Rede (Concluido — Marco 2026)
+- [x] EnemyController integrado com NavMeshAgent (caminho inteligente ao redor de obstaculos)
+- [x] NavMeshAgent desabilitado em clientes — IA roda apenas no servidor (host)
+- [x] Knockback: desabilita agent temporariamente, usa Rigidbody.AddForce, restaura apos 0.4s
+- [x] NetworkedEnemy.cs — saude e morte como NetworkVariables; TakeDamageServerRpc acessivel por qualquer jogador
+- [x] EnemyPoolManager.cs — bug de pool criando apenas 1 inimigo corrigido
+
+### ✅ Sprint: Sincronizacao de Movimento e Animacao (Concluido — Marco 2026)
+- [x] PlayerNetworkSetup.cs — habilita controles apenas no owner; desabilita CharacterController no remoto
+- [x] NetworkedHorde.cs — SpawnEnemy() completo com pontos de spawn configuraveis no Inspector
+- [x] NetworkedHorde.cs — EnemiesRemaining protegido com Mathf.Max(0, ...) contra underflow
+
+### 🚧 Fase 4: P2P via Internet (Em andamento)
+- [x] LAN funcional (NGO + UnityTransport UDP)
 - [ ] EOS P2P Transport (NAT Traversal para conexoes fora da LAN)
-- [ ] Teste entre maquinas em redes diferentes
+- [ ] Teste entre maquinas em redes diferentes (prioridade maxima)
 
 ### 🔲 Fase 5: Sincronizacao de Gameplay
-- [ ] Player Prefab com NetworkBehaviour
-- [ ] Movimento, vida, combate sincronizados
-- [ ] Torres, inimigos, waves sincronizados
-- [ ] Habilidades e ultimate sincronizados
+- [ ] Prefabs de personagem (Samurai, Arqueira) configurados no Editor:
+  - NetworkObject + ClientNetworkTransform (owner-authoritative)
+  - NetworkAnimator para sincronizar animacoes de ataque/corrida
+  - PlayerNetworkSetup com refs preenchidas no Inspector
+- [ ] PlayerMovement.cs e PlayerHealthSystem.cs migrados para NetworkBehaviour
+- [ ] NavMesh bake na cena SceneMapTest.unity (aguardando level design)
+- [ ] MONSTRO.prefab com NavMeshAgent + NetworkObject + NetworkTransform + NetworkedEnemy
 
 ### 🔲 Fase 6: Polimento
-- [ ] Tratamento de desconexao
-- [ ] Interpolacao de movimento
-- [ ] Testes de performance
+- [ ] Tratamento de desconexao e reconexao
+- [ ] Teste de performance com 4 jogadores simultaneos
+- [ ] Timeout em operacoes async EOS (UI trava se backend inacessivel)
 
 ---
 
@@ -172,6 +193,6 @@ Resumo: crie `EOSCredentials.json` na **raiz do projeto** (nao em Assets!) e pre
 
 ---
 
-**Versao:** 1.2
+**Versao:** 2.0
 **Ultima atualizacao:** Marco 2026
-**Fase atual:** Sprint Rede Basica concluida — iniciando Fase 3 (Lobby System)
+**Fase atual:** Fase 3 + Sprints NavMesh e Sync concluidos — Fase 4 (P2P Internet) e Fase 5 (Gameplay Sync) em andamento

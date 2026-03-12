@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 using System.Collections.Generic;
 using System.Collections;
 using FMODUnity;
@@ -49,6 +50,7 @@ public class EnemyController : MonoBehaviour
     private EnemyHealthSystem healthSystem;
     private EnemyCombatSystem combatSystem;
     private Rigidbody rb;
+    private NavMeshAgent agent;
     private Animator anim;
 
     private float currentMoveSpeed;
@@ -78,6 +80,9 @@ public class EnemyController : MonoBehaviour
             rb.constraints = RigidbodyConstraints.FreezeRotation;
             rb.useGravity = true;
         }
+
+        if (TryGetComponent(out agent))
+            rb.isKinematic = true;
 
         if (!string.IsNullOrEmpty(eventoMonstro))
         {
@@ -142,6 +147,13 @@ public class EnemyController : MonoBehaviour
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
+        }
+
+        if (agent != null)
+        {
+            agent.ResetPath();
+            agent.speed = originalMoveSpeed;
+            agent.isStopped = false;
         }
 
         if (combatSystem != null)
@@ -212,14 +224,19 @@ public class EnemyController : MonoBehaviour
 
     private IEnumerator KnockbackRoutine(Vector3 direction, float force)
     {
-        isKnockedBack = true; // Trava a movimentação normal
+        isKnockedBack = true;
 
-        rb.linearVelocity = Vector3.zero; // Zera velocidade atual
-        rb.AddForce(direction.normalized * force, ForceMode.Impulse); // Aplica o tiro
+        if (agent != null) agent.isStopped = true;
+        rb.isKinematic = false;
+        rb.linearVelocity = Vector3.zero;
+        rb.AddForce(direction.normalized * force, ForceMode.Impulse);
 
-        yield return new WaitForSeconds(0.4f); // Tempo para voar livremente sem a IA interferir
+        yield return new WaitForSeconds(0.4f);
 
-        isKnockedBack = false; // Devolve o controle para a IA
+        rb.linearVelocity = Vector3.zero;
+        rb.isKinematic = agent != null;
+        if (agent != null) agent.isStopped = false;
+        isKnockedBack = false;
     }
 
     public void ApplySlow(float percentage, float duration)
@@ -251,10 +268,12 @@ public class EnemyController : MonoBehaviour
     {
         isSlipping = true;
         if (anim != null) anim.SetTrigger("Slip");
-
+        if (agent != null) agent.isStopped = true;
         if (rb != null) rb.linearVelocity = Vector3.zero;
 
         yield return new WaitForSeconds(1.5f);
+
+        if (agent != null) agent.isStopped = false;
         isSlipping = false;
     }
 
@@ -273,9 +292,12 @@ public class EnemyController : MonoBehaviour
     private IEnumerator RootRoutine(float duration)
     {
         isRooted = true;
+        if (agent != null) agent.isStopped = true;
         if (rb != null) rb.linearVelocity = Vector3.zero;
 
         yield return new WaitForSeconds(duration);
+
+        if (agent != null) agent.isStopped = false;
         isRooted = false;
     }
 
@@ -388,7 +410,11 @@ public class EnemyController : MonoBehaviour
             rb.angularVelocity = Vector3.zero;
         }
 
-        transform.position = lastWaypointReached.position;
+        if (agent != null && agent.isOnNavMesh)
+            agent.Warp(lastWaypointReached.position);
+        else
+            transform.position = lastWaypointReached.position;
+
         target = null;
         if (anim != null) anim.SetBool("isWalking", true);
     }
@@ -418,7 +444,8 @@ public class EnemyController : MonoBehaviour
 
         if (distanceToTarget <= attackDistance)
         {
-            if (rb != null) rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
+            if (agent != null && agent.enabled) agent.isStopped = true;
+            if (rb != null && !rb.isKinematic) rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
 
             if (anim != null)
             {
@@ -431,11 +458,15 @@ public class EnemyController : MonoBehaviour
             if (direction != Vector3.zero)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(direction);
-                rb.MoveRotation(Quaternion.Slerp(transform.rotation, targetRotation, 10f * Time.fixedDeltaTime));
+                if (agent != null && agent.enabled)
+                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 10f * Time.fixedDeltaTime);
+                else
+                    rb.MoveRotation(Quaternion.Slerp(transform.rotation, targetRotation, 10f * Time.fixedDeltaTime));
             }
         }
         else
         {
+            if (agent != null && agent.enabled) agent.isStopped = false;
             if (anim != null) anim.SetBool("isWalking", true);
             MoveTowardsPosition(target.position);
         }
@@ -443,18 +474,22 @@ public class EnemyController : MonoBehaviour
 
     private void MoveTowardsPosition(Vector3 targetPosition)
     {
+        if (isRooted || isSlipping || isKnockedBack) return;
+
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
+        {
+            agent.speed = currentMoveSpeed * speedModifier;
+            agent.SetDestination(targetPosition);
+            return;
+        }
+
         if (rb == null) return;
-        if (isRooted || isSlipping || isKnockedBack) return; // Checagem extra
 
         Vector3 direction = (targetPosition - transform.position).normalized;
         direction.y = 0;
 
         float finalSpeed = currentMoveSpeed * speedModifier;
-
-        Vector3 horizontalVelocity = direction * finalSpeed;
-        float verticalVelocity = rb.linearVelocity.y;
-
-        rb.linearVelocity = new Vector3(horizontalVelocity.x, verticalVelocity, horizontalVelocity.z);
+        rb.linearVelocity = new Vector3(direction.x * finalSpeed, rb.linearVelocity.y, direction.z * finalSpeed);
 
         if (direction != Vector3.zero)
         {
@@ -466,6 +501,7 @@ public class EnemyController : MonoBehaviour
     public void HandleDeath()
     {
         if (anim != null) anim.SetBool("isWalking", false);
+        if (agent != null) agent.ResetPath();
         EnemyPoolManager.Instance.ReturnToPool(gameObject);
     }
 

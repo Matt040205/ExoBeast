@@ -5,7 +5,7 @@ public class EnemyPoolManager : MonoBehaviour
 {
     public static EnemyPoolManager Instance;
 
-    [Header("Configurações do Pool")]
+    [Header("Configuraï¿½ï¿½es do Pool")]
     public GameObject enemyPrefab;
     public int poolSize = 20;
 
@@ -13,7 +13,7 @@ public class EnemyPoolManager : MonoBehaviour
 
     private void Awake()
     {
-        // Cria uma instância singleton
+        // Cria uma instï¿½ncia singleton
         if (Instance == null)
         {
             Instance = this;
@@ -30,7 +30,6 @@ public class EnemyPoolManager : MonoBehaviour
             GameObject newEnemy = Instantiate(enemyPrefab);
             newEnemy.SetActive(false);
             enemyPool.Add(newEnemy);
-            return;
         }
     }
 
