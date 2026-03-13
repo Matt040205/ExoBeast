@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 using System.Collections.Generic;
 using System.Collections;
 using FMODUnity;
@@ -10,6 +11,7 @@ public enum AITargetPriority
     Objective
 }
 
+[RequireComponent(typeof(NavMeshAgent))]
 public class EnemyController : MonoBehaviour
 {
     [Header("Dados do Inimigo")]
@@ -30,11 +32,23 @@ public class EnemyController : MonoBehaviour
     public float attackDistance = 2f;
     public float respawnYThreshold = -10f;
 
+    [Header("Perseguição (Player)")]
+    public float maxChaseTime = 10f;
+    public float maxChaseDistance = 60f;
+    private float currentChaseTimer = 0f;
+    private Vector3 initialChasePosition;
+
+    [Header("Anti-Stuck")]
+    public float stuckCheckInterval = 1f;
+    public float minDistanceMoved = 0.5f;
+    private Vector3 lastStuckCheckPosition;
+    private float stuckTimer = 0f;
+
     [Header("Controle de Grupo (CC)")]
     private float speedModifier = 1f;
     private bool isRooted = false;
     private bool isSlipping = false;
-    private bool isKnockedBack = false; // NOVA VARIÁVEL
+    private bool isKnockedBack = false;
     private int paintStacks = 0;
     private float paintStackResetTime;
 
@@ -50,6 +64,7 @@ public class EnemyController : MonoBehaviour
     private EnemyCombatSystem combatSystem;
     private Rigidbody rb;
     private Animator anim;
+    private NavMeshAgent agent;
 
     private float currentMoveSpeed;
     private float originalMoveSpeed;
@@ -71,12 +86,19 @@ public class EnemyController : MonoBehaviour
         combatSystem = GetComponent<EnemyCombatSystem>();
         rb = GetComponent<Rigidbody>();
         anim = GetComponent<Animator>();
+        agent = GetComponent<NavMeshAgent>();
 
         if (rb == null)
         {
             rb = gameObject.AddComponent<Rigidbody>();
             rb.constraints = RigidbodyConstraints.FreezeRotation;
             rb.useGravity = true;
+        }
+
+        if (agent != null)
+        {
+            agent.updateRotation = true;
+            agent.updatePosition = true;
         }
 
         if (!string.IsNullOrEmpty(eventoMonstro))
@@ -89,6 +111,7 @@ public class EnemyController : MonoBehaviour
     void OnEnable()
     {
         if (monstroSoundInstance.isValid()) monstroSoundInstance.start();
+        lastStuckCheckPosition = transform.position;
     }
 
     void OnDisable()
@@ -101,7 +124,7 @@ public class EnemyController : MonoBehaviour
         if (monstroSoundInstance.isValid()) monstroSoundInstance.release();
     }
 
-    public void InitializeEnemy(Transform player, List<Transform> path, EnemyDataSO data, int level)
+    public void InitializeEnemy(Transform player, List<Transform> path, EnemyDataSO data, int level, Transform spawnPoint = null)
     {
         this.playerTransform = player;
         this.patrolPoints = path;
@@ -124,16 +147,25 @@ public class EnemyController : MonoBehaviour
         isBlinded = false;
         isKnockedBack = false;
         paintStacks = 0;
+        currentChaseTimer = 0f;
+
+        if (agent != null)
+        {
+            agent.enabled = true;
+            if (spawnPoint != null)
+                agent.Warp(spawnPoint.position);
+            else if (patrolPoints != null && patrolPoints.Count > 0)
+                agent.Warp(patrolPoints[0].position);
+
+            agent.speed = originalMoveSpeed;
+            agent.stoppingDistance = attackDistance;
+        }
 
         healthSystem.enemyData = this.enemyData;
         healthSystem.InitializeHealth(nivel);
         currentPointIndex = 0;
         target = null;
-
-        if (patrolPoints != null && patrolPoints.Count > 0)
-            lastWaypointReached = patrolPoints[0];
-        else
-            lastWaypointReached = null;
+        lastWaypointReached = spawnPoint != null ? spawnPoint : (patrolPoints != null && patrolPoints.Count > 0 ? patrolPoints[0] : null);
 
         if (anim == null) anim = GetComponent<Animator>();
         if (anim != null) anim.SetBool("isWalking", false);
@@ -144,82 +176,95 @@ public class EnemyController : MonoBehaviour
             rb.angularVelocity = Vector3.zero;
         }
 
-        if (combatSystem != null)
-        {
-            combatSystem.InitializeCombat(enemyData, nivel);
-        }
+        if (combatSystem != null) combatSystem.InitializeCombat(enemyData, nivel);
     }
 
     void Update()
     {
-        if (IsDead) return;
-
-        if (transform.position.y < respawnYThreshold)
-        {
-            RespawnAtLastWaypoint();
-        }
-
-        if (paintStacks > 0 && Time.time > paintStackResetTime)
-        {
-            paintStacks = 0;
-        }
-    }
-
-    void FixedUpdate()
-    {
         if (IsDead)
         {
-            if (anim != null) anim.SetBool("isWalking", false);
+            if (agent.enabled) agent.isStopped = true;
             return;
         }
 
-        if (isSlipping || isRooted || isKnockedBack) // SE ESTIVER SENDO EMPURRADO, NÃO MOVE
+        if (transform.position.y < respawnYThreshold) RespawnAtLastWaypoint();
+
+        if (paintStacks > 0 && Time.time > paintStackResetTime) paintStacks = 0;
+
+        bool canMove = !(isSlipping || isRooted || isKnockedBack);
+
+        if (agent.enabled)
+        {
+            agent.isStopped = !canMove;
+            agent.speed = currentMoveSpeed * speedModifier;
+            CheckIfStuck();
+        }
+
+        if (!canMove)
         {
             if (anim != null) anim.SetBool("isWalking", false);
             return;
-        }
-
-        if (target != null && target.CompareTag(TAG_POCA))
-        {
-            target = null;
         }
 
         DecideTarget();
 
-        if (target != null)
-        {
-            ChaseTarget();
-        }
-        else
-        {
-            Patrol();
-        }
+        if (target != null) ChaseTarget();
+        else Patrol();
     }
 
-    public void SetBlinded(bool state)
+    private void CheckIfStuck()
     {
-        isBlinded = state;
+        if (!agent.hasPath || agent.velocity.sqrMagnitude > 0.1f)
+        {
+            stuckTimer = 0;
+            return;
+        }
+
+        stuckTimer += Time.deltaTime;
+
+        if (stuckTimer >= stuckCheckInterval)
+        {
+            float dist = Vector3.Distance(transform.position, lastStuckCheckPosition);
+            if (dist < minDistanceMoved)
+            {
+                if (target != null)
+                {
+                    agent.ResetPath();
+                    target = null;
+                }
+                else
+                {
+                    currentPointIndex = (currentPointIndex + 1) % patrolPoints.Count;
+                }
+            }
+            lastStuckCheckPosition = transform.position;
+            stuckTimer = 0;
+        }
     }
 
-    // --- CORREÇÃO DO KNOCKBACK ---
+    public void SetBlinded(bool state) => isBlinded = state;
+
     public void ApplyKnockback(Vector3 direction, float force)
     {
-        if (rb != null && !isRooted)
-        {
-            StartCoroutine(KnockbackRoutine(direction, force));
-        }
+        if (rb != null && !isRooted) StartCoroutine(KnockbackRoutine(direction, force));
     }
 
     private IEnumerator KnockbackRoutine(Vector3 direction, float force)
     {
-        isKnockedBack = true; // Trava a movimentação normal
-
-        rb.linearVelocity = Vector3.zero; // Zera velocidade atual
-        rb.AddForce(direction.normalized * force, ForceMode.Impulse); // Aplica o tiro
-
-        yield return new WaitForSeconds(0.4f); // Tempo para voar livremente sem a IA interferir
-
-        isKnockedBack = false; // Devolve o controle para a IA
+        isKnockedBack = true;
+        if (agent.enabled) agent.enabled = false;
+        rb.isKinematic = false;
+        rb.linearVelocity = Vector3.zero;
+        rb.AddForce(direction.normalized * force, ForceMode.Impulse);
+        yield return new WaitForSeconds(0.4f);
+        yield return new WaitUntil(() => Mathf.Abs(rb.linearVelocity.y) < 0.1f);
+        rb.isKinematic = true;
+        isKnockedBack = false;
+        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2.0f, NavMesh.AllAreas))
+        {
+            agent.enabled = true;
+            agent.Warp(hit.position);
+        }
     }
 
     public void ApplySlow(float percentage, float duration)
@@ -232,28 +277,21 @@ public class EnemyController : MonoBehaviour
     {
         speedModifier = Mathf.Clamp01(1f - percentage);
         if (anim != null) anim.speed = speedModifier;
-
         yield return new WaitForSeconds(duration);
-
         speedModifier = 1f;
         if (anim != null) anim.speed = 1f;
     }
 
     public void ApplySlip()
     {
-        if (!isSlipping && !isRooted)
-        {
-            StartCoroutine(SlipRoutine());
-        }
+        if (!isSlipping && !isRooted) StartCoroutine(SlipRoutine());
     }
 
     private IEnumerator SlipRoutine()
     {
         isSlipping = true;
         if (anim != null) anim.SetTrigger("Slip");
-
-        if (rb != null) rb.linearVelocity = Vector3.zero;
-
+        if (agent.enabled) agent.isStopped = true;
         yield return new WaitForSeconds(1.5f);
         isSlipping = false;
     }
@@ -262,7 +300,6 @@ public class EnemyController : MonoBehaviour
     {
         paintStacks++;
         paintStackResetTime = Time.time + 5f;
-
         if (paintStacks >= 5)
         {
             StartCoroutine(RootRoutine(2f));
@@ -273,8 +310,7 @@ public class EnemyController : MonoBehaviour
     private IEnumerator RootRoutine(float duration)
     {
         isRooted = true;
-        if (rb != null) rb.linearVelocity = Vector3.zero;
-
+        if (agent.enabled) agent.isStopped = true;
         yield return new WaitForSeconds(duration);
         isRooted = false;
     }
@@ -299,13 +335,7 @@ public class EnemyController : MonoBehaviour
 
     private void DecideTarget()
     {
-        if (playerTransform == null)
-        {
-            target = null;
-            return;
-        }
-
-        if (playerTransform.CompareTag(TAG_POCA))
+        if (playerTransform == null || playerTransform.CompareTag(TAG_POCA))
         {
             target = null;
             return;
@@ -313,34 +343,35 @@ public class EnemyController : MonoBehaviour
 
         float distanceToPlayer = Vector3.Distance(transform.position, playerTransform.position);
 
-        bool foundTarget = false;
+        if (target == playerTransform)
+        {
+            currentChaseTimer += Time.deltaTime;
+            float distanceTraveled = Vector3.Distance(transform.position, initialChasePosition);
 
-        if (mainPriority == AITargetPriority.Player && distanceToPlayer <= chaseDistance)
-        {
-            target = playerTransform;
-            foundTarget = true;
+            if (currentChaseTimer >= maxChaseTime || distanceTraveled >= maxChaseDistance || distanceToPlayer > chaseDistance * 1.5f)
+            {
+                target = null;
+                currentChaseTimer = 0f;
+                return;
+            }
         }
-        else if (mainPriority == AITargetPriority.Objective && distanceToPlayer <= selfDefenseRadius)
+        else
         {
-            target = playerTransform;
-            foundTarget = true;
-        }
+            bool shouldChase = false;
+            if (mainPriority == AITargetPriority.Player && distanceToPlayer <= chaseDistance) shouldChase = true;
+            else if (mainPriority == AITargetPriority.Objective && distanceToPlayer <= selfDefenseRadius) shouldChase = true;
 
-        if (!foundTarget)
-        {
-            target = null;
+            if (shouldChase)
+            {
+                target = playerTransform;
+                initialChasePosition = transform.position;
+                currentChaseTimer = 0f;
+            }
         }
     }
 
-    public void LoseTarget()
-    {
-        target = null;
-    }
-
-    public void SetTargetNull()
-    {
-        target = null;
-    }
+    public void LoseTarget() => target = null;
+    public void SetTargetNull() => target = null;
 
     private void Patrol()
     {
@@ -350,11 +381,41 @@ public class EnemyController : MonoBehaviour
             AttackObjectiveAndDie();
             return;
         }
-
         if (anim != null) anim.SetBool("isWalking", true);
+        MoveTowardsPosition(patrolPoints[currentPointIndex].position);
+    }
 
-        Transform currentDestination = patrolPoints[currentPointIndex];
-        MoveTowardsPosition(currentDestination.position);
+    private void ChaseTarget()
+    {
+        if (target == null) return;
+        float distanceToTarget = Vector3.Distance(transform.position, target.position);
+        if (distanceToTarget <= attackDistance)
+        {
+            if (agent.enabled) agent.isStopped = true;
+            if (anim != null)
+            {
+                anim.SetBool("isWalking", false);
+                anim.SetTrigger("doAttack");
+            }
+            Vector3 direction = (target.position - transform.position).normalized;
+            direction.y = 0;
+            if (direction != Vector3.zero)
+                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(direction), 10f * Time.deltaTime);
+        }
+        else
+        {
+            if (anim != null) anim.SetBool("isWalking", true);
+            MoveTowardsPosition(target.position);
+        }
+    }
+
+    private void MoveTowardsPosition(Vector3 targetPosition)
+    {
+        if (agent.enabled)
+        {
+            agent.isStopped = false;
+            agent.SetDestination(targetPosition);
+        }
     }
 
     void OnTriggerEnter(Collider other)
@@ -373,123 +434,39 @@ public class EnemyController : MonoBehaviour
     {
         if (lastWaypointReached == null)
         {
-            if (patrolPoints != null && patrolPoints.Count > 0)
-                lastWaypointReached = patrolPoints[0];
+            if (patrolPoints != null && patrolPoints.Count > 0) lastWaypointReached = patrolPoints[0];
             else
             {
                 EnemyPoolManager.Instance.ReturnToPool(gameObject);
                 return;
             }
         }
-
-        if (rb != null)
-        {
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
-        }
-
-        transform.position = lastWaypointReached.position;
+        if (agent.enabled) agent.Warp(lastWaypointReached.position);
+        else transform.position = lastWaypointReached.position;
         target = null;
-        if (anim != null) anim.SetBool("isWalking", true);
     }
 
     private void AttackObjectiveAndDie()
     {
         ObjectiveHealthSystem objective = FindFirstObjectByType<ObjectiveHealthSystem>();
-        if (objective != null)
-        {
-            float damageToObjective = enemyData.GetDamage(nivel);
-            objective.TakeDamage(damageToObjective);
-        }
+        if (objective != null) objective.TakeDamage(enemyData.GetDamage(nivel));
         EnemyPoolManager.Instance.ReturnToPool(gameObject);
-    }
-
-    private void ChaseTarget()
-    {
-        if (target == null) return;
-
-        if (target.CompareTag(TAG_POCA))
-        {
-            target = null;
-            return;
-        }
-
-        float distanceToTarget = Vector3.Distance(transform.position, target.position);
-
-        if (distanceToTarget <= attackDistance)
-        {
-            if (rb != null) rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
-
-            if (anim != null)
-            {
-                anim.SetBool("isWalking", false);
-                anim.SetTrigger("doAttack");
-            }
-
-            Vector3 direction = (target.position - transform.position).normalized;
-            direction.y = 0;
-            if (direction != Vector3.zero)
-            {
-                Quaternion targetRotation = Quaternion.LookRotation(direction);
-                rb.MoveRotation(Quaternion.Slerp(transform.rotation, targetRotation, 10f * Time.fixedDeltaTime));
-            }
-        }
-        else
-        {
-            if (anim != null) anim.SetBool("isWalking", true);
-            MoveTowardsPosition(target.position);
-        }
-    }
-
-    private void MoveTowardsPosition(Vector3 targetPosition)
-    {
-        if (rb == null) return;
-        if (isRooted || isSlipping || isKnockedBack) return; // Checagem extra
-
-        Vector3 direction = (targetPosition - transform.position).normalized;
-        direction.y = 0;
-
-        float finalSpeed = currentMoveSpeed * speedModifier;
-
-        Vector3 horizontalVelocity = direction * finalSpeed;
-        float verticalVelocity = rb.linearVelocity.y;
-
-        rb.linearVelocity = new Vector3(horizontalVelocity.x, verticalVelocity, horizontalVelocity.z);
-
-        if (direction != Vector3.zero)
-        {
-            Quaternion targetRotation = Quaternion.LookRotation(direction);
-            rb.MoveRotation(Quaternion.Slerp(transform.rotation, targetRotation, 5f * Time.fixedDeltaTime));
-        }
     }
 
     public void HandleDeath()
     {
         if (anim != null) anim.SetBool("isWalking", false);
+        if (agent.enabled) agent.isStopped = true;
         EnemyPoolManager.Instance.ReturnToPool(gameObject);
     }
 
     public void TakeDamage(float damageAmount, Transform attacker = null)
     {
         healthSystem.TakeDamage(damageAmount);
-
-        if (attacker != null && target == null)
-        {
-            if (attacker.CompareTag(TAG_POCA))
-            {
-                // Ignora
-            }
-            else
-            {
-                target = attacker;
-            }
-        }
+        if (attacker != null && target == null && !attacker.CompareTag(TAG_POCA)) target = attacker;
     }
 
-    public void SetPatrolPoints(List<Transform> points)
-    {
-        patrolPoints = points;
-    }
+    public void SetPatrolPoints(List<Transform> points) => patrolPoints = points;
 
     void OnDrawGizmosSelected()
     {
