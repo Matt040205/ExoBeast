@@ -14986,6 +14986,7 @@ GameObject:
   m_Component:
   - component: {fileID: 405166958}
   - component: {fileID: 405166957}
+  - component: {fileID: 405166959}
   m_Layer: 0
   m_Name: HordaManager
   m_TagString: Untagged
@@ -15056,6 +15057,22 @@ Transform:
   - {fileID: 1945827120}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &405166959
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 405166956}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f0669480cacb40428bc7160a600e9b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  damagePopupPrefab: {fileID: 8326272338086162720, guid: f477467543ef0e14f90695c866eb1aae, type: 3}
+  magicStarPrefab: {fileID: 3646232356749302539, guid: d79e485ef3fc7134caf8813170b490be, type: 3}
+  initialPopupCount: 30
+  initialStarCount: 60
 --- !u!1 &409980617
 GameObject:
   m_ObjectHideFlags: 0
@@ -17665,8 +17682,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: " Enemy\xB4s Base 02\n\\/\n"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: adb615c1b67691f40af8b1507143a797, type: 2}
-  m_sharedMaterial: {fileID: -1928636499160523542, guid: adb615c1b67691f40af8b1507143a797, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -49674,8 +49691,8 @@ MonoBehaviour:
 
 '
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: adb615c1b67691f40af8b1507143a797, type: 2}
-  m_sharedMaterial: {fileID: -1928636499160523542, guid: adb615c1b67691f40af8b1507143a797, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -76444,8 +76461,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: " Enemy\xB4s Base 01\n\\/\n"
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: adb615c1b67691f40af8b1507143a797, type: 2}
-  m_sharedMaterial: {fileID: -1928636499160523542, guid: adb615c1b67691f40af8b1507143a797, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
