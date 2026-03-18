@@ -366,6 +366,7 @@ GameObject:
   - component: {fileID: 7905258126496636682}
   - component: {fileID: 1527235181715017189}
   - component: {fileID: 1988645179375761527}
+  - component: {fileID: -8535913011432277912}
   - component: {fileID: 573096255506189436}
   - component: {fileID: 9215532886368702831}
   - component: {fileID: 6472170318049487491}
@@ -508,6 +509,27 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &-8535913011432277912
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2682399473942067493}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 983681037
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!114 &573096255506189436
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -559,7 +581,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterData: {fileID: 11400000, guid: 8eb457e248c385043bf118efaf313b53, type: 2}
   firePoint: {fileID: 4757579757688161299}
-  projectileVisualPrefab: {fileID: 9104921844974723845, guid: f14f768e29c3c2c4ca827c7d1b39d783, type: 3}
+  projectileVisualPrefab: {fileID: 2027974582639016208, guid: e3fa2040e19007744b3937f9244f4c9f, type: 3}
   impactEffectPrefab: {fileID: 0}
   aimTarget: {fileID: 0}
   aimTargetDistance: 20
@@ -608,7 +630,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   characterData: {fileID: 11400000, guid: 8eb457e248c385043bf118efaf313b53, type: 2}
-  currentHealth: 0
+  currentHealth:
+    m_InternalValue: 0
   isRegenerating: 0
   damageMultiplier: 1
   speedMultiplier: 1
@@ -931,6 +954,22 @@ MonoBehaviour:
         m_CallState: 2
     m_ActionId: 2bda8d34-762f-4dc2-9605-3aa1e77097a3
     m_ActionName: 'Player/Aim[/Mouse/rightButton]'
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 9215532886368702831}
+        m_TargetAssemblyTypeName: PlayerShooting, Assembly-CSharp
+        m_MethodName: OnReload
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: c170012a-c332-45a7-82a1-c74086c0843c
+    m_ActionName: 'Player/Reload[/Keyboard/r]'
   m_NeverAutoSwitchControlSchemes: 0
   m_DefaultControlScheme: 
   m_DefaultActionMap: Player

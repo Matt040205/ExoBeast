@@ -1,25 +1,16 @@
 using UnityEngine;
 using System.Collections.Generic;
-using Unity.Cinemachine;
-using static TrapDataSO;
 using UnityEngine.EventSystems;
-using static Unity.VisualScripting.Member;
-using UnityEngine.Rendering; // Necessário para o Volume
-using UnityEngine.Rendering.Universal; // Necessário para o DepthOfField (URP)
+using Unity.Netcode;
 
 public class BuildManager : MonoBehaviour
 {
     public static BuildManager Instance;
 
     [Header("Câmeras")]
-    public CinemachineCamera buildCamera;
     public GameObject upgradePanel;
 
-    [Header("Pós-Processamento")]
-    public Volume globalVolume; // Arraste seu Global Volume aqui
-    private DepthOfField depthOfField; // Variável para controlar o efeito
-
-    [Header("Listas de Construíveis")]
+    [Header("Listas de Construíveis")]
     private List<CharacterBase> availableTowers = new List<CharacterBase>();
     public List<TrapDataSO> availableTraps = new List<TrapDataSO>();
     private Dictionary<TrapDataSO, int> activeTrapCounts = new Dictionary<TrapDataSO, int>();
@@ -39,35 +30,12 @@ public class BuildManager : MonoBehaviour
     [Header("Configuração de Altura")]
     public float globalHeightOffset = 0.5f;
 
-    private const int PriorityBuild = 20;
-    private const int PriorityInactive = 0;
-
-    // Propriedade para verificar se está segurando algo
     public bool IsHoldingBuilding { get { return selectedBuildablePrefab != null; } }
 
     void Awake()
     {
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
-    }
-
-    void Start()
-    {
-        buildCamera.Priority.Value = PriorityInactive;
-
-        // --- CONFIGURAÇÃO DO DEPTH OF FIELD ---
-        if (globalVolume != null)
-        {
-            // Tenta encontrar o efeito DepthOfField dentro do perfil do volume
-            if (globalVolume.profile.TryGet(out depthOfField))
-            {
-                // Encontrou! Agora podemos controlar.
-            }
-            else
-            {
-                Debug.LogWarning("BuildManager: Depth Of Field não encontrado no Global Volume.");
-            }
-        }
     }
 
     public int GetTrapCount(TrapDataSO trapData)
@@ -119,7 +87,6 @@ public class BuildManager : MonoBehaviour
 
     public void SelectTowerToBuild(CharacterBase towerData)
     {
-        // Se tentar selecionar algo novo, deseleciona qualquer torre/armadilha que esteja selecionada para venda/upgrade
         if (TowerSelectionManager.Instance != null)
         {
             TowerSelectionManager.Instance.DeselectAll();
@@ -143,7 +110,6 @@ public class BuildManager : MonoBehaviour
         selectedBuildableCost = trapData.geoditeCost;
         selectedBuildableData = trapData;
     }
-
 
     void Update()
     {
@@ -175,25 +141,15 @@ public class BuildManager : MonoBehaviour
 
     void ToggleBuildMode(bool state)
     {
-        buildCamera.Priority.Value = state ? PriorityBuild : PriorityInactive;
-
-        UnityEngine.Cursor.lockState = state ? CursorLockMode.None : CursorLockMode.Locked;
-        UnityEngine.Cursor.visible = state;
-
-        // --- CONTROLE DO DEPTH OF FIELD ---
-        if (depthOfField != null)
+        if (TopDownCameraManager.Instance != null)
         {
-            // Se state for TRUE (construção), DoF fica FALSE (desativado)
-            // Se state for FALSE (jogo), DoF fica TRUE (ativado)
-            depthOfField.active = !state;
+            TopDownCameraManager.Instance.ToggleTopDownView(state);
         }
-        // ---------------------------------
 
-        if (!state)
+        if (!state)
         {
             ClearSelection();
 
-            // Garante que painéis de upgrade fechem ao sair do modo construção
             if (TowerSelectionManager.Instance != null)
             {
                 TowerSelectionManager.Instance.DeselectAll();
@@ -233,16 +189,9 @@ public class BuildManager : MonoBehaviour
             return;
         }
 
-        GameObject selectedPrefab = selectedBuildablePrefab;
-        if (selectedPrefab == null)
-        {
-            if (currentBuildGhost != null) Destroy(currentBuildGhost);
-            return;
-        }
-
         if (currentBuildGhost == null)
         {
-            currentBuildGhost = Instantiate(selectedPrefab);
+            currentBuildGhost = Instantiate(selectedBuildablePrefab);
 
             var towerController = currentBuildGhost.GetComponentInChildren<TowerController>();
             if (towerController) towerController.enabled = false;
@@ -253,30 +202,11 @@ public class BuildManager : MonoBehaviour
 
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
         RaycastHit hit;
-
         bool isOverValidSurface = false;
 
         if (Physics.Raycast(ray, out hit))
         {
-            if (selectedBuildableData is TrapDataSO trapData)
-            {
-                switch (trapData.placementType)
-                {
-                    case TrapPlacementType.OnPath:
-                        isOverValidSurface = hit.transform.CompareTag("Path");
-                        break;
-                    case TrapPlacementType.OffPath:
-                        isOverValidSurface = hit.transform.CompareTag("Local");
-                        break;
-                    case TrapPlacementType.QualquerLugar:
-                        isOverValidSurface = true;
-                        break;
-                }
-            }
-            else if (selectedBuildableData is CharacterBase)
-            {
-                isOverValidSurface = hit.transform.CompareTag("Local");
-            }
+            isOverValidSurface = GridPlacement.IsPlacementValid(hit, selectedBuildableData);
 
             if (isOverValidSurface)
             {
@@ -349,17 +279,18 @@ public class BuildManager : MonoBehaviour
 
         if (ghostRenderer != null && ghostRenderer.material.name.StartsWith(validPlacementMaterial.name))
         {
-            GameObject prefabToBuild = selectedBuildablePrefab;
-            int buildingCost = selectedBuildableCost;
-
-            if (CurrencyManager.Instance.HasEnoughCurrency(buildingCost, CurrencyType.Geodites))
+            if (CurrencyManager.Instance.HasEnoughCurrency(selectedBuildableCost, CurrencyType.Geodites))
             {
                 Vector3 finalPosition = currentBuildGhost.transform.position;
-
                 finalPosition.x = Mathf.Round(finalPosition.x / gridSize) * gridSize;
                 finalPosition.z = Mathf.Round(finalPosition.z / gridSize) * gridSize;
 
-                GameObject newBuildObject = Instantiate(prefabToBuild, finalPosition, Quaternion.identity);
+                GameObject newBuildObject = Instantiate(selectedBuildablePrefab, finalPosition, Quaternion.identity);
+
+                if (newBuildObject.TryGetComponent<NetworkObject>(out NetworkObject netObj))
+                {
+                    netObj.Spawn();
+                }
 
                 TrapDataSO placedTrapData = null;
 
@@ -376,18 +307,10 @@ public class BuildManager : MonoBehaviour
                         {
                             trapLogic.trapData = trapData;
                         }
-                        else
-                        {
-                            Debug.LogError($"[BuildManager] O script de lógica '{logicComponentOnPrefab.GetType()}' em {trapData.name} NÃO herda de 'TrapLogicBase'. O limite de build não funcionará.");
-                        }
-                    }
-                    else
-                    {
-                        Debug.LogError($"[BuildManager] O 'logicPrefab' em {trapData.name} não tem um script (MonoBehaviour) anexado.");
                     }
                 }
 
-                CurrencyManager.Instance.SpendCurrency(buildingCost, CurrencyType.Geodites);
+                CurrencyManager.Instance.SpendCurrency(selectedBuildableCost, CurrencyType.Geodites);
 
                 if (placedTrapData != null)
                 {

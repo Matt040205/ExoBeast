@@ -11,15 +11,12 @@ public class UIManager : MonoBehaviour
     public GameObject buildPanel;
     public BuildButtonUI buildButtonUI;
 
-    [Header("Elementos de HUD")]
     public TextMeshProUGUI timerText;
 
-    [Header("HUD da Base")]
     public ObjectiveHealthSystem objectiveHealthSystem;
     public TextMeshProUGUI objectiveHealthText;
     public Image objectiveHealthBar;
 
-    [Header("Abas de Construção")]
     public Button towerShopButton;
     public Button trapShopButton;
     public GameObject towerShopPanel;
@@ -29,8 +26,7 @@ public class UIManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance == null) { Instance = this; }
-        else { Destroy(gameObject); }
+        Instance = this;
     }
 
     void Start()
@@ -41,10 +37,6 @@ public class UIManager : MonoBehaviour
         {
             objectiveHealthSystem.OnHealthChanged += UpdateObjectiveHealthUI;
             UpdateObjectiveHealthUI();
-        }
-        else
-        {
-            Debug.LogError("UIManager: A referência do ObjectiveHealthSystem não foi definida no Inspector!");
         }
 
         if (towerShopButton != null)
@@ -107,10 +99,6 @@ public class UIManager : MonoBehaviour
 
             buildButtonUI.ClearTrapButtons();
             buildButtonUI.CreateTrapBuildButtons(traps);
-        }
-        else
-        {
-            Debug.LogError("DEBUG FALHA: A variável 'buildButtonUI' no UIManager está NULA!");
         }
     }
 
@@ -177,11 +165,7 @@ public class UIManager : MonoBehaviour
 
     public void UpdateTimerDisplay(float timeInSeconds)
     {
-        if (timerText == null)
-        {
-            Debug.LogError("DEBUG FALHA: A variável 'timerText' no UIManager está NULA! Certifique-se de atribuir o TextMeshProUGUI no inspetor da Unity.");
-            return;
-        }
+        if (timerText == null) return;
 
         int minutes = Mathf.FloorToInt(timeInSeconds / 60);
         int seconds = Mathf.FloorToInt(timeInSeconds % 60);

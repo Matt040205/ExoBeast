@@ -329,6 +329,7 @@ GameObject:
   - component: {fileID: 1077178184275188685}
   - component: {fileID: 7071615917583694662}
   - component: {fileID: 6541197819373151204}
+  - component: {fileID: -6866062557052881310}
   - component: {fileID: 8428624953878048943}
   - component: {fileID: 4775827030820370958}
   - component: {fileID: 2838156437463877109}
@@ -466,6 +467,27 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &-6866062557052881310
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7665187458952505880}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 1640674918
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!114 &8428624953878048943
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -490,8 +512,14 @@ MonoBehaviour:
   aimLayerMask:
     serializedVersion: 2
     m_Bits: 0
+  aimTarget: {fileID: 0}
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 0
+  landingRaycastDistance: 1.2
   eventoPassos: event:/SFX/Passos
   isDashing: 0
+  isAiming: 0
   isGrounded: 0
   canDoubleJump: 0
   isFloating: 0
@@ -510,7 +538,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   characterData: {fileID: 11400000, guid: 6be7037535adf3347bc4a1b2a3d84af7, type: 2}
-  currentHealth: 0
+  currentHealth:
+    m_InternalValue: 0
   isRegenerating: 0
   damageMultiplier: 1
   speedMultiplier: 1
@@ -768,6 +797,10 @@ MonoBehaviour:
       m_Calls: []
     m_ActionId: 9caa3d8a-6b2f-4e8e-8bad-6ede561bd9be
     m_ActionName: UI/TrackedDeviceOrientation
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 2bda8d34-762f-4dc2-9605-3aa1e77097a3
+    m_ActionName: 'Player/Aim[/Mouse/rightButton]'
   m_NeverAutoSwitchControlSchemes: 0
   m_DefaultControlScheme: 
   m_DefaultActionMap: Player

@@ -2,9 +2,10 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using FMODUnity;
 using System.Collections.Generic;
+using Unity.Netcode;
 
 [RequireComponent(typeof(PlayerHealthSystem))]
-public class PlayerShooting : MonoBehaviour
+public class PlayerShooting : NetworkBehaviour
 {
     [Header("Configurações")]
     public CharacterBase characterData;
@@ -76,7 +77,6 @@ public class PlayerShooting : MonoBehaviour
 
     public void OnFire(InputAction.CallbackContext ctx)
     {
-        // Impede que a arma tente atirar enquanto a Ultimate da Katana estiver ativada
         if (!this.enabled) return;
 
         if (ctx.started || ctx.performed) fireInputHeld = true;
@@ -85,7 +85,6 @@ public class PlayerShooting : MonoBehaviour
 
     public void OnReload(InputAction.CallbackContext ctx)
     {
-        // TRAVA DE SEGURANÇA: Impede que a arma recarregue se a Ultimate (Katana) estiver ativada
         if (!this.enabled) return;
 
         if (ctx.performed && !isReloading && currentAmmo < characterData.magazineSize)
@@ -94,6 +93,8 @@ public class PlayerShooting : MonoBehaviour
 
     void Update()
     {
+        if (!IsOwner) return;
+
         if (PauseControl.isPaused || BuildManager.isBuildingMode) return;
 
         UpdateAimTargetPosition();
@@ -212,6 +213,19 @@ public class PlayerShooting : MonoBehaviour
                 {
                     visualScript.Initialize(damage, isCritical, characterData.armorPenetration, playerHealth, direction);
                 }
+            }
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void RequestDealDamageServerRpc(ulong enemyNetworkObjectId, float damage, float armorPenetration, bool isCritical)
+    {
+        if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(enemyNetworkObjectId, out NetworkObject enemyNetObj))
+        {
+            EnemyHealthSystem enemyHealth = enemyNetObj.GetComponent<EnemyHealthSystem>();
+            if (enemyHealth != null)
+            {
+                enemyHealth.TakeDamage(damage, armorPenetration, isCritical);
             }
         }
     }

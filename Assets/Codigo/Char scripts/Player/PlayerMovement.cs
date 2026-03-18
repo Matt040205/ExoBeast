@@ -4,9 +4,10 @@ using UnityEngine.InputSystem;
 using System.Collections;
 using FMODUnity;
 using FMOD.Studio;
+using Unity.Netcode;
 
 [RequireComponent(typeof(CharacterController))]
-public class PlayerMovement : MonoBehaviour
+public class PlayerMovement : NetworkBehaviour
 {
     [Header("Movement Settings")]
     public float walkSpeed = 4f;
@@ -23,14 +24,10 @@ public class PlayerMovement : MonoBehaviour
     public Rig aimRig;
     public MultiAimConstraint aimConstraint;
     public LayerMask aimLayerMask;
-
-    // !! MUDANÇA: Voltou a ser público. Arraste o "AimTarget_Fixo" aqui no Inspector do Prefab!
     public Transform aimTarget;
 
     [Header("Ground Check & Landing")]
-    [Tooltip("Coloque aqui as Layers que representam o Chão no seu jogo!")]
     public LayerMask groundMask;
-    [Tooltip("Tamanho do raio que prevê o chão. Aumente se o pivô do player for na barriga.")]
     public float landingRaycastDistance = 1.2f;
     private bool isAboutToLand;
 
@@ -87,9 +84,6 @@ public class PlayerMovement : MonoBehaviour
             cameraController = Camera.main.transform;
         }
 
-        // O Rigging agora já vem perfeitamente montado do seu Prefab!
-        // Não precisamos mais criar objetos dinâmicos ou chamar o RigBuilder.Build()
-
         if (aimRig != null) aimRig.weight = 0f;
 
         if (TutorialManager.Instance != null && GameDataManager.Instance != null)
@@ -113,16 +107,19 @@ public class PlayerMovement : MonoBehaviour
 
     public void OnMove(InputAction.CallbackContext ctx)
     {
+        if (!IsOwner) return;
         inputMove = ctx.ReadValue<Vector2>();
     }
 
     public void OnRun(InputAction.CallbackContext ctx)
     {
+        if (!IsOwner) return;
         inputRun = ctx.ReadValueAsButton();
     }
 
     public void OnJump(InputAction.CallbackContext ctx)
     {
+        if (!IsOwner) return;
         if (!ctx.started) return;
         if (GetComponent<MergulhoTintaLogic>() != null) return;
         if (PauseControl.isPaused || BuildManager.isBuildingMode || isFloating || isDashing) return;
@@ -137,7 +134,6 @@ public class PlayerMovement : MonoBehaviour
                 animator.ResetTrigger("Attack");
                 animator.ResetTrigger("Shoot");
                 animator.ResetTrigger("Reload");
-
                 animator.SetTrigger("Jump");
             }
             StopFootstepSound();
@@ -152,7 +148,6 @@ public class PlayerMovement : MonoBehaviour
                 animator.ResetTrigger("Attack");
                 animator.ResetTrigger("Shoot");
                 animator.ResetTrigger("Reload");
-
                 animator.SetTrigger("Jump");
             }
             StopFootstepSound();
@@ -161,6 +156,7 @@ public class PlayerMovement : MonoBehaviour
 
     public void OnAim(InputAction.CallbackContext ctx)
     {
+        if (!IsOwner) return;
         bool aimingInput = ctx.ReadValueAsButton();
 
         if (aimingInput != isAiming)
@@ -179,6 +175,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
+        if (!IsOwner) return;
+
         isGrounded = controller.isGrounded;
         if (isGrounded) hasDoubleJumped = false;
 
@@ -236,6 +234,7 @@ public class PlayerMovement : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (!IsOwner) return;
         if (PauseControl.isPaused || BuildManager.isBuildingMode || isFloating || isDashing) return;
 
         if (isAiming || direction.sqrMagnitude > 0.01f)

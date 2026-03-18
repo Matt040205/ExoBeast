@@ -6,23 +6,17 @@ public class GridPlacement : MonoBehaviour
     public float gridSize = 1f;
 
     [Header("Ajuste de Posicionamento")]
-    [Tooltip("Marque TRUE para personagens (pivô nos pés). Marque FALSE para caixas/muros (pivô no centro).")]
-    public bool pivotIsAtFeet = true; // <--- AQUI ESTÁ A CORREÇÃO PADRÃO
+    public bool pivotIsAtFeet = true;
 
     [Header("Custo")]
     public int cost = 100;
 
-    // Obtém a metade da altura do objeto
     public float GetObjectHalfHeight()
     {
-        // --- CORREÇÃO ---
-        // Se o pivô é nos pés, retornamos 0.
-        // Isso diz ao BuildManager: "Não adicione altura extra, coloque o pivô (pés) direto no chão."
         if (pivotIsAtFeet)
         {
             return 0f;
         }
-        // ----------------
 
         Renderer rend = GetComponent<Renderer>();
         if (rend != null)
@@ -30,14 +24,13 @@ public class GridPlacement : MonoBehaviour
             return rend.bounds.extents.y;
         }
 
-        // Se não tiver Renderer (ex: objeto sem renderização, apenas com collider)
         Collider col = GetComponent<Collider>();
         if (col != null)
         {
             return col.bounds.extents.y;
         }
 
-        return 0f; // Retorna 0 se não encontrar nada
+        return 0f;
     }
 
     public void SnapToGrid()
@@ -45,7 +38,6 @@ public class GridPlacement : MonoBehaviour
         Vector3 currentPosition = transform.position;
 
         float alignedX = Mathf.Round(currentPosition.x / gridSize) * gridSize;
-        // Não ajustamos o Y aqui, será feito no BuildManager
         float alignedZ = Mathf.Round(currentPosition.z / gridSize) * gridSize;
 
         transform.position = new Vector3(alignedX, currentPosition.y, alignedZ);
@@ -66,5 +58,27 @@ public class GridPlacement : MonoBehaviour
         }
 
         return 0f;
+    }
+
+    public static bool IsPlacementValid(RaycastHit hit, object buildableData)
+    {
+        if (buildableData is TrapDataSO trapData)
+        {
+            switch (trapData.placementType)
+            {
+                case TrapPlacementType.OnPath:
+                    return hit.transform.CompareTag("Path");
+                case TrapPlacementType.OffPath:
+                    return hit.transform.CompareTag("Local");
+                case TrapPlacementType.QualquerLugar:
+                    return true;
+            }
+        }
+        else if (buildableData is CharacterBase)
+        {
+            return hit.transform.CompareTag("Local");
+        }
+
+        return false;
     }
 }

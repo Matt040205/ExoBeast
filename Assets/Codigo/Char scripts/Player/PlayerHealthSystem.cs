@@ -1,11 +1,12 @@
 using UnityEngine;
 using System;
 using System.Collections;
+using Unity.Netcode;
 
-public class PlayerHealthSystem : MonoBehaviour
+public class PlayerHealthSystem : NetworkBehaviour
 {
     public CharacterBase characterData;
-    public float currentHealth;
+    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public bool isRegenerating;
 
     [Header("Status de Buffs")]
@@ -27,15 +28,21 @@ public class PlayerHealthSystem : MonoBehaviour
     public event Action OnHealthChanged;
     public event Action<float> OnDamageDealt;
 
-    void Start()
+    public override void OnNetworkSpawn()
     {
-        currentHealth = characterData.maxHealth;
+        if (IsServer)
+        {
+            currentHealth.Value = characterData.maxHealth;
+        }
+
+        currentHealth.OnValueChanged += (oldValue, newValue) => NotifyHealthChanged();
         NotifyHealthChanged();
         FindRespawnPoint();
     }
 
     void Update()
     {
+        if (!IsServer) return;
         HandleRegeneration();
     }
 
@@ -74,15 +81,11 @@ public class PlayerHealthSystem : MonoBehaviour
         {
             respawnPoint = respawnObject.transform;
         }
-        else
-        {
-            Debug.LogWarning($"Respawn Point '{respawnPointNameOrTag}' NÃO foi encontrado na cena!");
-        }
     }
 
     void HandleRegeneration()
     {
-        if (currentHealth >= characterData.maxHealth)
+        if (currentHealth.Value >= characterData.maxHealth)
         {
             isRegenerating = false;
             return;
@@ -93,14 +96,15 @@ public class PlayerHealthSystem : MonoBehaviour
         if (timeSinceLastDamage >= 3f)
         {
             isRegenerating = true;
-            currentHealth += characterData.maxHealth * 0.01f * Time.deltaTime;
-            currentHealth = Mathf.Min(currentHealth, characterData.maxHealth);
-            NotifyHealthChanged();
+            currentHealth.Value += characterData.maxHealth * 0.01f * Time.deltaTime;
+            currentHealth.Value = Mathf.Min(currentHealth.Value, characterData.maxHealth);
         }
     }
 
     public void TakeDamage(float damage, Transform attacker = null)
     {
+        if (!IsServer) return;
+
         if (isCountering)
         {
             if (attacker != null)
@@ -109,7 +113,6 @@ public class PlayerHealthSystem : MonoBehaviour
                 if (enemyHealth != null)
                 {
                     enemyHealth.TakeDamage(damage);
-                    Debug.Log($"CONTRA-ATAQUE: Devolveu {damage} de dano para {attacker.name}");
                 }
 
                 EnemyController enemyController = attacker.GetComponent<EnemyController>();
@@ -124,19 +127,17 @@ public class PlayerHealthSystem : MonoBehaviour
         float finalDamage = damage * (1f - damageResistance);
         if (finalDamage < 0) finalDamage = 0;
 
-        currentHealth -= finalDamage;
+        currentHealth.Value -= finalDamage;
         timeSinceLastDamage = 0f;
         isRegenerating = false;
 
-        NotifyHealthChanged();
-
-        if (currentHealth <= 0) Die();
+        if (currentHealth.Value <= 0) Die();
     }
 
     public void Heal(float amount)
     {
-        currentHealth = Mathf.Min(currentHealth + amount, characterData.maxHealth);
-        NotifyHealthChanged();
+        if (!IsServer) return;
+        currentHealth.Value = Mathf.Min(currentHealth.Value + amount, characterData.maxHealth);
     }
 
     void Die()
@@ -155,18 +156,12 @@ public class PlayerHealthSystem : MonoBehaviour
 
             StartCoroutine(ReactivatePlayer(controller, movementScript));
         }
-        else
-        {
-            Debug.LogError("O Respawn Point não foi encontrado! O jogador não pode ser teletransportado.");
-        }
 
-        currentHealth = characterData.maxHealth;
+        currentHealth.Value = characterData.maxHealth;
 
         damageMultiplier = 1f;
         speedMultiplier = 1f;
         isCountering = false;
-
-        NotifyHealthChanged();
     }
 
     private IEnumerator ReactivatePlayer(CharacterController controller, MonoBehaviour movementScript)

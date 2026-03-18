@@ -62,7 +62,6 @@ public class PlayerHUD : MonoBehaviour
 
     void Update()
     {
-        // --- Busca e Assinatura de Eventos do Player ---
         if (playerHealth == null)
         {
             GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -75,11 +74,10 @@ public class PlayerHUD : MonoBehaviour
         if (playerHealth != null && !isSubscribed)
         {
             playerHealth.OnHealthChanged += OnHealthChanged;
-            OnHealthChanged(); // Atualiza a primeira vez
+            OnHealthChanged();
             isSubscribed = true;
         }
 
-        // --- Busca do AbilityController ---
         if (abilityController == null && playerHealth != null)
         {
             abilityController = playerHealth.GetComponent<CommanderAbilityController>();
@@ -89,7 +87,6 @@ public class PlayerHUD : MonoBehaviour
             }
         }
 
-        // --- Atualizações Visuais (Lerp e Texto) ---
         if (playerHealth != null) UpdateHealthDisplay();
         if (playerShooting != null) UpdateAmmoDisplay();
         if (objectiveHealth != null) UpdateObjectiveHealthDisplay();
@@ -105,9 +102,7 @@ public class PlayerHUD : MonoBehaviour
             objectiveHealth = objective.GetComponent<ObjectiveHealthSystem>();
             if (objectiveHealth != null)
             {
-                // Assina o evento
                 objectiveHealth.OnHealthChanged += OnObjectiveHealthChanged;
-                // Força atualização imediata
                 OnObjectiveHealthChanged();
             }
         }
@@ -128,11 +123,10 @@ public class PlayerHUD : MonoBehaviour
         }
     }
 
-    // --- VIDA DO JOGADOR ---
     void OnHealthChanged()
     {
         if (playerHealth == null) return;
-        targetHealthPercent = playerHealth.currentHealth / playerHealth.characterData.maxHealth;
+        targetHealthPercent = playerHealth.currentHealth.Value / playerHealth.characterData.maxHealth;
         isRegenerating = playerHealth.isRegenerating;
     }
 
@@ -142,22 +136,19 @@ public class PlayerHUD : MonoBehaviour
             healthBarFill.fillAmount = Mathf.Lerp(healthBarFill.fillAmount, targetHealthPercent, healthLerpSpeed * Time.deltaTime);
 
         if (healthText != null)
-            healthText.text = $"{Mathf.CeilToInt(playerHealth.currentHealth)}/{playerHealth.characterData.maxHealth}";
+            healthText.text = $"{Mathf.CeilToInt(playerHealth.currentHealth.Value)}/{playerHealth.characterData.maxHealth}";
 
         if (regenEffect != null) regenEffect.SetActive(isRegenerating);
     }
 
-    // --- VIDA DO OBJETIVO ---
     void OnObjectiveHealthChanged()
     {
         if (objectiveHealth == null) return;
-        // Calcula a porcentagem alvo sempre que o evento disparar
         targetObjectiveHealthPercent = objectiveHealth.currentHealth / objectiveHealth.maxHealth;
     }
 
     void UpdateObjectiveHealthDisplay()
     {
-        // --- MODO NORMAL ---
         if (objectiveHealthBarFill != null)
         {
             objectiveHealthBarFill.fillAmount = Mathf.Lerp(objectiveHealthBarFill.fillAmount, targetObjectiveHealthPercent, healthLerpSpeed * Time.deltaTime);
@@ -167,18 +158,10 @@ public class PlayerHUD : MonoBehaviour
             objectiveHealthText.text = $"{Mathf.CeilToInt(objectiveHealth.currentHealth)}/{objectiveHealth.maxHealth}";
         }
 
-        // --- MODO CONSTRUÇÃO (DEBUG AGRESSIVO) ---
         if (BuildModeObjectiveHealthBarFill != null)
         {
-            // Forçamos a atualização sem ler o valor antigo para evitar problemas de precisão
             float novoValor = Mathf.Lerp(BuildModeObjectiveHealthBarFill.fillAmount, targetObjectiveHealthPercent, healthLerpSpeed * Time.deltaTime);
             BuildModeObjectiveHealthBarFill.fillAmount = novoValor;
-
-            // Debug apenas se a vida não estiver cheia (para não spammar quando está 100%)
-            if (targetObjectiveHealthPercent < 0.99f)
-            {
-                // Debug.Log($"[HUD DEBUG] Vida Alvo: {targetObjectiveHealthPercent} | Valor da Barra Build: {BuildModeObjectiveHealthBarFill.fillAmount} | Nome do Objeto: {BuildModeObjectiveHealthBarFill.gameObject.name}");
-            }
         }
 
         if (BuildModeObjectiveHealthText != null)

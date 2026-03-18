@@ -3,30 +3,25 @@ using TMPro;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.SceneManagement;
+using Unity.Netcode;
 
-public class HordeManager : MonoBehaviour
+public class HordeManager : NetworkBehaviour
 {
-    [Header("Configurações da Horda")]
     public int enemiesPerHordeMin = 5;
     public int enemiesPerHordeMax = 10;
     public int victoryHorde = 5;
 
-    [Header("Spawn de Inimigos")]
     public float spawnInterval = 1f;
     public int enemiesPerInterval = 1;
 
-    [Header("Dados dos Inimigos")]
     public EnemyDataSO[] enemyTypes;
 
-    [Header("Configuração das Rotas")]
     public List<SpawnPath> spawnPaths;
     private int lastPathIndex = -1;
 
-    [Header("Status da Horda")]
     public int currentHorde = 0;
     public int enemyLevel = 1;
 
-    [Header("UI")]
     public TextMeshProUGUI hordeText;
     public TextMeshProUGUI hordeTextBuild;
 
@@ -38,29 +33,24 @@ public class HordeManager : MonoBehaviour
     private int enemiesSpawnedCount = 0;
     private Coroutine spawnCoroutine;
 
-    void Start()
+    public override void OnNetworkSpawn()
     {
-        if (EnemyPoolManager.Instance == null)
+        if (IsServer)
         {
-            Debug.LogError("EnemyPoolManager não encontrado na cena!");
-            return;
+            StartCoroutine(FindPlayerAndBeginHorde());
         }
-
-        StartCoroutine(FindPlayerAndBeginHorde());
     }
 
     private IEnumerator FindPlayerAndBeginHorde()
     {
-        yield return null;
-
-        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
-        if (playerObject != null)
+        while (playerTransform == null)
         {
-            playerTransform = playerObject.transform;
-        }
-        else
-        {
-            Debug.LogError("HordeManager não conseguiu encontrar o Player! A IA do inimigo pode falhar.");
+            GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+            if (playerObject != null)
+            {
+                playerTransform = playerObject.transform;
+            }
+            yield return new WaitForSeconds(0.5f);
         }
 
         StartNextHorde();
@@ -68,6 +58,8 @@ public class HordeManager : MonoBehaviour
 
     void Update()
     {
+        if (!IsServer) return;
+
         if (waveIsActive)
         {
             CheckForRemainingEnemies();
@@ -81,7 +73,6 @@ public class HordeManager : MonoBehaviour
 
                 if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
 
-                Debug.Log("Horda " + currentHorde + " concluída!");
                 if (currentHorde >= victoryHorde)
                 {
                     SceneManager.LoadScene("Win");
@@ -96,11 +87,14 @@ public class HordeManager : MonoBehaviour
 
     private void UpdateHordeUI()
     {
-        if (hordeText != null && hordeTextBuild != null)
-        {
-            hordeTextBuild.text = $"{currentHorde}/{victoryHorde}";
-            hordeText.text = $"{currentHorde}/{victoryHorde}";
-        }
+        UpdateHordeUIClientRpc(currentHorde, victoryHorde);
+    }
+
+    [ClientRpc]
+    private void UpdateHordeUIClientRpc(int curHorde, int vicHorde)
+    {
+        if (hordeTextBuild != null) hordeTextBuild.text = $"{curHorde}/{vicHorde}";
+        if (hordeText != null) hordeText.text = $"{curHorde}/{vicHorde}";
     }
 
     void StartNextHorde()
@@ -123,16 +117,8 @@ public class HordeManager : MonoBehaviour
 
     private IEnumerator SpawnEnemiesOverTime()
     {
-        if (spawnPaths == null || spawnPaths.Count == 0)
-        {
-            Debug.LogError("Nenhuma rota (SpawnPath) configurada! Impossível spawnar inimigos.");
-            yield break;
-        }
-        if (enemyTypes.Length == 0)
-        {
-            Debug.LogError("Faltam tipos de inimigos configurados! Impossível spawnar inimigos.");
-            yield break;
-        }
+        if (spawnPaths == null || spawnPaths.Count == 0) yield break;
+        if (enemyTypes.Length == 0) yield break;
 
         while (enemiesSpawnedCount < enemiesToSpawnTotal)
         {
@@ -150,7 +136,6 @@ public class HordeManager : MonoBehaviour
                 yield return new WaitForSeconds(spawnInterval);
             }
         }
-
     }
 
     void SpawnSingleEnemy()
@@ -158,11 +143,7 @@ public class HordeManager : MonoBehaviour
         int pathIndex = GetRandomPathIndex();
         SpawnPath selectedPath = spawnPaths[pathIndex];
 
-        if (selectedPath.spawnPoint == null || selectedPath.patrolPoints == null || selectedPath.patrolPoints.Count == 0)
-        {
-            Debug.LogWarning("A rota '" + selectedPath.pathName + "' não está configurada corretamente. Inimigo não spawnado.");
-            return;
-        }
+        if (selectedPath.spawnPoint == null || selectedPath.patrolPoints == null || selectedPath.patrolPoints.Count == 0) return;
 
         int enemyTypeIndex = Random.Range(0, enemyTypes.Length);
         EnemyDataSO enemyData = enemyTypes[enemyTypeIndex];

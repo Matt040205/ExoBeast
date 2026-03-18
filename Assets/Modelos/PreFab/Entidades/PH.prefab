@@ -280,6 +280,7 @@ GameObject:
   - component: {fileID: 1527235181715017189}
   - component: {fileID: 1988645179375761527}
   - component: {fileID: 573096255506189436}
+  - component: {fileID: 3358838759021377825}
   - component: {fileID: 9215532886368702831}
   - component: {fileID: 6472170318049487491}
   - component: {fileID: 6330410534027532317}
@@ -434,6 +435,45 @@ MonoBehaviour:
   rotationSpeed: 15
   cameraController: {fileID: 0}
   modelPivot: {fileID: 4237064630503924919}
+  aimRig: {fileID: 0}
+  aimConstraint: {fileID: 0}
+  aimLayerMask:
+    serializedVersion: 2
+    m_Bits: 0
+  aimTarget: {fileID: 0}
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 0
+  landingRaycastDistance: 1.2
+  eventoPassos: event:/SFX/Passos
+  isDashing: 0
+  isAiming: 0
+  isGrounded: 0
+  canDoubleJump: 0
+  isFloating: 0
+  floatDuration: 0
+  jumpHeightModifier: 1
+--- !u!114 &3358838759021377825
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2682399473942067493}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 1007017225
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!114 &9215532886368702831
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -450,6 +490,14 @@ MonoBehaviour:
   firePoint: {fileID: 4757579757688161299}
   projectileVisualPrefab: {fileID: 9104921844974723845, guid: f14f768e29c3c2c4ca827c7d1b39d783, type: 3}
   impactEffectPrefab: {fileID: 0}
+  aimTarget: {fileID: 0}
+  aimTargetDistance: 20
+  tipoDeSom: Arma
+  eventoTiroUnicoArma: event:/SFX/Atirar
+  eventoTiroContinuoArma: event:/SFX/Atirar_segurando
+  eventoRecargaArma: event:/SFX/Recarga Arma
+  eventoTiroUnicoArco: event:/SFX/Arco
+  eventoTiroContinuoArco: event:/SFX/Arco
   maxDistance: 100
   hitLayers:
     serializedVersion: 2
@@ -474,6 +522,8 @@ MonoBehaviour:
   shootingSystem: {fileID: 9215532886368702831}
   meleeSystem: {fileID: 6853114845528409664}
   healthSystem: {fileID: 6330410534027532317}
+  meleeWeaponModel: {fileID: 0}
+  rangedWeaponModel: {fileID: 0}
 --- !u!114 &6330410534027532317
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -487,9 +537,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   characterData: {fileID: 11400000, guid: 9630a35620054cf4db1008eb33d8d40a, type: 2}
-  currentHealth: 0
+  currentHealth:
+    m_InternalValue: 0
   isRegenerating: 0
-  respawnPoint: {fileID: 0}
+  damageMultiplier: 1
+  speedMultiplier: 1
+  damageResistance: 0
+  isBuffed: 0
+  isCountering: 0
+  respawnPointNameOrTag: RespawnPoint
 --- !u!114 &6853114845528409664
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -504,13 +560,34 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterData: {fileID: 11400000, guid: 9630a35620054cf4db1008eb33d8d40a, type: 2}
   attackPoint: {fileID: 0}
-  attackRange: 2
-  attackAngle: 90
   hitLayers:
     serializedVersion: 2
     m_Bits: 0
-  isAttacking: 0
-  attackCooldown: 0
+  currentWeaponType: 0
+  swordStats:
+    attackRange: 2
+    attackAngle: 90
+    animationSpeed: 1
+    damageHit1: 15
+    damageHit2: 15
+    damageHit3: 20
+    damageHit4: 30
+    sfxHit1: 
+    sfxHit2: 
+    sfxHit3: 
+    sfxHit4: 
+  hammerStats:
+    attackRange: 2
+    attackAngle: 90
+    animationSpeed: 1
+    damageHit1: 15
+    damageHit2: 15
+    damageHit3: 20
+    damageHit4: 30
+    sfxHit1: 
+    sfxHit2: 
+    sfxHit3: 
+    sfxHit4: 
 --- !u!114 &4810200277711100742
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -536,6 +613,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   characterData: {fileID: 11400000, guid: 9630a35620054cf4db1008eb33d8d40a, type: 2}
+  ultimateChargeThreshold: 100
+  currentUltimateCharge: 0
 --- !u!114 &7517613348814378390
 MonoBehaviour:
   m_ObjectHideFlags: 0

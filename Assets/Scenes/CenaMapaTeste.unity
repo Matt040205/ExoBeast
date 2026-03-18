@@ -9173,6 +9173,203 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5549334194213866907, guid: 8ab523538ae958744a5aeacfee1bb58b, type: 3}
   m_PrefabInstance: {fileID: 226458967}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &227151036
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 227151045}
+  - component: {fileID: 227151044}
+  - component: {fileID: 227151043}
+  - component: {fileID: 227151042}
+  - component: {fileID: 227151041}
+  - component: {fileID: 227151040}
+  - component: {fileID: 227151039}
+  - component: {fileID: 227151038}
+  - component: {fileID: 227151037}
+  m_Layer: 0
+  m_Name: Managers_Da_Partida
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &227151037
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 429e04e937edd1444a680e15d1ab3786, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  buildCamera: {fileID: 2106906705}
+  globalVolume: {fileID: 395403812}
+--- !u!114 &227151038
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 503c026cd31d4be49872f8da8aad6b07, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  healthBarFill: {fileID: 975659748}
+  healthText: {fileID: 2108771038}
+  healthIcon: {fileID: 0}
+  regenEffect: {fileID: 0}
+  objectiveHealthBarFill: {fileID: 1593375844}
+  objectiveHealthText: {fileID: 372065045}
+  BuildModeObjectiveHealthBarFill: {fileID: 1648370726}
+  BuildModeObjectiveHealthText: {fileID: 1663559692}
+  ammoText: {fileID: 1689620943}
+  ammoIcon: {fileID: 0}
+  reloadEffect: {fileID: 0}
+  reloadSlider: {fileID: 0}
+  geoditesText: {fileID: 1042967705}
+  darkEtherText: {fileID: 0}
+  ability1_Icon: {fileID: 997229231}
+  ability2_Icon: {fileID: 1609694103}
+  ultimate_Icon: {fileID: 533405370}
+  ability1_CooldownFill: {fileID: 811250510}
+  ability2_CooldownFill: {fileID: 659141808}
+  ultimate_ChargeFill: {fileID: 1585785408}
+  healthLerpSpeed: 5
+  fullHealthColor: {r: 0, g: 1, b: 0, a: 1}
+  lowHealthColor: {r: 1, g: 0, b: 0, a: 1}
+  ammoNormalColor: {r: 1, g: 1, b: 1, a: 1}
+  ammoLowColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  reloadColor: {r: 0, g: 0, b: 0, a: 0.7529412}
+--- !u!114 &227151039
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f915061fc63ed7c48a2866541b656314, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spawnPoint: {fileID: 1889514695}
+--- !u!114 &227151040
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb471c2c691f24c43b0b62eb5457553e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  enemyPrefab: {fileID: 366370626998246806, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+  poolSize: 20
+--- !u!114 &227151041
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1aff4c807d1eadb4ca0f6413907bc8a7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  projectilePrefab: {fileID: 9104921844974723845, guid: f14f768e29c3c2c4ca827c7d1b39d783, type: 3}
+  initialPoolSize: 20
+  maxPoolSize: 50
+--- !u!114 &227151042
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 968367f4e1f81284383328b14c0794dd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  upgradePanel: {fileID: 2052899276}
+  availableTraps:
+  - {fileID: 11400000, guid: a1774902a14055740bc45ccf9e46bfde, type: 2}
+  - {fileID: 11400000, guid: 7683705dd1cad8f4396d53af16f61c4a, type: 2}
+  - {fileID: 11400000, guid: 3e00b754ccc6a6d428702c22f2d14e7c, type: 2}
+  - {fileID: 11400000, guid: 8b47951347b78bb4ba54e9eb8db3292b, type: 2}
+  - {fileID: 11400000, guid: c669ce080944fd34294f36420b9eba79, type: 2}
+  validPlacementMaterial: {fileID: 2100000, guid: 73563327067872d4ba7be49d1e11a506, type: 2}
+  invalidPlacementMaterial: {fileID: 2100000, guid: aab2a511bf791ce4a89881888cef9450, type: 2}
+  gridSize: 1
+  globalHeightOffset: 0.5
+--- !u!114 &227151043
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 80ca9bd02a96e354cbb3e858c0d47943, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  geoditesTextBuild: {fileID: 1979527351}
+  geoditesText: {fileID: 1042967705}
+  darkEtherText: {fileID: 0}
+  initialGeodites: 10000000
+  initialDarkEther: 0
+--- !u!114 &227151044
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d84f645d7fef8b541a5f2ae8eb3486ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  hudPanel: {fileID: 952988210}
+  pausePanel: {fileID: 1677525049}
+  buildPanel: {fileID: 952988213}
+  buildButtonUI: {fileID: 952988215}
+  timerText: {fileID: 1996353364}
+  objectiveHealthSystem: {fileID: 2602548221357003788}
+  objectiveHealthText: {fileID: 372065045}
+  objectiveHealthBar: {fileID: 1593375844}
+  towerShopButton: {fileID: 34802618}
+  trapShopButton: {fileID: 34802617}
+  towerShopPanel: {fileID: 34802622}
+  trapShopPanel: {fileID: 34802620}
+--- !u!4 &227151045
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 127.52819, y: 25.568083, z: -36.582546}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &229386449
 GameObject:
   m_ObjectHideFlags: 0
@@ -14985,6 +15182,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 405166958}
+  - component: {fileID: 405166959}
   - component: {fileID: 405166957}
   m_Layer: 0
   m_Name: HordaManager
@@ -15056,6 +15254,27 @@ Transform:
   - {fileID: 1945827120}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &405166959
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 405166956}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 3012194516
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!1 &409980617
 GameObject:
   m_ObjectHideFlags: 0
@@ -26587,18 +26806,18 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 683562784}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -4.85}
+  m_LocalPosition: {x: 0, y: 0, z: -70.45}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1227478206}
   - {fileID: 1798048196}
   - {fileID: 452464834}
-  m_Father: {fileID: 1889514695}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 23.54, y: 0.77}
+  m_AnchoredPosition: {x: 112.84, y: 12.857204}
   m_SizeDelta: {x: 985.3334, y: 554}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &683562786
@@ -39252,7 +39471,7 @@ PrefabInstance:
     - target: {fileID: 7117706984822015012, guid: d3e71203092a72b49beb3c9049ef00bf, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
-      objectReference: {fileID: 2056349557}
+      objectReference: {fileID: 0}
     - target: {fileID: 7629276757595486715, guid: d3e71203092a72b49beb3c9049ef00bf, type: 3}
       propertyPath: m_Value
       value: 1
@@ -39328,7 +39547,7 @@ PrefabInstance:
     - target: {fileID: 8826103730518130429, guid: d3e71203092a72b49beb3c9049ef00bf, type: 3}
       propertyPath: m_OnClick.m_PersistentCalls.m_Calls.Array.data[0].m_Target
       value: 
-      objectReference: {fileID: 2056349557}
+      objectReference: {fileID: 0}
     - target: {fileID: 8996227268362333595, guid: d3e71203092a72b49beb3c9049ef00bf, type: 3}
       propertyPath: m_LocalScale.x
       value: 10.182247
@@ -79531,8 +79750,7 @@ Transform:
   m_LocalPosition: {x: 89.3, y: 12.087204, z: -65.6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children:
-  - {fileID: 683562785}
+  m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1889524349
@@ -88323,16 +88541,11 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2056349554}
-  - component: {fileID: 2056349553}
-  - component: {fileID: 2056349555}
-  - component: {fileID: 2056349556}
-  - component: {fileID: 2056349557}
-  - component: {fileID: 2056349558}
-  - component: {fileID: 2056349559}
   - component: {fileID: 2056349560}
   - component: {fileID: 2056349561}
   - component: {fileID: 2056349562}
-  - component: {fileID: 2056349563}
+  - component: {fileID: 2056349566}
+  - component: {fileID: 2056349565}
   m_Layer: 0
   m_Name: Managers
   m_TagString: Untagged
@@ -88340,20 +88553,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &2056349553
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2056349552}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bb471c2c691f24c43b0b62eb5457553e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  enemyPrefab: {fileID: 366370626998246806, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
-  poolSize: 20
 --- !u!4 &2056349554
 Transform:
   m_ObjectHideFlags: 0
@@ -88369,100 +88568,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &2056349555
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2056349552}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1aff4c807d1eadb4ca0f6413907bc8a7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  projectilePrefab: {fileID: 9104921844974723845, guid: f14f768e29c3c2c4ca827c7d1b39d783, type: 3}
-  initialPoolSize: 20
-  maxPoolSize: 50
---- !u!114 &2056349556
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2056349552}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 80ca9bd02a96e354cbb3e858c0d47943, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  geoditesTextBuild: {fileID: 1979527351}
-  geoditesText: {fileID: 1042967705}
-  darkEtherText: {fileID: 0}
-  initialGeodites: 10000000
-  initialDarkEther: 0
---- !u!114 &2056349557
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2056349552}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 968367f4e1f81284383328b14c0794dd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  buildCamera: {fileID: 2106906705}
-  upgradePanel: {fileID: 2052899276}
-  globalVolume: {fileID: 395403812}
-  availableTraps:
-  - {fileID: 11400000, guid: a1774902a14055740bc45ccf9e46bfde, type: 2}
-  - {fileID: 11400000, guid: 7683705dd1cad8f4396d53af16f61c4a, type: 2}
-  - {fileID: 11400000, guid: 3e00b754ccc6a6d428702c22f2d14e7c, type: 2}
-  - {fileID: 11400000, guid: 8b47951347b78bb4ba54e9eb8db3292b, type: 2}
-  - {fileID: 11400000, guid: c669ce080944fd34294f36420b9eba79, type: 2}
-  validPlacementMaterial: {fileID: 2100000, guid: 73563327067872d4ba7be49d1e11a506, type: 2}
-  invalidPlacementMaterial: {fileID: 2100000, guid: aab2a511bf791ce4a89881888cef9450, type: 2}
-  gridSize: 1
-  globalHeightOffset: 0.5
---- !u!114 &2056349558
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2056349552}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d84f645d7fef8b541a5f2ae8eb3486ba, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  hudPanel: {fileID: 952988210}
-  pausePanel: {fileID: 1677525049}
-  buildPanel: {fileID: 952988213}
-  buildButtonUI: {fileID: 952988215}
-  timerText: {fileID: 1996353364}
-  objectiveHealthSystem: {fileID: 2602548221357003788}
-  objectiveHealthText: {fileID: 372065045}
-  objectiveHealthBar: {fileID: 1593375844}
-  towerShopButton: {fileID: 34802618}
-  trapShopButton: {fileID: 34802617}
-  towerShopPanel: {fileID: 34802622}
-  trapShopPanel: {fileID: 34802620}
---- !u!114 &2056349559
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2056349552}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f915061fc63ed7c48a2866541b656314, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  spawnPoint: {fileID: 1889514695}
 --- !u!114 &2056349560
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -88516,7 +88621,7 @@ MonoBehaviour:
   minIntervalo: 60
   maxIntervalo: 180
   chancePercentual: 40
---- !u!114 &2056349563
+--- !u!114 &2056349565
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -88525,35 +88630,63 @@ MonoBehaviour:
   m_GameObject: {fileID: 2056349552}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 503c026cd31d4be49872f8da8aad6b07, type: 3}
+  m_Script: {fileID: 11500000, guid: 6960e84d07fb87f47956e7a81d71c4e6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  healthBarFill: {fileID: 975659748}
-  healthText: {fileID: 2108771038}
-  healthIcon: {fileID: 0}
-  regenEffect: {fileID: 0}
-  objectiveHealthBarFill: {fileID: 1593375844}
-  objectiveHealthText: {fileID: 372065045}
-  BuildModeObjectiveHealthBarFill: {fileID: 1648370726}
-  BuildModeObjectiveHealthText: {fileID: 1663559692}
-  ammoText: {fileID: 1689620943}
-  ammoIcon: {fileID: 0}
-  reloadEffect: {fileID: 0}
-  reloadSlider: {fileID: 0}
-  geoditesText: {fileID: 1042967705}
-  darkEtherText: {fileID: 0}
-  ability1_Icon: {fileID: 997229231}
-  ability2_Icon: {fileID: 1609694103}
-  ultimate_Icon: {fileID: 533405370}
-  ability1_CooldownFill: {fileID: 811250510}
-  ability2_CooldownFill: {fileID: 659141808}
-  ultimate_ChargeFill: {fileID: 1585785408}
-  healthLerpSpeed: 5
-  fullHealthColor: {r: 0, g: 1, b: 0, a: 1}
-  lowHealthColor: {r: 1, g: 0, b: 0, a: 1}
-  ammoNormalColor: {r: 1, g: 1, b: 1, a: 1}
-  ammoLowColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
-  reloadColor: {r: 0, g: 0, b: 0, a: 0.7529412}
+  m_ProtocolType: 0
+  m_UseWebSockets: 0
+  m_UseEncryption: 0
+  m_MaxPacketQueueSize: 128
+  m_MaxPayloadSize: 6144
+  m_HeartbeatTimeoutMS: 500
+  m_ConnectTimeoutMS: 1000
+  m_MaxConnectAttempts: 60
+  m_DisconnectTimeoutMS: 30000
+  ConnectionData:
+    Address: 127.0.0.1
+    Port: 7777
+    ServerListenAddress: 127.0.0.1
+  DebugSimulator:
+    PacketDelayMS: 0
+    PacketJitterMS: 0
+    PacketDropRate: 0
+--- !u!114 &2056349566
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2056349552}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 593a2fe42fa9d37498c96f9a383b6521, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  NetworkConfig:
+    ProtocolVersion: 0
+    NetworkTransport: {fileID: 2056349565}
+    PlayerPrefab: {fileID: 0}
+    Prefabs:
+      NetworkPrefabsLists:
+      - {fileID: 11400000, guid: 2333402c3714ba341b7c8acc1a90d22e, type: 2}
+    TickRate: 30
+    ClientConnectionBufferTimeout: 10
+    ConnectionApproval: 0
+    ConnectionData: 
+    EnableTimeResync: 0
+    TimeResyncInterval: 30
+    EnsureNetworkVariableLengthSafety: 0
+    EnableSceneManagement: 1
+    ForceSamePrefabs: 1
+    RecycleNetworkIds: 1
+    NetworkIdRecycleDelay: 120
+    RpcHashSize: 0
+    LoadSceneTimeOut: 120
+    SpawnTimeout: 10
+    EnableNetworkLogs: 1
+    OldPrefabList: []
+  RunInBackground: 1
+  LogLevel: 1
 --- !u!1001 &2059375045
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -94420,7 +94553,7 @@ PrefabInstance:
     - target: {fileID: 3108196525561350392, guid: 2a801796c49bbb8448d8bab9f81f5ee0, type: 3}
       propertyPath: uiManager
       value: 
-      objectReference: {fileID: 2056349558}
+      objectReference: {fileID: 0}
     - target: {fileID: 3108196525561350392, guid: 2a801796c49bbb8448d8bab9f81f5ee0, type: 3}
       propertyPath: pauseMenuCanvas
       value: 
@@ -95665,6 +95798,7 @@ SceneRoots:
   - {fileID: 1740990609}
   - {fileID: 1234217393}
   - {fileID: 1885024161}
+  - {fileID: 227151045}
   - {fileID: 2056349554}
   - {fileID: 405166958}
   - {fileID: 134093684}
@@ -95672,6 +95806,7 @@ SceneRoots:
   - {fileID: 6374203510572391595}
   - {fileID: 952988209}
   - {fileID: 2106906706}
+  - {fileID: 683562785}
   - {fileID: 1889514695}
   - {fileID: 311488434}
   - {fileID: 950291598}
