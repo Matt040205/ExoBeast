@@ -21,6 +21,7 @@ GameObject:
   - component: {fileID: 5339123124668043555}
   - component: {fileID: -1552781774586141199}
   - component: {fileID: 4911595844394222668}
+  - component: {fileID: 1792441756373837351}
   - component: {fileID: 6634385706723176738}
   m_Layer: 6
   m_Name: Dragao
@@ -330,6 +331,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   statusBase: {fileID: 11400000, guid: 78cb2df0fda232c4792b569b2d154ee6, type: 2}
   frascosAtivos: []
+--- !u!114 &1792441756373837351
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 15912487291283997}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4d577a2c26dea049819c5de70bca308, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pauseAction: {fileID: -9037946779579287163, guid: 052faaac586de48259a63d0c4782560b, type: 3}
 --- !u!114 &6634385706723176738
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -480,9 +494,45 @@ MonoBehaviour:
     m_ActionId: 9caa3d8a-6b2f-4e8e-8bad-6ede561bd9be
     m_ActionName: UI/TrackedDeviceOrientation
   - m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 3291792908564467092}
+        m_TargetAssemblyTypeName: PlayerMovement, Assembly-CSharp
+        m_MethodName: OnAim
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
     m_ActionId: 2bda8d34-762f-4dc2-9605-3aa1e77097a3
     m_ActionName: 'Player/Aim[/Mouse/rightButton]'
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: c170012a-c332-45a7-82a1-c74086c0843c
+    m_ActionName: 'Player/Reload[/Keyboard/r]'
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 9e6be54f-3389-45ba-a0a3-ee9341f80f09
+    m_ActionName: 'Player/Build[/Keyboard/b]'
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 1792441756373837351}
+        m_TargetAssemblyTypeName: PauseControl, Assembly-CSharp
+        m_MethodName: OnPause
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: 5122d884-93dc-4d01-b917-87e27b63dafa
+    m_ActionName: 'Player/Pause[/Keyboard/p]'
   m_NeverAutoSwitchControlSchemes: 0
   m_DefaultControlScheme: 
   m_DefaultActionMap: Player

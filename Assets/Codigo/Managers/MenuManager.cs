@@ -1,101 +1,100 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Unity.Netcode;
+using System.Collections;
+using System.Collections.Generic;
 
 public class MenuManager : MonoBehaviour
 {
-    [Header("Menus")]
+    public static MenuManager Instance;
+
     public GameObject menuPanel;
     public GameObject optionsPanel;
-    public GameObject creditosPanel;
-    public GameObject sonsPanel;
-    public GameObject PausePanel;
-    public GameObject HUDPanel;
+    public GameObject pausePanel;
+    public GameObject hudPanel;
+    public List<GameObject> pauseButtons = new List<GameObject>();
+    public float optionsCenterX = -117f;
+
+    private void Awake() => Instance = this;
 
     void Start()
     {
-        if (menuPanel != null) menuPanel.SetActive(true);
-        if (optionsPanel != null) optionsPanel.SetActive(false);
-        if (creditosPanel != null) creditosPanel.SetActive(false);
-        if (sonsPanel != null) sonsPanel.SetActive(false);
+        if (optionsPanel) optionsPanel.SetActive(false);
+        if (pausePanel) pausePanel.SetActive(false);
+
+        if (hudPanel != null) { if (menuPanel) menuPanel.SetActive(false); }
+        else { if (menuPanel) menuPanel.SetActive(true); }
     }
 
-    public void ChangeScene(string nomeDaCena)
+    public void AbrirPause()
     {
-        if (!string.IsNullOrEmpty(nomeDaCena))
-        {
-            Time.timeScale = 1f;
-            PauseControl.isPaused = false;
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-            SceneManager.LoadScene(nomeDaCena);
-        }
-        else
-        {
-            Debug.LogError("O nome da cena não foi definido no Inspetor do botão que chamou ChangeScene!");
-        }
+        Time.timeScale = 0f;
+        PauseControl.isPaused = true;
+        if (hudPanel) hudPanel.SetActive(false);
+        if (pausePanel) pausePanel.SetActive(true);
+        SetPauseButtonsState(true);
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
 
     public void Resume()
     {
-        if (PausePanel != null)
-        {
-            PausePanel.SetActive(false);
-            HUDPanel.SetActive(true);
-        }
         Time.timeScale = 1f;
         PauseControl.isPaused = false;
-
-        if (BuildManager.isBuildingMode)
-        {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-        }
-        else
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
+        if (optionsPanel) optionsPanel.SetActive(false);
+        if (pausePanel) pausePanel.SetActive(false);
+        if (hudPanel) hudPanel.SetActive(!BuildManager.isBuildingMode);
+        Cursor.lockState = BuildManager.isBuildingMode ? CursorLockMode.None : CursorLockMode.Locked;
+        Cursor.visible = BuildManager.isBuildingMode;
     }
 
     public void Options()
     {
-        if (menuPanel != null) menuPanel.SetActive(false);
-        if (optionsPanel != null) optionsPanel.SetActive(true);
+        StopAllCoroutines();
+        StartCoroutine(ForcarAberturaOptions());
     }
 
-    public void Voltar()
+    private IEnumerator ForcarAberturaOptions()
     {
-        if (optionsPanel != null) optionsPanel.SetActive(false);
-        if (menuPanel != null) menuPanel.SetActive(true);
+        SetPauseButtonsState(false);
+
+        yield return null;
+
+        if (optionsPanel != null)
+        {
+            optionsPanel.SetActive(true);
+
+            RectTransform rt = optionsPanel.GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.anchoredPosition = new Vector2(optionsCenterX, 0f);
+            }
+
+            optionsPanel.transform.SetAsLastSibling();
+        }
+
+        Canvas.ForceUpdateCanvases();
     }
 
-    public void Creditos()
+    public void BotaoBack()
     {
-        if (optionsPanel != null) optionsPanel.SetActive(false);
-        if (creditosPanel != null) creditosPanel.SetActive(true);
+        if (optionsPanel) optionsPanel.SetActive(false);
+        SetPauseButtonsState(true);
     }
 
-    public void Sons()
+    private void SetPauseButtonsState(bool state)
     {
-        if (optionsPanel != null) optionsPanel.SetActive(false);
-        if (sonsPanel != null) sonsPanel.SetActive(true);
+        foreach (GameObject btn in pauseButtons)
+        {
+            if (btn != null) btn.SetActive(state);
+        }
     }
 
-    public void VoltarSons()
+    public void ChangeScene(string nomeDaCena)
     {
-        if (sonsPanel != null) sonsPanel.SetActive(false);
-        if (optionsPanel != null) optionsPanel.SetActive(true);
-    }
-
-    public void VoltarCreditos()
-    {
-        if (creditosPanel != null) creditosPanel.SetActive(false);
-        if (optionsPanel != null) optionsPanel.SetActive(true);
-    }
-
-    public void QuitGame()
-    {
-        Application.Quit();
-        Debug.Log("Saiu do jogo.");
+        Time.timeScale = 1f;
+        PauseControl.isPaused = false;
+        if (NetworkManager.Singleton != null) NetworkManager.Singleton.Shutdown();
+        SceneManager.LoadScene(nomeDaCena);
     }
 }

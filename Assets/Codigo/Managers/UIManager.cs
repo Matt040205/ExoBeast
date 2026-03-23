@@ -27,6 +27,7 @@ public class UIManager : MonoBehaviour
     private void Awake()
     {
         Instance = this;
+        Debug.Log("[UIManager] Awake chamado. Singleton inicializado com sucesso.");
     }
 
     void Start()
@@ -111,7 +112,18 @@ public class UIManager : MonoBehaviour
 
     public void ShowPauseMenu(bool show)
     {
-        if (pausePanel != null) pausePanel.SetActive(show);
+        Debug.Log($"[UIManager] ShowPauseMenu acionado! Mostrar: {show}");
+
+        if (pausePanel != null)
+        {
+            pausePanel.SetActive(show);
+            Debug.Log("[UIManager] Status do pausePanel alterado.");
+        }
+        else
+        {
+            Debug.LogError("[UIManager] ERRO: O 'pausePanel' está NULO no Inspector!");
+        }
+
         if (show)
         {
             if (hudPanel != null) hudPanel.SetActive(false);

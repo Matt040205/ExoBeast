@@ -379,6 +379,7 @@ GameObject:
   - component: {fileID: 8436099783770465690}
   - component: {fileID: 1514725371722067090}
   - component: {fileID: 5783181433193836938}
+  - component: {fileID: 7720910808485816602}
   - component: {fileID: -3926413528464722638}
   m_Layer: 6
   m_Name: Player 1
@@ -777,6 +778,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   statusBase: {fileID: 0}
   frascosAtivos: []
+--- !u!114 &7720910808485816602
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2682399473942067493}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4d577a2c26dea049819c5de70bca308, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  pauseAction: {fileID: -9037946779579287163, guid: 052faaac586de48259a63d0c4782560b, type: 3}
 --- !u!114 &-3926413528464722638
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -970,6 +984,26 @@ MonoBehaviour:
         m_CallState: 2
     m_ActionId: c170012a-c332-45a7-82a1-c74086c0843c
     m_ActionName: 'Player/Reload[/Keyboard/r]'
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 9e6be54f-3389-45ba-a0a3-ee9341f80f09
+    m_ActionName: 'Player/Build[/Keyboard/b]'
+  - m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 7720910808485816602}
+        m_TargetAssemblyTypeName: PauseControl, Assembly-CSharp
+        m_MethodName: OnPause
+        m_Mode: 0
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+    m_ActionId: 5122d884-93dc-4d01-b917-87e27b63dafa
+    m_ActionName: 'Player/Pause[/Keyboard/p]'
   m_NeverAutoSwitchControlSchemes: 0
   m_DefaultControlScheme: 
   m_DefaultActionMap: Player

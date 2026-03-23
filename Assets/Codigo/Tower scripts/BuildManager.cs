@@ -1,7 +1,9 @@
-using UnityEngine;
 using System.Collections.Generic;
-using UnityEngine.EventSystems;
+using System.Globalization;
 using Unity.Netcode;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem;
 
 public class BuildManager : MonoBehaviour
 {
@@ -111,13 +113,15 @@ public class BuildManager : MonoBehaviour
         selectedBuildableData = trapData;
     }
 
+    public void OnBuild(InputAction.CallbackContext ctx)
+    {
+        isBuildingMode = !isBuildingMode;
+        ToggleBuildMode(isBuildingMode);
+    }
+
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.B))
-        {
-            isBuildingMode = !isBuildingMode;
-            ToggleBuildMode(isBuildingMode);
-        }
+
 
         if (isBuildingMode)
         {

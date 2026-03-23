@@ -1,60 +1,45 @@
 using UnityEngine;
+using Unity.Netcode;
 
-public class PauseControl : MonoBehaviour
+public class PauseControl : NetworkBehaviour
 {
-    [Header("Gerenciador de UI")]
-    public UIManager uiManager;
-
     public static bool isPaused = false;
 
-    void Start() { /* Vazio */ }
+    public KeyCode teclaPausePrincipal = KeyCode.Escape;
+    public KeyCode teclaPauseSecundaria = KeyCode.P;
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape))
+        if (!IsOwner) return;
+
+        if (Input.GetKeyDown(teclaPausePrincipal) || Input.GetKeyDown(teclaPauseSecundaria))
         {
-            if (isPaused)
-            {
-                ResumeGame();
-            }
-            else
-            {
-                PauseGame();
-            }
+            if (isPaused) ResumeGame();
+            else PauseGame();
         }
     }
 
     public void PauseGame()
     {
-        if (uiManager != null) uiManager.ShowPauseMenu(true);
+        Debug.Log("[PauseControl] Congelando o jogo e chamando MenuManager...");
+
+        if (MenuManager.Instance != null)
+        {
+            MenuManager.Instance.AbrirPause();
+        }
+        else
+        {
+            Debug.LogError("[PauseControl] ERRO: MenuManager.Instance está NULO! O script MenuManager não está na sua cena do Mapa!");
+        }
 
         Time.timeScale = 0f;
-
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
-
         isPaused = true;
     }
 
     public void ResumeGame()
     {
-        if (uiManager != null) uiManager.ShowPauseMenu(false);
-
-        Time.timeScale = 1f;
-
-        // --- MUDANÇA AQUI ---
-        // Acessando isBuildingMode com o nome da classe, não com uma instância
-        if (BuildManager.isBuildingMode)
-        {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-        }
-        else
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
-
-        isPaused = false;
+        if (MenuManager.Instance != null) MenuManager.Instance.Resume();
     }
 }
