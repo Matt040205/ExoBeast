@@ -12,8 +12,15 @@ using PlayEveryWare.EpicOnlineServices;
 namespace ExoBeasts.Multiplayer.Core
 {
     /// <summary>
-    /// Wrapper para gerenciamento do EOS SDK
-    /// Integra nosso sistema de credenciais com o PlayEveryWare EOS Plugin
+    /// ── EOSManagerWrapper ────────────────────────────────
+    /// Wrapper sobre o PlayEveryWare EOSManager — ponto central de acesso ao EOS SDK.
+    ///
+    ///  ▸ Initialize(): aguarda init do PlayEveryWare via coroutine (timeout 10s)
+    ///  ▸ GetConnectInterface() / GetAuthInterface(): acessores tipados
+    ///  ▸ OnEOSInitialized: evento disparado quando SDK esta pronto
+    ///  ▸ SetConnected(bool): atualizado pelo EOSAuthenticator apos login
+    ///  ▸ Singleton com DontDestroyOnLoad; Start() chama Initialize() automaticamente
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class EOSManagerWrapper : MonoBehaviour
     {
@@ -41,7 +48,6 @@ namespace ExoBeasts.Multiplayer.Core
         public bool IsInitialized => isInitialized;
         public bool IsConnected => isConnected;
 
-        // Eventos
         public event Action OnEOSInitialized;
         public event Action OnEOSShutdown;
         public event Action<string> OnInitializationFailed;
@@ -49,9 +55,6 @@ namespace ExoBeasts.Multiplayer.Core
 #if !EOS_DISABLE
         private PlatformInterface platformInterface;
 
-        /// <summary>
-        /// Obter a interface da plataforma EOS
-        /// </summary>
         public PlatformInterface GetPlatformInterface()
         {
             if (PlayEveryWare.EpicOnlineServices.EOSManager.Instance != null)
@@ -61,18 +64,12 @@ namespace ExoBeasts.Multiplayer.Core
             return platformInterface;
         }
 
-        /// <summary>
-        /// Obter a interface Connect para autenticacao
-        /// </summary>
         public ConnectInterface GetConnectInterface()
         {
             var platform = GetPlatformInterface();
             return platform?.GetConnectInterface();
         }
 
-        /// <summary>
-        /// Obter a interface Auth para login Epic Account
-        /// </summary>
         public AuthInterface GetAuthInterface()
         {
             var platform = GetPlatformInterface();
@@ -93,7 +90,6 @@ namespace ExoBeasts.Multiplayer.Core
 
         private void Start()
         {
-            // Tentar encontrar EOSConfig se nao foi atribuido
             if (eosConfig == null)
             {
                 eosConfig = Resources.Load<EOSConfig>("EOSConfig_Main");
@@ -102,12 +98,10 @@ namespace ExoBeasts.Multiplayer.Core
                     Debug.LogWarning("[EOSManagerWrapper] EOSConfig nao encontrado. Atribua via Inspector ou crie em Resources/EOSConfig_Main");
                 }
             }
+
+            Initialize();
         }
 
-        /// <summary>
-        /// Inicializar o EOS SDK
-        /// Carrega credenciais e configura o PlayEveryWare
-        /// </summary>
         public void Initialize()
         {
             if (isInitialized)
@@ -119,7 +113,6 @@ namespace ExoBeasts.Multiplayer.Core
 #if !EOS_DISABLE
             Debug.Log("[EOSManagerWrapper] Iniciando inicializacao do EOS SDK...");
 
-            // Carregar credenciais do arquivo externo
             if (eosConfig != null)
             {
                 eosConfig.LoadCredentialsFromFile();
@@ -132,12 +125,9 @@ namespace ExoBeasts.Multiplayer.Core
                     return;
                 }
 
-                // Aplicar credenciais ao sistema PlayEveryWare
                 ApplyCredentialsToPlayEveryWare();
             }
 
-            // O PlayEveryWare EOSManager inicializa automaticamente
-            // Verificar se ja esta pronto
             if (PlayEveryWare.EpicOnlineServices.EOSManager.Instance != null)
             {
                 var platform = PlayEveryWare.EpicOnlineServices.EOSManager.Instance.GetEOSPlatformInterface();
@@ -150,7 +140,6 @@ namespace ExoBeasts.Multiplayer.Core
                 else
                 {
                     Debug.Log("[EOSManagerWrapper] Aguardando PlayEveryWare EOSManager inicializar...");
-                    // PlayEveryWare inicializa no Awake/Start, entao deve estar pronto em breve
                     StartCoroutine(WaitForPlayEveryWareInit());
                 }
             }
@@ -192,38 +181,21 @@ namespace ExoBeasts.Multiplayer.Core
             OnInitializationFailed?.Invoke("Timeout na inicializacao");
         }
 
-        /// <summary>
-        /// Aplicar credenciais carregadas ao sistema PlayEveryWare
-        /// O PlayEveryWare usa seu proprio sistema de config em StreamingAssets
-        /// Esta funcao configura em runtime quando necessario
-        /// </summary>
+        // O PlayEveryWare usa seu proprio sistema de config em StreamingAssets
         private void ApplyCredentialsToPlayEveryWare()
         {
             if (eosConfig == null) return;
-
             Debug.Log("[EOSManagerWrapper] Credenciais carregadas do arquivo externo");
-            // O PlayEveryWare le configs de StreamingAssets/EOS/
-            // Para sobrescrever em runtime, usamos o sistema de Config do PlayEveryWare
-
-            // Nota: O PlayEveryWare gerencia isso internamente
-            // Nossas credenciais sao usadas como fallback/validacao
         }
 #endif
 
-        /// <summary>
-        /// Desligar o EOS SDK
-        /// </summary>
         public void Shutdown()
         {
-            if (!isInitialized)
-            {
-                return;
-            }
+            if (!isInitialized) return;
 
 #if !EOS_DISABLE
             Debug.Log("[EOSManagerWrapper] Desligando EOS SDK...");
 
-            // Limpar credenciais da memoria
             if (eosConfig != null)
             {
                 eosConfig.ClearCredentials();
@@ -247,17 +219,6 @@ namespace ExoBeasts.Multiplayer.Core
             Shutdown();
         }
 
-#if !EOS_DISABLE
-        private void Update()
-        {
-            // O PlayEveryWare EOSManager ja faz o Tick automaticamente
-            // Nao precisamos chamar manualmente
-        }
-#endif
-
-        /// <summary>
-        /// Marcar como conectado (chamado pelo EOSAuthenticator apos login)
-        /// </summary>
         public void SetConnected(bool connected)
         {
             isConnected = connected;

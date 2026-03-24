@@ -4,8 +4,15 @@ using Unity.Netcode;
 namespace ExoBeasts.Multiplayer.GameServer
 {
     /// <summary>
-    /// Gerencia o estado da partida no servidor
-    /// Controla inicio, pausas, fim da partida
+    /// ── MatchManager ─────────────────────────────────────
+    /// Controla o estado da partida em rede (servidor-autoritativo).
+    ///
+    ///  ▸ NetworkVariable CurrentMatchState: WaitingForPlayers → Starting → Playing → Victory/Defeat
+    ///  ▸ MatchTime acumulado no servidor enquanto Playing
+    ///  ▸ StartMatchServerRpc: chamavel de qualquer cliente
+    ///  ▸ EndMatchVictory / EndMatchDefeat: encerram e notificam via ClientRpc
+    ///  ▸ Singleton
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class MatchManager : NetworkBehaviour
     {
@@ -16,7 +23,6 @@ namespace ExoBeasts.Multiplayer.GameServer
         [SerializeField] private float matchStartDelay = 3f;
         [SerializeField] private bool autoStartMatch = false;
 
-        // Estado da partida
         public NetworkVariable<MatchState> CurrentMatchState = new NetworkVariable<MatchState>(
             MatchState.WaitingForPlayers,
             NetworkVariableReadPermission.Everyone,
@@ -43,7 +49,6 @@ namespace ExoBeasts.Multiplayer.GameServer
                 InitializeMatch();
             }
 
-            // Escutar mudancas de estado
             CurrentMatchState.OnValueChanged += OnMatchStateChanged;
         }
 
@@ -62,16 +67,12 @@ namespace ExoBeasts.Multiplayer.GameServer
         {
             if (!IsServer) return;
 
-            // Atualizar tempo de partida se estiver jogando
             if (CurrentMatchState.Value == MatchState.Playing)
             {
                 MatchTime.Value += Time.deltaTime;
             }
         }
 
-        /// <summary>
-        /// Iniciar a partida (apenas servidor)
-        /// </summary>
         [ServerRpc(RequireOwnership = false)]
         public void StartMatchServerRpc()
         {
@@ -85,10 +86,8 @@ namespace ExoBeasts.Multiplayer.GameServer
             Debug.Log("[MatchManager] Iniciando partida!");
             CurrentMatchState.Value = MatchState.Starting;
 
-            // Notificar clientes
             OnMatchStartingClientRpc();
 
-            // Aguardar delay e comecar
             Invoke(nameof(BeginPlaying), matchStartDelay);
         }
 
@@ -101,9 +100,6 @@ namespace ExoBeasts.Multiplayer.GameServer
             Debug.Log("[MatchManager] Partida em andamento!");
         }
 
-        /// <summary>
-        /// Pausar a partida
-        /// </summary>
         public void PauseMatch()
         {
             if (!IsServer) return;
@@ -112,9 +108,6 @@ namespace ExoBeasts.Multiplayer.GameServer
             CurrentMatchState.Value = MatchState.Paused;
         }
 
-        /// <summary>
-        /// Retomar a partida
-        /// </summary>
         public void ResumeMatch()
         {
             if (!IsServer) return;
@@ -123,9 +116,6 @@ namespace ExoBeasts.Multiplayer.GameServer
             CurrentMatchState.Value = MatchState.Playing;
         }
 
-        /// <summary>
-        /// Encerrar a partida com vitoria
-        /// </summary>
         public void EndMatchVictory()
         {
             if (!IsServer) return;
@@ -135,9 +125,6 @@ namespace ExoBeasts.Multiplayer.GameServer
             OnMatchEndedClientRpc(true);
         }
 
-        /// <summary>
-        /// Encerrar a partida com derrota
-        /// </summary>
         public void EndMatchDefeat()
         {
             if (!IsServer) return;
@@ -147,26 +134,21 @@ namespace ExoBeasts.Multiplayer.GameServer
             OnMatchEndedClientRpc(false);
         }
 
-        // Client RPCs
         [ClientRpc]
         private void OnMatchStartingClientRpc()
         {
             Debug.Log("[MatchManager] Partida iniciando em breve...");
-            // TODO: Mostrar contagem regressiva
         }
 
         [ClientRpc]
         private void OnMatchEndedClientRpc(bool victory)
         {
             Debug.Log($"[MatchManager] Partida encerrada - {(victory ? "VITORIA" : "DERROTA")}");
-            // TODO: Mostrar tela de resultado
         }
 
-        // Event Handler
         private void OnMatchStateChanged(MatchState oldState, MatchState newState)
         {
             Debug.Log($"[MatchManager] Estado mudou: {oldState} -> {newState}");
-            // TODO: Disparar eventos para outros sistemas reagirem
         }
 
         private void OnDestroy()
@@ -175,17 +157,14 @@ namespace ExoBeasts.Multiplayer.GameServer
         }
     }
 
-    /// <summary>
-    /// Estados possiveis da partida
-    /// </summary>
     public enum MatchState
     {
-        WaitingForPlayers,  // Aguardando jogadores conectarem
-        Starting,           // Contagem regressiva para inicio
-        Playing,            // Partida em andamento
-        Paused,             // Partida pausada
-        Victory,            // Jogadores venceram
-        Defeat,             // Jogadores perderam
-        Ended               // Partida encerrada
+        WaitingForPlayers,
+        Starting,
+        Playing,
+        Paused,
+        Victory,
+        Defeat,
+        Ended
     }
 }

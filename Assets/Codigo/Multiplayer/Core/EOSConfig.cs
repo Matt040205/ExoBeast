@@ -3,9 +3,15 @@ using UnityEngine;
 namespace ExoBeasts.Multiplayer.Core
 {
     /// <summary>
-    /// ScriptableObject para configuracao do Epic Online Services
-    /// IMPORTANTE: As credenciais reais devem estar em um arquivo externo (EOSCredentials.json)
-    /// que NAO deve ser commitado no Git
+    /// ── EOSConfig ────────────────────────────────────────
+    /// ScriptableObject com credenciais e configuracoes do EOS.
+    ///
+    ///  ▸ Credenciais carregadas de EOSCredentials.json (externo ao Git)
+    ///  ▸ LoadCredentialsFromFile(): popula campos em runtime
+    ///  ▸ ValidateCredentials(): verifica campos obrigatorios
+    ///  ▸ ClearCredentials(): limpa da memoria ao encerrar
+    ///  ▸ Criar via: Assets > Create > Multiplayer > EOS Config
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     [CreateAssetMenu(fileName = "EOSConfig", menuName = "Multiplayer/EOS Config")]
     public class EOSConfig : ScriptableObject
@@ -35,9 +41,6 @@ namespace ExoBeasts.Multiplayer.Core
         [Tooltip("Caminho do arquivo de credenciais (relativo ao projeto)")]
         public string credentialsFilePath = "EOSCredentials.json";
 
-        /// <summary>
-        /// Carregar credenciais de arquivo externo
-        /// </summary>
         public void LoadCredentialsFromFile()
         {
             string filePath = System.IO.Path.Combine(Application.dataPath, "..", credentialsFilePath);
@@ -54,7 +57,6 @@ namespace ExoBeasts.Multiplayer.Core
                 string json = System.IO.File.ReadAllText(filePath);
                 EOSCredentials credentials = JsonUtility.FromJson<EOSCredentials>(json);
 
-                // Atribuir valores (sem mostrar no log)
                 ProductId = credentials.ProductId;
                 SandboxId = credentials.SandboxId;
                 DeploymentId = credentials.DeploymentId;
@@ -70,9 +72,6 @@ namespace ExoBeasts.Multiplayer.Core
             }
         }
 
-        /// <summary>
-        /// Validar se as credenciais estao configuradas
-        /// </summary>
         public bool ValidateCredentials()
         {
             bool isValid = !string.IsNullOrEmpty(ProductId) &&
@@ -89,9 +88,6 @@ namespace ExoBeasts.Multiplayer.Core
             return isValid;
         }
 
-        /// <summary>
-        /// Limpar credenciais da memoria (seguranca)
-        /// </summary>
         public void ClearCredentials()
         {
             ProductId = "";
@@ -104,9 +100,6 @@ namespace ExoBeasts.Multiplayer.Core
         }
     }
 
-    /// <summary>
-    /// Estrutura para deserializar o arquivo JSON de credenciais
-    /// </summary>
     [System.Serializable]
     public class EOSCredentials
     {

@@ -1,9 +1,3 @@
-/*
- * Workaround para inicializar o PlatformSpecifics no Windows
- * O PlayEveryWare EOS não tem uma implementação específica para Windows standalone
- * Esta classe garante que o singleton seja inicializado corretamente
- */
-
 #if !EOS_DISABLE && UNITY_STANDALONE_WIN || UNITY_EDITOR_WIN
 
 using UnityEngine;
@@ -12,8 +6,14 @@ using PlayEveryWare.EpicOnlineServices;
 namespace ExoBeasts.Multiplayer.Core
 {
     /// <summary>
-    /// Implementação de PlatformSpecifics para Windows
-    /// Esta classe é necessária porque o PlayEveryWare EOS não fornece uma por padrão
+    /// ── WindowsPlatformSpecifics ─────────────────────────
+    /// Implementacao de PlatformSpecifics para Windows/Editor, exigida pelo PlayEveryWare EOS.
+    ///
+    ///  ▸ Registrado via [RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]
+    ///  ▸ GetTempDir(): subdiretorio isolado por clone MPPM (via MppmHelper)
+    ///  ▸ ConfigureSystemPlatformCreateOptions(): desabilita RTC (voz)
+    ///  ▸ Sem esta classe, EOS SDK falha ao inicializar no Windows standalone e Editor
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class WindowsPlatformSpecifics : PlatformSpecifics<WindowsConfig>
     {
@@ -21,27 +21,36 @@ namespace ExoBeasts.Multiplayer.Core
         {
         }
 
-        /// <summary>
-        /// Configura as opções específicas da plataforma para criação do EOS Platform
-        /// </summary>
+        public override string GetTempDir()
+        {
+            // Clones MPPM precisam de cache isolado — caso contrário,
+            // todos compartilham a mesma credencial Device ID do EOS.
+            if (MppmHelper.IsClone)
+            {
+                string dir = System.IO.Path.Combine(
+                    Application.temporaryCachePath, $"eos_clone_{MppmHelper.CloneId}");
+                System.IO.Directory.CreateDirectory(dir);
+                Debug.Log($"[WindowsPlatformSpecifics] MPPM clone — EOS CacheDir: {dir}");
+                return dir;
+            }
+
+            return Application.temporaryCachePath;
+        }
+
         public override void ConfigureSystemPlatformCreateOptions(ref EOSCreateOptions createOptions)
         {
-            // Não chamar base.ConfigureSystemPlatformCreateOptions() para evitar criar RTCOptions vazio
-
-            // Desabilitar RTC por enquanto (voz não é necessária para autenticação básica)
             // Setting RTCOptions to null disables RTC features
             createOptions.options.RTCOptions = null;
         }
 
-        // Método estático para registrar a instância no singleton
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void Initialize()
         {
-            // Registrar a instância de WindowsPlatformSpecifics no singleton
             var instance = new WindowsPlatformSpecifics();
             EOSManagerPlatformSpecificsSingleton.SetEOSManagerPlatformSpecificsInterface(instance);
 
-            Debug.Log("[WindowsPlatformSpecifics] Platform specifics inicializado para Windows");
+            string tempDir = instance.GetTempDir();
+            Debug.Log($"[WindowsPlatformSpecifics] Inicializado. EOS CacheDir: {tempDir}");
         }
     }
 }

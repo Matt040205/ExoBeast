@@ -5,7 +5,13 @@ using TMPro;
 namespace ExoBeasts.Multiplayer.Lobby
 {
     /// <summary>
-    /// Representa um item de lobby na lista de lobbies disponiveis
+    /// ── LobbyItemUI ──────────────────────────────────────
+    /// Item individual na lista de lobbies disponiveis (Canvas UI).
+    ///
+    ///  ▸ Setup(LobbyInfo): popula nome, host e contagem de jogadores
+    ///  ▸ Desabilita botao de Entrar se lobby cheio
+    ///  ▸ OnJoinButtonClicked: delega para LobbyManager.JoinLobby
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class LobbyItemUI : MonoBehaviour
     {
@@ -25,9 +31,6 @@ namespace ExoBeasts.Multiplayer.Lobby
             }
         }
 
-        /// <summary>
-        /// Configurar o item com dados do lobby
-        /// </summary>
         public void Setup(LobbyInfo info)
         {
             lobbyInfo = info;
@@ -47,7 +50,6 @@ namespace ExoBeasts.Multiplayer.Lobby
             if (playerCountText != null)
                 playerCountText.text = $"{lobbyInfo.currentPlayers}/{lobbyInfo.maxPlayers}";
 
-            // Desabilitar botao se lobby estiver cheio
             if (joinButton != null)
                 joinButton.interactable = lobbyInfo.currentPlayers < lobbyInfo.maxPlayers;
         }

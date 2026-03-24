@@ -1,11 +1,19 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using ExoBeasts.Multiplayer.Auth;
 
 namespace ExoBeasts.Multiplayer.Lobby
 {
     /// <summary>
-    /// Gerencia a interface de usuario do sistema de lobby
+    /// ── LobbyUI ──────────────────────────────────────────
+    /// Interface Canvas para o sistema de lobby (aguarda artes finais).
+    ///
+    ///  ▸ Tres paineis: CreateLobby, LobbyList, LobbyRoom
+    ///  ▸ UpdateLobbyList: recria itens usando LobbyItemUI prefab
+    ///  ▸ RefreshPlayerSlots: reconstroi slots com TextMeshProUGUI dinamico
+    ///  ▸ Inscrita nos eventos do LobbyManager; desinscreve em OnDestroy
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class LobbyUI : MonoBehaviour
     {
@@ -47,7 +55,6 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         private void SetupUI()
         {
-            // Setup Create Lobby Panel
             if (maxPlayersSlider != null)
             {
                 maxPlayersSlider.minValue = 2;
@@ -56,7 +63,6 @@ namespace ExoBeasts.Multiplayer.Lobby
                 maxPlayersSlider.onValueChanged.AddListener(OnMaxPlayersChanged);
             }
 
-            // Setup buttons
             if (createButton != null)
                 createButton.onClick.AddListener(OnCreateLobbyClicked);
             if (refreshButton != null)
@@ -76,11 +82,13 @@ namespace ExoBeasts.Multiplayer.Lobby
         private void SubscribeToEvents()
         {
             var lobbyManager = LobbyManager.Instance;
-            lobbyManager.OnLobbyCreated += OnLobbyCreated;
-            lobbyManager.OnLobbiesFound += OnLobbiesFound;
-            lobbyManager.OnLobbyJoined += OnLobbyJoined;
-            lobbyManager.OnLobbyLeft += OnLobbyLeft;
-            lobbyManager.OnError += OnError;
+            lobbyManager.OnLobbyCreated  += OnLobbyCreated;
+            lobbyManager.OnLobbiesFound  += OnLobbiesFound;
+            lobbyManager.OnLobbyJoined   += OnLobbyJoined;
+            lobbyManager.OnLobbyLeft     += OnLobbyLeft;
+            lobbyManager.OnMemberJoined  += OnMemberJoined;
+            lobbyManager.OnMemberLeft    += OnMemberLeft;
+            lobbyManager.OnError         += OnError;
         }
 
         private void OnDestroy()
@@ -88,15 +96,16 @@ namespace ExoBeasts.Multiplayer.Lobby
             var lobbyManager = LobbyManager.Instance;
             if (lobbyManager != null)
             {
-                lobbyManager.OnLobbyCreated -= OnLobbyCreated;
-                lobbyManager.OnLobbiesFound -= OnLobbiesFound;
-                lobbyManager.OnLobbyJoined -= OnLobbyJoined;
-                lobbyManager.OnLobbyLeft -= OnLobbyLeft;
-                lobbyManager.OnError -= OnError;
+                lobbyManager.OnLobbyCreated  -= OnLobbyCreated;
+                lobbyManager.OnLobbiesFound  -= OnLobbiesFound;
+                lobbyManager.OnLobbyJoined   -= OnLobbyJoined;
+                lobbyManager.OnLobbyLeft     -= OnLobbyLeft;
+                lobbyManager.OnMemberJoined  -= OnMemberJoined;
+                lobbyManager.OnMemberLeft    -= OnMemberLeft;
+                lobbyManager.OnError         -= OnError;
             }
         }
 
-        // Panel Management
         private void ShowCreateLobbyPanel()
         {
             createLobbyPanel?.SetActive(true);
@@ -118,7 +127,6 @@ namespace ExoBeasts.Multiplayer.Lobby
             lobbyRoomPanel?.SetActive(true);
         }
 
-        // Button Callbacks
         private void OnCreateLobbyClicked()
         {
             var settings = new LobbySettings
@@ -141,7 +149,6 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         private void OnSelectCharacterClicked()
         {
-            // TODO: Abrir tela de selecao de personagem
             Debug.Log("[LobbyUI] Selecionar personagem");
         }
 
@@ -167,7 +174,6 @@ namespace ExoBeasts.Multiplayer.Lobby
                 maxPlayersText.text = value.ToString("0");
         }
 
-        // Event Handlers
         private void OnLobbyCreated(LobbyInfo lobby)
         {
             SetStatusText($"Lobby criado: {lobby.lobbyName}");
@@ -194,17 +200,37 @@ namespace ExoBeasts.Multiplayer.Lobby
             ShowLobbyListPanel();
         }
 
+        private void OnMemberJoined(LobbyMember member)
+        {
+            SetStatusText($"{member.displayName} entrou na sala");
+            RefreshPlayerSlots();
+        }
+
+        private void OnMemberLeft(LobbyMember member)
+        {
+            SetStatusText($"{member.displayName} saiu da sala");
+            RefreshPlayerSlots();
+        }
+
         private void OnError(string error)
         {
             SetStatusText($"Erro: {error}");
         }
 
-        // UI Updates
         private void UpdateLobbyList(System.Collections.Generic.List<LobbyInfo> lobbies)
         {
-            // TODO: Limpar lista existente
-            // TODO: Instanciar prefabs para cada lobby
-            // TODO: Configurar callbacks de click
+            if (lobbyListContent == null || lobbyItemPrefab == null) return;
+
+            foreach (Transform child in lobbyListContent)
+                Destroy(child.gameObject);
+
+            foreach (var info in lobbies)
+            {
+                var item = Instantiate(lobbyItemPrefab, lobbyListContent);
+                var itemUI = item.GetComponent<LobbyItemUI>();
+                if (itemUI != null)
+                    itemUI.Setup(info);
+            }
         }
 
         private void UpdateLobbyRoomUI(LobbyInfo lobby)
@@ -212,8 +238,53 @@ namespace ExoBeasts.Multiplayer.Lobby
             if (lobbyNameText != null)
                 lobbyNameText.text = lobby.lobbyName;
 
-            // TODO: Atualizar slots de jogadores
-            // TODO: Habilitar/desabilitar botao Start (apenas para host)
+            RefreshPlayerSlots();
+
+            if (startGameButton != null)
+            {
+                var currentLobby = LobbyManager.Instance.GetCurrentLobby();
+                string localUid = SessionManager.Instance?.GetUserId() ?? "";
+                bool isHost = !string.IsNullOrEmpty(currentLobby?.hostProductUserId) &&
+                              currentLobby.hostProductUserId == localUid;
+                startGameButton.gameObject.SetActive(isHost);
+            }
+        }
+
+        private void RefreshPlayerSlots()
+        {
+            if (playerSlotsContainer == null) return;
+
+            var members = LobbyManager.Instance.GetMembers();
+            int maxPlayers = LobbyManager.Instance.GetCurrentLobby()?.maxPlayers ?? 4;
+
+            foreach (Transform child in playerSlotsContainer)
+                Destroy(child.gameObject);
+
+            for (int i = 0; i < maxPlayers; i++)
+            {
+                var slotGO  = new GameObject($"Slot_{i + 1}", typeof(RectTransform));
+                slotGO.transform.SetParent(playerSlotsContainer, false);
+
+                var label = slotGO.AddComponent<TMPro.TextMeshProUGUI>();
+                if (i < members.Count)
+                {
+                    var m = members[i];
+                    string hostTag   = m.isHost   ? " [Host]" : "";
+                    string readyTag  = m.isReady  ? " ✓"      : "";
+                    label.text       = $"{m.displayName}{hostTag}{readyTag}";
+                    label.color      = m.isReady
+                        ? new UnityEngine.Color(0.2f, 0.8f, 0.2f)
+                        : UnityEngine.Color.white;
+                }
+                else
+                {
+                    label.text  = "— Aguardando —";
+                    label.color = new UnityEngine.Color(0.5f, 0.5f, 0.5f);
+                }
+
+                label.fontSize  = 18;
+                label.alignment = TMPro.TextAlignmentOptions.MidlineLeft;
+            }
         }
 
         private void SetStatusText(string message)

@@ -12,8 +12,13 @@ using Epic.OnlineServices.Connect;
 namespace ExoBeasts.Multiplayer.Testing
 {
     /// <summary>
-    /// Script de teste para autenticacao EOS via Device ID
-    /// Este script cria automaticamente o EOSManager do PlayEveryWare se necessario
+    /// ── EOSAuthTest ──────────────────────────────────────
+    /// Teste isolado de autenticacao EOS via Device ID.
+    ///
+    ///  ▸ autoLoginOnStart: login automatico aguardando SDK pronto (coroutine)
+    ///  ▸ Independente de EOSAuthenticator e SessionManager para o fluxo de auth
+    ///  ▸ OnGUI de debug sem Canvas — cena: EOSAuthTest.unity
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class EOSAuthTest : MonoBehaviour
     {
@@ -36,14 +41,13 @@ namespace ExoBeasts.Multiplayer.Testing
 
         private void Awake()
         {
-            // Verificar se o EOSManager existe
 #if !EOS_DISABLE
             var existingManager = FindObjectOfType<PlayEveryWare.EpicOnlineServices.EOSManager>();
             if (existingManager == null)
             {
-                Debug.LogError("[EOSAuthTest] ERRO CRÍTICO: EOSManager não encontrado na cena!");
-                Debug.LogError("[EOSAuthTest] Você precisa adicionar um GameObject com o componente EOSManager na cena.");
-                Debug.LogError("[EOSAuthTest] Vá em GameObject > Create Empty, renomeie para 'EOSManager' e adicione o componente PlayEveryWare.EpicOnlineServices.EOSManager");
+                Debug.LogError("[EOSAuthTest] ERRO CRITICO: EOSManager nao encontrado na cena!");
+                Debug.LogError("[EOSAuthTest] Voce precisa adicionar um GameObject com o componente EOSManager na cena.");
+                Debug.LogError("[EOSAuthTest] Va em GameObject > Create Empty, renomeie para 'EOSManager' e adicione o componente PlayEveryWare.EpicOnlineServices.EOSManager");
             }
             else
             {
@@ -54,7 +58,6 @@ namespace ExoBeasts.Multiplayer.Testing
 
         private void Start()
         {
-            // Configurar botoes se existirem
             if (loginButton != null)
             {
                 loginButton.onClick.AddListener(DoLogin);
@@ -67,20 +70,15 @@ namespace ExoBeasts.Multiplayer.Testing
 
             UpdateStatus("Aguardando EOS SDK...");
 
-            // Aguardar inicializacao do EOS
             if (autoLoginOnStart)
             {
                 StartCoroutine(WaitForEOSAndLogin());
             }
         }
 
-        /// <summary>
-        /// Garante que o EOSManager do PlayEveryWare existe na cena
-        /// </summary>
         private void EnsurePlayEveryWareEOSManager()
         {
 #if !EOS_DISABLE
-            // Verificar se ja existe um EOSManager na cena
             var existingManager = FindObjectOfType<PlayEveryWare.EpicOnlineServices.EOSManager>();
             if (existingManager == null)
             {
@@ -103,7 +101,6 @@ namespace ExoBeasts.Multiplayer.Testing
             float timeout = 15f;
             float elapsed = 0f;
 
-            // Aguardar o EOSManager inicializar
             while (elapsed < timeout)
             {
                 if (PlayEveryWare.EpicOnlineServices.EOSManager.Instance != null)
@@ -112,21 +109,20 @@ namespace ExoBeasts.Multiplayer.Testing
                     if (platform != null)
                     {
                         Debug.Log("[EOSAuthTest] EOS SDK inicializado!");
-                        Debug.Log($"[EOSAuthTest] Platform válido: {platform != null}");
+                        Debug.Log($"[EOSAuthTest] Platform valido: {platform != null}");
 
                         var connectInterface = platform.GetConnectInterface();
-                        Debug.Log($"[EOSAuthTest] ConnectInterface válido: {connectInterface != null}");
+                        Debug.Log($"[EOSAuthTest] ConnectInterface valido: {connectInterface != null}");
 
                         if (connectInterface != null)
                         {
                             UpdateStatus("EOS SDK pronto! Fazendo login...");
-                            // Fazer login via Device ID
                             yield return StartCoroutine(LoginWithDeviceId());
                             yield break;
                         }
                         else
                         {
-                            Debug.LogWarning("[EOSAuthTest] Platform inicializado mas ConnectInterface é null. Aguardando mais um frame...");
+                            Debug.LogWarning("[EOSAuthTest] Platform inicializado mas ConnectInterface e null. Aguardando mais um frame...");
                         }
                     }
                 }
@@ -155,7 +151,6 @@ namespace ExoBeasts.Multiplayer.Testing
                 yield break;
             }
 
-            // Passo 1: Criar Device ID
             UpdateStatus("Criando Device ID...");
 
             bool deviceIdCreated = false;
@@ -172,7 +167,6 @@ namespace ExoBeasts.Multiplayer.Testing
                 deviceIdCreated = true;
             });
 
-            // Aguardar callback
             while (!deviceIdCreated)
             {
                 yield return null;
@@ -186,7 +180,6 @@ namespace ExoBeasts.Multiplayer.Testing
 
             Debug.Log($"[EOSAuthTest] Device ID: {(deviceIdResult == Result.DuplicateNotAllowed ? "ja existe" : "criado")}");
 
-            // Passo 2: Login com Device ID
             UpdateStatus("Fazendo login...");
 
             bool loginCompleted = false;
@@ -219,7 +212,6 @@ namespace ExoBeasts.Multiplayer.Testing
                 loginCompleted = true;
             });
 
-            // Aguardar callback
             while (!loginCompleted)
             {
                 yield return null;
@@ -232,7 +224,6 @@ namespace ExoBeasts.Multiplayer.Testing
             }
             else if (loginResult == Result.InvalidUser)
             {
-                // Usuario nao existe, criar
                 Debug.Log("[EOSAuthTest] Usuario nao existe, criando...");
                 UpdateStatus("Criando usuario...");
 
@@ -262,7 +253,6 @@ namespace ExoBeasts.Multiplayer.Testing
                 createCompleted = true;
             });
 
-            // Aguardar callback
             while (!createCompleted)
             {
                 yield return null;
@@ -287,7 +277,6 @@ namespace ExoBeasts.Multiplayer.Testing
             Debug.Log($"[EOSAuthTest] Login bem-sucedido! ProductUserId: {currentUserId}");
             UpdateStatus($"Logado!\nID: {currentUserId}");
 
-            // Atualizar SessionManager
             SessionManager.Instance.StartSession(currentUserId, playerDisplayName);
 
             if (loginButton != null) loginButton.interactable = false;
@@ -334,7 +323,6 @@ namespace ExoBeasts.Multiplayer.Testing
             Debug.Log($"[EOSAuthTest] Status: {message}");
         }
 
-        // Debug GUI para testes rapidos sem UI
         private void OnGUI()
         {
             GUILayout.BeginArea(new Rect(10, 10, 350, 250));

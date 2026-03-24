@@ -11,9 +11,14 @@ using Epic.OnlineServices.Auth;
 namespace ExoBeasts.Multiplayer.Auth
 {
     /// <summary>
-    /// Gerencia autenticacao no EOS via Device ID
-    /// Device ID permite login anonimo sem necessidade de conta Epic
-    /// Ideal para desenvolvimento e testes
+    /// ── EOSAuthenticator ─────────────────────────────────
+    /// Autentica o jogador no EOS via Device ID (login anonimo persistente).
+    ///
+    ///  ▸ Fluxo: CreateDeviceId → Login → (InvalidUser) → CreateUser
+    ///  ▸ Apos login: atualiza EOSManagerWrapper e inicia sessao no SessionManager
+    ///  ▸ SetDeviceIdName(): configurar displayName antes de LoginWithDeviceId()
+    ///  ▸ Singleton — acessivel via EOSAuthenticator.Instance
+    /// ─────────────────────────────────────────────────────
     /// </summary>
     public class EOSAuthenticator : MonoBehaviour
     {
@@ -39,7 +44,6 @@ namespace ExoBeasts.Multiplayer.Auth
         public bool IsLoggedIn => isLoggedIn;
         public string CurrentProductUserId => currentProductUserId;
 
-        // Eventos
         public event Action<string> OnLoginSuccess;
         public event Action<string> OnLoginFailed;
         public event Action OnLogout;
@@ -60,8 +64,8 @@ namespace ExoBeasts.Multiplayer.Auth
         }
 
         /// <summary>
-        /// Login via Device ID (anonimo)
-        /// Cria um Device ID unico se nao existir, depois faz login
+        /// Login via Device ID (anonimo).
+        /// Cria um Device ID unico se nao existir, depois faz login.
         /// </summary>
         public void LoginWithDeviceId()
         {
@@ -89,8 +93,6 @@ namespace ExoBeasts.Multiplayer.Auth
             }
 
             Debug.Log("[EOSAuthenticator] Iniciando login via Device ID...");
-
-            // Primeiro, criar Device ID se necessario
             CreateDeviceIdAndLogin(connectInterface);
 #else
             Debug.LogWarning("[EOSAuthenticator] EOS desabilitado");
@@ -101,31 +103,34 @@ namespace ExoBeasts.Multiplayer.Auth
 #if !EOS_DISABLE
         private void CreateDeviceIdAndLogin(ConnectInterface connectInterface)
         {
+            string baseModel = $"{SystemInfo.deviceModel}_{SystemInfo.deviceName}";
+
+            // Clones MPPM partilham o mesmo SystemInfo — o CloneId diferencia o DeviceModel.
+            string deviceModel = Core.MppmHelper.IsClone
+                ? $"{baseModel}_clone{Core.MppmHelper.CloneId}"
+                : baseModel;
+
             var createDeviceIdOptions = new CreateDeviceIdOptions
             {
-                DeviceModel = $"{SystemInfo.deviceModel}_{SystemInfo.deviceName}"
+                DeviceModel = deviceModel
             };
 
-            Debug.Log($"[EOSAuthenticator] Criando/recuperando Device ID: {createDeviceIdOptions.DeviceModel}");
+            Debug.Log($"[EOSAuthenticator] Device ID: {deviceModel}" +
+                      (Core.MppmHelper.IsClone ? $" (MPPM clone: {Core.MppmHelper.CloneId})" : ""));
 
             connectInterface.CreateDeviceId(ref createDeviceIdOptions, null, OnCreateDeviceIdComplete);
         }
 
         private void OnCreateDeviceIdComplete(ref CreateDeviceIdCallbackInfo data)
         {
-            // DuplicateNotAllowed significa que o Device ID ja existe - isso e OK
+            // DuplicateNotAllowed significa que o Device ID ja existe — isso e OK
             if (data.ResultCode == Result.Success || data.ResultCode == Result.DuplicateNotAllowed)
             {
                 if (data.ResultCode == Result.DuplicateNotAllowed)
-                {
                     Debug.Log("[EOSAuthenticator] Device ID ja existe, usando existente");
-                }
                 else
-                {
                     Debug.Log("[EOSAuthenticator] Device ID criado com sucesso");
-                }
 
-                // Agora fazer login com o Device ID
                 PerformDeviceIdLogin();
             }
             else
@@ -149,7 +154,7 @@ namespace ExoBeasts.Multiplayer.Auth
             var credentials = new Epic.OnlineServices.Connect.Credentials
             {
                 Type = ExternalCredentialType.DeviceidAccessToken,
-                Token = null // Device ID nao precisa de token
+                Token = null
             };
 
             var userLoginInfo = new UserLoginInfo
@@ -177,17 +182,12 @@ namespace ExoBeasts.Multiplayer.Auth
 
                 Debug.Log($"[EOSAuthenticator] Login bem-sucedido! ProductUserId: {currentProductUserId}");
 
-                // Atualizar EOSManagerWrapper
                 EOSManagerWrapper.Instance.SetConnected(true);
-
-                // Atualizar SessionManager
                 SessionManager.Instance.StartSession(currentProductUserId, deviceIdName);
-
                 OnLoginSuccess?.Invoke(currentProductUserId);
             }
             else if (data.ResultCode == Result.InvalidUser)
             {
-                // Usuario nao existe, precisamos criar
                 Debug.Log("[EOSAuthenticator] Usuario nao existe, criando novo usuario...");
                 CreateUser(data.ContinuanceToken);
             }
@@ -228,12 +228,8 @@ namespace ExoBeasts.Multiplayer.Auth
 
                 Debug.Log($"[EOSAuthenticator] Usuario criado e logado! ProductUserId: {currentProductUserId}");
 
-                // Atualizar EOSManagerWrapper
                 EOSManagerWrapper.Instance.SetConnected(true);
-
-                // Atualizar SessionManager
                 SessionManager.Instance.StartSession(currentProductUserId, deviceIdName);
-
                 OnLoginSuccess?.Invoke(currentProductUserId);
             }
             else
@@ -244,9 +240,7 @@ namespace ExoBeasts.Multiplayer.Auth
         }
 #endif
 
-        /// <summary>
-        /// Logout do EOS
-        /// </summary>
+        /// <summary>Logout do EOS.</summary>
         public void Logout()
         {
 #if !EOS_DISABLE
@@ -258,15 +252,11 @@ namespace ExoBeasts.Multiplayer.Auth
 
             Debug.Log("[EOSAuthenticator] Realizando logout...");
 
-            // Limpar estado local
             isLoggedIn = false;
             currentProductUserId = "";
             localProductUserId = null;
 
-            // Atualizar EOSManagerWrapper
             EOSManagerWrapper.Instance.SetConnected(false);
-
-            // Encerrar sessao
             SessionManager.Instance.EndSession();
 
             Debug.Log("[EOSAuthenticator] Logout realizado");
@@ -274,22 +264,16 @@ namespace ExoBeasts.Multiplayer.Auth
 #endif
         }
 
-        /// <summary>
-        /// Definir nome de exibicao para Device ID
-        /// Deve ser chamado antes do login
-        /// </summary>
+        /// <summary>Definir nome de exibicao para Device ID. Chamar antes do login.</summary>
         public void SetDeviceIdName(string name)
         {
-            if (!string.IsNullOrEmpty(name))
+            if (!string.IsNullOrWhiteSpace(name))
             {
-                deviceIdName = name;
+                deviceIdName = name.Trim();
             }
         }
 
 #if !EOS_DISABLE
-        /// <summary>
-        /// Obter o ProductUserId atual
-        /// </summary>
         public ProductUserId GetProductUserId()
         {
             return localProductUserId;

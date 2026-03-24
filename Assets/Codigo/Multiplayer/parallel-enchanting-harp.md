@@ -1,21 +1,20 @@
-# Plano de Implementacao Multiplayer - ExoBeasts V3
+# Plano de Implementação Multiplayer — ExoBeasts V3
 
-## Especificacoes do Projeto
+## Especificações do Projeto
 
 | Item | Valor |
 |------|-------|
 | **Engine** | Unity 6 (6000.0.52f1) |
 | **Max Jogadores** | 4 jogadores |
-| **Modelo de Conexao** | **P2P (Peer-to-Peer) com Host** |
-| **Prazo** | 1-2 meses |
-| **Escopo** | Sincronizacao completa (lobby, movimento, combate, torres, inimigos, moedas, habilidades) |
+| **Modelo de Conexão** | **P2P (Peer-to-Peer) com Host** |
+| **Escopo** | Sincronização completa (lobby, movimento, combate, torres, inimigos, moedas, habilidades) |
 
 ---
 
-## Visao Geral da Arquitetura - P2P
+## Visão Geral da Arquitetura — P2P
 
 ```
-[Epic Online Services - Lobby Service]
+[Epic Online Services — Lobby Service]
        |
        v
 [Client 1 - HOST] <----+
@@ -27,28 +26,18 @@
        +---> [Client 4] (Apenas Cliente)
 ```
 
-**Modelo P2P (Peer-to-Peer):**
+**Modelo P2P:**
 - Um jogador atua como **Host** (servidor + cliente simultaneamente)
 - O Host processa toda a lógica autoritativa do jogo
 - Outros jogadores conectam diretamente ao Host
 - Epic Lobby Service gerencia matchmaking e conexões iniciais
 - NAT Traversal facilitado pelo Epic P2P Service
 
-**Vantagens do P2P:**
-- ✅ Sem custo de servidor dedicado
-- ✅ Setup mais simples
-- ✅ Melhor para grupos pequenos (2-4 jogadores)
-- ✅ Latência menor para jogadores próximos ao Host
-
-**Considerações:**
-- ⚠️ Host precisa de conexão estável
-- ⚠️ Se Host desconectar, partida termina (Host Migration pode ser implementado depois)
-
 ---
 
-## Pacotes Instalados (versoes reais)
+## Pacotes Instalados
 
-| Pacote | Versao | Status |
+| Pacote | Versão | Status |
 |--------|--------|--------|
 | `com.unity.netcode.gameobjects` | 1.12.0 | ✅ Instalado e funcional |
 | `com.unity.transport` | 2.4.0 | ✅ Instalado e funcional |
@@ -58,21 +47,21 @@
 
 ---
 
-## FASE 1: Fundacao e Configuracao — ✅ CONCLUIDA
+## FASE 1: Fundação e Configuração — ✅ CONCLUÍDA
 
-### 1.1 Configuracao no Epic Developer Portal — ✅
+### 1.1 Configuração no Epic Developer Portal — ✅
 
 - [x] Conta de desenvolvedor Epic criada
 - [x] Produto "ExoBeasts" configurado
 - [x] Credenciais (ProductId, SandboxId, ClientId, DeploymentId) obtidas
-- [x] Servico **Lobbies** ativado
-- [x] Servico **Peer-to-peer** ativado (NAT traversal)
+- [x] Serviço **Lobbies** ativado
+- [x] Serviço **Peer-to-peer** ativado (NAT traversal)
 - [x] Arquivo `EOSCredentials.json` configurado na raiz do projeto
-- [x] Arquivo no `.gitignore` (nao comitado)
+- [x] Arquivo no `.gitignore` (não comitado)
 
-### 1.2 Instalacao de Pacotes Unity — ✅
+### 1.2 Instalação de Pacotes Unity — ✅
 
-Todos os pacotes estao em `Packages/manifest.json`:
+Todos os pacotes estão em `Packages/manifest.json`:
 
 ```json
 "com.unity.netcode.gameobjects": "1.12.0",
@@ -81,72 +70,79 @@ Todos os pacotes estao em `Packages/manifest.json`:
 "com.playeveryware.eos": "file:com.playeveryware.eos"
 ```
 
-### 1.3 Estrutura de Pastas — ✅
-
-Todos os scripts base criados em `Assets/Codigo/Multiplayer/`:
+### 1.3 Estrutura de Pastas — ✅ Completa
 
 ```
 Multiplayer/
 ├── Core/
-│   ├── NetworkBootstrap.cs        ✅ Implementado (StartHost/StartClient reais)
-│   ├── EOSManager.cs              ✅ Implementado (wrapper PlayEveryWare)
-│   ├── EOSConfig.cs               ✅ Implementado (carrega credenciais do arquivo)
-│   ├── HostManager.cs             ✅ Implementado (StartAsHost + StartAsClient)
-│   └── WindowsPlatformSpecifics.cs ✅ Implementado
+│   ├── NetworkBootstrap.cs          ✅ Implementado (StartHost/StartClient reais)
+│   ├── EOSManager.cs                ✅ Implementado (wrapper PlayEveryWare, auto-init)
+│   ├── EOSConfig.cs                 ✅ Implementado (carrega credenciais do arquivo)
+│   ├── HostManager.cs               ✅ Implementado (StartAsHost + StartAsClient)
+│   ├── MppmHelper.cs                ✅ Implementado (detecção clone MPPM v1.6+)
+│   └── WindowsPlatformSpecifics.cs  ✅ Implementado (cache EOS isolado por clone)
 ├── Auth/
-│   ├── EOSAuthenticator.cs        ✅ Implementado (Device ID - funcional)
-│   └── SessionManager.cs          ✅ Implementado
+│   ├── EOSAuthenticator.cs          ✅ Implementado (Device ID — funcional e testado)
+│   └── SessionManager.cs            ✅ Implementado
 ├── Lobby/
-│   ├── LobbyManager.cs            🚧 Estrutura criada (EOS calls = TODO)
-│   ├── LobbyUI.cs                 🚧 Estrutura criada
-│   ├── LobbyData.cs               ✅ Implementado (structs)
-│   └── LobbyItemUI.cs             🚧 Estrutura criada
+│   ├── LobbyManager.cs              ✅ Implementado e testado (Março 2026)
+│   ├── LobbyUI.cs                   ✅ Implementado (Canvas-based, aguarda artes)
+│   ├── LobbyItemUI.cs               ✅ Implementado
+│   └── LobbyData.cs                 ✅ Implementado (structs e constantes)
 ├── GameServer/
-│   ├── GameServerManager.cs       🚧 Estrutura criada
-│   ├── MatchManager.cs            🚧 Estrutura criada
-│   └── PlayerRegistry.cs          🚧 Estrutura criada
+│   ├── GameServerManager.cs         🚧 Estrutura criada
+│   ├── MatchManager.cs              🚧 Estrutura criada
+│   └── PlayerRegistry.cs            🚧 Estrutura criada
 ├── Sync/
-│   ├── NetworkedPlayerController.cs 🚧 Estrutura criada
-│   ├── NetworkedCurrency.cs        🚧 Estrutura criada
-│   ├── NetworkedBuilding.cs        🚧 Estrutura criada
-│   └── NetworkedHorde.cs           🚧 Estrutura criada
+│   ├── NetworkedPlayerController.cs ✅ Implementado (NetworkBehaviour base)
+│   ├── PlayerNetworkSetup.cs        ✅ Implementado (desabilita input remoto)
+│   ├── NetworkedEnemy.cs            ✅ Implementado (classe base inimigo em rede)
+│   ├── NetworkedHorde.cs            ✅ Implementado (gerenciamento de waves)
+│   ├── NetworkedCurrency.cs         🚧 Estrutura criada
+│   └── NetworkedBuilding.cs         🚧 Estrutura criada
 └── Testing/
-    ├── EOSAuthTest.cs              ✅ Funcional (testado)
-    └── NetworkConnectionTest.cs    ✅ Implementado e testado (Host/Client LAN)
+    ├── EOSAuthTest.cs               ✅ Funcional (testado)
+    ├── NetworkConnectionTest.cs     ✅ Implementado e testado (Host/Client LAN)
+    ├── NetworkedCubeMovement.cs     ✅ Implementado (movimento WASD p/ cubo de teste)
+    └── LobbyPlaceholderUI.cs        ✅ Implementado e testado (UI OnGUI p/ LobbyScene)
 ```
 
-### 1.4 Cenas do Projeto — ✅ Parcial
+### 1.4 Cenas do Projeto — ✅ Atualizadas
 
-- [x] `EOSAuthTest.unity` — cena de teste de autenticacao EOS
-- [x] `NetworkTest.unity` — cena de teste de conexao P2P (criada nesta sprint)
-- [ ] `LobbyScene.unity` — aguardando Fase 3
-- [ ] `NetworkBootstrap.unity` — aguardando integracao com menu
+- [x] `EOSAuthTest.unity` — teste de autenticação EOS
+- [x] `Network Test.unity` — teste de conexão P2P (cubos com movimento)
+- [x] `LobbyScene.unity` — cena de lobby (criada, usando LobbyPlaceholderUI)
+- [x] `SceneMapTest.unity` — mapa destino após conexão
+- [ ] `NetworkBootstrap.unity` — aguardando integração com menu principal
 
 ---
 
-## FASE 2: Autenticacao — ✅ CONCLUIDA (Device ID)
+## FASE 2: Autenticação — ✅ CONCLUÍDA (Device ID)
 
 ### 2.1 EOSManagerWrapper — ✅
 
 **Arquivo:** `Core/EOSManager.cs`
 
 - [x] Wrapper para PlayEveryWare EOSManager
-- [x] Expoe `ConnectInterface`, `AuthInterface`, `PlatformInterface`
+- [x] Expõe `ConnectInterface`, `AuthInterface`, `PlatformInterface`
 - [x] Carrega credenciais via `EOSConfig`
 - [x] Singleton com DontDestroyOnLoad
+- [x] `Start()` chama `Initialize()` automaticamente
+- [x] Eventos `OnEOSInitialized` e `OnInitializationFailed` para observadores assíncronos
 
 ### 2.2 EOSAuthenticator — ✅
 
 **Arquivo:** `Auth/EOSAuthenticator.cs`
 
-**Metodo implementado:** Device ID (login anonimo)
-- [x] `LoginWithDeviceId()` — cria Device ID unico por maquina
+**Método implementado:** Device ID (login anônimo)
+- [x] `LoginWithDeviceId()` — cria Device ID único por máquina
 - [x] Fluxo: CreateDeviceId → Login → (se novo) CreateUser → sucesso
 - [x] Armazena `ProductUserId` localmente
 - [x] Dispara `OnLoginSuccess` / `OnLoginFailed`
 - [x] Integrado com `SessionManager`
+- [x] `SetDeviceIdName(name)` — define nome de exibição antes do login (valida com `IsNullOrWhiteSpace`)
 
-**Testado:** Login funcional confirmado em `EOSAuthTest.unity`
+**Testado:** Login funcional confirmado em `EOSAuthTest.unity` e `LobbyScene.unity`
 
 ### 2.3 SessionManager — ✅
 
@@ -156,113 +152,146 @@ Multiplayer/
 - [x] `StartSession()` / `EndSession()`
 - [x] Singleton com DontDestroyOnLoad
 
-### 2.4 UI de Login — 🚧 Pendente
+### 2.4 UI de Login — 🚧 Pendente (formal)
 
 - [ ] UI formal em `MenuScene.unity` (atualmente usando OnGUI de debug)
-- Aguardando integracao com fluxo de menu principal
+- Aguardando integração com fluxo de menu principal
 
 ---
 
-## SPRINT: Validacao de Rede Basica — ✅ CONCLUIDA
+## SPRINT: Validação de Rede Básica — ✅ CONCLUÍDA
 
-> Sprint da equipe: validar que NGO + UnityTransport funcionam entre instancias.
-
-- [x] **Pacote de Netcode instalado** — NGO 1.12.0 confirmado
-- [x] **NetworkManager configurado na cena** — NetworkTest.unity com NetworkManager + UnityTransport
-- [x] **Sistema basico Host/Client** — `NetworkConnectionTest.cs` com Host e Client funcionais
-- [x] **Teste de conexao entre instancias com Prefabs genericos** — 2 instancias conectadas via MPPM (Multiplayer Play Mode), capsulas spawnando corretamente
-
-**Como testar:**
-- `Window → Package Manager` → instalar `com.unity.multiplayer.playmode`
-- Ou: Build + Editor (Host no .exe, Client no Editor)
-- Cena: `NetworkTest.unity`
-- Script: `Testing/NetworkConnectionTest.cs` (UI via OnGUI, sem Canvas necessario)
-- Troca de cena sincronizada: campo `Game Scene Name` no Inspector
+- [x] Pacote de Netcode instalado — NGO 1.12.0 confirmado
+- [x] NetworkManager configurado na cena — `Network Test.unity`
+- [x] Sistema básico Host/Client — `NetworkConnectionTest.cs`
+- [x] Prefab de teste — `PlayerTest.prefab` (cubo) com NetworkObject + ClientNetworkTransform
+- [x] Movimento sincronizado — `NetworkedCubeMovement.cs` (WASD, apenas no owner)
+- [x] Troca de cena sincronizada — NGO SceneManager carrega `SceneMapTest.unity` para todos
+- [x] `PlayerNetworkSetup` — desabilita input/câmera/CharacterController no jogador remoto
 
 ---
 
-## FASE 3: Sistema de Lobby — 🚧 PROXIMA FASE
+## SPRINT: Base de IA para Inimigos — ✅ CONCLUÍDA
 
-### 3.1 Estrutura de Dados — ✅ Definida
+- [x] **NetworkedEnemy.cs** — classe base `NetworkBehaviour` para todos os inimigos
+  - `NetworkVariable<float> CurrentHealth` (server-authoritative)
+  - `NetworkVariable<int> State` (enum EnemyState: Idle, Chasing, Attacking, Dead)
+  - `TakeDamageServerRpc(float damage, ulong attackerClientId)` — RequireOwnership = false
+  - `Die()` → notifica NetworkedHorde, dispara `OnDiedClientRpc`, despawna após 2s
+  - `RunAI()` virtual — executa apenas no servidor
+- [x] **NetworkedHorde.cs** — gerenciamento de waves
+  - `NetworkVariable<int> CurrentWave`, `EnemiesRemaining` (clampado em ≥ 0)
+  - `OnEnemyKilledServerRpc()` — decrementa contador
+  - `ForceStartNextWaveServerRpc()` — forçar próxima wave (debug)
+  - `SpawnEnemy()` — placeholder (precisa de referência ao prefab de inimigo)
 
-**Arquivo:** `Lobby/LobbyData.cs` — structs ja implementadas:
-- `LobbyInfo` (id, nome, host, players, mapa, publico, estado)
-- `LobbyMember` (userId, displayName, characterIndex, isReady)
-- `LobbySettings`, `LobbySearchFilter`
-- `LobbyState` enum, `MemberAttributes` constants
+---
 
-### 3.2 LobbyManager — 🚧 TODO (estrutura pronta)
+## FASE 3: Sistema de Lobby — ✅ IMPLEMENTADO E TESTADO
+
+### 3.1 Estrutura de Dados — ✅
+
+**Arquivo:** `Lobby/LobbyData.cs`
+
+- [x] `LobbyInfo` — id, nome, host, hostProductUserId, players, mapa, público, estado
+- [x] `LobbyMember` — userId, displayName, characterIndex, isReady, isHost
+- [x] `LobbySettings`, `LobbySearchFilter`
+- [x] `LobbyState` enum (WaitingForPlayers, SelectingCharacters, StartingMatch, InGame)
+- [x] `LobbyAttributes` constants (LOBBY_NAME, MAP_NAME, MAX_PLAYERS, SERVER_ADDRESS, SERVER_PORT...)
+- [x] `MemberAttributes` constants (DISPLAY_NAME, CHARACTER_INDEX, IS_READY, IS_HOST)
+
+### 3.2 LobbyManager — ✅ Testado com chamadas EOS reais
 
 **Arquivo:** `Lobby/LobbyManager.cs`
 
-**Metodos com estrutura criada, chamadas EOS pendentes:**
+| Método | Status | Descrição |
+|--------|--------|-----------|
+| `CreateLobby(settings)` | ✅ Testado | `LobbyInterface.CreateLobby()` + SetLobbyAttributes + publica DISPLAY_NAME |
+| `SearchLobbies(filter)` | ✅ Testado | `CreateLobbySearch` + `Find` + cache de LobbyDetails |
+| `JoinLobby(lobbyId)` | ✅ Testado | Cache de LobbyDetails; fallback `SearchByIdThenJoin`; popula membros existentes |
+| `LeaveLobby()` | ✅ EOS real | `LobbyInterface.LeaveLobby()` com guard de autenticação |
+| `SetMemberAttribute(key, value)` | ✅ EOS real | `UpdateLobbyModification` + `AddMemberAttribute` com guard |
+| `SetReady(bool)` | ✅ | Wrapper de `SetMemberAttribute(IS_READY)` |
+| `SelectCharacter(int)` | ✅ | Wrapper de `SetMemberAttribute(CHARACTER_INDEX)` |
+| `StartMatch()` | ✅ | `NetworkManager.StartHost()` + publica IP + LoadScene + rollback em falha |
 
-| Metodo | Status | O que falta |
-|--------|--------|-------------|
-| `CreateLobby(settings)` | 🚧 Simulado | Chamar `LobbyInterface.CreateLobby()` real |
-| `SearchLobbies(filter)` | 🚧 Simulado | Chamar `LobbyInterface.CreateLobbySearch()` |
-| `JoinLobby(lobbyId)` | 🚧 TODO | Implementar `LobbyInterface.JoinLobby()` |
-| `LeaveLobby()` | 🚧 Parcial | Chamar `LobbyInterface.LeaveLobby()` |
-| `SetMemberAttribute(key, value)` | 🚧 TODO | Implementar `UpdateLobbyMember()` |
-| `StartMatch()` | 🚧 TODO | Coordenar Host.StartAsHost() + enviar conexao para clients |
+**Métodos internos relevantes:**
+- `SearchByIdThenJoin(id)` — busca EOS por ID exato (`LobbySearchSetLobbyIdOptions`) quando handle não está em cache
+- `PopulateMembersFromDetails(details, hostId)` — itera membros existentes via `GetMemberByIndex` ao entrar no lobby
+- `ReadMemberDisplayName(lobbyId, userId)` — lê atributo `DISPLAY_NAME` de um membro via `CopyMemberAttributeByKey`
+- `PopulateLobbyInfoFromDetails(lobbyId, details, cb)` — lê `LobbyInfo` completo incluindo `hostProductUserId`
 
-### 3.3 Fluxo de Matchmaking P2P — Planejado
+**Notificações EOS registradas** (após confirmação de init do EOS):
+- `AddNotifyLobbyMemberStatusReceived` — detecta entradas/saídas em tempo real
+- `AddNotifyLobbyUpdateReceived` — clientes detectam `SERVER_ADDRESS` e conectam automaticamente ao NGO Host
 
-```
-1. Host cria lobby via Epic Lobby Service
-2. Outros jogadores buscam e entram no lobby
-3. Todos selecionam personagens (atributo do membro)
-4. Todos marcam "Pronto"
-5. Host clica "Iniciar Partida"
-6. Host chama HostManager.StartAsHost()
-   └─ transport.SetConnectionData("0.0.0.0", porta)
-   └─ NetworkManager.StartHost()
-7. LobbyManager guarda IP:Porta do Host como atributo do lobby
-8. Clients leem IP:Porta do lobby e chamam HostManager.StartAsClient(ip)
-   └─ transport.SetConnectionData(ip, porta)
-   └─ NetworkManager.StartClient()
-9. Host carrega cena via NetworkManager.SceneManager.LoadScene()
-10. Clients sao transportados automaticamente (Network Scene Management)
-```
+### 3.3 MppmHelper — ✅ Implementado (Março 2026, 2ª sessão)
 
-> **Nota:** O fluxo de rede (passos 6-10) ja foi validado na Sprint de Rede Basica.
-> O que falta e apenas a parte do Lobby EOS (passos 1-8).
+**Arquivo:** `Core/MppmHelper.cs`
 
-### 3.4 UI de Lobby — 🚧 Pendente
+Utilitário estático para detecção de clone MPPM no Unity 6 (MPPM v1.6.3).
 
-**Nova Cena:** `LobbyScene.unity`
+**Descoberta crítica:** O MPPM v1.6.3 **não usa** a variável de ambiente `UNITY_MULTIPLAYER_PLAY_MODE_PLAYER_INDEX`. A detecção correta é via **command-line args** passados ao processo clone:
+- `--virtual-project-clone` → marca o processo como clone
+- `-vpId={id}` → identificador estável de 8 chars hex (persiste entre sessões)
 
-**Panel: CreateLobbyPanel**
-- InputField: LobbyName
-- Slider: MaxPlayers (2-4)
-- Toggle: IsPublic
-- Button: CreateLobby
+| Propriedade | Descrição |
+|---|---|
+| `MppmHelper.IsClone` | `true` quando rodando como Virtual Player |
+| `MppmHelper.CloneId` | ID estável do clone (ex: `"a1b2c3d4"`), vazio se não for clone |
 
-**Panel: LobbyListPanel**
-- ScrollView: LobbyList
-  - Prefab: LobbyListItem (Nome, Host, 2/4, Button Join)
-- Button: RefreshList
-- Button: CreateNew
+**Integração:**
+- `WindowsPlatformSpecifics.GetTempDir()` retorna `eos_clone_{CloneId}/` (cache EOS isolado)
+- `EOSAuthenticator.CreateDeviceIdAndLogin()` usa `_clone{CloneId}` no DeviceModel
+- `LobbyPlaceholderUI` exibe auto-nome `Clone_{vpId4chars}` e debug MPPM em ciano
 
-**Panel: LobbyRoomPanel**
-- Text: LobbyName
-- List: PlayerSlots (4 slots)
-  - Cada slot: Avatar, Nome, Personagem, Ready Status
-- Button: SelectCharacter
-- Toggle: Ready
-- Button: StartGame (apenas host, apenas quando todos prontos)
-- Button: LeaveLobby
+### 3.4 Bugs críticos corrigidos no LobbyManager — Março 2026
+
+| Bug | Causa | Fix |
+|-----|-------|-----|
+| CS1739: parâmetro `isHost` inexistente | `LobbyMember(isHost: true)` → nome errado | `host: true` |
+| Notificações nunca registradas | Race condition: EOS init assíncrono; `RegisterNotifications` chamado antes do SDK estar pronto | `Start()` subscreve `OnEOSInitialized` se `!IsInitialized` |
+| Membros existentes não aparecem para quem entra | EOS não emite `Joined` para membros pré-existentes | `PopulateMembersFromDetails` itera `GetMemberByIndex` |
+| `hostProductUserId` vazio para cliente | `PopulateLobbyInfoFromDetails` não lia `LobbyOwnerUserId` | Adicionado `result.hostProductUserId = di.Value.LobbyOwnerUserId?.ToString()` |
+| Crash potencial em `LeaveLobby` sem auth | `GetLocalUserId()` sem validação | Guard `if (!localUserId.IsValid())` com limpeza de estado local |
+| Rollback ausente em `StartMatch` | Se `UpdateLobby` falha após `StartHost`, host rodando sem clientes | `NetworkManager.Singleton.Shutdown()` no callback de erro |
+| `SearchLobbies`/`JoinLobby` sem auth | EOS recebia `ProductUserId` inválido silenciosamente | Guards `if (!localUserId.IsValid())` em todos os métodos públicos |
+
+### 3.5 UI de Lobby — ✅ Placeholder funcional e testado
+
+**Placeholder (sem artes) — `Testing/LobbyPlaceholderUI.cs`:**
+- [x] Tela Auth: input de nome + botão de login gateado por `_eosReady`
+- [x] Tela Lista: busca por nome com filtro, lista scrollável, botão Entrar por item
+- [x] Campo "ID:": entrar em qualquer lobby direto pelo ID (sem busca prévia)
+- [x] Sub-painel Criar: nome, max jogadores (2-4), público/privado
+- [x] Tela Sala: lista de membros populada de membros existentes + novos via evento
+- [x] Detecção de host por `ProductUserId` (não por nome de exibição)
+- [x] Referências cacheadas no `Start()` para evitar lazy-create em `OnDestroy`
+- [x] Subscrição a `OnEOSInitialized` / `OnInitializationFailed`
+
+**Canvas real (aguarda artes) — `Lobby/LobbyUI.cs` + `Lobby/LobbyItemUI.cs`:**
+- [x] Estrutura de panels (CreateLobbyPanel, LobbyListPanel, LobbyRoomPanel)
+- [x] `UpdateLobbyList()` — instancia lobbyItemPrefab por resultado
+- [x] `RefreshPlayerSlots()` — reconstrói slots dinamicamente
+- [x] Host-only Start button via SetActive
+- [x] Subscrições completas: OnMemberJoined + OnMemberLeft em tempo real
+
+**Teste end-to-end realizado (Março 2026):**
+- [x] Host cria lobby → exibido na sala de espera com ID visível
+- [x] Client entra por ID → membros existentes aparecem imediatamente
+- [x] Host vê client entrar via notificação EOS
+- [x] Nomes de exibição propagados como atributo de membro
+- [x] Auditoria completa de código (Março 2026, 2ª sessão) — todos os fluxos EOS verificados, nenhum código alucinado encontrado
 
 ---
 
-## FASE 4: Configuracao P2P — 🚧 Parcialmente Concluida
+## FASE 4: Configuração P2P — 🚧 Parcialmente Concluída
 
-### 4.1 Host e Client — ✅ Implementado
+### 4.1 Host e Client — ✅ Implementado (LAN)
 
 **Arquivo:** `Core/HostManager.cs`
 
 ```csharp
-// Ja implementado e testado:
 public void StartAsHost()
 {
     transport.SetConnectionData("0.0.0.0", hostPort);
@@ -288,39 +317,27 @@ Responsabilidades (apenas no Host):
 
 ### 4.3 Epic P2P Service — 🚧 Pendente
 
-**Objetivo:** Substituir UnityTransport padrao por EOS P2P Transport para NAT Traversal automatico.
+**Objetivo:** Substituir UnityTransport padrão por EOS P2P Transport para NAT Traversal automático.
 
-**Configuracao no Portal:**
-- Game Services > Peer-to-peer > Ativar
-
-**No Codigo (a implementar na Fase 3/4):**
-```csharp
-// Configurar EOS P2P Transport ao inves de UDP simples
-// Isso resolve conexoes entre jogadores em redes diferentes (NAT)
-```
-
-> **Nota:** Na Sprint atual usamos UnityTransport UDP direto (funciona em LAN).
-> Para conexoes via internet (jogadores em redes diferentes), precisaremos
-> configurar o EOS P2P Transport para NAT traversal automatico.
+> **Status atual:** UnityTransport UDP direto (funciona em LAN).
+> Para conexões via internet (jogadores em redes diferentes), é necessário configurar
+> o EOS P2P Transport para NAT traversal automático.
 
 ---
 
-## FASE 5: Sincronizacao de Gameplay — 🚧 PENDENTE
+## FASE 5: Sincronização de Gameplay — 🚧 PENDENTE
 
-### 5.1 Player Prefab Networked
+### 5.1 Player Prefab Networked — Tarefa no Editor (pendente)
 
-**Modificar:** `Assets/Modelos/PreFab/Entidades/Player 1.prefab`
-
-**Componentes a adicionar:**
+`Player 1.prefab` (personagem real) precisa receber:
 1. `NetworkObject`
-2. `NetworkTransform`
-   - Sync Position X/Y/Z: true
-   - Sync Rotation Y: true
-   - Interpolate: true
-3. `NetworkAnimator`
-4. `NetworkedPlayerController` (script em Sync/)
+2. `ClientNetworkTransform` (Interpolate=true, PositionThreshold=0.001)
+3. `NetworkedPlayerController` (já existe em `Sync/`)
+4. `PlayerNetworkSetup` (já existe em `Sync/`) — conectar refs no Inspector:
+   - movement, cameraController, shooting, melee, combat, characterController
+   - localOnlyObjects: CinemachineCamera, AudioListener, HUD Canvas
 
-### 5.2 NetworkedPlayerController — 🚧 Estrutura criada
+### 5.2 NetworkedPlayerController — ✅ Implementado (base)
 
 **Arquivo:** `Sync/NetworkedPlayerController.cs`
 
@@ -330,119 +347,28 @@ public class NetworkedPlayerController : NetworkBehaviour
     public NetworkVariable<float> NetworkHealth = new(writePerm: NetworkVariableWritePermission.Server);
     public NetworkVariable<int> NetworkAmmo = new(writePerm: NetworkVariableWritePermission.Server);
     public NetworkVariable<int> CharacterIndex = new(writePerm: NetworkVariableWritePermission.Owner);
-
-    public override void OnNetworkSpawn()
-    {
-        if (!IsOwner)
-            movement.enabled = false; // Outros jogadores nao controlam este
-
-        NetworkHealth.OnValueChanged += OnHealthChanged;
-    }
 }
 ```
 
-### 5.3 Modificacoes em PlayerMovement.cs
+### 5.3 PlayerNetworkSetup — ✅ Implementado
 
-**Arquivo:** `Assets/Codigo/Char scripts/Player/PlayerMovement.cs`
+**Arquivo:** `Sync/PlayerNetworkSetup.cs`
 
-```csharp
-// Mudar heranca:
-public class PlayerMovement : NetworkBehaviour
+- `IsOwner = true` → todos os scripts ficam habilitados normalmente
+- `IsOwner = false` → desabilita: PlayerMovement, CameraController, PlayerShooting,
+  MeleeCombatSystem, PlayerCombatManager, CharacterController
+  e desativa: CinemachineCamera, AudioListener, HUD Canvas (via localOnlyObjects)
 
-// No Update():
-private void Update()
-{
-    if (!IsOwner) return; // CRITICO: apenas dono processa input
-    // ... resto do codigo
-}
+### 5.4 Modificações Pendentes nos Scripts do Jogador
+
 ```
-
-### 5.4 Modificacoes em PlayerHealthSystem.cs
-
-```csharp
-public class PlayerHealthSystem : NetworkBehaviour
-{
-    public NetworkVariable<float> networkHealth = new(
-        writePerm: NetworkVariableWritePermission.Server
-    );
-
-    [ServerRpc(RequireOwnership = false)]
-    public void TakeDamageServerRpc(float damage, ulong attackerId) { ... }
-
-    [ClientRpc]
-    private void RespawnClientRpc() { ... }
-}
-```
-
-### 5.5 Sincronizacao de Combate
-
-```csharp
-// PlayerShooting.cs:
-if (IsOwner && Input.GetButton("Fire1"))
-    ShootServerRpc(targetPosition, damage);
-
-[ServerRpc]
-private void ShootServerRpc(Vector3 target, float damage) { ... }
-```
-
-### 5.6 Sincronizacao de Moedas (CurrencyManager)
-
-```csharp
-public class CurrencyManager : NetworkBehaviour
-{
-    public NetworkVariable<int> TeamGeodites = new(writePerm: NetworkVariableWritePermission.Server);
-    public NetworkVariable<int> TeamDarkEther = new(writePerm: NetworkVariableWritePermission.Server);
-
-    [ServerRpc(RequireOwnership = false)]
-    public void AddGeoditeServerRpc(int amount) { ... }
-
-    [ServerRpc(RequireOwnership = false)]
-    public void SpendGeoditeServerRpc(int amount, ServerRpcParams rpcParams = default) { ... }
-}
-```
-
-### 5.7 Sincronizacao de Torres (BuildManager)
-
-```csharp
-[ServerRpc(RequireOwnership = false)]
-public void PlaceTowerServerRpc(int towerIndex, Vector3 position, Quaternion rotation)
-{
-    GameObject tower = Instantiate(towerPrefabs[towerIndex], position, rotation);
-    tower.GetComponent<NetworkObject>().Spawn();
-}
-```
-
-### 5.8 Sincronizacao de Waves (HordeManager)
-
-```csharp
-public class HordeManager : NetworkBehaviour
-{
-    public NetworkVariable<int> CurrentWave = new();
-    public NetworkVariable<int> EnemiesRemaining = new();
-
-    public override void OnNetworkSpawn()
-    {
-        if (IsServer) StartCoroutine(SpawnWaves()); // Apenas servidor spawna
-    }
-}
-```
-
-### 5.9 Sincronizacao de Habilidades
-
-```csharp
-public void UseAbility1()
-{
-    if (!IsOwner) return;
-    if (IsOnCooldown(ability1)) return;
-    UseAbilityServerRpc(1);
-    StartCooldown(ability1);
-}
-
-[ServerRpc]
-private void UseAbilityServerRpc(int abilityIndex) { ... }
-
-[ClientRpc]
-private void PlayAbilityEffectClientRpc(int abilityIndex) { ... }
+PlayerMovement.cs       → mudar para NetworkBehaviour, if (!IsOwner) return no Update()
+PlayerHealthSystem.cs   → NetworkVariable, TakeDamageServerRpc
+PlayerShooting.cs       → ShootServerRpc
+MeleeCombatSystem.cs    → MeleeAttackServerRpc
+CurrencyManager.cs      → NetworkVariable (Geodites, DarkEther)
+HordeManager.cs         → Servidor controla spawn de inimigos
+BuildManager.cs         → PlaceTowerServerRpc, PlaceTrapServerRpc
 ```
 
 ---
@@ -451,14 +377,13 @@ private void PlayAbilityEffectClientRpc(int abilityIndex) { ... }
 
 ### 6.1 Ferramentas de Teste
 
-**Multiplayer Play Mode (MPPM)** — recomendado para desenvolvimento:
+**Multiplayer Play Mode (MPPM)** — recomendado:
 ```
 Window → Package Manager → Add by name: com.unity.multiplayer.playmode
 Window → Multiplayer → Multiplayer Play Mode
 ```
-> Ja utilizado com sucesso na Sprint de Rede Basica.
 
-### 6.2 Tratamento de Desconexao
+### 6.2 Tratamento de Desconexão
 
 ```csharp
 NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnect;
@@ -474,7 +399,7 @@ private void OnClientDisconnect(ulong clientId)
 }
 ```
 
-### 6.3 Configuracao de NetworkTransform
+### 6.3 Configuração de NetworkTransform
 
 - Position Threshold: 0.001
 - Rotation Threshold: 0.01
@@ -482,22 +407,11 @@ private void OnClientDisconnect(ulong clientId)
 - Use Quaternion Sync: true
 - Use Unreliable Deltas: true (melhor para movimento)
 
-### 6.4 Lag Compensation (Futuro)
-
-```csharp
-[ServerRpc]
-void ShootServerRpc(Vector3 direction, float clientTimestamp)
-{
-    float latency = NetworkManager.Singleton.LocalTime.Time - clientTimestamp;
-    // Rollback de posicoes para o momento do tiro
-}
-```
-
 ---
 
-## Checklist Geral de Verificacao
+## Checklist Geral de Verificação
 
-### Fase 1 - Setup
+### Fase 1 — Setup
 - [x] Conta Epic Developer criada
 - [x] Produto configurado no portal (Lobbies + P2P ativos)
 - [x] NGO 1.12.0 instalado
@@ -505,134 +419,171 @@ void ShootServerRpc(Vector3 direction, float clientTimestamp)
 - [x] Projeto compila sem erros
 - [x] Estrutura de pastas criada
 
-### Fase 2 - Auth
-- [x] EOS SDK inicializa corretamente
+### Fase 2 — Auth
+- [x] EOS SDK inicializa corretamente (auto-init no `Start()`)
 - [x] Login com Device ID funcional
 - [x] ProductUserId exibido no console
-- [x] SessionManager armazena dados da sessao
-- [ ] UI de login integrada ao MenuScene (OnGUI temporario em uso)
+- [x] SessionManager armazena dados da sessão
+- [ ] UI de login integrada ao MenuScene (OnGUI temporário em uso)
 
-### Sprint - Rede Basica
+### Sprint — Rede Básica
 - [x] NetworkManager configurado na cena
 - [x] UnityTransport configurado no NetworkManager
-- [x] Player Prefab (capsula) com NetworkObject + NetworkTransform
-- [x] Host inicia com StartHost() funcional
-- [x] Client conecta com StartClient() funcional
-- [x] Capsula spawna para cada jogador conectado
+- [x] Player Prefab (cubo) com NetworkObject + ClientNetworkTransform
+- [x] Host inicia com `StartHost()` funcional
+- [x] Client conecta com `StartClient()` funcional
+- [x] Cubo spawna para cada jogador conectado
+- [x] Movimento WASD sincronizado (NetworkedCubeMovement)
+- [x] PlayerNetworkSetup desabilita input/câmera no jogador remoto
 - [x] Troca de cena sincronizada via NGO SceneManager
-- [x] Testado com 2 instancias (MPPM ou Build+Editor)
 
-### Fase 3 - Lobby
-- [ ] Criar lobby via EOS funciona
-- [ ] Buscar lobbies funciona
-- [ ] Entrar em lobby funciona
-- [ ] Sair de lobby funciona
-- [ ] Lista de membros atualiza em tempo real
-- [ ] Status "pronto" funciona
-- [ ] Host inicia partida quando todos prontos
-- [ ] Clients recebem IP do Host via lobby
-- [ ] UI de lobby completa (LobbyScene.unity)
+### Fase 3 — Lobby
+- [x] LobbyManager com chamadas EOS reais
+- [x] `CreateLobby` implementado e testado
+- [x] `SearchLobbies` implementado e testado
+- [x] `JoinLobby` implementado e testado (cache + fallback por ID)
+- [x] `LeaveLobby` implementado com guards de auth
+- [x] `SetMemberAttribute` implementado (IS_READY, CHARACTER_INDEX, DISPLAY_NAME)
+- [x] `StartMatch`: StartHost + publica IP + LoadScene + rollback em falha
+- [x] Notificações EOS (MemberStatus + LobbyUpdate) — registro adiado até EOS pronto
+- [x] Clientes auto-conectam ao detectar SERVER_ADDRESS no lobby
+- [x] `LobbyScene.unity` criada com `LobbyPlaceholderUI`
+- [x] `LobbyPlaceholderUI.cs` (OnGUI) — testado com duas instâncias reais
+- [x] `LobbyUI.cs` + `LobbyItemUI.cs` (Canvas, aguarda artes)
+- [x] Membros existentes aparecem ao entrar (PopulateMembersFromDetails)
+- [x] Nomes de exibição propagados como atributo de membro
+- [x] Host detectado por ProductUserId (não nome)
+- [x] Entrar por ID direto (campo ID: na UI)
+- [x] Teste end-to-end: criar lobby → entrar por ID → membros visíveis ✅
 
-### Fase 4 - P2P
-- [x] HostManager.StartAsHost() funcional (LAN)
-- [x] HostManager.StartAsClient() funcional (LAN)
-- [ ] EOS P2P Transport configurado (para conexoes via internet / NAT)
-- [ ] Teste entre maquinas em redes diferentes (internet)
+### Fase 4 — P2P
+- [x] `HostManager.StartAsHost()` funcional (LAN)
+- [x] `HostManager.StartAsClient()` funcional (LAN)
+- [ ] EOS P2P Transport configurado (para conexões via internet / NAT)
+- [ ] Teste entre máquinas em redes diferentes (internet)
 
-### Fase 5 - Gameplay
-- [ ] Spawn de jogadores funciona
+### Fase 5 — Gameplay
+- [ ] Player 1.prefab configurado com componentes de rede
+- [ ] Spawn de jogadores reais (não cubo) funciona
 - [ ] Movimento sincronizado
 - [ ] Combate ranged sincronizado
 - [ ] Combate melee sincronizado
 - [ ] Vida sincronizada
 - [ ] Moedas sincronizadas
 - [ ] Torres sincronizadas
-- [ ] Traps sincronizadas
 - [ ] Inimigos sincronizados
 - [ ] Waves sincronizadas
 - [ ] Habilidades sincronizadas
-- [ ] Ultimate sincronizado
 
-### Fase 6 - Polimento
-- [ ] Desconexao tratada (volta ao menu)
-- [ ] Movimento suave com interpolacao
-- [ ] Sem erros no console em sessao completa
-- [ ] Funciona entre maquinas em redes diferentes
-- [ ] Performance aceitavel (4 jogadores, 1 wave)
-
----
-
-## Cronograma Atualizado
-
-### ✅ Concluido
-- **Semana 1-2:** Fundacao (Epic Portal, Pacotes, Estrutura)
-- **Semana 3:** Autenticacao (Device ID funcional)
-- **Sprint extra:** Rede basica validada (NGO + Transport + Host/Client)
-
-### 🚧 Em andamento / Proximo
-- **Semana 4:** Lobby System (implementar chamadas EOS reais no LobbyManager)
-- **Semana 5:** P2P Transport + integracao Lobby → Rede
-- **Semana 6:** Gameplay basico (Player Networked + movimento + vida)
-- **Semana 7:** Gameplay completo (combate, moedas, torres, inimigos)
-- **Semana 8:** Polimento, testes entre redes, preparacao para apresentacao
+### Fase 6 — Polimento
+- [ ] Desconexão tratada (volta ao menu)
+- [ ] Movimento suave com interpolação confirmado em partida real
+- [ ] Sem erros no console em sessão completa
+- [ ] Funciona entre máquinas em redes diferentes
+- [ ] Performance aceitável (4 jogadores, 1 wave)
 
 ---
 
-## Proximos Passos Imediatos
+---
 
-1. **Implementar LobbyManager com chamadas EOS reais**
-   - `LobbyInterface.CreateLobby()` em `CreateLobby()`
-   - `LobbyInterface.CreateLobbySearch()` em `SearchLobbies()`
-   - `LobbyInterface.JoinLobby()` em `JoinLobby()`
-   - Referencia: https://dev.epicgames.com/docs/game-services/lobbies
+## Sessão Março 2026 — 2ª sessão: Limpeza + MPPM + Auditoria
 
-2. **Criar LobbyScene.unity** com UI de lista e sala
+### O que foi feito
 
-3. **Configurar EOS P2P Transport** para conexoes via internet
-   - Necessario para testar entre redes diferentes (fora da LAN)
-   - Referencia: https://dev.epicgames.com/docs/game-services/p-2-p
+**TAREFA 1 — Limpeza de código (todos os 24 scripts):**
+- Removidos comentários que apenas repetiam o código (`// Eventos`, `// Getters`, `// Cleanup`, separadores `// ---`)
+- Removidos blocos TODO e stubs de código comentado
+- Adicionados cabeçalhos profissionais padronizados (`/// <summary>` com `── NomeDaClasse ──`, bullets `▸`, linha de fechamento)
 
-4. **Integrar fluxo completo:** Login → Lobby → Host/Client → Cena de jogo
+**TAREFA 2 — Fix detecção MPPM:**
+- Descoberto que `UNITY_MULTIPLAYER_PLAY_MODE_PLAYER_INDEX` não existe no MPPM v1.6.3
+- Criado `Core/MppmHelper.cs` com detecção via command-line args (`--virtual-project-clone`, `-vpId=`)
+- Atualizado `WindowsPlatformSpecifics`, `EOSAuthenticator`, `LobbyPlaceholderUI`
+- Fix D aplicado em `LobbyUI.cs`: detecção de host por `hostProductUserId` (não `hostDisplayName`)
 
-5. **Criar UI de Login formal** em MenuScene.unity (substituir OnGUI de debug)
+**Auditoria end-to-end do sistema de lobby:**
+- Todos os 3 fluxos rastreados (criar, buscar+entrar, entrar por ID)
+- Todas as chamadas EOS SDK verificadas como corretas
+- Nenhum código alucinado encontrado
+
+### Bugs encontrados na auditoria (não bloqueantes)
+
+| Severidade | Arquivo | Descrição | Workaround |
+|---|---|---|---|
+| Cosmético | `LobbyManager.cs` | `hostDisplayName` recebe `productUserId` raw em `SearchLobbies` | Não afeta: UI usa `lobbyName`, não `hostDisplayName` |
+| Cosmético | `LobbyData.cs` | Default `LobbySettings.mapName = "CenaMapaTeste"` mas cena real é `"SceneMapTest"` | LobbyPlaceholderUI sempre sobrescreve o valor |
+| Ausente | `LobbyManager.cs` | Sem timeout em operações async EOS | Nenhum; UI trava se backend inacessível |
+| UX | `LobbyManager.cs` | `_isInLobby = true` antes de `_currentLobby` ser atribuído | Coberto por null check em `SetMemberAttribute` |
+| UX | `LobbyManager.cs` | `SetMemberAttribute` não atualiza `_members` localmente | OnGUI lê diretamente da lista; se fosse Canvas, seria bug |
+| UX | `LobbyManager.cs` | Ordem de `_members` não determinística | Layout pode diferir entre host e cliente |
+
+### Checklist adicional — Fase 3 (após 2ª sessão)
+
+- [x] Todos os 24 scripts com cabeçalho profissional padronizado
+- [x] `LobbyUI.cs`: host detection corrigida para `hostProductUserId`
+- [x] `MppmHelper.cs` criado (detecção MPPM v1.6+ via command-line args)
+- [x] `WindowsPlatformSpecifics.GetTempDir()` isola cache EOS por clone MPPM
+- [x] `EOSAuthenticator` usa `MppmHelper.CloneId` no DeviceModel
+- [x] `LobbyPlaceholderUI` usa `MppmHelper` para auto-nome e debug
+- [x] Auditoria completa — fluxos EOS verificados, sem código alucinado
+- [ ] Teste entre duas máquinas físicas (pendente pelo usuário)
 
 ---
 
-## Arquivos a Serem Modificados (Fase 5)
+## Próximos Passos Imediatos
+
+1. **Testar lobby entre duas máquinas físicas** (prioridade máxima — valida todo o sistema)
+
+2. **Configurar EOS P2P Transport** (Fase 4 — para internet / NAT entre redes diferentes)
+
+3. **Configurar Player 1.prefab** (Fase 5 — tarefa no Editor)
+   - Adicionar NetworkObject, ClientNetworkTransform, PlayerNetworkSetup
+   - Conectar referências no Inspector
+
+4. **Sincronizar PlayerMovement e PlayerHealthSystem** (Fase 5)
+   - Mudar herança para NetworkBehaviour
+   - Adicionar ServerRpcs para dano
+
+5. **Adicionar timeout em operações async EOS** (bug identificado na auditoria de Março 2026)
+   - `CreateLobby`, `JoinLobby`, `SearchLobbies` podem travar a UI se o backend EOS estiver inacessível
+
+6. **UI de Login formal** em MenuScene.unity (substituir OnGUI de debug)
+
+---
+
+## Arquivos a Modificar — Fase 5
 
 ```
 Assets/Codigo/Char scripts/Player/
-  PlayerMovement.cs          # NetworkBehaviour, IsOwner check
-  PlayerHealthSystem.cs      # NetworkVariable, TakeDamageServerRpc
-  PlayerShooting.cs          # ShootServerRpc
-  MeleeCombatSystem.cs       # MeleeAttackServerRpc
+  PlayerMovement.cs          → NetworkBehaviour, IsOwner check
+  PlayerHealthSystem.cs      → NetworkVariable, TakeDamageServerRpc
+  PlayerShooting.cs          → ShootServerRpc
+  MeleeCombatSystem.cs       → MeleeAttackServerRpc
 
 Assets/Codigo/Char scripts/JP/
-  CommanderAbilityController.cs  # UseAbilityServerRpc
+  CommanderAbilityController.cs  → UseAbilityServerRpc
 
 Assets/Codigo/Managers/
-  CurrencyManager.cs         # NetworkVariable (Geodites, DarkEther)
-  HordeManager.cs            # Servidor controla spawn de inimigos
-  PauseControl.cs            # Pausar nao funciona em rede (adaptar)
+  CurrencyManager.cs         → NetworkVariable (Geodites, DarkEther)
+  HordeManager.cs            → Servidor controla spawn de inimigos
+  PauseControl.cs            → Pausar não funciona em rede (adaptar)
 
 Assets/Codigo/Tower scripts/
-  BuildManager.cs            # PlaceTowerServerRpc, PlaceTrapServerRpc
+  BuildManager.cs            → PlaceTowerServerRpc, PlaceTrapServerRpc
 
 Assets/Modelos/PreFab/Entidades/
-  Player 1.prefab            # Adicionar NetworkObject, NetworkTransform
-  [prefabs de inimigos]      # Adicionar NetworkObject
-  [prefabs de torres]        # Adicionar NetworkObject
+  Player 1.prefab            → NetworkObject + ClientNetworkTransform
+  [prefabs de inimigos]      → NetworkObject
+  [prefabs de torres]        → NetworkObject
 ```
 
 ---
 
-## Riscos e Mitigacoes
+## Riscos e Mitigações
 
-| Risco | Probabilidade | Impacto | Mitigacao |
+| Risco | Probabilidade | Impacto | Mitigação |
 |-------|---------------|---------|-----------|
-| NAT Traversal falha em algumas redes | Media | Alto | EOS P2P Relay (fallback automatico) |
-| Bugs de sincronizacao | Alta | Medio | Testar incrementalmente com MPPM |
-| Latencia alta | Media | Medio | Interpolacao no NetworkTransform |
-| EOS Lobby SDK complexo | Media | Alto | Testar cada operacao isoladamente |
-| Host desconecta durante partida | Baixa | Alto | Tratar OnServerStopped (voltar ao menu) |
-| Prazo apertado | Media | Alto | Priorizar: Lobby → P2P basico → Gameplay |
+| NAT Traversal falha em algumas redes | Média | Alto | EOS P2P Relay (fallback automático) |
+| Bugs de sincronização | Alta | Médio | Testar incrementalmente com MPPM |
+| Latência alta | Média | Médio | Interpolação no ClientNetworkTransform |
+| Host desconecta durante partida | Baixa | Alto | Tratar `OnServerStopped` (voltar ao menu) |
