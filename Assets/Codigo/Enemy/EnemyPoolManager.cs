@@ -6,6 +6,7 @@ public class EnemyPoolManager : MonoBehaviour
 {
     public static EnemyPoolManager Instance;
 
+    [Header("Configurações do Pool")]
     public GameObject enemyPrefab;
     public int poolSize = 20;
 

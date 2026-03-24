@@ -63,8 +63,8 @@ public class EnemyController : MonoBehaviour
     private EnemyHealthSystem healthSystem;
     private EnemyCombatSystem combatSystem;
     private Rigidbody rb;
-    private Animator anim;
     private NavMeshAgent agent;
+    private Animator anim;
 
     private float currentMoveSpeed;
     private float originalMoveSpeed;
@@ -95,10 +95,11 @@ public class EnemyController : MonoBehaviour
             rb.useGravity = true;
         }
 
-        if (agent != null)
+        if (TryGetComponent(out agent))
         {
             agent.updateRotation = true;
             agent.updatePosition = true;
+            rb.isKinematic = true;
         }
 
         if (!string.IsNullOrEmpty(eventoMonstro))
@@ -174,6 +175,13 @@ public class EnemyController : MonoBehaviour
         {
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
+        }
+
+        if (agent != null)
+        {
+            agent.ResetPath();
+            agent.speed = originalMoveSpeed;
+            agent.isStopped = false;
         }
 
         if (combatSystem != null) combatSystem.InitializeCombat(enemyData, nivel);
@@ -252,15 +260,20 @@ public class EnemyController : MonoBehaviour
     private IEnumerator KnockbackRoutine(Vector3 direction, float force)
     {
         isKnockedBack = true;
-        if (agent.enabled) agent.enabled = false;
+
+        if (agent != null && agent.enabled) agent.enabled = false;
         rb.isKinematic = false;
         rb.linearVelocity = Vector3.zero;
         rb.AddForce(direction.normalized * force, ForceMode.Impulse);
+
         yield return new WaitForSeconds(0.4f);
         yield return new WaitUntil(() => Mathf.Abs(rb.linearVelocity.y) < 0.1f);
-        rb.isKinematic = true;
+
+        rb.linearVelocity = Vector3.zero;
+        rb.isKinematic = agent != null;
         isKnockedBack = false;
-        if (NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2.0f, NavMesh.AllAreas))
+
+        if (agent != null && NavMesh.SamplePosition(transform.position, out NavMeshHit hit, 2.0f, NavMesh.AllAreas))
         {
             agent.enabled = true;
             agent.Warp(hit.position);
@@ -291,8 +304,12 @@ public class EnemyController : MonoBehaviour
     {
         isSlipping = true;
         if (anim != null) anim.SetTrigger("Slip");
-        if (agent.enabled) agent.isStopped = true;
+        if (agent != null) agent.isStopped = true;
+        if (rb != null) rb.linearVelocity = Vector3.zero;
+
         yield return new WaitForSeconds(1.5f);
+
+        if (agent != null) agent.isStopped = false;
         isSlipping = false;
     }
 
@@ -310,8 +327,12 @@ public class EnemyController : MonoBehaviour
     private IEnumerator RootRoutine(float duration)
     {
         isRooted = true;
-        if (agent.enabled) agent.isStopped = true;
+        if (agent != null) agent.isStopped = true;
+        if (rb != null) rb.linearVelocity = Vector3.zero;
+
         yield return new WaitForSeconds(duration);
+
+        if (agent != null) agent.isStopped = false;
         isRooted = false;
     }
 
@@ -388,22 +409,40 @@ public class EnemyController : MonoBehaviour
     private void ChaseTarget()
     {
         if (target == null) return;
+
+        if (target.CompareTag(TAG_POCA))
+        {
+            target = null;
+            return;
+        }
+
         float distanceToTarget = Vector3.Distance(transform.position, target.position);
+
         if (distanceToTarget <= attackDistance)
         {
-            if (agent.enabled) agent.isStopped = true;
+            if (agent != null && agent.enabled) agent.isStopped = true;
+            if (rb != null && !rb.isKinematic) rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
+
             if (anim != null)
             {
                 anim.SetBool("isWalking", false);
                 anim.SetTrigger("doAttack");
             }
+
             Vector3 direction = (target.position - transform.position).normalized;
             direction.y = 0;
             if (direction != Vector3.zero)
-                transform.rotation = Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(direction), 10f * Time.deltaTime);
+            {
+                Quaternion targetRotation = Quaternion.LookRotation(direction);
+                if (agent != null && agent.enabled)
+                    transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 10f * Time.fixedDeltaTime);
+                else if (rb != null)
+                    rb.MoveRotation(Quaternion.Slerp(transform.rotation, targetRotation, 10f * Time.fixedDeltaTime));
+            }
         }
         else
         {
+            if (agent != null && agent.enabled) agent.isStopped = false;
             if (anim != null) anim.SetBool("isWalking", true);
             MoveTowardsPosition(target.position);
         }
@@ -411,10 +450,27 @@ public class EnemyController : MonoBehaviour
 
     private void MoveTowardsPosition(Vector3 targetPosition)
     {
-        if (agent.enabled)
+        if (isRooted || isSlipping || isKnockedBack) return;
+
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
         {
-            agent.isStopped = false;
+            agent.speed = currentMoveSpeed * speedModifier;
             agent.SetDestination(targetPosition);
+            return;
+        }
+
+        if (rb == null) return;
+
+        Vector3 direction = (targetPosition - transform.position).normalized;
+        direction.y = 0;
+
+        float finalSpeed = currentMoveSpeed * speedModifier;
+        rb.linearVelocity = new Vector3(direction.x * finalSpeed, rb.linearVelocity.y, direction.z * finalSpeed);
+
+        if (direction != Vector3.zero)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(direction);
+            rb.MoveRotation(Quaternion.Slerp(transform.rotation, targetRotation, 5f * Time.fixedDeltaTime));
         }
     }
 
@@ -441,8 +497,17 @@ public class EnemyController : MonoBehaviour
                 return;
             }
         }
-        if (agent.enabled) agent.Warp(lastWaypointReached.position);
-        else transform.position = lastWaypointReached.position;
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+        }
+
+        if (agent != null && agent.isOnNavMesh)
+            agent.Warp(lastWaypointReached.position);
+        else
+            transform.position = lastWaypointReached.position;
+
         target = null;
     }
 
@@ -456,7 +521,7 @@ public class EnemyController : MonoBehaviour
     public void HandleDeath()
     {
         if (anim != null) anim.SetBool("isWalking", false);
-        if (agent.enabled) agent.isStopped = true;
+        if (agent != null) agent.ResetPath();
         EnemyPoolManager.Instance.ReturnToPool(gameObject);
     }
 

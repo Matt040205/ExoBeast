@@ -2499,9 +2499,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 5e36abf0ef28d354eab9a8628b6d8667, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8634314579253324727}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 5e36abf0ef28d354eab9a8628b6d8667, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 4861593248878927143}
   m_SourcePrefab: {fileID: 100100000, guid: 5e36abf0ef28d354eab9a8628b6d8667, type: 3}
 --- !u!4 &4097020196655005722 stripped
 Transform:
@@ -2550,8 +2547,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c9d6cfbb41d37dc43b3689ab46f04b7e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   magiaAtualDaCacadora: {fileID: 0}
 --- !u!4 &8049307198455110388 stripped
 Transform:

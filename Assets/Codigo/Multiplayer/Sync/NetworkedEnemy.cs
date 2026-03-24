@@ -1,162 +1,91 @@
 using UnityEngine;
+using UnityEngine.AI;
 using Unity.Netcode;
+using System.Collections;
 
 namespace ExoBeasts.Multiplayer.Sync
 {
     /// <summary>
-    /// ── NetworkedEnemy ───────────────────────────────────
-    /// Classe base para todos os inimigos sincronizados em rede.
-    ///
-    ///  ▸ IA executada exclusivamente no servidor via RunAI() (protected virtual)
-    ///  ▸ Vida e estado sincronizados via NetworkVariable (server-write)
-    ///  ▸ Dano recebivel de qualquer cliente via TakeDamageServerRpc (RequireOwnership = false)
-    ///  ▸ Morte: notifica NetworkedHorde, dispara ClientRpc, despawna apos 2s
-    ///  ▸ Subclasses sobrescrevem: RunAI, OnHitClientRpc, OnDiedClientRpc
-    /// ─────────────────────────────────────────────────────
+    /// Wrapper de rede para o inimigo.
+    /// Apenas o servidor roda EnemyController e NavMeshAgent.
+    /// Clientes recebem posicao via NetworkTransform e exibem o estado via NetworkVariables.
     /// </summary>
     public class NetworkedEnemy : NetworkBehaviour
     {
-        public enum EnemyState : int
-        {
-            Idle     = 0,
-            Moving   = 1,
-            Attacking = 2,
-            Dead     = 3
-        }
-
-        [Header("Stats Base")]
-        [SerializeField] protected float maxHealth = 100f;
-
-        public NetworkVariable<float> CurrentHealth = new NetworkVariable<float>(
+        [Header("Estado de Rede")]
+        public NetworkVariable<float> NetworkHealth = new NetworkVariable<float>(
             100f,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server
         );
 
-        public NetworkVariable<int> State = new NetworkVariable<int>(
-            (int)EnemyState.Idle,
+        public NetworkVariable<bool> IsDead = new NetworkVariable<bool>(
+            false,
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server
         );
 
-        protected Transform currentTarget;
-        protected bool isDead = false;
+        private EnemyController enemyController;
+        private NavMeshAgent navMeshAgent;
 
         public override void OnNetworkSpawn()
         {
-            if (IsServer)
-            {
-                CurrentHealth.Value = maxHealth;
-                State.Value = (int)EnemyState.Idle;
-                Debug.Log($"[NetworkedEnemy] {gameObject.name} spawnado no servidor. " +
-                          $"Vida: {maxHealth}");
-            }
+            enemyController = GetComponent<EnemyController>();
+            navMeshAgent = GetComponent<NavMeshAgent>();
 
-            State.OnValueChanged         += OnStateChanged;
-            CurrentHealth.OnValueChanged += OnHealthChanged;
+            bool runAI = IsServer;
+            if (enemyController != null) enemyController.enabled = runAI;
+            if (navMeshAgent != null) navMeshAgent.enabled = runAI;
+
+            IsDead.OnValueChanged += OnDeathStateChanged;
         }
 
-        private void Update()
-        {
-            if (!IsServer || isDead) return;
-            RunAI();
-        }
-
-        /// <summary>Logica de IA do inimigo. Chamado todo frame no servidor. Sobrescreva nas subclasses.</summary>
-        protected virtual void RunAI()
-        {
-        }
-
-        /// <summary>Aplica dano ao inimigo. RequireOwnership = false permite chamada de qualquer cliente.</summary>
         [ServerRpc(RequireOwnership = false)]
-        public void TakeDamageServerRpc(float damage, ulong attackerClientId)
+        public void TakeDamageServerRpc(float damage)
         {
-            if (isDead || !IsServer) return;
+            if (IsDead.Value) return;
 
-            float finalDamage = Mathf.Max(0, damage);
-            CurrentHealth.Value -= finalDamage;
+            NetworkHealth.Value = Mathf.Max(0f, NetworkHealth.Value - damage);
 
-            Debug.Log($"[NetworkedEnemy] {gameObject.name} recebeu {finalDamage} de dano " +
-                      $"(atacante: {attackerClientId}). Vida: {CurrentHealth.Value}/{maxHealth}");
-
-            OnHitClientRpc(finalDamage);
-
-            if (CurrentHealth.Value <= 0)
-            {
-                Die();
-            }
+            if (NetworkHealth.Value <= 0f)
+                StartCoroutine(DieRoutine());
         }
 
-        /// <summary>Processa a morte do inimigo no servidor.</summary>
-        protected virtual void Die()
+        private IEnumerator DieRoutine()
         {
-            if (!IsServer || isDead) return;
+            IsDead.Value = true;
+            NetworkedHorde.Instance?.OnEnemyKilledServerRpc();
+            OnEnemyDiedClientRpc();
 
-            isDead = true;
-            State.Value = (int)EnemyState.Dead;
+            yield return new WaitForSeconds(2f);
 
-            Debug.Log($"[NetworkedEnemy] {gameObject.name} foi eliminado.");
-
-            if (NetworkedHorde.Instance != null)
-            {
-                NetworkedHorde.Instance.OnEnemyKilledServerRpc();
-            }
-
-            OnDiedClientRpc();
-
-            var col = GetComponent<Collider>();
-            if (col != null) col.enabled = false;
-
-            Invoke(nameof(DespawnEnemy), 2f);
-        }
-
-        private void DespawnEnemy()
-        {
-            if (!IsServer) return;
-
-            var networkObject = GetComponent<NetworkObject>();
-            if (networkObject != null && networkObject.IsSpawned)
-            {
-                networkObject.Despawn(destroy: true);
-            }
+            var netObj = GetComponent<NetworkObject>();
+            if (netObj != null && netObj.IsSpawned)
+                netObj.Despawn();
         }
 
         [ClientRpc]
-        protected virtual void OnHitClientRpc(float damage)
+        private void OnEnemyDiedClientRpc()
         {
+            if (enemyController != null) enemyController.enabled = false;
+            if (navMeshAgent != null) navMeshAgent.enabled = false;
+
+            var anim = GetComponent<Animator>();
+            if (anim != null) anim.SetBool("isWalking", false);
         }
 
-        [ClientRpc]
-        protected virtual void OnDiedClientRpc()
+        private void OnDeathStateChanged(bool oldVal, bool newVal)
         {
+            if (newVal && !IsServer)
+            {
+                if (enemyController != null) enemyController.enabled = false;
+                if (navMeshAgent != null) navMeshAgent.enabled = false;
+            }
         }
-
-        protected virtual void OnStateChanged(int oldState, int newState)
-        {
-            Debug.Log($"[NetworkedEnemy] {gameObject.name}: {(EnemyState)oldState} → {(EnemyState)newState}");
-        }
-
-        protected virtual void OnHealthChanged(float oldHealth, float newHealth)
-        {
-        }
-
-        /// <summary>Define o alvo da IA. Apenas servidor usa este metodo.</summary>
-        public void SetTarget(Transform target)
-        {
-            if (!IsServer) return;
-            currentTarget = target;
-        }
-
-        /// <summary>Retorna o estado atual como enum (legivel).</summary>
-        public EnemyState GetCurrentState() => (EnemyState)State.Value;
-
-        /// <summary>Retorna true se o inimigo esta morto.</summary>
-        public bool IsDead() => isDead;
 
         public override void OnNetworkDespawn()
         {
-            State.OnValueChanged         -= OnStateChanged;
-            CurrentHealth.OnValueChanged -= OnHealthChanged;
+            IsDead.OnValueChanged -= OnDeathStateChanged;
         }
     }
 }

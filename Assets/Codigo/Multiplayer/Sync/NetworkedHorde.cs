@@ -26,6 +26,9 @@ namespace ExoBeasts.Multiplayer.Sync
         [SerializeField] private float spawnInterval = 2f;
         [SerializeField] private int baseEnemiesPerWave = 10;
 
+        [Header("Spawn")]
+        [SerializeField] private Transform[] spawnPoints;
+
         [Header("Wave State")]
         public NetworkVariable<int> CurrentWave = new NetworkVariable<int>(
             0,
@@ -117,7 +120,28 @@ namespace ExoBeasts.Multiplayer.Sync
         private void SpawnEnemy()
         {
             if (!IsServer) return;
-            Debug.Log("[NetworkedHorde] Inimigo spawnado (placeholder)");
+            GameObject enemy = EnemyPoolManager.Instance?.GetPooledEnemy();
+            if (enemy == null)
+            {
+                Debug.LogWarning("[NetworkedHorde] Pool de inimigos vazio ou nao inicializado.");
+                return;
+            }
+
+            enemy.transform.position = GetRandomSpawnPoint();
+
+            var netObj = enemy.GetComponent<NetworkObject>();
+            if (netObj != null && !netObj.IsSpawned)
+                netObj.Spawn();
+
+            Debug.Log($"[NetworkedHorde] Inimigo spawnado em {enemy.transform.position}");
+        }
+
+        private Vector3 GetRandomSpawnPoint()
+        {
+            if (spawnPoints != null && spawnPoints.Length > 0)
+                return spawnPoints[Random.Range(0, spawnPoints.Length)].position;
+
+            return Vector3.zero;
         }
 
         [ServerRpc(RequireOwnership = false)]
