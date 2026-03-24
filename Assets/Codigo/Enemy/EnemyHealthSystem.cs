@@ -9,9 +9,26 @@ public class EnemyHealthSystem : MonoBehaviour
     public EnemyDataSO enemyData;
     public Material markedMaterial;
     private Renderer enemyRenderer;
-    private WorldSpaceEnemyUI worldSpaceUI;
+    private WorldSpaceEnemyUI worldSpaceUI; // Fallback antigo
 
     private Material[] originalMaterials;
+
+    [Header("Feedback Visual (Novo)")]
+    [Tooltip("Opcional: Ponto exato onde o texto vai nascer (ex: um Empty na cabeça do inimigo)")]
+    public Transform popupSpawnPoint;
+
+    [Header("Hit Flash (Juice)")]
+    [Tooltip("Cor do flash (Branco acinzentado para não machucar os olhos)")]
+    public Color flashColor = new Color(0.8f, 0.8f, 0.8f, 1f);
+    [Tooltip("Duração do piscar em segundos (bem rapidinho)")]
+    public float flashDuration = 0.05f;
+    [Tooltip("Nome da propriedade Float no Shader Graph")]
+    public string flashAmountProperty = "_FlashAmount";
+    [Tooltip("Nome da propriedade Color no Shader Graph")]
+    public string flashColorProperty = "_FlashColor";
+
+    private Coroutine flashCoroutine;
+    private MaterialPropertyBlock propBlock;
 
     [Header("Status Atual")]
     public float currentHealth;
@@ -25,7 +42,7 @@ public class EnemyHealthSystem : MonoBehaviour
 
     private EnemyController enemyController;
     private bool isMarked = false;
-    private Coroutine vulnerabilityCoroutine; // Referência para controlar o timer
+    private Coroutine vulnerabilityCoroutine;
 
     public bool IsArmorShredded => armorShredStacks > 0;
 
@@ -34,6 +51,10 @@ public class EnemyHealthSystem : MonoBehaviour
         enemyController = GetComponent<EnemyController>();
         worldSpaceUI = GetComponentInChildren<WorldSpaceEnemyUI>();
         enemyRenderer = GetComponent<Renderer>();
+
+        // Inicializa o bloco de propriedades para o Hit Flash
+        propBlock = new MaterialPropertyBlock();
+
         if (enemyRenderer == null)
         {
             enemyRenderer = GetComponentInChildren<Renderer>();
@@ -67,6 +88,10 @@ public class EnemyHealthSystem : MonoBehaviour
         if (enemyRenderer != null && originalMaterials != null)
         {
             enemyRenderer.materials = originalMaterials;
+            // Limpa qualquer override que tenha ficado
+            enemyRenderer.GetPropertyBlock(propBlock);
+            propBlock.Clear();
+            enemyRenderer.SetPropertyBlock(propBlock);
         }
         isMarked = false;
     }
@@ -86,12 +111,23 @@ public class EnemyHealthSystem : MonoBehaviour
 
         if (markedDamageMultiplier > 1f || vulnerabilityMultiplier > 1f)
         {
-            Debug.Log($"<color=orange>Dano Modificado:</color> Dano Base {damage.ToString("F1")}, Multiplicador (Mark*Vuln) {(markedDamageMultiplier * vulnerabilityMultiplier).ToString("F2")}, Armadura Efetiva {effectiveArmor.ToString("F1")}. Dano Final: {finalDamage.ToString("F1")}");
+            Debug.Log($"<color=orange>Dano Modificado:</color> Dano Base {damage.ToString("F1")}. Dano Final: {finalDamage.ToString("F1")}");
         }
 
-        if (worldSpaceUI != null && finalDamage > 0)
+        if (finalDamage > 0)
         {
-            worldSpaceUI.ShowDamageNumber(finalDamage, isCritical);
+            if (UIPoolManager.Instance != null)
+            {
+                SpawnDamagePopupLocal((int)finalDamage, isCritical);
+            }
+            else if (worldSpaceUI != null)
+            {
+                worldSpaceUI.ShowDamageNumber(finalDamage, isCritical);
+            }
+
+            // --- ACIONA O HIT FLASH AQUI ---
+            if (flashCoroutine != null) StopCoroutine(flashCoroutine);
+            flashCoroutine = StartCoroutine(HitFlashRoutine());
         }
 
         currentHealth -= finalDamage;
@@ -104,17 +140,44 @@ public class EnemyHealthSystem : MonoBehaviour
         return false;
     }
 
+    private IEnumerator HitFlashRoutine()
+    {
+        if (enemyRenderer != null)
+        {
+            enemyRenderer.GetPropertyBlock(propBlock);
+            // Ativa o flash (1) e define a cor
+            propBlock.SetFloat(flashAmountProperty, 1f);
+            propBlock.SetColor(flashColorProperty, flashColor);
+            enemyRenderer.SetPropertyBlock(propBlock);
+
+            yield return new WaitForSeconds(flashDuration);
+
+            if (enemyRenderer != null)
+            {
+                enemyRenderer.GetPropertyBlock(propBlock);
+                // Desativa o flash voltando para (0)
+                propBlock.SetFloat(flashAmountProperty, 0f);
+                enemyRenderer.SetPropertyBlock(propBlock);
+            }
+        }
+    }
+
+    private void SpawnDamagePopupLocal(int damageAmount, bool isCritical)
+    {
+        Vector3 spawnPos = popupSpawnPoint != null ? popupSpawnPoint.position : transform.position + Vector3.up * 1.5f;
+        UIPoolManager.Instance.SpawnDamagePopup(spawnPos, damageAmount, isCritical);
+    }
+
     public void ApplyArmorShred(float percentage, int maxStacks)
     {
         if (armorShredStacks < maxStacks)
         {
             armorShredStacks++;
             currentArmorModifier += percentage;
-            Debug.Log($"<color=purple>ARMOR SHRED:</color> {gameObject.name} shredado. Stacks: {armorShredStacks}. Modificador atual: {currentArmorModifier}.");
+            Debug.Log($"<color=purple>ARMOR SHRED:</color> {gameObject.name} shredado.");
         }
     }
 
-    // Função Base (Mantida)
     public void AplicarVulnerabilidade(float multiplicador)
     {
         vulnerabilityMultiplier = multiplicador;
@@ -125,16 +188,12 @@ public class EnemyHealthSystem : MonoBehaviour
         vulnerabilityMultiplier = 1f;
     }
 
-    // --- NOVA FUNÇÃO PARA A ULT (Com Timer) ---
     public void AplicarVulnerabilidadeTemporaria(float multiplicador, float duracao)
     {
-        // Se já existe um timer rodando, para ele para reiniciar a contagem
         if (vulnerabilityCoroutine != null) StopCoroutine(vulnerabilityCoroutine);
 
         vulnerabilityMultiplier = multiplicador;
         vulnerabilityCoroutine = StartCoroutine(ResetVulnerabilidadeRoutine(duracao));
-
-        Debug.Log($"<color=red>VULNERABILIDADE APLICADA:</color> Inimigo toma x{multiplicador} de dano por {duracao}s.");
     }
 
     private IEnumerator ResetVulnerabilidadeRoutine(float tempo)
@@ -142,9 +201,7 @@ public class EnemyHealthSystem : MonoBehaviour
         yield return new WaitForSeconds(tempo);
         vulnerabilityMultiplier = 1f;
         vulnerabilityCoroutine = null;
-        // Debug.Log("<color=green>VULNERABILIDADE ACABOU.</color>");
     }
-    // ------------------------------------------
 
     public void ApplyMarkedStatus(float multiplier)
     {
@@ -158,17 +215,7 @@ public class EnemyHealthSystem : MonoBehaviour
                 markedMaterialsArray[i] = markedMaterial;
             }
             enemyRenderer.materials = markedMaterialsArray;
-
             isMarked = true;
-            Debug.Log($"<color=green>MARCADO VISUALMENTE:</color> {gameObject.name} agora com material de marcação em todas as {markedMaterialsArray.Length} slots.");
-        }
-        else if (isMarked)
-        {
-            Debug.Log($"<color=yellow>JÁ MARCADO:</color> {gameObject.name} já estava marcado. Multiplicador atualizado para {multiplier}.");
-        }
-        else
-        {
-            Debug.LogError($"<color=red>FALHA VISUAL DE MARCAÇÃO:</color> {gameObject.name} marcado logicamente, mas material NÃO ALTERADO. MarkedMaterial Nulo? {markedMaterial == null}. Renderer Nulo? {enemyRenderer == null}");
         }
     }
 
@@ -179,17 +226,7 @@ public class EnemyHealthSystem : MonoBehaviour
         if (enemyRenderer != null && originalMaterials != null && isMarked)
         {
             enemyRenderer.materials = originalMaterials;
-
             isMarked = false;
-            Debug.Log($"<color=blue>MARCAÇÃO REMOVIDA VISUALMENTE:</color> {gameObject.name} voltou ao material original.");
-        }
-        else if (!isMarked)
-        {
-            Debug.Log($"<color=gray>MARCAÇÃO JÁ REMOVIDA:</color> {gameObject.name} não estava marcado.");
-        }
-        else
-        {
-            Debug.LogError($"<color=red>FALHA VISUAL AO REMOVER MARCAÇÃO:</color> {gameObject.name} desmarcado logicamente, mas material NÃO RESTAURADO. OriginalMaterials Nulo? {originalMaterials == null}.");
         }
     }
 
@@ -203,7 +240,7 @@ public class EnemyHealthSystem : MonoBehaviour
             {
                 CurrencyManager.Instance.AddCurrency(geoditesAmount, CurrencyType.Geodites);
             }
-            if (UnityEngine.Random.value <= enemyData.etherDropChance)
+            if (Random.value <= enemyData.etherDropChance)
             {
                 CurrencyManager.Instance.AddCurrency(1, CurrencyType.DarkEther);
             }
@@ -214,7 +251,6 @@ public class EnemyHealthSystem : MonoBehaviour
         }
         else
         {
-            Debug.LogError("Inimigo morreu sem um EnemyController! Desativando em vez de destruir.");
             gameObject.SetActive(false);
         }
     }

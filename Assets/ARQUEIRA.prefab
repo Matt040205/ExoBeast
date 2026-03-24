@@ -465,6 +465,18 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -2939083467828303576, guid: 264ffc225b196b74796b479503721c75, type: 3}
+      propertyPath: m_Materials.Array.size
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: -2939083467828303576, guid: 264ffc225b196b74796b479503721c75, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: d3b79392956344f47ba80efa321e08f1, type: 2}
+    - target: {fileID: -2939083467828303576, guid: 264ffc225b196b74796b479503721c75, type: 3}
+      propertyPath: 'm_Materials.Array.data[1]'
+      value: 
+      objectReference: {fileID: 2100000, guid: a7a45affdd7f9aa4c8bef50052b7c21a, type: 2}
     - target: {fileID: 919132149155446097, guid: 264ffc225b196b74796b479503721c75, type: 3}
       propertyPath: m_Name
       value: ARQUEIRA
@@ -548,6 +560,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9d6cfbb41d37dc43b3689ab46f04b7e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  magiaAtualDaCacadora: {fileID: 0}
 --- !u!4 &6591203056182639744 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 264ffc225b196b74796b479503721c75, type: 3}
