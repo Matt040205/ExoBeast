@@ -1,5 +1,6 @@
 using UnityEngine;
 using TMPro;
+using Unity.Netcode;
 
 public enum CurrencyType
 {
@@ -7,11 +8,25 @@ public enum CurrencyType
     DarkEther
 }
 
-public class CurrencyManager : MonoBehaviour
+/// <summary>
+/// ── CurrencyManager ────────────────────────────────────
+/// Economia compartilhada entre todos os jogadores (Geodites e Dark Ether).
+///
+///  ▸ NetworkVariables: networkedGeodites, networkedDarkEther (Server write)
+///  ▸ AddCurrency / SpendCurrency: rota para ServerRpc se chamado por cliente
+///  ▸ OnValueChanged: atualiza UI local em todos os clientes
+///  ▸ Propriedades CurrentGeodites/CurrentDarkEther para compatibilidade
+/// ─────────────────────────────────────────────────────
+/// </summary>
+public class CurrencyManager : NetworkBehaviour
 {
-    public static CurrencyManager Instance;
+    public static CurrencyManager Instance { get; private set; }
 
-    [Header("Refer�ncias da UI")]
+    [Header("Network Sync")]
+    public NetworkVariable<int> networkedGeodites = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<int> networkedDarkEther = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    [Header("Referências da UI")]
     public TextMeshProUGUI geoditesTextBuild;
     public TextMeshProUGUI geoditesText;
     public TextMeshProUGUI darkEtherText;
@@ -20,8 +35,8 @@ public class CurrencyManager : MonoBehaviour
     [SerializeField] private int initialGeodites = 500;
     [SerializeField] private int initialDarkEther = 0;
 
-    public int CurrentGeodites { get; private set; }
-    public int CurrentDarkEther { get; private set; }
+    public int CurrentGeodites => networkedGeodites.Value;
+    public int CurrentDarkEther => networkedDarkEther.Value;
 
     private bool jaGanhouRecursoTutorial = false;
 
@@ -37,30 +52,48 @@ public class CurrencyManager : MonoBehaviour
         }
     }
 
-    private void Start()
+    public override void OnNetworkSpawn()
     {
-        CurrentGeodites = initialGeodites;
-        CurrentDarkEther = initialDarkEther;
+        base.OnNetworkSpawn();
+
+        if (IsServer)
+        {
+            networkedGeodites.Value = initialGeodites;
+            networkedDarkEther.Value = initialDarkEther;
+        }
+
+        networkedGeodites.OnValueChanged += (oldVal, newVal) => UpdateUI();
+        networkedDarkEther.OnValueChanged += (oldVal, newVal) => UpdateUI();
+
         UpdateUI();
     }
 
     public void AddCurrency(int amount, CurrencyType type)
     {
-        if (amount <= 0)
-        {
-            UpdateUI();
-            return;
-        }
+        if (amount <= 0) return;
 
-        switch (type)
+        if (IsServer)
         {
-            case CurrencyType.Geodites:
-                CurrentGeodites += amount;
-                break;
-            case CurrencyType.DarkEther:
-                CurrentDarkEther += amount;
-                break;
+            ApplyAddCurrencyServer(amount, type);
         }
+        else
+        {
+            RequestAddCurrencyServerRpc(amount, type);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestAddCurrencyServerRpc(int amount, CurrencyType type)
+    {
+        ApplyAddCurrencyServer(amount, type);
+    }
+
+    private void ApplyAddCurrencyServer(int amount, CurrencyType type)
+    {
+        if (type == CurrencyType.Geodites)
+            networkedGeodites.Value += amount;
+        else
+            networkedDarkEther.Value += amount;
 
         if (!jaGanhouRecursoTutorial && GameDataManager.Instance != null && GameDataManager.Instance.tutoriaisConcluidos.Contains("USE_SKILLS"))
         {
@@ -70,37 +103,42 @@ public class CurrencyManager : MonoBehaviour
                 TutorialManager.Instance.TriggerTutorial("EXPLAIN_UPGRADE");
             }
         }
-
-        UpdateUI();
     }
 
     public bool HasEnoughCurrency(int amount, CurrencyType type)
     {
-        switch (type)
-        {
-            case CurrencyType.Geodites:
-                return CurrentGeodites >= amount;
-            case CurrencyType.DarkEther:
-                return CurrentDarkEther >= amount;
-            default:
-                return false;
-        }
+        if (type == CurrencyType.Geodites)
+            return networkedGeodites.Value >= amount;
+        else
+            return networkedDarkEther.Value >= amount;
     }
 
     public void SpendCurrency(int amount, CurrencyType type)
     {
+        if (IsServer)
+        {
+            ApplySpendCurrencyServer(amount, type);
+        }
+        else
+        {
+            RequestSpendCurrencyServerRpc(amount, type);
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestSpendCurrencyServerRpc(int amount, CurrencyType type)
+    {
+        ApplySpendCurrencyServer(amount, type);
+    }
+
+    private void ApplySpendCurrencyServer(int amount, CurrencyType type)
+    {
         if (HasEnoughCurrency(amount, type))
         {
-            switch (type)
-            {
-                case CurrencyType.Geodites:
-                    CurrentGeodites -= amount;
-                    break;
-                case CurrencyType.DarkEther:
-                    CurrentDarkEther -= amount;
-                    break;
-            }
-            UpdateUI();
+            if (type == CurrencyType.Geodites)
+                networkedGeodites.Value -= amount;
+            else
+                networkedDarkEther.Value -= amount;
         }
     }
 
@@ -108,17 +146,17 @@ public class CurrencyManager : MonoBehaviour
     {
         if (geoditesText != null)
         {
-            geoditesText.text = $"Geoditas: {CurrentGeodites}";
+            geoditesText.text = $"Geoditas: {networkedGeodites.Value}";
         }
 
         if (geoditesTextBuild != null)
         {
-            geoditesTextBuild.text = $" {CurrentGeodites}";
+            geoditesTextBuild.text = $" {networkedGeodites.Value}";
         }
 
         if (darkEtherText != null)
         {
-            darkEtherText.text = $"�ter Negro: {CurrentDarkEther}";
+            darkEtherText.text = $"Éter Negro: {networkedDarkEther.Value}";
         }
     }
 }

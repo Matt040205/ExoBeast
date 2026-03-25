@@ -1,9 +1,20 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Unity.Netcode;
+using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
+using ExoBeasts.Managers;
 
+/// <summary>
+/// ── MenuManager ────────────────────────────────────────
+/// Gerencia o menu principal, pause e navegacao de paineis de UI.
+///
+///  ▸ AbrirPause() / Resume(): pause visual-only (sem Time.timeScale)
+///  ▸ ChangeScene(): encerra sessao NGO e carrega nova cena
+///  ▸ Integra com GameModeManager para botoes Solo/Online
+/// ─────────────────────────────────────────────────────
+/// </summary>
 public class MenuManager : MonoBehaviour
 {
     public static MenuManager Instance;
@@ -15,6 +26,10 @@ public class MenuManager : MonoBehaviour
     public List<GameObject> pauseButtons = new List<GameObject>();
     public float optionsCenterX = -117f;
 
+    [Header("Multiplayer")]
+    [SerializeField] private Button botaoJogarSolo;
+    [SerializeField] private Button botaoJogarOnline;
+
     private void Awake() => Instance = this;
 
     void Start()
@@ -24,11 +39,15 @@ public class MenuManager : MonoBehaviour
 
         if (hudPanel != null) { if (menuPanel) menuPanel.SetActive(false); }
         else { if (menuPanel) menuPanel.SetActive(true); }
+
+        if (botaoJogarSolo != null)
+            botaoJogarSolo.onClick.AddListener(() => GameModeManager.Instance.StartSingleplayer());
+        if (botaoJogarOnline != null)
+            botaoJogarOnline.onClick.AddListener(() => GameModeManager.Instance.StartMultiplayer());
     }
 
     public void AbrirPause()
     {
-        Time.timeScale = 0f;
         PauseControl.isPaused = true;
         if (hudPanel) hudPanel.SetActive(false);
         if (pausePanel) pausePanel.SetActive(true);
@@ -39,7 +58,6 @@ public class MenuManager : MonoBehaviour
 
     public void Resume()
     {
-        Time.timeScale = 1f;
         PauseControl.isPaused = false;
         if (optionsPanel) optionsPanel.SetActive(false);
         if (pausePanel) pausePanel.SetActive(false);
@@ -92,9 +110,13 @@ public class MenuManager : MonoBehaviour
 
     public void ChangeScene(string nomeDaCena)
     {
-        Time.timeScale = 1f;
         PauseControl.isPaused = false;
-        if (NetworkManager.Singleton != null) NetworkManager.Singleton.Shutdown();
-        SceneManager.LoadScene(nomeDaCena);
+
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            NetworkManager.Singleton.Shutdown();
+        }
+
+        GameModeManager.LoadSceneSafe(nomeDaCena);
     }
 }

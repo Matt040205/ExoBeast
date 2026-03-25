@@ -1,36 +1,31 @@
+﻿using System.Collections.Generic;
 using UnityEngine;
 using Unity.Netcode;
-using System.Collections.Generic;
 
 namespace ExoBeasts.Multiplayer.GameServer
 {
     /// <summary>
-    /// ── PlayerRegistry ───────────────────────────────────
-    /// Registro server-side de jogadores conectados durante a partida.
+    /// ── PlayerRegistry ─────────────────────────────────────
+    /// Registro central de todos os jogadores conectados (server-only writes).
     ///
-    ///  ▸ Mapeia clientId → GameObject e clientId → NetworkObject
-    ///  ▸ RegisterPlayer / UnregisterPlayer: chamados pelo NetworkedPlayerController
-    ///  ▸ OnClientDisconnected: despawna automaticamente
-    ///  ▸ GetLocalPlayer(): retorna objeto do jogador local
-    ///  ▸ Singleton
+    ///  ▸ RegisterPlayer / UnregisterPlayer: gerencia dicionarios de jogadores
+    ///  ▸ GetClosestPlayer(pos): retorna Transform do jogador mais proximo
+    ///  ▸ GetPlayerCharacterChoice(clientId): retorna indice do personagem escolhido
+    ///  ▸ Usado por EnemyController, HordeManager e GameSetupManager
     /// ─────────────────────────────────────────────────────
     /// </summary>
     public class PlayerRegistry : NetworkBehaviour
     {
-        private static PlayerRegistry _instance;
-        public static PlayerRegistry Instance => _instance;
+        public static PlayerRegistry Instance { get; private set; }
 
         private Dictionary<ulong, GameObject> playerObjects = new Dictionary<ulong, GameObject>();
         private Dictionary<ulong, NetworkObject> playerNetworkObjects = new Dictionary<ulong, NetworkObject>();
+        private Dictionary<ulong, int> playerCharacterChoices = new Dictionary<ulong, int>(); // NOVO
 
         private void Awake()
         {
-            if (_instance != null && _instance != this)
-            {
-                Destroy(gameObject);
-                return;
-            }
-            _instance = this;
+            if (Instance == null) Instance = this;
+            else Destroy(gameObject);
         }
 
         public override void OnNetworkSpawn()
@@ -41,130 +36,85 @@ namespace ExoBeasts.Multiplayer.GameServer
             }
         }
 
-        public void RegisterPlayer(ulong clientId, GameObject playerObject)
+        public override void OnNetworkDespawn()
         {
-            if (!IsServer)
+            if (IsServer)
             {
-                Debug.LogWarning("[PlayerRegistry] Apenas o servidor pode registrar jogadores");
-                return;
+                NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
             }
+            base.OnNetworkDespawn();
+        }
+
+        private void OnClientDisconnected(ulong clientId)
+        {
+            UnregisterPlayer(clientId);
+        }
+
+        public void RegisterPlayer(ulong clientId, GameObject playerObj, int characterIndex = 0)
+        {
+            if (!IsServer) return;
 
             if (playerObjects.ContainsKey(clientId))
-            {
-                Debug.LogWarning($"[PlayerRegistry] Jogador {clientId} ja esta registrado");
-                return;
-            }
+                playerObjects[clientId] = playerObj;
+            else
+                playerObjects.Add(clientId, playerObj);
 
-            playerObjects.Add(clientId, playerObject);
+            var netObj = playerObj.GetComponent<NetworkObject>();
+            if (netObj != null)
+                playerNetworkObjects[clientId] = netObj;
+                
+            playerCharacterChoices[clientId] = characterIndex;
 
-            var networkObject = playerObject.GetComponent<NetworkObject>();
-            if (networkObject != null)
-            {
-                playerNetworkObjects.Add(clientId, networkObject);
-            }
+        }
 
-            Debug.Log($"[PlayerRegistry] Jogador {clientId} registrado. Total: {playerObjects.Count}");
+        public void SetPlayerCharacterChoice(ulong clientId, int index)
+        {
+            if (!IsServer) return;
+            playerCharacterChoices[clientId] = index;
+        }
+
+        public int GetPlayerCharacterChoice(ulong clientId)
+        {
+            if (playerCharacterChoices.TryGetValue(clientId, out int index))
+                return index;
+            return 0;
         }
 
         public void UnregisterPlayer(ulong clientId)
         {
             if (!IsServer) return;
 
-            if (playerObjects.ContainsKey(clientId))
-            {
-                playerObjects.Remove(clientId);
-                playerNetworkObjects.Remove(clientId);
-                Debug.Log($"[PlayerRegistry] Jogador {clientId} removido. Total: {playerObjects.Count}");
-            }
+            playerObjects.Remove(clientId);
+            playerNetworkObjects.Remove(clientId);
+            playerCharacterChoices.Remove(clientId);
         }
 
         public GameObject GetPlayerObject(ulong clientId)
         {
-            if (playerObjects.ContainsKey(clientId))
-            {
-                return playerObjects[clientId];
-            }
+            if (playerObjects.TryGetValue(clientId, out GameObject obj))
+                return obj;
             return null;
         }
 
-        public NetworkObject GetPlayerNetworkObject(ulong clientId)
+        public Dictionary<ulong, GameObject> GetAllPlayers() => playerObjects;
+
+        public int GetPlayerCount() => playerObjects.Count;
+
+        public Transform GetClosestPlayer(Vector3 position)
         {
-            if (playerNetworkObjects.ContainsKey(clientId))
+            float minDist = float.MaxValue;
+            Transform closest = null;
+            foreach (var p in playerObjects.Values)
             {
-                return playerNetworkObjects[clientId];
-            }
-            return null;
-        }
-
-        public Dictionary<ulong, GameObject> GetAllPlayers()
-        {
-            return playerObjects;
-        }
-
-        public int GetPlayerCount()
-        {
-            return playerObjects.Count;
-        }
-
-        public bool IsPlayerRegistered(ulong clientId)
-        {
-            return playerObjects.ContainsKey(clientId);
-        }
-
-        public List<ulong> GetAllClientIds()
-        {
-            return new List<ulong>(playerObjects.Keys);
-        }
-
-        public GameObject GetLocalPlayer()
-        {
-            if (NetworkManager.Singleton == null) return null;
-
-            ulong localClientId = NetworkManager.Singleton.LocalClientId;
-            return GetPlayerObject(localClientId);
-        }
-
-        private void OnClientDisconnected(ulong clientId)
-        {
-            if (!IsServer) return;
-
-            if (playerObjects.ContainsKey(clientId))
-            {
-                GameObject playerObj = playerObjects[clientId];
-
-                // Despawn() ja destroi o GameObject por padrao
-                if (playerObj != null)
+                if (p == null) continue;
+                float dist = Vector3.Distance(position, p.transform.position);
+                if (dist < minDist)
                 {
-                    var networkObject = playerObj.GetComponent<NetworkObject>();
-                    if (networkObject != null && networkObject.IsSpawned)
-                    {
-                        networkObject.Despawn();
-                    }
-                    else if (playerObj != null)
-                    {
-                        Destroy(playerObj);
-                    }
+                    minDist = dist;
+                    closest = p.transform;
                 }
-
-                UnregisterPlayer(clientId);
             }
-        }
-
-        private void OnDestroy()
-        {
-            if (IsServer && NetworkManager.Singleton != null)
-            {
-                NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
-            }
-        }
-
-        public void ClearRegistry()
-        {
-            if (!IsServer) return;
-
-            playerObjects.Clear();
-            playerNetworkObjects.Clear();
-            Debug.Log("[PlayerRegistry] Registro limpo");
+            return closest;
         }
     }
 }

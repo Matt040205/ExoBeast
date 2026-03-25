@@ -1,178 +1,202 @@
-using UnityEngine;
+﻿using UnityEngine;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.SceneManagement;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.GameServer;
 
+/// <summary>
+/// ── HordeManager ───────────────────────────────────────
+/// Gerencia ondas de inimigos com autoridade no servidor.
+///
+///  ▸ NetworkVariables: currentHorde, enemiesRemaining, isWaveActive
+///  ▸ Server: spawna inimigos via EnemyPoolManager em intervalos
+///  ▸ Server: detecta fim de onda e carrega cena de vitoria via NGO SceneManager
+///  ▸ OnEnemyKilledServerRpc: qualquer cliente pode notificar morte de inimigo
+///  ▸ Distribui alvos entre jogadores via PlayerRegistry
+/// ─────────────────────────────────────────────────────
+/// </summary>
 public class HordeManager : NetworkBehaviour
 {
-    public int enemiesPerHordeMin = 5;
-    public int enemiesPerHordeMax = 10;
-    public int victoryHorde = 5;
+    public static HordeManager Instance { get; private set; }
 
+    [Header("Configuracoes da Horda")]
+    public int victoryHorde = 5;
+    public float timeBetweenWaves = 10f;
     public float spawnInterval = 1f;
     public int enemiesPerInterval = 1;
 
+    [Header("Inimigos e Dificuldade")]
     public EnemyDataSO[] enemyTypes;
+    public int enemiesPerHordeMin = 5;
+    public int enemiesPerHordeMax = 10;
 
+    [Header("Caminhos de Spawn")]
     public List<SpawnPath> spawnPaths;
     private int lastPathIndex = -1;
 
-    public int currentHorde = 0;
-    public int enemyLevel = 1;
-
+    [Header("Interface (UI)")]
     public TextMeshProUGUI hordeText;
     public TextMeshProUGUI hordeTextBuild;
 
-    private List<GameObject> aliveEnemies = new List<GameObject>();
-    private bool waveIsActive = false;
-    private Transform playerTransform;
+    [Header("Network Variables")]
+    public NetworkVariable<int> currentHorde = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<int> enemiesRemaining = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<bool> isWaveActive = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     private int enemiesToSpawnTotal;
     private int enemiesSpawnedCount = 0;
     private Coroutine spawnCoroutine;
 
-    public override void OnNetworkSpawn()
+    private void Awake()
     {
-        if (IsServer)
-        {
-            StartCoroutine(FindPlayerAndBeginHorde());
-        }
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
     }
 
-    private IEnumerator FindPlayerAndBeginHorde()
+    public override void OnNetworkSpawn()
     {
-        while (playerTransform == null)
+        base.OnNetworkSpawn();
+
+        if (IsServer)
         {
-            GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
-            if (playerObject != null)
-            {
-                playerTransform = playerObject.transform;
-            }
-            yield return new WaitForSeconds(0.5f);
+            StartCoroutine(WaitForPlayersAndBegin());
         }
 
+        currentHorde.OnValueChanged += OnCurrentHordeChanged;
+        UpdateHordeUI(currentHorde.Value);
+    }
+
+    private void OnCurrentHordeChanged(int oldVal, int newVal) => UpdateHordeUI(newVal);
+
+    public override void OnNetworkDespawn()
+    {
+        currentHorde.OnValueChanged -= OnCurrentHordeChanged;
+        base.OnNetworkDespawn();
+    }
+
+    private IEnumerator WaitForPlayersAndBegin()
+    {
+        while (PlayerRegistry.Instance == null || PlayerRegistry.Instance.GetPlayerCount() == 0)
+        {
+            yield return new WaitForSeconds(1f);
+        }
+
+        yield return new WaitForSeconds(3f); 
         StartNextHorde();
     }
 
-    void Update()
+    private void UpdateHordeUI(int current)
+    {
+        if (hordeTextBuild != null) hordeTextBuild.text = $"{current}/{victoryHorde}";
+        if (hordeText != null) hordeText.text = $"{current}/{victoryHorde}";
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void OnEnemyKilledServerRpc()
     {
         if (!IsServer) return;
 
-        if (waveIsActive)
+        enemiesRemaining.Value = Mathf.Max(0, enemiesRemaining.Value - 1);
+
+        if (enemiesRemaining.Value <= 0 && isWaveActive.Value && enemiesSpawnedCount >= enemiesToSpawnTotal)
         {
-            CheckForRemainingEnemies();
-
-            bool allEnemiesSpawned = enemiesSpawnedCount >= enemiesToSpawnTotal;
-            bool allAliveEnemiesDefeated = aliveEnemies.Count == 0;
-
-            if (allEnemiesSpawned && allAliveEnemiesDefeated)
-            {
-                waveIsActive = false;
-
-                if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
-
-                if (currentHorde >= victoryHorde)
-                {
-                    SceneManager.LoadScene("Win");
-                }
-                else
-                {
-                    Invoke("StartNextHorde", 5f);
-                }
-            }
+            OnWaveCompleted();
         }
     }
 
-    private void UpdateHordeUI()
+    private void OnWaveCompleted()
     {
-        UpdateHordeUIClientRpc(currentHorde, victoryHorde);
+        if (!IsServer) return;
+
+        isWaveActive.Value = false;
+
+        if (currentHorde.Value >= victoryHorde)
+        {
+            // Vitoria via Sincronizacao de Cena do NGO
+            NetworkManager.Singleton.SceneManager.LoadScene("Win", LoadSceneMode.Single);
+        }
+        else
+        {
+            StartCoroutine(WaitAndStartNextWave());
+        }
     }
 
-    [ClientRpc]
-    private void UpdateHordeUIClientRpc(int curHorde, int vicHorde)
+    private IEnumerator WaitAndStartNextWave()
     {
-        if (hordeTextBuild != null) hordeTextBuild.text = $"{curHorde}/{vicHorde}";
-        if (hordeText != null) hordeText.text = $"{curHorde}/{vicHorde}";
+        yield return new WaitForSeconds(timeBetweenWaves);
+        if (IsServer) StartNextHorde();
     }
 
-    void StartNextHorde()
+    private void StartNextHorde()
     {
-        currentHorde++;
-        enemyLevel = currentHorde;
+        if (!IsServer) return;
+
+        currentHorde.Value++;
+        isWaveActive.Value = true;
 
         enemiesToSpawnTotal = Random.Range(enemiesPerHordeMin, enemiesPerHordeMax + 1);
         enemiesSpawnedCount = 0;
+        enemiesRemaining.Value = enemiesToSpawnTotal;
 
-        if (enemiesToSpawnTotal > 0)
-        {
-            if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
-            spawnCoroutine = StartCoroutine(SpawnEnemiesOverTime());
-        }
-
-        waveIsActive = true;
-        UpdateHordeUI();
+        if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
+        spawnCoroutine = StartCoroutine(SpawnEnemiesOverTime());
     }
 
     private IEnumerator SpawnEnemiesOverTime()
     {
-        if (spawnPaths == null || spawnPaths.Count == 0) yield break;
-        if (enemyTypes.Length == 0) yield break;
-
         while (enemiesSpawnedCount < enemiesToSpawnTotal)
         {
-            int enemiesThisInterval = Mathf.Min(enemiesPerInterval, enemiesToSpawnTotal - enemiesSpawnedCount);
+            int batchSize = Mathf.Min(enemiesPerInterval, enemiesToSpawnTotal - enemiesSpawnedCount);
 
-            for (int i = 0; i < enemiesThisInterval; i++)
+            for (int i = 0; i < batchSize; i++)
             {
                 SpawnSingleEnemy();
             }
 
-            enemiesSpawnedCount += enemiesThisInterval;
-
-            if (enemiesSpawnedCount < enemiesToSpawnTotal)
-            {
-                yield return new WaitForSeconds(spawnInterval);
-            }
+            enemiesSpawnedCount += batchSize;
+            yield return new WaitForSeconds(spawnInterval);
         }
     }
 
-    void SpawnSingleEnemy()
+    private void SpawnSingleEnemy()
     {
+        if (spawnPaths == null || spawnPaths.Count == 0 || enemyTypes.Length == 0) return;
+
         int pathIndex = GetRandomPathIndex();
         SpawnPath selectedPath = spawnPaths[pathIndex];
 
-        if (selectedPath.spawnPoint == null || selectedPath.patrolPoints == null || selectedPath.patrolPoints.Count == 0) return;
+        if (selectedPath.spawnPoint == null) return;
 
         int enemyTypeIndex = Random.Range(0, enemyTypes.Length);
         EnemyDataSO enemyData = enemyTypes[enemyTypeIndex];
 
-        GameObject newEnemy = EnemyPoolManager.Instance.GetPooledEnemy();
-        newEnemy.transform.position = selectedPath.spawnPoint.position;
-        newEnemy.transform.rotation = selectedPath.spawnPoint.rotation;
+        GameObject newEnemy = EnemyPoolManager.Instance.GetPooledEnemy(enemyData.enemyPrefab, selectedPath.spawnPoint.position, selectedPath.spawnPoint.rotation);
 
-        EnemyController enemyController = newEnemy.GetComponent<EnemyController>();
-        if (enemyController != null)
+        if (newEnemy != null)
         {
-            enemyController.InitializeEnemy(playerTransform, selectedPath.patrolPoints, enemyData, enemyLevel);
-        }
-
-        aliveEnemies.Add(newEnemy);
-    }
-
-    void CheckForRemainingEnemies()
-    {
-        for (int i = aliveEnemies.Count - 1; i >= 0; i--)
-        {
-            if (aliveEnemies[i] == null || !aliveEnemies[i].activeInHierarchy)
+            EnemyController enemyController = newEnemy.GetComponent<EnemyController>();
+            if (enemyController != null)
             {
-                aliveEnemies.RemoveAt(i);
+                Transform target = GetRandomPlayerTarget();
+                enemyController.InitializeEnemy(target, selectedPath.patrolPoints, enemyData, currentHorde.Value);
             }
         }
     }
 
-    int GetRandomPathIndex()
+    private Transform GetRandomPlayerTarget()
+    {
+        if (PlayerRegistry.Instance == null || PlayerRegistry.Instance.GetPlayerCount() == 0) return null;
+
+        var players = PlayerRegistry.Instance.GetAllPlayers();
+        var clientIds = new List<ulong>(players.Keys);
+        ulong randomId = clientIds[Random.Range(0, clientIds.Count)];
+
+        return players[randomId].transform;
+    }
+
+    private int GetRandomPathIndex()
     {
         if (spawnPaths.Count <= 1) return 0;
         int newIndex;

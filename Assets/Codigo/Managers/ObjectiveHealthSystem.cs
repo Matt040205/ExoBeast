@@ -1,31 +1,64 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System;
 using UnityEngine.SceneManagement;
+using Unity.Netcode;
 
-public class ObjectiveHealthSystem : MonoBehaviour
+/// <summary>
+/// ── ObjectiveHealthSystem ──────────────────────────────
+/// Vida do objetivo (cristal/base) com autoridade no servidor.
+///
+///  ▸ NetworkVariable currentHealth: sincroniza vida para todos
+///  ▸ Server: TakeDamage, Die → carrega cena Lose via NGO SceneManager
+///  ▸ Client: OnHealthChanged atualiza UI local
+/// ─────────────────────────────────────────────────────
+/// </summary>
+public class ObjectiveHealthSystem : NetworkBehaviour
 {
-    [Header("Configura��es de Vida")]
+    public static ObjectiveHealthSystem Instance { get; private set; }
+
+    [Header("Configuracoes de Vida (Sincronizada)")]
     public float maxHealth = 100f;
-    public float currentHealth;
+    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     public event Action OnHealthChanged;
     private bool isDead = false;
 
-    void Start()
+    private void Awake()
     {
-        currentHealth = maxHealth;
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
+    }
+
+    private void OnCurrentHealthChanged(float oldVal, float newVal) => OnHealthChanged?.Invoke();
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        if (IsServer)
+        {
+            currentHealth.Value = maxHealth;
+        }
+
+        currentHealth.OnValueChanged += OnCurrentHealthChanged;
         NotifyHealthChanged();
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        currentHealth.OnValueChanged -= OnCurrentHealthChanged;
+        base.OnNetworkDespawn();
     }
 
     public void TakeDamage(float damage)
     {
-        if (currentHealth <= 0 || isDead) return;
+        if (!IsServer) return;
+        if (currentHealth.Value <= 0 || isDead) return;
 
-        currentHealth -= damage;
-        currentHealth = Mathf.Max(currentHealth, 0);
+        currentHealth.Value = Mathf.Max(currentHealth.Value - damage, 0);
         NotifyHealthChanged();
 
-        if (currentHealth <= 0)
+        if (currentHealth.Value <= 0)
         {
             Die();
         }
@@ -33,10 +66,12 @@ public class ObjectiveHealthSystem : MonoBehaviour
 
     private void Die()
     {
+        if (!IsServer) return;
+        if (isDead) return;
         isDead = true;
 
-        Time.timeScale = 1f;
-        SceneManager.LoadScene("Lose");
+        // Derrota! Carregamento de cena em rede via Servidor
+        NetworkManager.Singleton.SceneManager.LoadScene("Lose", LoadSceneMode.Single);
     }
 
     private void NotifyHealthChanged()

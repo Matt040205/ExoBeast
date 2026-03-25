@@ -10,7 +10,7 @@ public class TutorialManager : MonoBehaviour
     public GameObject popupPanelObject;
     public List<TutorialData> todosOsTutoriais;
 
-    private Dictionary<string, TutorialData> databaseTutoriais = new Dictionary<string, TutorialData>();
+    public Dictionary<string, TutorialData> databaseTutoriais = new Dictionary<string, TutorialData>();
     private TutorialPopupUI popupUIScript;
 
     void Awake()
@@ -32,7 +32,7 @@ public class TutorialManager : MonoBehaviour
                 }
                 else
                 {
-                    Debug.LogWarning($"TUTORIAL_MANAGER: ID Duplicado encontrado na lista 'todosOsTutoriais': {tutorial.tutorialID}. Apenas o primeiro será usado.");
+                    Debug.LogWarning($"TUTORIAL_MANAGER: ID Duplicado encontrado na lista 'todosOsTutoriais': {tutorial.tutorialID}. Apenas o primeiro serï¿½ usado.");
                 }
             }
         }
@@ -44,7 +44,7 @@ public class TutorialManager : MonoBehaviour
 
         if (popupPanelObject == null)
         {
-            Debug.LogError("TUTORIAL_MANAGER: 'popupPanelObject' não foi anexado no Inspetor!", this.gameObject);
+            Debug.LogError("TUTORIAL_MANAGER: 'popupPanelObject' nï¿½o foi anexado no Inspetor!", this.gameObject);
             return;
         }
 
@@ -67,7 +67,7 @@ public class TutorialManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError($"TUTORIAL_MANAGER: O ID [{tutorialID}] não foi encontrado no 'databaseTutoriais'.", this.gameObject);
+            Debug.LogError($"TUTORIAL_MANAGER: O ID [{tutorialID}] nï¿½o foi encontrado no 'databaseTutoriais'.", this.gameObject);
         }
     }
 

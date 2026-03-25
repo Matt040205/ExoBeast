@@ -1,90 +1,47 @@
-using UnityEngine;
-using TMPro;
+﻿using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
+/// <summary>
+/// ── TutorialPopupUI ─────────────────────────────────────
+/// Exibe popup de tutorial com titulo e descricao (UI local, sem rede).
+///
+///  ▸ Show(TutorialData): preenche textos, ativa objeto, solta o cursor
+///  ▸ Close: desativa objeto, trava cursor (exceto na cena Menu)
+///  ▸ MonoBehaviour — UI display apenas, sem logica de rede necessaria
+/// ─────────────────────────────────────────────────────
+/// </summary>
 public class TutorialPopupUI : MonoBehaviour
 {
-    public GameObject painelRoot;
-    public TextMeshProUGUI tituloText;
-    public TextMeshProUGUI descricaoText;
-    public Button botaoFechar;
+    public TextMeshProUGUI titleText;
+    public TextMeshProUGUI descriptionText;
+    public Button closeButton;
 
-    void Awake()
+    private void Awake()
     {
-        if (botaoFechar != null)
-        {
-            botaoFechar.onClick.AddListener(Fechar);
-        }
-        else
-        {
-            Debug.LogError("POPUP_UI ERRO: O 'botaoFechar' n�o foi anexado no Inspetor!", this.gameObject);
-        }
+        if (closeButton != null)
+            closeButton.onClick.AddListener(Close);
     }
 
     public void Show(TutorialData data)
     {
-        if (data == null)
-        {
-            Debug.LogError("POPUP_UI ERRO: Show() foi chamado, mas o 'TutorialData' (data) veio NULO.", this.gameObject);
-            Time.timeScale = 0f;
-            return;
-        }
-
-        if (tituloText == null)
-        {
-            Debug.LogError("POPUP_UI ERRO: A refer�ncia 'tituloText' (TextMeshPro) est� NULA.", this.gameObject);
-        }
-        else
-        {
-            tituloText.text = data.titulo;
-        }
-
-        if (descricaoText == null)
-        {
-            Debug.LogError("POPUP_UI ERRO: A refer�ncia 'descricaoText' (TextMeshPro) est� NULA.", this.gameObject);
-        }
-        else
-        {
-            descricaoText.text = data.descricao;
-        }
-
-        if (painelRoot != null)
-            painelRoot.SetActive(true);
-        else
-            this.gameObject.SetActive(true);
-
-        Time.timeScale = 0f;
-
+        if (titleText != null) titleText.text = data.titulo;
+        if (descriptionText != null) descriptionText.text = data.descricao;
+        
+        gameObject.SetActive(true);
+        // Em multiplayer, a pausa deve ser logica e individual. Para simplificar, abrimos o cursor apenas.
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
     }
 
-    public void Fechar()
+    public void Close()
     {
-        if (painelRoot != null)
-            painelRoot.SetActive(false);
-        else
-            this.gameObject.SetActive(false);
-
-        Time.timeScale = 1f;
-
-        if (BuildManager.Instance != null)
+        gameObject.SetActive(false);
+        // Verificar se nao estamos em Menu antes de travar o cursor
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "Menu")
         {
-            if (BuildManager.isBuildingMode)
-            {
-                Cursor.lockState = CursorLockMode.None;
-                Cursor.visible = true;
-            }
-            else
-            {
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
-            }
-        }
-        else
-        {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
     }
 }

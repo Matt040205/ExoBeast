@@ -2,35 +2,42 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using ExoBeasts.Multiplayer.Sync;
 
+/// <summary>
+/// ── EnemyHealthSystem ──────────────────────────────────
+/// Sistema de vida do inimigo vinculado ao NetworkedEnemy.
+///
+///  ▸ Server: processa dano (armor, crit, mark, vulnerability), sincroniza NetworkHealth
+///  ▸ Client: recebe ShowHitVisualLocal via ClientRpc para flash e popup de dano
+///  ▸ Die(): inicia DieRoutine do NetworkedEnemy e entrega recompensas
+///  ▸ Suporta armor shred, marked status e vulnerability stacks
+/// ─────────────────────────────────────────────────────
+/// </summary>
 public class EnemyHealthSystem : MonoBehaviour
 {
-    [Header("Refer�ncias")]
+    [Header("Referências")]
     public EnemyDataSO enemyData;
     public Material markedMaterial;
     private Renderer enemyRenderer;
-    private WorldSpaceEnemyUI worldSpaceUI; // Fallback antigo
+    private WorldSpaceEnemyUI worldSpaceUI; 
 
     private Material[] originalMaterials;
 
-    [Header("Feedback Visual (Novo)")]
-    [Tooltip("Opcional: Ponto exato onde o texto vai nascer (ex: um Empty na cabe�a do inimigo)")]
+    [Header("Feedback Visual")]
+    [Tooltip("Ponto de spawn dos números de dano")]
     public Transform popupSpawnPoint;
 
     [Header("Hit Flash (Juice)")]
-    [Tooltip("Cor do flash (Branco acinzentado para n�o machucar os olhos)")]
     public Color flashColor = new Color(0.8f, 0.8f, 0.8f, 1f);
-    [Tooltip("Dura��o do piscar em segundos (bem rapidinho)")]
     public float flashDuration = 0.05f;
-    [Tooltip("Nome da propriedade Float no Shader Graph")]
     public string flashAmountProperty = "_FlashAmount";
-    [Tooltip("Nome da propriedade Color no Shader Graph")]
     public string flashColorProperty = "_FlashColor";
 
     private Coroutine flashCoroutine;
     private MaterialPropertyBlock propBlock;
 
-    [Header("Status Atual")]
+    [Header("Status Atual (Servidor Autoritativo)")]
     public float currentHealth;
     public bool isDead;
 
@@ -41,42 +48,32 @@ public class EnemyHealthSystem : MonoBehaviour
     private float vulnerabilityMultiplier = 1f;
 
     private EnemyController enemyController;
+    private NetworkedEnemy networkedEnemy;
     private bool isMarked = false;
     private Coroutine vulnerabilityCoroutine;
-
-    public bool IsArmorShredded => armorShredStacks > 0;
 
     void Awake()
     {
         enemyController = GetComponent<EnemyController>();
+        networkedEnemy = GetComponent<NetworkedEnemy>();
         worldSpaceUI = GetComponentInChildren<WorldSpaceEnemyUI>();
+        
         enemyRenderer = GetComponent<Renderer>();
-
-        // Inicializa o bloco de propriedades para o Hit Flash
-        propBlock = new MaterialPropertyBlock();
-
         if (enemyRenderer == null)
-        {
             enemyRenderer = GetComponentInChildren<Renderer>();
-        }
+
+        propBlock = new MaterialPropertyBlock();
 
         if (enemyRenderer != null)
         {
             originalMaterials = enemyRenderer.materials.ToArray();
         }
-        else
-        {
-            Debug.LogError($"<color=red>EnemyHealthSystem:</color> NENHUM RENDERER ENCONTRADO para o inimigo '{gameObject.name}'. A marca��o visual N�O FUNCIONAR�!");
-        }
     }
 
     public void InitializeHealth(int level)
     {
-        if (enemyData == null)
-        {
-            Debug.LogError("EnemyData n�o atribu�do em " + gameObject.name);
-            return;
-        }
+        if (enemyData == null) return;
+        
         currentHealth = enemyData.GetHealth(level);
         baseArmor = enemyData.GetArmor(level);
         currentArmorModifier = 0f;
@@ -88,49 +85,38 @@ public class EnemyHealthSystem : MonoBehaviour
         if (enemyRenderer != null && originalMaterials != null)
         {
             enemyRenderer.materials = originalMaterials;
-            // Limpa qualquer override que tenha ficado
             enemyRenderer.GetPropertyBlock(propBlock);
             propBlock.Clear();
             enemyRenderer.SetPropertyBlock(propBlock);
         }
         isMarked = false;
+
+        if (networkedEnemy != null && networkedEnemy.IsServer)
+        {
+            networkedEnemy.NetworkHealth.Value = currentHealth;
+            networkedEnemy.IsDead.Value = false;
+        }
     }
 
     public bool TakeDamage(float damage, float armorPenetration = 0f, bool isCritical = false)
     {
+        if (networkedEnemy != null && !networkedEnemy.IsServer) return false;
         if (isDead) return false;
 
         float damageWithMark = damage * markedDamageMultiplier * vulnerabilityMultiplier;
-
         float armorToIgnore = baseArmor * armorPenetration;
         float effectiveArmor = Mathf.Max(0, baseArmor - currentArmorModifier - armorToIgnore);
-        float damageReduction = effectiveArmor;
-        float damageMultiplier = 1f - damageReduction;
-
-        float finalDamage = damageWithMark * damageMultiplier;
-
-        if (markedDamageMultiplier > 1f || vulnerabilityMultiplier > 1f)
-        {
-            Debug.Log($"<color=orange>Dano Modificado:</color> Dano Base {damage.ToString("F1")}. Dano Final: {finalDamage.ToString("F1")}");
-        }
-
-        if (finalDamage > 0)
-        {
-            if (UIPoolManager.Instance != null)
-            {
-                SpawnDamagePopupLocal((int)finalDamage, isCritical);
-            }
-            else if (worldSpaceUI != null)
-            {
-                worldSpaceUI.ShowDamageNumber(finalDamage, isCritical);
-            }
-
-            // --- ACIONA O HIT FLASH AQUI ---
-            if (flashCoroutine != null) StopCoroutine(flashCoroutine);
-            flashCoroutine = StartCoroutine(HitFlashRoutine());
-        }
+        float finalDamage = damageWithMark * (1.0f - Mathf.Clamp01(effectiveArmor / 100f));
+        if (finalDamage < 0) finalDamage = 0;
 
         currentHealth -= finalDamage;
+
+        if (networkedEnemy != null)
+        {
+            networkedEnemy.NetworkHealth.Value = currentHealth;
+            if (finalDamage > 0)
+                networkedEnemy.TriggerHitVisual(finalDamage, isCritical);
+        }
 
         if (currentHealth <= 0)
         {
@@ -140,12 +126,19 @@ public class EnemyHealthSystem : MonoBehaviour
         return false;
     }
 
+    public void ShowHitVisualLocal(float damageAmount, bool isCritical)
+    {
+            if (flashCoroutine != null) StopCoroutine(flashCoroutine);
+        flashCoroutine = StartCoroutine(HitFlashRoutine());
+
+        SpawnDamagePopupLocal((int)damageAmount, isCritical);
+    }
+
     private IEnumerator HitFlashRoutine()
     {
         if (enemyRenderer != null)
         {
             enemyRenderer.GetPropertyBlock(propBlock);
-            // Ativa o flash (1) e define a cor
             propBlock.SetFloat(flashAmountProperty, 1f);
             propBlock.SetColor(flashColorProperty, flashColor);
             enemyRenderer.SetPropertyBlock(propBlock);
@@ -155,7 +148,6 @@ public class EnemyHealthSystem : MonoBehaviour
             if (enemyRenderer != null)
             {
                 enemyRenderer.GetPropertyBlock(propBlock);
-                // Desativa o flash voltando para (0)
                 propBlock.SetFloat(flashAmountProperty, 0f);
                 enemyRenderer.SetPropertyBlock(propBlock);
             }
@@ -165,22 +157,47 @@ public class EnemyHealthSystem : MonoBehaviour
     private void SpawnDamagePopupLocal(int damageAmount, bool isCritical)
     {
         Vector3 spawnPos = popupSpawnPoint != null ? popupSpawnPoint.position : transform.position + Vector3.up * 1.5f;
-        UIPoolManager.Instance.SpawnDamagePopup(spawnPos, damageAmount, isCritical);
+        
+        if (UIPoolManager.Instance != null)
+            UIPoolManager.Instance.SpawnDamagePopup(spawnPos, damageAmount, isCritical);
+        else if (worldSpaceUI != null)
+            worldSpaceUI.ShowDamageNumber((float)damageAmount, isCritical);
     }
 
     public void ApplyArmorShred(float percentage, int maxStacks)
     {
+        if (networkedEnemy != null && !networkedEnemy.IsServer) return;
         if (armorShredStacks < maxStacks)
         {
             armorShredStacks++;
             currentArmorModifier += percentage;
-            Debug.Log($"<color=purple>ARMOR SHRED:</color> {gameObject.name} shredado.");
         }
     }
 
-    public void AplicarVulnerabilidade(float multiplicador)
+    public void ApplyMarkedStatus(float multiplier)
     {
-        vulnerabilityMultiplier = multiplicador;
+        if (networkedEnemy != null && !networkedEnemy.IsServer) return;
+        markedDamageMultiplier = multiplier;
+    }
+
+    public bool IsArmorShredded => armorShredStacks > 0;
+
+    public void AplicarVulnerabilidadeTemporaria(float multiplier, float duration)
+    {
+        vulnerabilityMultiplier = multiplier;
+        if (vulnerabilityCoroutine != null) StopCoroutine(vulnerabilityCoroutine);
+        vulnerabilityCoroutine = StartCoroutine(VulnerabilityRoutine(duration));
+    }
+
+    private IEnumerator VulnerabilityRoutine(float duration)
+    {
+        yield return new WaitForSeconds(duration);
+        vulnerabilityMultiplier = 1f;
+    }
+
+    public void AplicarVulnerabilidade(float multiplier)
+    {
+        vulnerabilityMultiplier = multiplier;
     }
 
     public void RemoverVulnerabilidade()
@@ -188,70 +205,28 @@ public class EnemyHealthSystem : MonoBehaviour
         vulnerabilityMultiplier = 1f;
     }
 
-    public void AplicarVulnerabilidadeTemporaria(float multiplicador, float duracao)
-    {
-        if (vulnerabilityCoroutine != null) StopCoroutine(vulnerabilityCoroutine);
-
-        vulnerabilityMultiplier = multiplicador;
-        vulnerabilityCoroutine = StartCoroutine(ResetVulnerabilidadeRoutine(duracao));
-    }
-
-    private IEnumerator ResetVulnerabilidadeRoutine(float tempo)
-    {
-        yield return new WaitForSeconds(tempo);
-        vulnerabilityMultiplier = 1f;
-        vulnerabilityCoroutine = null;
-    }
-
-    public void ApplyMarkedStatus(float multiplier)
-    {
-        markedDamageMultiplier = multiplier;
-
-        if (enemyRenderer != null && markedMaterial != null && !isMarked)
-        {
-            Material[] markedMaterialsArray = new Material[enemyRenderer.materials.Length];
-            for (int i = 0; i < markedMaterialsArray.Length; i++)
-            {
-                markedMaterialsArray[i] = markedMaterial;
-            }
-            enemyRenderer.materials = markedMaterialsArray;
-            isMarked = true;
-        }
-    }
-
-    public void RemoveMarkedStatus()
-    {
-        markedDamageMultiplier = 1f;
-
-        if (enemyRenderer != null && originalMaterials != null && isMarked)
-        {
-            enemyRenderer.materials = originalMaterials;
-            isMarked = false;
-        }
-    }
-
     private void Die()
     {
+        if (isDead) return;
         isDead = true;
-        if (CurrencyManager.Instance != null && enemyData != null)
+
+        if (networkedEnemy != null && networkedEnemy.IsServer)
         {
-            int geoditesAmount = enemyData.geoditasOnDeath;
-            if (geoditesAmount > 0)
+            // Iniciar sequência de morte sincronizada
+            StartCoroutine(networkedEnemy.DieRoutine());
+
+            // Recompensas entregues pelo servidor
+            if (CurrencyManager.Instance != null && enemyData != null)
             {
-                CurrencyManager.Instance.AddCurrency(geoditesAmount, CurrencyType.Geodites);
-            }
-            if (Random.value <= enemyData.etherDropChance)
-            {
-                CurrencyManager.Instance.AddCurrency(1, CurrencyType.DarkEther);
+                CurrencyManager.Instance.AddCurrency(enemyData.geoditasOnDeath, CurrencyType.Geodites);
+                if (Random.value <= enemyData.etherDropChance)
+                    CurrencyManager.Instance.AddCurrency(1, CurrencyType.DarkEther);
             }
         }
+
         if (enemyController != null)
-        {
             enemyController.HandleDeath();
-        }
-        else
-        {
+        else if (networkedEnemy == null)
             gameObject.SetActive(false);
-        }
     }
 }

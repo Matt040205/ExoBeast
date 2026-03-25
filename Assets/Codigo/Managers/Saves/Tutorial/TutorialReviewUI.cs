@@ -1,120 +1,47 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 using System.Collections.Generic;
 
+/// <summary>
+/// ── TutorialReviewUI ────────────────────────────────────
+/// Lista tutoriais ja concluidos para revisao pelo jogador (UI local, sem rede).
+///
+///  ▸ UpdateList: limpa e reconstroi slots a partir de GameDataManager.tutoriaisConcluidos
+///  ▸ Open/Close: controla visibilidade do painel
+///  ▸ MonoBehaviour — leitura de dados de save local apenas
+/// ─────────────────────────────────────────────────────
+/// </summary>
 public class TutorialReviewUI : MonoBehaviour
 {
-    [Header("Controlo")]
-    public KeyCode reviewKey = KeyCode.T;
-    public GameObject panelRoot;
+    public GameObject slotPrefab;
+    public Transform container;
+    public TutorialPopupUI detailsPopup;
 
-    [Header("Refer�ncias da UI")]
-    [Tooltip("O objeto que cont�m o Vertical Layout Group para a lista")]
-    public Transform listaContainer;
-    [Tooltip("O Prefab do bot�o que ser� instanciado na lista")]
-    public GameObject tutorialButtonPrefab;
-
-    [Header("Painel de Detalhes")]
-    public TextMeshProUGUI nomeTutorialText;
-    public TextMeshProUGUI descricaoTutorialText;
-� � public Button botaoFechar;
-
-    private bool isPanelOpen = false;
-
-    void Start()
+    public void UpdateList()
     {
-        if (botaoFechar != null)
+        if (GameDataManager.Instance == null) return;
+
+        foreach (Transform child in container) Destroy(child.gameObject);
+
+        foreach (string id in GameDataManager.Instance.tutoriaisConcluidos)
         {
-            botaoFechar.onClick.AddListener(ClosePanel);
-        }
-        panelRoot.SetActive(false);
-
-        LimparDetalhes();
-    }
-
-    void Update()
-    {
-        if (Input.GetKeyDown(reviewKey))
-        {
-            TogglePanel();
-        }
-    }
-
-    public void TogglePanel()
-    {
-        isPanelOpen = !isPanelOpen;
-        panelRoot.SetActive(isPanelOpen);
-
-        if (isPanelOpen)
-        {
-            Time.timeScale = 0f;
-            PopularLista();
-            LimparDetalhes();
-        }
-        else
-        {
-            Time.timeScale = 1f;
-        }
-    }
-
-    public void ClosePanel()
-    {
-        isPanelOpen = false;
-        panelRoot.SetActive(isPanelOpen);
-        Time.timeScale = 1f;
-    }
-
-    void PopularLista()
-    {
-        foreach (Transform child in listaContainer)
-        {
-            Destroy(child.gameObject);
-        }
-
-        if (TutorialManager.Instance == null || GameDataManager.Instance == null)
-        {
-            Debug.LogError("TutorialReviewUI: TutorialManager ou GameDataManager n�o encontrados!");
-            return;
-        }
-
-        List<TutorialData> todosOsTutoriais = TutorialManager.Instance.todosOsTutoriais;
-        List<string> concluidos = GameDataManager.Instance.tutoriaisConcluidos;
-
-        foreach (TutorialData tutorial in todosOsTutoriais)
-        {
-            if (concluidos.Contains(tutorial.tutorialID))
-                {
-                GameObject botaoGO = Instantiate(tutorialButtonPrefab, listaContainer);
-
-                TextMeshProUGUI botaoText = botaoGO.GetComponentInChildren<TextMeshProUGUI>();
-                if (botaoText != null)
-                {
-                    botaoText.text = tutorial.titulo;
-                }
-
-                Button botaoComponent = botaoGO.GetComponent<Button>();
-                if (botaoComponent != null)
-                {
-                    TutorialData dataParaEsteBotao = tutorial;
-                    botaoComponent.onClick.AddListener(() => {
-                        MostrarDetalhes(dataParaEsteBotao);
-                    });
-                }
+            if (TutorialManager.Instance.databaseTutoriais.ContainsKey(id))
+            {
+                TutorialData data = TutorialManager.Instance.databaseTutoriais[id];
+                GameObject obj = Instantiate(slotPrefab, container);
+                // TODO: obj.GetComponent<TutorialSlot>().Setup(data, detailsPopup);
             }
         }
     }
 
-    void MostrarDetalhes(TutorialData data)
+    public void Open()
     {
-        if (data == null) return;
-        nomeTutorialText.text = data.titulo;
-        descricaoTutorialText.text = data.descricao;
+        gameObject.SetActive(true);
+        UpdateList();
     }
 
-    void LimparDetalhes()
+    public void Close()
     {
-        nomeTutorialText.text = "Selecione um Tutorial";
-        descricaoTutorialText.text = "Selecione um item da lista para ler a descri��o.";
+        gameObject.SetActive(false);
     }
 }

@@ -1,6 +1,15 @@
 using UnityEngine;
 using Unity.Netcode;
 
+/// <summary>
+/// ── PauseControl ────────────────────────────────────
+/// Controle de pause local por jogador (visual-only, sem Time.timeScale).
+///
+///  ▸ Owner: detecta input Escape/P para toggle de pause
+///  ▸ isPaused eh static local — cada cliente pausa independentemente
+///  ▸ Delega UI para MenuManager.AbrirPause() / Resume()
+/// ─────────────────────────────────────────────────────
+/// </summary>
 public class PauseControl : NetworkBehaviour
 {
     public static bool isPaused = false;
@@ -21,18 +30,9 @@ public class PauseControl : NetworkBehaviour
 
     public void PauseGame()
     {
-        Debug.Log("[PauseControl] Congelando o jogo e chamando MenuManager...");
-
         if (MenuManager.Instance != null)
-        {
             MenuManager.Instance.AbrirPause();
-        }
-        else
-        {
-            Debug.LogError("[PauseControl] ERRO: MenuManager.Instance est� NULO! O script MenuManager n�o est� na sua cena do Mapa!");
-        }
 
-        Time.timeScale = 0f;
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
         isPaused = true;

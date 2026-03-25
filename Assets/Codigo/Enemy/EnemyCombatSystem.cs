@@ -1,10 +1,20 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 
-public class EnemyCombatSystem : MonoBehaviour
+/// <summary>
+/// ── EnemyCombatSystem ──────────────────────────────────
+/// Sistema de combate do inimigo (server-only).
+///
+///  ▸ Server: detecta jogadores via trigger, aplica dano ciclico
+///  ▸ Server: aura de dano em torres via OverlapSphere periodico
+///  ▸ Remotos: script desativado (IA roda apenas no servidor)
+/// ─────────────────────────────────────────────────────
+/// </summary>
+public class EnemyCombatSystem : NetworkBehaviour
 {
-    [Header("Configura��es de Combate (Player)")]
+    [Header("Configurações de Combate (Player)")]
     public float attackRange = 2f;
     public float timeToDamage = 2f;
 
@@ -13,7 +23,7 @@ public class EnemyCombatSystem : MonoBehaviour
     public float towerAuraDamage = 14f;
     public float towerAuraInterval = 3f;
 
-    [Header("Refer�ncias")]
+    [Header("Referências")]
     public Transform attackPoint;
     public LayerMask playerLayer;
     public LayerMask towerLayer;
@@ -24,25 +34,35 @@ public class EnemyCombatSystem : MonoBehaviour
 
     private bool playerIsInside = false;
     private Coroutine attackCoroutine;
-
     private Coroutine towerAuraCoroutine;
 
-    void Awake()
+    public override void OnNetworkSpawn()
     {
+        base.OnNetworkSpawn();
+        
         enemyController = GetComponent<EnemyController>();
+        
+        // APENAS o servidor deve processar a IA de combate em rede
+        if (!IsServer)
+        {
+            this.enabled = false;
+            return;
+        }
     }
 
     public void InitializeCombat(EnemyDataSO data, int nivel)
     {
-        this.enemyData = data;
+        if (!IsServer) return;
 
+        this.enemyData = data;
         if (enemyData != null)
         {
             currentDamage = enemyData.GetDamage(nivel);
 
+            // Tentar encontrar ou adicionar um SphereCollider para o gatilho de detecção
             SphereCollider sphereCollider = (attackPoint != null && attackPoint.GetComponent<SphereCollider>() != null)
-                                            ? attackPoint.GetComponent<SphereCollider>()
-                                            : GetComponent<SphereCollider>();
+                ? attackPoint.GetComponent<SphereCollider>()
+                : GetComponent<SphereCollider>();
 
             if (sphereCollider == null)
             {
@@ -58,14 +78,12 @@ public class EnemyCombatSystem : MonoBehaviour
             if (towerAuraCoroutine != null) StopCoroutine(towerAuraCoroutine);
             towerAuraCoroutine = StartCoroutine(TowerAuraCycle());
         }
-        else
-        {
-            Debug.LogError("EnemyCombatSystem: InitializeCombat FALHOU. EnemyData est� faltando.");
-        }
     }
 
     void OnTriggerEnter(Collider other)
     {
+        if (!IsServer) return;
+
         if (((1 << other.gameObject.layer) & playerLayer) != 0)
         {
             if (!playerIsInside)
@@ -79,6 +97,8 @@ public class EnemyCombatSystem : MonoBehaviour
 
     void OnTriggerExit(Collider other)
     {
+        if (!IsServer) return;
+
         if (((1 << other.gameObject.layer) & playerLayer) != 0)
         {
             if (playerIsInside)
@@ -109,24 +129,21 @@ public class EnemyCombatSystem : MonoBehaviour
 
     void ApplyDamageInArea()
     {
-        if (enemyData == null) return;
+        if (!IsServer || enemyData == null) return;
 
         if (enemyController != null && enemyController.IsBlinded)
         {
-            if (Random.value < 0.8f)
-            {
-                return;
-            }
+            if (Random.value < 0.8f) return;
         }
 
         Collider[] hitPlayers = Physics.OverlapSphere(attackPoint.position, attackRange, playerLayer);
 
         if (hitPlayers.Length > 0)
         {
+            // Ataca o primeiro jogador detectado (autoritativo no servidor)
             PlayerHealthSystem playerHealth = hitPlayers[0].GetComponent<PlayerHealthSystem>();
             if (playerHealth != null)
             {
-
                 playerHealth.TakeDamage(currentDamage, transform);
             }
         }
@@ -149,12 +166,13 @@ public class EnemyCombatSystem : MonoBehaviour
 
     private void ApplyAuraDamageToTowers()
     {
+        if (!IsServer) return;
+        
         Collider[] hitTowers = Physics.OverlapSphere(transform.position, towerAuraRadius, towerLayer);
-
         foreach (Collider towerCollider in hitTowers)
         {
+            // No modo multiplayer, as torres também devem ser protegidas por IsServer em seus sistemas de vida
             TowerController tower = towerCollider.GetComponent<TowerController>();
-
             if (tower != null)
             {
                 tower.TakeDamage(towerAuraDamage);
