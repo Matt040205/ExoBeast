@@ -1,5 +1,7 @@
 using UnityEngine;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.Core;
+using ExoBeasts.Multiplayer.Auth;
 
 namespace ExoBeasts.Multiplayer.Sync
 {
@@ -35,6 +37,31 @@ namespace ExoBeasts.Multiplayer.Sync
         private void SetupAsLocalPlayer()
         {
             Debug.Log($"[PlayerNetworkSetup] Jogador LOCAL inicializado | ClientId: {OwnerClientId}");
+            RegisterIdentityWithBridge();
+        }
+
+        /// <summary>
+        /// Envia productUserId + sessionToken do EOS para o servidor via PlayerIdentityBridge.
+        /// Permite que o servidor saiba qual jogador EOS corresponde a este clientId NGO.
+        /// </summary>
+        private void RegisterIdentityWithBridge()
+        {
+            if (PlayerIdentityBridge.Instance == null)
+            {
+                Debug.LogWarning("[PlayerNetworkSetup] PlayerIdentityBridge nao encontrado na cena.");
+                return;
+            }
+
+            string userId = "";
+            string token = "";
+
+            if (EOSAuthenticator.Instance != null)
+                userId = EOSAuthenticator.Instance.CurrentProductUserId ?? "";
+
+            if (SessionManager.Instance != null)
+                token = SessionManager.Instance.sessionToken ?? "";
+
+            PlayerIdentityBridge.Instance.RegisterPlayerServerRpc(userId, token);
         }
 
         private void SetupAsRemotePlayer()

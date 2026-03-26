@@ -20,7 +20,9 @@ namespace ExoBeasts.Multiplayer.GameServer
 
         private Dictionary<ulong, GameObject> playerObjects = new Dictionary<ulong, GameObject>();
         private Dictionary<ulong, NetworkObject> playerNetworkObjects = new Dictionary<ulong, NetworkObject>();
-        private Dictionary<ulong, int> playerCharacterChoices = new Dictionary<ulong, int>(); // NOVO
+        private Dictionary<ulong, int> playerCharacterChoices = new Dictionary<ulong, int>();
+        private Dictionary<ulong, string> playerUserIds = new Dictionary<ulong, string>();
+        private Dictionary<string, ulong> userIdToClientId = new Dictionary<string, ulong>();
 
         private void Awake()
         {
@@ -80,10 +82,33 @@ namespace ExoBeasts.Multiplayer.GameServer
             return 0;
         }
 
+        public void LinkProductUserId(ulong clientId, string productUserId)
+        {
+            if (!IsServer) return;
+            playerUserIds[clientId] = productUserId;
+            userIdToClientId[productUserId] = clientId;
+            Debug.Log($"[PlayerRegistry] Link: ClientId={clientId} ↔ UserId={productUserId}");
+        }
+
+        public string GetProductUserId(ulong clientId)
+        {
+            return playerUserIds.TryGetValue(clientId, out string uid) ? uid : null;
+        }
+
+        public ulong? GetClientIdByUserId(string productUserId)
+        {
+            return userIdToClientId.TryGetValue(productUserId, out ulong cid) ? cid : null;
+        }
+
         public void UnregisterPlayer(ulong clientId)
         {
             if (!IsServer) return;
 
+            if (playerUserIds.TryGetValue(clientId, out string uid))
+            {
+                userIdToClientId.Remove(uid);
+                playerUserIds.Remove(clientId);
+            }
             playerObjects.Remove(clientId);
             playerNetworkObjects.Remove(clientId);
             playerCharacterChoices.Remove(clientId);

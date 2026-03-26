@@ -32,6 +32,10 @@ namespace ExoBeasts.Multiplayer.Auth
         private string displayName = "";
         private bool isInSession = false;
 
+        /// Token unico por processo — identifica esta instancia mesmo se dois clones MPPM
+        /// tiverem o mesmo productUserId (cache compartilhado).
+        public readonly string sessionToken = System.Guid.NewGuid().ToString();
+
         private string currentLobbyId = "";
         private string currentMatchId = "";
 
