@@ -8,11 +8,8 @@ using ExoBeasts.Managers;
 
 /// <summary>
 /// ── MenuManager ────────────────────────────────────────
-/// Gerencia o menu principal, pause e navegacao de paineis de UI.
-///
-///  ▸ AbrirPause() / Resume(): pause visual-only (sem Time.timeScale)
-///  ▸ ChangeScene(): encerra sessao NGO e carrega nova cena
-///  ▸ Integra com GameModeManager para botoes Solo/Online
+/// Gerencia o menu principal, pause e navegação de painéis de UI.
+/// Inclui agora funções de rede para iniciar Host, Client e Server.
 /// ─────────────────────────────────────────────────────
 /// </summary>
 public class MenuManager : MonoBehaviour
@@ -40,11 +37,54 @@ public class MenuManager : MonoBehaviour
         if (hudPanel != null) { if (menuPanel) menuPanel.SetActive(false); }
         else { if (menuPanel) menuPanel.SetActive(true); }
 
+        // Mantendo suas lógicas de GameModeManager
         if (botaoJogarSolo != null)
             botaoJogarSolo.onClick.AddListener(() => GameModeManager.Instance.StartSingleplayer());
         if (botaoJogarOnline != null)
             botaoJogarOnline.onClick.AddListener(() => GameModeManager.Instance.StartMultiplayer());
     }
+
+    #region Funções de Conexão (NGO)
+
+    /// <summary>
+    /// Inicia o jogo como HOST (Servidor e Jogador ao mesmo tempo).
+    /// </summary>
+    public void HostGame()
+    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.StartHost();
+            Debug.Log("[MenuManager] Iniciando como HOST...");
+            // Se você quiser carregar a cena do mapa logo após dar host:
+            // NetworkManager.Singleton.SceneManager.LoadScene("NomeDoSeuMapa", LoadSceneMode.Single);
+        }
+    }
+
+    /// <summary>
+    /// Inicia o jogo como CLIENT (Tenta conectar a um IP configurado no Unity Transport).
+    /// </summary>
+    public void JoinGame()
+    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.StartClient();
+            Debug.Log("[MenuManager] Tentando conectar como CLIENTE...");
+        }
+    }
+
+    /// <summary>
+    /// Inicia apenas o SERVIDOR (Sem jogador local).
+    /// </summary>
+    public void ServerOnly()
+    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.StartServer();
+            Debug.Log("[MenuManager] Iniciando apenas como SERVIDOR...");
+        }
+    }
+
+    #endregion
 
     public void AbrirPause()
     {
@@ -75,22 +115,18 @@ public class MenuManager : MonoBehaviour
     private IEnumerator ForcarAberturaOptions()
     {
         SetPauseButtonsState(false);
-
         yield return null;
 
         if (optionsPanel != null)
         {
             optionsPanel.SetActive(true);
-
             RectTransform rt = optionsPanel.GetComponent<RectTransform>();
             if (rt != null)
             {
                 rt.anchoredPosition = new Vector2(optionsCenterX, 0f);
             }
-
             optionsPanel.transform.SetAsLastSibling();
         }
-
         Canvas.ForceUpdateCanvases();
     }
 
