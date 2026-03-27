@@ -54,6 +54,7 @@ public class MeleeCombatSystem : NetworkBehaviour
     public float? overrideAttackAngle = null;
 
     private Animator anim;
+    private NetworkAnimator networkAnimator; // <--- CACHE SEGURO ADICIONADO AQUI
     private WeaponConfig currentStats;
 
     public override void OnNetworkSpawn()
@@ -67,6 +68,11 @@ public class MeleeCombatSystem : NetworkBehaviour
         }
 
         anim = GetComponentInChildren<Animator>();
+
+        // Cache seguro do NetworkAnimator
+        networkAnimator = GetComponent<NetworkAnimator>();
+        if (networkAnimator == null) networkAnimator = GetComponentInChildren<NetworkAnimator>();
+
         UpdateCurrentStats();
     }
 
@@ -76,7 +82,8 @@ public class MeleeCombatSystem : NetworkBehaviour
 
         if (ctx.performed && !PauseControl.isPaused && !BuildManager.isBuildingMode)
         {
-            GetComponent<NetworkAnimator>().SetTrigger("Attack");
+            // CORREÇÃO DA LINHA 79: Usando a referência segura para o NetworkAnimator
+            if (networkAnimator != null) networkAnimator.SetTrigger("Attack");
         }
     }
 
@@ -135,7 +142,7 @@ public class MeleeCombatSystem : NetworkBehaviour
         }
     }
 
-    [ServerRpc]
+    [ServerRpc(RequireOwnership = false)] // Adicionado para garantir que o dano rode em Multiplayer
     private void RequestMeleeDamageServerRpc(ulong targetId, float damage, float armorPen, bool isCrit)
     {
         if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(targetId, out NetworkObject target))

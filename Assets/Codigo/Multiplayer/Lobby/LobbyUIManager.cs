@@ -13,17 +13,17 @@ public class LobbyUIManager : MonoBehaviour
 {
     public static LobbyUIManager Instance;
 
-    [Header("Pain�is")]
+    [Header("Painéis")]
     public RectTransform painelSelecao;
     public RectTransform painelLobby;
 
-    [Header("Configura��es de Posi��o")]
+    [Header("Configurações de Posição")]
     public Vector2 posSelecaoCentro = Vector2.zero;
     public Vector2 posSelecaoLado = new Vector2(-400, 0);
     public Vector2 posLobbyEscondido = new Vector2(1200, 0);
     public Vector2 posLobbyVisivel = new Vector2(450, 0);
 
-    [Header("Elementos da UI de Cria��o")]
+    [Header("Elementos da UI de Criação")]
     public TMP_InputField inputNomeSala;
     public TMP_Text textoMaxJogadores;
     public Toggle togglePublico;
@@ -38,6 +38,7 @@ public class LobbyUIManager : MonoBehaviour
         // Garante que o painel comece fora da tela
         if (painelLobby != null)
             painelLobby.anchoredPosition = posLobbyEscondido;
+
         AtualizarTextoPlayers();
 
         // Em multiplayer, inicia auth EOS e depois abre o painel de lobby
@@ -99,7 +100,7 @@ public class LobbyUIManager : MonoBehaviour
         AbrirPainelMultiplayer();
     }
 
-    // --- NAVEGA��O ---
+    // --- NAVEGAÇÃO ---
 
     public void AbrirPainelMultiplayer()
     {
@@ -115,7 +116,7 @@ public class LobbyUIManager : MonoBehaviour
         painelLobby.DOAnchorPos(posLobbyEscondido, 0.5f).SetEase(Ease.InBack);
     }
 
-    // --- L�GICA DE CONFIGURA��O (O + e - que voc� pediu) ---
+    // --- LÓGICA DE CONFIGURAÇÃO (O + e - que você pediu) ---
 
     public void AlterarMaxPlayers(int quantidade)
     {
@@ -130,10 +131,17 @@ public class LobbyUIManager : MonoBehaviour
             textoMaxJogadores.text = maxPlayersSelecionado.ToString();
     }
 
-    // --- L�GICA DE REDE (Portando do PlaceholderUI) ---
+    // --- LÓGICA DE REDE (Portando do PlaceholderUI) ---
 
     public void CriarLobbyPelaUI()
     {
+        // TRAVA DE SEGURANÇA: Impede criar a sala se o login ainda estiver carregando
+        if (!EOSAuthenticator.Instance.IsLoggedIn)
+        {
+            Debug.LogWarning("[LobbyUIManager] Calma aí! O login na Epic ainda não terminou. Aguarde um segundo.");
+            return;
+        }
+
         string nome = string.IsNullOrEmpty(inputNomeSala.text) ? "Minha Sala" : inputNomeSala.text;
 
         // Chama o Singleton do seu LobbyManager real

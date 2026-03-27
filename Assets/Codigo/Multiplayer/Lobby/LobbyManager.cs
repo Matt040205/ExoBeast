@@ -44,17 +44,17 @@ namespace ExoBeasts.Multiplayer.Lobby
             }
         }
 
-        public event Action<LobbyInfo>       OnLobbyCreated;
+        public event Action<LobbyInfo> OnLobbyCreated;
         public event Action<List<LobbyInfo>> OnLobbiesFound;
-        public event Action<LobbyInfo>       OnLobbyJoined;
-        public event Action                  OnLobbyLeft;
-        public event Action<LobbyMember>     OnMemberJoined;
-        public event Action<LobbyMember>     OnMemberLeft;
-        public event Action<LobbyMember>     OnMemberUpdated;
-        public event Action<string>          OnError;
+        public event Action<LobbyInfo> OnLobbyJoined;
+        public event Action OnLobbyLeft;
+        public event Action<LobbyMember> OnMemberJoined;
+        public event Action<LobbyMember> OnMemberLeft;
+        public event Action<LobbyMember> OnMemberUpdated;
+        public event Action<string> OnError;
 
-        private LobbyInfo         _currentLobby;
-        private bool              _isInLobby;
+        private LobbyInfo _currentLobby;
+        private bool _isInLobby;
         private List<LobbyMember> _members = new List<LobbyMember>();
 
         // EOS exige LobbyDetails handle para JoinLobby, nao apenas string ID
@@ -69,7 +69,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         private Core.EOSManagerWrapper _eosCache;
 
         private const ushort DEFAULT_PORT = 7777;
-        private const string BUCKET_ID   = "ExoBeasts";
+        private const string BUCKET_ID = "ExoBeasts";
 
         private void Awake()
         {
@@ -106,7 +106,11 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         private ProductUserId GetLocalUserId()
         {
-            return ProductUserId.FromString(SessionManager.Instance.GetUserId());
+            // TRAVA DE SEGURANÇA: Se o ID estiver vazio, retorna nulo para não quebrar a SDK
+            string userIdStr = SessionManager.Instance?.GetUserId();
+            if (string.IsNullOrEmpty(userIdStr)) return null;
+
+            return ProductUserId.FromString(userIdStr);
         }
 #endif
 
@@ -125,15 +129,15 @@ namespace ExoBeasts.Multiplayer.Lobby
 
             var options = new CreateLobbyOptions
             {
-                LocalUserId          = localUserId,
-                MaxLobbyMembers      = (uint)Mathf.Clamp(settings.maxPlayers, 2, 4),
-                PermissionLevel      = settings.isPublic
+                LocalUserId = localUserId,
+                MaxLobbyMembers = (uint)Mathf.Clamp(settings.maxPlayers, 2, 4),
+                PermissionLevel = settings.isPublic
                                          ? LobbyPermissionLevel.Publicadvertised
                                          : LobbyPermissionLevel.Inviteonly,
-                BucketId             = BUCKET_ID,
-                AllowInvites         = true,
-                PresenceEnabled      = false,
-                EnableJoinById       = true,
+                BucketId = BUCKET_ID,
+                AllowInvites = true,
+                PresenceEnabled = false,
+                EnableJoinById = true,
                 DisableHostMigration = true,
             };
 
@@ -156,15 +160,15 @@ namespace ExoBeasts.Multiplayer.Lobby
                 {
                     _currentLobby = new LobbyInfo
                     {
-                        lobbyId           = lobbyId,
-                        lobbyName         = settings.lobbyName,
-                        hostDisplayName   = SessionManager.Instance.GetDisplayName(),
+                        lobbyId = lobbyId,
+                        lobbyName = settings.lobbyName,
+                        hostDisplayName = SessionManager.Instance.GetDisplayName(),
                         hostProductUserId = SessionManager.Instance.GetUserId(),
-                        currentPlayers    = 1,
-                        maxPlayers        = settings.maxPlayers,
-                        mapName           = settings.mapName,
-                        isPublic          = settings.isPublic,
-                        state             = LobbyState.WaitingForPlayers,
+                        currentPlayers = 1,
+                        maxPlayers = settings.maxPlayers,
+                        mapName = settings.mapName,
+                        isPublic = settings.isPublic,
+                        state = LobbyState.WaitingForPlayers,
                     };
 
                     _members.Clear();
@@ -189,12 +193,12 @@ namespace ExoBeasts.Multiplayer.Lobby
         {
 #if !EOS_DISABLE
             var lobbyInterface = GetLobbyInterface();
-            var localUserId    = GetLocalUserId();
+            var localUserId = GetLocalUserId();
 
             var modOptions = new UpdateLobbyModificationOptions
             {
                 LocalUserId = localUserId,
-                LobbyId     = lobbyId,
+                LobbyId = lobbyId,
             };
 
             if (lobbyInterface.UpdateLobbyModification(ref modOptions, out var mod) != Result.Success)
@@ -204,13 +208,13 @@ namespace ExoBeasts.Multiplayer.Lobby
                 return;
             }
 
-            AddStringAttr(mod, LobbyAttributes.LOBBY_NAME,     settings.lobbyName,                       LobbyAttributeVisibility.Public);
-            AddStringAttr(mod, LobbyAttributes.MAP_NAME,       settings.mapName,                          LobbyAttributeVisibility.Public);
-            AddInt64Attr (mod, LobbyAttributes.MAX_PLAYERS,    settings.maxPlayers,                       LobbyAttributeVisibility.Public);
-            AddStringAttr(mod, LobbyAttributes.LOBBY_STATE,    LobbyState.WaitingForPlayers.ToString(),   LobbyAttributeVisibility.Public);
+            AddStringAttr(mod, LobbyAttributes.LOBBY_NAME, settings.lobbyName, LobbyAttributeVisibility.Public);
+            AddStringAttr(mod, LobbyAttributes.MAP_NAME, settings.mapName, LobbyAttributeVisibility.Public);
+            AddInt64Attr(mod, LobbyAttributes.MAX_PLAYERS, settings.maxPlayers, LobbyAttributeVisibility.Public);
+            AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.WaitingForPlayers.ToString(), LobbyAttributeVisibility.Public);
             // Campos reservados para StartMatch — clientes observam SERVER_ADDRESS
-            AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, "",            LobbyAttributeVisibility.Public);
-            AddInt64Attr (mod, LobbyAttributes.SERVER_PORT,    DEFAULT_PORT,  LobbyAttributeVisibility.Public);
+            AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, "", LobbyAttributeVisibility.Public);
+            AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, DEFAULT_PORT, LobbyAttributeVisibility.Public);
 
             var updateOpts = new UpdateLobbyOptions { LobbyModificationHandle = mod };
             lobbyInterface.UpdateLobby(ref updateOpts, null, (ref UpdateLobbyCallbackInfo info) =>
@@ -251,7 +255,7 @@ namespace ExoBeasts.Multiplayer.Lobby
                 {
                     Parameter = new AttributeData
                     {
-                        Key   = LobbyAttributes.LOBBY_NAME,
+                        Key = LobbyAttributes.LOBBY_NAME,
                         Value = new AttributeDataValue { AsUtf8 = filter.lobbyName },
                     },
                     ComparisonOp = ComparisonOp.Contains,
@@ -273,8 +277,8 @@ namespace ExoBeasts.Multiplayer.Lobby
                 ReleaseDetailCache();
 
                 var countOpts = new LobbySearchGetSearchResultCountOptions();
-                uint count    = searchHandle.GetSearchResultCount(ref countOpts);
-                var  results  = new List<LobbyInfo>();
+                uint count = searchHandle.GetSearchResultCount(ref countOpts);
+                var results = new List<LobbyInfo>();
 
                 for (uint i = 0; i < count; i++)
                 {
@@ -292,12 +296,12 @@ namespace ExoBeasts.Multiplayer.Lobby
                     string ownerUserId = di.Value.LobbyOwnerUserId?.ToString() ?? "";
                     var lobby = new LobbyInfo
                     {
-                        lobbyId           = di.Value.LobbyId,
-                        hostDisplayName   = ownerUserId,
+                        lobbyId = di.Value.LobbyId,
+                        hostDisplayName = ownerUserId,
                         hostProductUserId = ownerUserId,
-                        maxPlayers        = (int)di.Value.MaxMembers,
-                        currentPlayers    = (int)(di.Value.MaxMembers - di.Value.AvailableSlots),
-                        isPublic          = di.Value.PermissionLevel == LobbyPermissionLevel.Publicadvertised,
+                        maxPlayers = (int)di.Value.MaxMembers,
+                        currentPlayers = (int)(di.Value.MaxMembers - di.Value.AvailableSlots),
+                        isPublic = di.Value.PermissionLevel == LobbyPermissionLevel.Publicadvertised,
                     };
 
                     var attrOpts = new LobbyDetailsCopyAttributeByKeyOptions { AttrKey = LobbyAttributes.LOBBY_NAME };
@@ -344,8 +348,8 @@ namespace ExoBeasts.Multiplayer.Lobby
             var joinOpts = new JoinLobbyOptions
             {
                 LobbyDetailsHandle = details,
-                LocalUserId        = localUserId,
-                PresenceEnabled    = false,
+                LocalUserId = localUserId,
+                PresenceEnabled = false,
             };
 
             Debug.Log($"[LobbyManager] Entrando no lobby: {lobbyId}...");
@@ -371,7 +375,7 @@ namespace ExoBeasts.Multiplayer.Lobby
                     // Apos o join, busca um handle fresco via CopyLobbyDetailsHandle.
                     var freshOpts = new CopyLobbyDetailsHandleOptions
                     {
-                        LobbyId     = lobbyId,
+                        LobbyId = lobbyId,
                         LocalUserId = GetLocalUserId(),
                     };
                     if (GetLobbyInterface()?.CopyLobbyDetailsHandle(ref freshOpts, out var freshDetails) == Result.Success)
@@ -403,7 +407,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         {
 #if !EOS_DISABLE
             var lobbyInterface = GetLobbyInterface();
-            var localUserId    = GetLocalUserId();
+            var localUserId = GetLocalUserId();
             if (localUserId == null || !localUserId.IsValid())
             {
                 OnError?.Invoke("Usuario nao autenticado. Faca login antes de entrar em um lobby.");
@@ -466,7 +470,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             var options = new LeaveLobbyOptions
             {
                 LocalUserId = localUserId,
-                LobbyId     = _currentLobby?.lobbyId ?? "",
+                LobbyId = _currentLobby?.lobbyId ?? "",
             };
 
             Debug.Log($"[LobbyManager] Saindo do lobby: {_currentLobby?.lobbyId}...");
@@ -508,7 +512,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             var modOpts = new UpdateLobbyModificationOptions
             {
                 LocalUserId = localUserId,
-                LobbyId     = _currentLobby.lobbyId,
+                LobbyId = _currentLobby.lobbyId,
             };
 
             if (lobbyInterface.UpdateLobbyModification(ref modOpts, out var mod) != Result.Success)
@@ -562,8 +566,8 @@ namespace ExoBeasts.Multiplayer.Lobby
             }
 
             string localIp = GetLocalIpAddress();
-            ushort port    = DEFAULT_PORT;
-            var transport  = NetworkManager.Singleton.GetComponent<UnityTransport>();
+            ushort port = DEFAULT_PORT;
+            var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
             if (transport != null)
             {
                 transport.SetConnectionData("0.0.0.0", port);
@@ -577,7 +581,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             var modOpts = new UpdateLobbyModificationOptions
             {
                 LocalUserId = GetLocalUserId(),
-                LobbyId     = _currentLobby.lobbyId,
+                LobbyId = _currentLobby.lobbyId,
             };
 
             if (lobbyInterface.UpdateLobbyModification(ref modOpts, out var mod) != Result.Success)
@@ -586,9 +590,9 @@ namespace ExoBeasts.Multiplayer.Lobby
                 return;
             }
 
-            AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, localIp,                         LobbyAttributeVisibility.Public);
-            AddInt64Attr (mod, LobbyAttributes.SERVER_PORT,    port,                             LobbyAttributeVisibility.Public);
-            AddStringAttr(mod, LobbyAttributes.LOBBY_STATE,   LobbyState.InGame.ToString(),     LobbyAttributeVisibility.Public);
+            AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, localIp, LobbyAttributeVisibility.Public);
+            AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, port, LobbyAttributeVisibility.Public);
+            AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.InGame.ToString(), LobbyAttributeVisibility.Public);
 
             var updateOpts = new UpdateLobbyOptions { LobbyModificationHandle = mod };
             lobbyInterface.UpdateLobby(ref updateOpts, null, (ref UpdateLobbyCallbackInfo info) =>
@@ -709,7 +713,7 @@ namespace ExoBeasts.Multiplayer.Lobby
 
             var detailsOpts = new CopyLobbyDetailsHandleOptions
             {
-                LobbyId     = info.LobbyId,
+                LobbyId = info.LobbyId,
                 LocalUserId = GetLocalUserId(),
             };
 
@@ -721,7 +725,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             var readyOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
             {
                 TargetUserId = info.TargetUserId,
-                AttrKey      = MemberAttributes.IS_READY,
+                AttrKey = MemberAttributes.IS_READY,
             };
             if (details.CopyMemberAttributeByKey(ref readyOpts, out var readyAttr) == Result.Success && readyAttr.HasValue)
                 bool.TryParse(readyAttr.Value.Data?.Value.AsUtf8, out member.isReady);
@@ -730,7 +734,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             var nameOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
             {
                 TargetUserId = info.TargetUserId,
-                AttrKey      = MemberAttributes.DISPLAY_NAME,
+                AttrKey = MemberAttributes.DISPLAY_NAME,
             };
             if (details.CopyMemberAttributeByKey(ref nameOpts, out var nameAttr) == Result.Success && nameAttr.HasValue)
             {
@@ -768,7 +772,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             var lobbyInterface = GetLobbyInterface();
             var detailsOpts = new CopyLobbyDetailsHandleOptions
             {
-                LobbyId     = info.LobbyId,
+                LobbyId = info.LobbyId,
                 LocalUserId = GetLocalUserId(),
             };
 
@@ -805,7 +809,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         {
             var opts = new LobbyModificationAddAttributeOptions
             {
-                Attribute  = new AttributeData { Key = key, Value = new AttributeDataValue { AsUtf8 = value } },
+                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsUtf8 = value } },
                 Visibility = vis,
             };
             mod.AddAttribute(ref opts);
@@ -815,7 +819,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         {
             var opts = new LobbyModificationAddAttributeOptions
             {
-                Attribute  = new AttributeData { Key = key, Value = new AttributeDataValue { AsInt64 = value } },
+                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsInt64 = value } },
                 Visibility = vis,
             };
             mod.AddAttribute(ref opts);
@@ -825,7 +829,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         {
             var opts = new LobbyModificationAddMemberAttributeOptions
             {
-                Attribute  = new AttributeData { Key = key, Value = new AttributeDataValue { AsUtf8 = value } },
+                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsUtf8 = value } },
                 Visibility = vis,
             };
             mod.AddMemberAttribute(ref opts);
@@ -838,7 +842,7 @@ namespace ExoBeasts.Multiplayer.Lobby
 
             var detailsOpts = new CopyLobbyDetailsHandleOptions
             {
-                LobbyId     = lobbyId,
+                LobbyId = lobbyId,
                 LocalUserId = GetLocalUserId(),
             };
 
@@ -848,7 +852,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             var attrOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
             {
                 TargetUserId = ProductUserId.FromString(userId),
-                AttrKey      = MemberAttributes.DISPLAY_NAME,
+                AttrKey = MemberAttributes.DISPLAY_NAME,
             };
 
             string result = "";
@@ -873,8 +877,8 @@ namespace ExoBeasts.Multiplayer.Lobby
                 var memberId = details.GetMemberByIndex(ref byIndexOpts);
                 if (memberId == null) continue;
 
-                string userId  = memberId.ToString();
-                bool   isHost  = userId == hostUserId;
+                string userId = memberId.ToString();
+                bool isHost = userId == hostUserId;
                 string displayName;
 
                 // Jogador local: usa nome da sessao (mais confiavel que o atributo ainda nao definido)
@@ -887,7 +891,7 @@ namespace ExoBeasts.Multiplayer.Lobby
                     var attrOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
                     {
                         TargetUserId = memberId,
-                        AttrKey      = MemberAttributes.DISPLAY_NAME,
+                        AttrKey = MemberAttributes.DISPLAY_NAME,
                     };
                     displayName = "";
                     if (details.CopyMemberAttributeByKey(ref attrOpts, out var attr) == Result.Success && attr.HasValue)
@@ -911,9 +915,9 @@ namespace ExoBeasts.Multiplayer.Lobby
             var infoOpts = new LobbyDetailsCopyInfoOptions();
             if (details.CopyInfo(ref infoOpts, out var di) == Result.Success && di.HasValue)
             {
-                result.maxPlayers        = (int)di.Value.MaxMembers;
-                result.currentPlayers    = (int)(di.Value.MaxMembers - di.Value.AvailableSlots);
-                result.isPublic          = di.Value.PermissionLevel == LobbyPermissionLevel.Publicadvertised;
+                result.maxPlayers = (int)di.Value.MaxMembers;
+                result.currentPlayers = (int)(di.Value.MaxMembers - di.Value.AvailableSlots);
+                result.isPublic = di.Value.PermissionLevel == LobbyPermissionLevel.Publicadvertised;
                 result.hostProductUserId = di.Value.LobbyOwnerUserId?.ToString() ?? "";
             }
 
@@ -931,7 +935,7 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         private void ClearLobbyState()
         {
-            _isInLobby    = false;
+            _isInLobby = false;
             _currentLobby = null;
             _members.Clear();
             SessionManager.Instance.SetCurrentLobby("");
@@ -969,8 +973,8 @@ namespace ExoBeasts.Multiplayer.Lobby
             return "127.0.0.1";
         }
 
-        public bool IsInLobby()               => _isInLobby;
-        public LobbyInfo GetCurrentLobby()    => _currentLobby;
+        public bool IsInLobby() => _isInLobby;
+        public LobbyInfo GetCurrentLobby() => _currentLobby;
         public List<LobbyMember> GetMembers() => _members;
     }
 }

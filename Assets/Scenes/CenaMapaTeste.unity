@@ -9723,6 +9723,7 @@ GameObject:
   m_Component:
   - component: {fileID: 227151045}
   - component: {fileID: 227151044}
+  - component: {fileID: 227151048}
   - component: {fileID: 227151043}
   - component: {fileID: 227151042}
   - component: {fileID: 227151041}
@@ -9752,7 +9753,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   buildCamera: {fileID: 2106906705}
-  globalVolume: {fileID: 395403812}
+  globalVolume: {fileID: 0}
 --- !u!114 &227151038
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9803,6 +9804,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f915061fc63ed7c48a2866541b656314, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  characterPrefabs:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  spawnPoints: []
   spawnPoint: {fileID: 1889514695}
 --- !u!114 &227151040
 MonoBehaviour:
@@ -9816,8 +9823,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bb471c2c691f24c43b0b62eb5457553e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enemyPrefab: {fileID: 366370626998246806, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
-  poolSize: 20
+  initialPoolSize: 5
+  maxPoolSize: 100
 --- !u!114 &227151041
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9845,17 +9852,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 968367f4e1f81284383328b14c0794dd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  upgradePanel: {fileID: 2052899276}
-  availableTraps:
-  - {fileID: 11400000, guid: a1774902a14055740bc45ccf9e46bfde, type: 2}
-  - {fileID: 11400000, guid: 7683705dd1cad8f4396d53af16f61c4a, type: 2}
-  - {fileID: 11400000, guid: 3e00b754ccc6a6d428702c22f2d14e7c, type: 2}
-  - {fileID: 11400000, guid: 8b47951347b78bb4ba54e9eb8db3292b, type: 2}
-  - {fileID: 11400000, guid: c669ce080944fd34294f36420b9eba79, type: 2}
-  validPlacementMaterial: {fileID: 2100000, guid: 73563327067872d4ba7be49d1e11a506, type: 2}
-  invalidPlacementMaterial: {fileID: 2100000, guid: aab2a511bf791ce4a89881888cef9450, type: 2}
   gridSize: 1
   globalHeightOffset: 0.5
+  validPlacementMaterial: {fileID: 2100000, guid: 73563327067872d4ba7be49d1e11a506, type: 2}
+  invalidPlacementMaterial: {fileID: 2100000, guid: aab2a511bf791ce4a89881888cef9450, type: 2}
+  buildablePrefabs: []
 --- !u!114 &227151043
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -9868,6 +9869,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 80ca9bd02a96e354cbb3e858c0d47943, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  networkedGeodites:
+    m_InternalValue: 0
+  networkedDarkEther:
+    m_InternalValue: 0
   geoditesTextBuild: {fileID: 1979527351}
   geoditesText: {fileID: 1042967705}
   darkEtherText: {fileID: 0}
@@ -10067,6 +10072,29 @@ MonoBehaviour:
   - {fileID: 72694050}
   - {fileID: 952988212}
   optionsCenterX: -117
+  botaoJogarSolo: {fileID: 0}
+  botaoJogarOnline: {fileID: 0}
+--- !u!114 &227151048
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 243875877
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!1 &229386449
 GameObject:
   m_ObjectHideFlags: 0
@@ -16070,7 +16098,6 @@ GameObject:
   - component: {fileID: 405166958}
   - component: {fileID: 405166959}
   - component: {fileID: 405166957}
-  - component: {fileID: 405166959}
   m_Layer: 0
   m_Name: HordaManager
   m_TagString: Untagged
@@ -16090,13 +16117,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1bf260b3d1ab6e6428f5dbee1dc41211, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  enemiesPerHordeMin: 3
-  enemiesPerHordeMax: 6
   victoryHorde: 20
+  timeBetweenWaves: 10
   spawnInterval: 1
   enemiesPerInterval: 1
   enemyTypes:
   - {fileID: 11400000, guid: 6c387383024c2f64eae487681be4e202, type: 2}
+  enemiesPerHordeMin: 3
+  enemiesPerHordeMax: 6
   spawnPaths:
   - pathName: ponte
     spawnPoint: {fileID: 195748446}
@@ -16120,10 +16148,14 @@ MonoBehaviour:
     - {fileID: 1019262622}
     - {fileID: 259904542}
     - {fileID: 444947868}
-  currentHorde: 0
-  enemyLevel: 1
   hordeText: {fileID: 2087706056}
   hordeTextBuild: {fileID: 1842179471}
+  currentHorde:
+    m_InternalValue: 0
+  enemiesRemaining:
+    m_InternalValue: 0
+  isWaveActive:
+    m_InternalValue: 0
 --- !u!4 &405166958
 Transform:
   m_ObjectHideFlags: 0
@@ -16141,6 +16173,27 @@ Transform:
   - {fileID: 1945827120}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &405166959
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 405166956}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 3012194516
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!1 &409980617
 GameObject:
   m_ObjectHideFlags: 0
@@ -28098,7 +28151,7 @@ RectTransform:
   - {fileID: 1227478206}
   - {fileID: 1798048196}
   - {fileID: 452464834}
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 1889514695}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
@@ -52215,7 +52268,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5534669388535471857, guid: d3e71203092a72b49beb3c9049ef00bf, type: 3}
   m_PrefabInstance: {fileID: 952988209}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2052899276}
+  m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9c50237ff42b15b4895460a749cc6268, type: 3}
@@ -91727,11 +91780,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 311488434}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &2052899276 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 8012821877452405672, guid: d3e71203092a72b49beb3c9049ef00bf, type: 3}
-  m_PrefabInstance: {fileID: 952988209}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &2053043320
 GameObject:
   m_ObjectHideFlags: 0
@@ -92214,6 +92262,8 @@ GameObject:
   - component: {fileID: 2056349562}
   - component: {fileID: 2056349566}
   - component: {fileID: 2056349565}
+  - component: {fileID: 2056349555}
+  - component: {fileID: 2056349558}
   m_Layer: 0
   m_Name: Managers
   m_TagString: Untagged
@@ -92251,48 +92301,6 @@ MonoBehaviour:
   projectilePrefab: {fileID: 9104921844974723845, guid: f14f768e29c3c2c4ca827c7d1b39d783, type: 3}
   initialPoolSize: 20
   maxPoolSize: 50
---- !u!114 &2056349556
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2056349552}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 80ca9bd02a96e354cbb3e858c0d47943, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  geoditesTextBuild: {fileID: 1979527351}
-  geoditesText: {fileID: 1042967705}
-  darkEtherText: {fileID: 0}
-  initialGeodites: 10000000
-  initialDarkEther: 0
---- !u!114 &2056349557
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2056349552}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 968367f4e1f81284383328b14c0794dd, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  buildCamera: {fileID: 2106906705}
-  upgradePanel: {fileID: 2052899276}
-  globalVolume: {fileID: 395403812}
-  availableTraps:
-  - {fileID: 11400000, guid: a1774902a14055740bc45ccf9e46bfde, type: 2}
-  - {fileID: 11400000, guid: 7683705dd1cad8f4396d53af16f61c4a, type: 2}
-  - {fileID: 11400000, guid: 3e00b754ccc6a6d428702c22f2d14e7c, type: 2}
-  - {fileID: 11400000, guid: 8b47951347b78bb4ba54e9eb8db3292b, type: 2}
-  - {fileID: 11400000, guid: c669ce080944fd34294f36420b9eba79, type: 2}
-  validPlacementMaterial: {fileID: 2100000, guid: 73563327067872d4ba7be49d1e11a506, type: 2}
-  invalidPlacementMaterial: {fileID: 2100000, guid: aab2a511bf791ce4a89881888cef9450, type: 2}
-  gridSize: 1
-  globalHeightOffset: 0.5
 --- !u!114 &2056349558
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -92317,19 +92325,6 @@ MonoBehaviour:
   trapShopButton: {fileID: 34802617}
   towerShopPanel: {fileID: 34802622}
   trapShopPanel: {fileID: 34802620}
---- !u!114 &2056349559
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2056349552}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f915061fc63ed7c48a2866541b656314, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  spawnPoint: {fileID: 1889514695}
 --- !u!114 &2056349560
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -99059,6 +99054,14 @@ PrefabInstance:
       propertyPath: pauseMenuCanvas
       value: 
       objectReference: {fileID: 0}
+    - target: {fileID: 4180160224137864611, guid: 2a801796c49bbb8448d8bab9f81f5ee0, type: 3}
+      propertyPath: GlobalObjectIdHash
+      value: 3092820094
+      objectReference: {fileID: 0}
+    - target: {fileID: 4180160224137864611, guid: 2a801796c49bbb8448d8bab9f81f5ee0, type: 3}
+      propertyPath: InScenePlacedSourceGlobalObjectIdHash
+      value: 127074076
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -100546,12 +100549,11 @@ SceneRoots:
   - {fileID: 4764984337283579692}
   - {fileID: 952988209}
   - {fileID: 2106906706}
-  - {fileID: 683562785}
   - {fileID: 1889514695}
   - {fileID: 1467983346}
   - {fileID: 607211826}
-  - {fileID: 395403813}
   - {fileID: 1783851726}
   - {fileID: 2126717757}
   - {fileID: 365438248}
   - {fileID: 2066372102}
+  - {fileID: 6374203510572391595}

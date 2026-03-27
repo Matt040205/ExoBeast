@@ -8,12 +8,6 @@ using Unity.Netcode.Components;
 /// <summary>
 /// ── PlayerShooting ─────────────────────────────────────
 /// Sistema de tiro a distancia com projeteis visuais locais.
-///
-///  ▸ Owner: detecta input de tiro, spawna projetil visual, envia ShootServerRpc
-///  ▸ Server: repassa ShootVisualClientRpc para remotos
-///  ▸ Remotos: spawnam projetil visual local (nao eh NetworkObject)
-///  ▸ RequestDealDamageServerRpc: dano validado no servidor via NetworkObjectId
-///  ▸ Reload sincronizado via ServerRpc → ClientRpc
 /// ─────────────────────────────────────────────────────
 /// </summary>
 [RequireComponent(typeof(PlayerHealthSystem))]
@@ -56,6 +50,7 @@ public class PlayerShooting : NetworkBehaviour
     private ProjectilePool projectilePool;
     private Camera mainCamera;
     private Animator animator;
+    private NetworkAnimator networkAnimator; // <--- ADICIONADO AQUI
 
     private PlayerHealthSystem playerHealth;
     private bool hasNextShotBonus = false;
@@ -80,7 +75,7 @@ public class PlayerShooting : NetworkBehaviour
     private void InitializeShooting()
     {
         currentAmmo = (characterData != null) ? characterData.magazineSize : 10;
-        
+
         mainCamera = Camera.main;
         playerHealth = GetComponent<PlayerHealthSystem>();
 
@@ -91,7 +86,11 @@ public class PlayerShooting : NetworkBehaviour
             if (modelPivot != null)
                 animator = modelPivot.GetComponentInChildren<Animator>();
         }
-        
+
+        // CACHE DO NETWORK ANIMATOR SEGURO
+        networkAnimator = GetComponent<NetworkAnimator>();
+        if (networkAnimator == null) networkAnimator = GetComponentInChildren<NetworkAnimator>();
+
         cameraController = GetComponentInChildren<CameraController>();
         if (cameraController == null && mainCamera != null)
             cameraController = mainCamera.GetComponent<CameraController>();
@@ -175,7 +174,7 @@ public class PlayerShooting : NetworkBehaviour
     void Shoot()
     {
         Vector3 shotDirection = GetShotDirection();
-        
+
         ExecuteShootVisual(shotDirection, true);
         ShootServerRpc(shotDirection);
 
@@ -200,8 +199,9 @@ public class PlayerShooting : NetworkBehaviour
 
     private void ExecuteShootVisual(Vector3 direction, bool isOwnerShot)
     {
-        if (animator != null) GetComponent<NetworkAnimator>().SetTrigger("Shoot");
-        
+        // CORREÇÃO: Usando a variável segura networkAnimator
+        if (networkAnimator != null) networkAnimator.SetTrigger("Shoot");
+
         PlayShootSound();
 
         if (firePoint != null)
@@ -217,10 +217,10 @@ public class PlayerShooting : NetworkBehaviour
                 {
                     float damage = 0;
                     bool isCrit = false;
-                    
+
                     if (isOwnerShot)
                         damage = CalculateDamage(out isCrit);
-                        
+
                     visualScript.Initialize(damage, isCrit, characterData.armorPenetration, playerHealth, direction);
                 }
             }
@@ -300,20 +300,22 @@ public class PlayerShooting : NetworkBehaviour
     void StartReloadLocal()
     {
         if (isReloading) return;
-        
+
         float multiplier = 3.0f / characterData.reloadSpeed;
-        if (animator != null)
+
+        // CORREÇÃO: Usando a variável segura networkAnimator
+        if (animator != null && networkAnimator != null)
         {
             animator.SetFloat("ReloadSpeedMultiplier", multiplier);
-            GetComponent<NetworkAnimator>().SetTrigger("Reload");
+            networkAnimator.SetTrigger("Reload");
         }
-        
+
         if (tipoDeSom == "Arma" && !string.IsNullOrEmpty(eventoRecargaArma))
             RuntimeManager.PlayOneShot(eventoRecargaArma, transform.position);
 
         isReloading = true;
         reloadStartTime = Time.time;
-        
+
         Invoke("FinishReload", characterData.reloadSpeed);
     }
 
@@ -326,7 +328,7 @@ public class PlayerShooting : NetworkBehaviour
     Vector3 GetShotDirection()
     {
         if (mainCamera == null) return transform.forward;
-        
+
         Ray ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
         RaycastHit hit;
         if (Physics.Raycast(ray, out hit, maxDistance, hitLayers))

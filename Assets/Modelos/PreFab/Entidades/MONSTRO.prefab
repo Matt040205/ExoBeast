@@ -1737,13 +1737,13 @@ PrefabInstance:
       addedObject: {fileID: 7039939480628894558}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1341843679577720853}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: -8987182849631250749}
+      addedObject: {fileID: 4918446304132380940}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
       insertIndex: -1
       addedObject: {fileID: 8001866522814007648}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -8987182849631250749}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2009206100699956420}
@@ -1755,13 +1755,13 @@ PrefabInstance:
       addedObject: {fileID: 3105538356712168213}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 5221111164875352524}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 8256814513029606555}
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6257321825097452607}
+    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 8487683371603754112}
   m_SourcePrefab: {fileID: 100100000, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
 --- !u!1 &366370626998246806 stripped
 GameObject:
@@ -1818,7 +1818,7 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 80
   m_CollisionDetection: 0
---- !u!114 &1341843679577720853
+--- !u!114 &4918446304132380940
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -1827,20 +1827,39 @@ MonoBehaviour:
   m_GameObject: {fileID: 366370626998246806}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: df184ae1d6bc84c47939a5d4c33d4624, type: 3}
+  m_Script: {fileID: 11500000, guid: 6a6d0951f3c04614cacc6bf8333be13c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mainPriority: 1
+  chaseDistance: 15
+  selfDefenseRadius: 5
+  attackDistance: 2
+  maxChaseTime: 10
+  maxChaseDistance: 20
+  originalMoveSpeed: 3.5
+  IsDead: 0
+  IsBlinded: 0
+--- !u!114 &8001866522814007648
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 366370626998246806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f53259ddc7ac814bbc7a821061a63a9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   enemyData: {fileID: 11400000, guid: 6c387383024c2f64eae487681be4e202, type: 2}
-  nivel: 1
-  patrolPoints:
-  - {fileID: 0}
-  - {fileID: 0}
-  mainPriority: 1
-  selfDefenseRadius: 5
-  chaseDistance: 50
-  attackDistance: 2
-  respawnYThreshold: -10
-  eventoMonstro: event:/SFX/Monstro
+  markedMaterial: {fileID: 2100000, guid: ea497927e75b3b24989c24378ede5b7c, type: 2}
+  popupSpawnPoint: {fileID: 2388387850070160008}
+  flashColor: {r: 0.8, g: 0.8, b: 0.8, a: 1}
+  flashDuration: 0.05
+  flashAmountProperty: _FlashAmount
+  flashColorProperty: _FlashColor
+  currentHealth: 0
+  isDead: 0
 --- !u!114 &-8987182849631250749
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1862,26 +1881,6 @@ MonoBehaviour:
   SpawnWithObservers: 1
   DontDestroyWithOwner: 0
   AutoObjectParentSync: 1
---- !u!114 &8001866522814007648
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 366370626998246806}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 3f53259ddc7ac814bbc7a821061a63a9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  enemyData: {fileID: 11400000, guid: 6c387383024c2f64eae487681be4e202, type: 2}
-  markedMaterial: {fileID: 2100000, guid: ea497927e75b3b24989c24378ede5b7c, type: 2}
-  popupSpawnPoint: {fileID: 2388387850070160008}
-  flashColor: {r: 0.8, g: 0.8, b: 0.8, a: 1}
-  flashDuration: 0.05
-  colorPropertyName: _BaseColor
-  currentHealth: 0
-  isDead: 0
 --- !u!114 &2009206100699956420
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1950,27 +1949,6 @@ NavMeshAgent:
   m_BaseOffset: 0
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
---- !u!114 &5221111164875352524
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 366370626998246806}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 1014690013
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
 --- !u!114 &8256814513029606555
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2018,6 +1996,20 @@ MonoBehaviour:
     m_InternalValue: 100
   IsDead:
     m_InternalValue: 0
+--- !u!114 &8487683371603754112
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 366370626998246806}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e8d0727d5ae3244e3b569694d3912374, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  TransitionStateInfoList: []
+  m_Animator: {fileID: 183209586296406744}
 --- !u!4 &1035349113437046572 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
