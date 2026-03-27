@@ -2,24 +2,28 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using DG.Tweening;
-using ExoBeasts.Multiplayer.Lobby; // Namespace do seu sistema de lobby
+using ExoBeasts.Multiplayer.Lobby;
+using ExoBeasts.Multiplayer.Auth;
+using ExoBeasts.Multiplayer.Core;
+using ExoBeasts.Managers;
+using System.Collections;
 using System.Collections.Generic;
 
 public class LobbyUIManager : MonoBehaviour
 {
     public static LobbyUIManager Instance;
 
-    [Header("Painéis")]
+    [Header("Painï¿½is")]
     public RectTransform painelSelecao;
     public RectTransform painelLobby;
 
-    [Header("Configurações de Posição")]
+    [Header("Configuraï¿½ï¿½es de Posiï¿½ï¿½o")]
     public Vector2 posSelecaoCentro = Vector2.zero;
     public Vector2 posSelecaoLado = new Vector2(-400, 0);
     public Vector2 posLobbyEscondido = new Vector2(1200, 0);
     public Vector2 posLobbyVisivel = new Vector2(450, 0);
 
-    [Header("Elementos da UI de Criação")]
+    [Header("Elementos da UI de Criaï¿½ï¿½o")]
     public TMP_InputField inputNomeSala;
     public TMP_Text textoMaxJogadores;
     public Toggle togglePublico;
@@ -32,11 +36,70 @@ public class LobbyUIManager : MonoBehaviour
     void Start()
     {
         // Garante que o painel comece fora da tela
-        painelLobby.anchoredPosition = posLobbyEscondido;
+        if (painelLobby != null)
+            painelLobby.anchoredPosition = posLobbyEscondido;
         AtualizarTextoPlayers();
+
+        // Em multiplayer, inicia auth EOS e depois abre o painel de lobby
+        if (GameModeManager.CurrentMode == GameMode.Multiplayer)
+            StartCoroutine(InitMultiplayerFlow());
     }
 
-    // --- NAVEGAÇÃO ---
+    /// <summary>
+    /// Aguarda EOS inicializar, faz login automatico via Device ID,
+    /// e so entao abre o painel de lobby.
+    /// </summary>
+    private IEnumerator InitMultiplayerFlow()
+    {
+        // 1. Aguardar EOSManagerWrapper inicializar
+        Debug.Log("[LobbyUIManager] Aguardando EOS inicializar...");
+        float timeout = 15f;
+        float elapsed = 0f;
+        while (!EOSManagerWrapper.Instance.IsInitialized && elapsed < timeout)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (!EOSManagerWrapper.Instance.IsInitialized)
+        {
+            Debug.LogError("[LobbyUIManager] EOS nao inicializou a tempo. Verifique o EOSManager na cena.");
+            yield break;
+        }
+
+        // 2. Fazer login automatico se ainda nao logado
+        if (!EOSAuthenticator.Instance.IsLoggedIn)
+        {
+            Debug.Log("[LobbyUIManager] Iniciando login EOS automatico...");
+            bool loginDone = false;
+            bool loginOk = false;
+
+            EOSAuthenticator.Instance.OnLoginSuccess += (_) => { loginDone = true; loginOk = true; };
+            EOSAuthenticator.Instance.OnLoginFailed += (_) => { loginDone = true; loginOk = false; };
+            EOSAuthenticator.Instance.LoginWithDeviceId();
+
+            // Aguardar callback
+            elapsed = 0f;
+            while (!loginDone && elapsed < 10f)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            if (!loginOk)
+            {
+                Debug.LogError("[LobbyUIManager] Login EOS falhou. Lobby nao sera aberto.");
+                yield break;
+            }
+
+            Debug.Log("[LobbyUIManager] Login EOS bem-sucedido!");
+        }
+
+        // 3. Abrir painel de lobby
+        AbrirPainelMultiplayer();
+    }
+
+    // --- NAVEGAï¿½ï¿½O ---
 
     public void AbrirPainelMultiplayer()
     {
@@ -52,7 +115,7 @@ public class LobbyUIManager : MonoBehaviour
         painelLobby.DOAnchorPos(posLobbyEscondido, 0.5f).SetEase(Ease.InBack);
     }
 
-    // --- LÓGICA DE CONFIGURAÇÃO (O + e - que você pediu) ---
+    // --- Lï¿½GICA DE CONFIGURAï¿½ï¿½O (O + e - que vocï¿½ pediu) ---
 
     public void AlterarMaxPlayers(int quantidade)
     {
@@ -67,7 +130,7 @@ public class LobbyUIManager : MonoBehaviour
             textoMaxJogadores.text = maxPlayersSelecionado.ToString();
     }
 
-    // --- LÓGICA DE REDE (Portando do PlaceholderUI) ---
+    // --- Lï¿½GICA DE REDE (Portando do PlaceholderUI) ---
 
     public void CriarLobbyPelaUI()
     {
@@ -79,7 +142,7 @@ public class LobbyUIManager : MonoBehaviour
             lobbyName = nome,
             maxPlayers = maxPlayersSelecionado,
             isPublic = togglePublico.isOn,
-            mapName = "SceneMapTest" // Nome da cena que vai carregar
+            mapName = "CenaMapaTeste"
         });
 
         Debug.Log($"Criando Lobby: {nome} | Max: {maxPlayersSelecionado}");

@@ -6,6 +6,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using Unity.Netcode;
 using DG.Tweening;
+using ExoBeasts.Managers;
+using ExoBeasts.Multiplayer.Lobby;
 
 /// <summary>
 /// ── SelecaoManager ─────────────────────────────────────
@@ -30,7 +32,7 @@ public class SelecaoManager : NetworkBehaviour
     public GameObject slotEquipePrefab;
     public Transform gridEquipeContainer;
     public Button botaoJogar;
-    public string nomeDaCenaDoJogo;
+    public string nomeDaCenaDoJogo = "CenaMapaTeste";
 
     [Header("Modo Remover")]
     public Button botaoRemover;
@@ -135,60 +137,75 @@ public class SelecaoManager : NetworkBehaviour
         }
     }
 
+    private bool IsNetworkActive =>
+        NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+
     void OnSlotClicked(int slotIndex)
     {
         if (slotIndex < slotInicialPermitido || slotIndex > slotFinalPermitido) return;
-        if (isRemoveMode) SolicitarRemocaoServerRpc(slotIndex);
+        if (isRemoveMode)
+        {
+            if (IsNetworkActive)
+                SolicitarRemocaoServerRpc(slotIndex);
+            else
+                RemoverLocal(slotIndex);
+        }
         else AbrirPainelEscolha(slotIndex);
     }
 
     void ConfirmarEscolha()
     {
         int id = todosOsPersonagens.IndexOf(personagemEmVisualizacao);
-        ConfirmarEscolhaServerRpc(id, slotSendoEditado);
+        if (IsNetworkActive)
+            ConfirmarEscolhaServerRpc(id, slotSendoEditado);
+        else
+            AplicarEscolhaLocal(id, slotSendoEditado);
         VoltarParaPainelEquipe();
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    void ConfirmarEscolhaServerRpc(int id, int slot) => ConfirmarEscolhaClientRpc(id, slot);
+    // --- Paths locais (singleplayer, sem NGO) ---
 
-    [ClientRpc]
-    void ConfirmarEscolhaClientRpc(int id, int slot)
+    void AplicarEscolhaLocal(int id, int slot)
     {
         CharacterBase modelo = todosOsPersonagens[id];
-
         if (GameDataManager.Instance.equipeSelecionada[slot] != null)
             Destroy(GameDataManager.Instance.equipeSelecionada[slot]);
 
         CharacterBase novaInstancia = Instantiate(modelo);
-
-        // CRITICAL: Registro no GameDataManager para todos os clientes
         GameDataManager.Instance.AplicarDadosCarregados(novaInstancia);
         GameDataManager.Instance.equipeSelecionada[slot] = novaInstancia;
-
         slotsEquipe[slot].SetPersonagem(novaInstancia);
         AtualizarEstadoBotaoJogar();
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    void SolicitarRemocaoServerRpc(int slot) => RemoverClientRpc(slot);
-
-    [ClientRpc]
-    void RemoverClientRpc(int slot)
+    void RemoverLocal(int slot)
     {
         if (GameDataManager.Instance.equipeSelecionada[slot] != null)
             Destroy(GameDataManager.Instance.equipeSelecionada[slot]);
-
         GameDataManager.Instance.equipeSelecionada[slot] = null;
         slotsEquipe[slot].LimparSlot();
         AtualizarEstadoBotaoJogar();
     }
 
+    // --- Paths de rede (multiplayer, NGO ativo) ---
+
+    [ServerRpc(RequireOwnership = false)]
+    void ConfirmarEscolhaServerRpc(int id, int slot) => ConfirmarEscolhaClientRpc(id, slot);
+
+    [ClientRpc]
+    void ConfirmarEscolhaClientRpc(int id, int slot) => AplicarEscolhaLocal(id, slot);
+
+    [ServerRpc(RequireOwnership = false)]
+    void SolicitarRemocaoServerRpc(int slot) => RemoverClientRpc(slot);
+
+    [ClientRpc]
+    void RemoverClientRpc(int slot) => RemoverLocal(slot);
+
     void AtualizarEstadoBotaoJogar()
     {
         if (botaoJogar == null || GameDataManager.Instance == null) return;
 
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
+        if (IsNetworkActive)
             botaoJogar.gameObject.SetActive(IsServer);
         else
             botaoJogar.gameObject.SetActive(true);
@@ -225,9 +242,23 @@ public class SelecaoManager : NetworkBehaviour
     void ConfigurarBotoesPrincipais()
     {
         botaoJogar.onClick.RemoveAllListeners();
-        botaoJogar.onClick.AddListener(() => {
-            if (IsServer || !NetworkManager.Singleton.IsConnectedClient)
-                NetworkManager.Singleton.SceneManager.LoadScene(nomeDaCenaDoJogo, UnityEngine.SceneManagement.LoadSceneMode.Single);
+        botaoJogar.onClick.AddListener(() =>
+        {
+            if (GameModeManager.CurrentMode == GameMode.Multiplayer)
+            {
+                // Multiplayer: LobbyManager.StartMatch() faz StartHost + publica SERVER_ADDRESS + LoadScene
+                if (LobbyManager.Instance != null)
+                    LobbyManager.Instance.StartMatch();
+                else
+                    Debug.LogError("[SelecaoManager] LobbyManager nao encontrado para StartMatch!");
+            }
+            else
+            {
+                // Singleplayer: inicia como Host local e carrega a cena
+                NetworkManager.Singleton.StartHost();
+                NetworkManager.Singleton.SceneManager.LoadScene(
+                    nomeDaCenaDoJogo, UnityEngine.SceneManagement.LoadSceneMode.Single);
+            }
         });
         botaoVoltarDaEscolha.onClick.AddListener(VoltarParaPainelEquipe);
         botaoVoltarDosDetalhes.onClick.AddListener(VoltarParaPainelEscolha);

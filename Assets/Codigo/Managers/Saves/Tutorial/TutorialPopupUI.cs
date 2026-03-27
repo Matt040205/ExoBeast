@@ -38,7 +38,7 @@ public class TutorialPopupUI : MonoBehaviour
     {
         gameObject.SetActive(false);
         // Verificar se nao estamos em Menu antes de travar o cursor
-        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "Menu")
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name != "MenuScene")
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;

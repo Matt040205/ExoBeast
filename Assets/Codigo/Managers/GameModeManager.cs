@@ -22,7 +22,7 @@ namespace ExoBeasts.Managers
         public static GameMode CurrentMode { get; private set; } = GameMode.Singleplayer;
 
         [SerializeField] private string escolherPersonagemScene = "EscolherPersonagem";
-        [SerializeField] private string lobbyScene = "LobbyScene";
+        [SerializeField] private string lobbyScene = "EscolherPersonagem";
 
         private void Awake()
         {
