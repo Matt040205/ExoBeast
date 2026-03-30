@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//mnt/c/Users/zegil/Documents/GitHub/ExoBeasts_V3/PI3D/Assets/**)",
+      "Bash(while read:*)",
+      "Bash(do grep:*)",
+      "Bash(done)",
+      "Bash(find c:UserszegilDocumentsGitHubExoBeasts_V3PI3DAssetsCodigo -name *.cs -exec grep -l 'yield return' {})",
+      "Bash(2)",
+      "Bash(find c:/Users/zegil/Documents/GitHub/ExoBeasts_V3/PI3D/Assets/Codigo/Managers/Saves -name +.prefab -o -name *.prefab)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -l 'namespace ExoBeasts.Multiplayer.Auth' /c/Users/zegil/Documents/GitHub/ExoBeasts_V3/PI3D/Assets/Codigo/**/*.cs)",
+      "Read(//c/Users/zegil/AppData/Local/Unity/Editor/**)",
+      "Bash(find c:/Users/zegil/Documents/GitHub/ExoBeasts_V3/PI3D/Library/PackageCache -name *.cs -path *RenderGraph*)"
+    ]
+  }
+}

@@ -3,6 +3,12 @@ using UnityEngine.UI;
 using FMODUnity;
 using FMOD.Studio;
 
+/// <summary>
+/// -- VolumeManager ---------------------------------------
+/// Gerencia os volumes de Áudio (Master, Música, SFX) via Sliders e Botões.
+/// Sincroniza com as Busses do FMOD e salva em PlayerPrefs.
+/// --------------------------------------------------------
+/// </summary>
 public class VolumeManager : MonoBehaviour
 {
     [Header("Sliders da UI")]
@@ -10,9 +16,12 @@ public class VolumeManager : MonoBehaviour
     public Slider musicSlider;
     public Slider sfxSlider;
 
-    [Header("Caminhos dos Barramentos FMOD (Verifique no FMOD Studio)")]
-    // O padrão do FMOD é "bus:/". Se você criou grupos, adicione os nomes.
-    // Exemplo: "bus:/Music", "bus:/SFX"
+    [Header("Botões de Mute/Ativar")]
+    public Button masterButton;
+    public Button musicButton;
+    public Button sfxButton;
+
+    [Header("Caminhos dos Barramentos FMOD")]
     public string masterBusPath = "bus:/";
     public string musicBusPath = "bus:/Music";
     public string sfxBusPath = "bus:/SFX";
@@ -21,9 +30,12 @@ public class VolumeManager : MonoBehaviour
     private Bus musicBus;
     private Bus sfxBus;
 
+    private bool masterMuted;
+    private bool musicMuted;
+    private bool sfxMuted;
+
     void Awake()
     {
-        // Pega as referências dos canais de áudio do FMOD
         masterBus = RuntimeManager.GetBus(masterBusPath);
         musicBus = RuntimeManager.GetBus(musicBusPath);
         sfxBus = RuntimeManager.GetBus(sfxBusPath);
@@ -31,12 +43,21 @@ public class VolumeManager : MonoBehaviour
 
     void Start()
     {
-        // Carrega os valores salvos (ou usa 1.0 se for a primeira vez)
+        InitializeVolumes();
+    }
+
+    #region Inicialização
+
+    private void InitializeVolumes()
+    {
         float masterVol = PlayerPrefs.GetFloat("MasterVolume", 1f);
         float musicVol = PlayerPrefs.GetFloat("MusicVolume", 1f);
         float sfxVol = PlayerPrefs.GetFloat("SFXVolume", 1f);
 
-        // Configura os Sliders visuais
+        masterMuted = PlayerPrefs.GetInt("MasterMute", 0) == 1;
+        musicMuted = PlayerPrefs.GetInt("MusicMute", 0) == 1;
+        sfxMuted = PlayerPrefs.GetInt("SFXMute", 0) == 1;
+
         if (masterSlider != null)
         {
             masterSlider.value = masterVol;
@@ -55,26 +76,75 @@ public class VolumeManager : MonoBehaviour
             sfxSlider.onValueChanged.AddListener(SetSFXVolume);
         }
 
-        masterBus.setVolume(masterVol);
-        musicBus.setVolume(musicVol);
-        sfxBus.setVolume(sfxVol);
+        if (masterButton != null) masterButton.onClick.AddListener(ToggleMasterMute);
+        if (musicButton != null) musicButton.onClick.AddListener(ToggleMusicMute);
+        if (sfxButton != null) sfxButton.onClick.AddListener(ToggleSFXMute);
+
+        UpdateAllBusses();
     }
+
+    #endregion
+
+    #region Configurações de Volume
 
     public void SetMasterVolume(float value)
     {
-        masterBus.setVolume(value);
         PlayerPrefs.SetFloat("MasterVolume", value);
+        if (!masterMuted) masterBus.setVolume(value);
     }
 
     public void SetMusicVolume(float value)
     {
-        musicBus.setVolume(value);
         PlayerPrefs.SetFloat("MusicVolume", value);
+        if (!musicMuted) musicBus.setVolume(value);
     }
 
     public void SetSFXVolume(float value)
     {
-        sfxBus.setVolume(value);
         PlayerPrefs.SetFloat("SFXVolume", value);
+        if (!sfxMuted) sfxBus.setVolume(value);
+        
+        // Garante que o SFX seja atualizado no barramento
+        sfxBus.setVolume(sfxMuted ? 0 : value);
     }
+
+    #endregion
+
+    #region Configurações de Mute (Botões)
+
+    public void ToggleMasterMute()
+    {
+        masterMuted = !masterMuted;
+        PlayerPrefs.SetInt("MasterMute", masterMuted ? 1 : 0);
+        UpdateAllBusses();
+    }
+
+    public void ToggleMusicMute()
+    {
+        musicMuted = !musicMuted;
+        PlayerPrefs.SetInt("MusicMute", musicMuted ? 1 : 0);
+        UpdateAllBusses();
+    }
+
+    public void ToggleSFXMute()
+    {
+        sfxMuted = !sfxMuted;
+        PlayerPrefs.SetInt("SFXMute", sfxMuted ? 1 : 0);
+        UpdateAllBusses();
+    }
+
+    private void UpdateAllBusses()
+    {
+        float masterVol = PlayerPrefs.GetFloat("MasterVolume", 1f);
+        float musicVol = PlayerPrefs.GetFloat("MusicVolume", 1f);
+        float sfxVol = PlayerPrefs.GetFloat("SFXVolume", 1f);
+
+        masterBus.setVolume(masterMuted ? 0 : masterVol);
+        musicBus.setVolume(musicMuted ? 0 : musicVol);
+        sfxBus.setVolume(sfxMuted ? 0 : sfxVol);
+
+        // Feedback visual simples pode ser adicionado aqui se houver imagens nos botões
+    }
+
+    #endregion
 }

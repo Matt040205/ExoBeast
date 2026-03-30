@@ -14,28 +14,47 @@ public class MusicManager : MonoBehaviour
 
     void Awake()
     {
-        // --- LÓGICA DE SINGLETON ---
-        // Garante que só exista UM MusicManager no jogo inteiro.
-        // Se tentarmos carregar o Menu de novo, ele destrói o novo e mantém o antigo (que já está tocando).
-        if (Instance != null)
+        if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
             return;
         }
 
         Instance = this;
-        DontDestroyOnLoad(gameObject); // Impede que a música seja destruída ao trocar de cena
+        DontDestroyOnLoad(gameObject);
 
-        StartMusic();
+        // Verifica se a música já está tocando para não sobrepor
+        if (!IsPlaying())
+        {
+            StartMusic();
+        }
+    }
+
+    public bool IsPlaying()
+    {
+        if (musicInstance.isValid())
+        {
+            PLAYBACK_STATE state;
+            musicInstance.getPlaybackState(out state);
+            return state != PLAYBACK_STATE.STOPPED;
+        }
+        return false;
     }
 
     void StartMusic()
     {
         if (!string.IsNullOrEmpty(eventoMusica))
         {
-            musicInstance = RuntimeManager.CreateInstance(eventoMusica);
-            musicInstance.start();
-            musicInstance.release(); // Libera a memória quando o evento terminar naturalmente (ou for parado)
+            // Se já existir uma instância válida, vamos apenas garantir que ela toque
+            if (!musicInstance.isValid())
+            {
+                musicInstance = RuntimeManager.CreateInstance(eventoMusica);
+            }
+
+            if (!IsPlaying())
+            {
+                musicInstance.start();
+            }
         }
         else
         {
@@ -49,6 +68,7 @@ public class MusicManager : MonoBehaviour
         if (musicInstance.isValid())
         {
             musicInstance.stop(FMOD.Studio.STOP_MODE.ALLOWFADEOUT);
+            musicInstance.release(); // Agora liberamos apenas quando paramos de verdade
         }
     }
 
