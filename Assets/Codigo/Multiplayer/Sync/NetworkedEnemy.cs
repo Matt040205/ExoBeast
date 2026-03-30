@@ -109,8 +109,12 @@ namespace ExoBeasts.Multiplayer.Sync
             if (enemyController != null) enemyController.enabled = false;
             if (navMeshAgent != null) navMeshAgent.enabled = false;
 
-            var anim = GetComponent<Animator>();
-            if (anim != null) anim.SetBool("isWalking", false);
+            var anim = GetComponentInChildren<Animator>();
+            if (anim != null)
+            {
+                anim.SetBool("isWalking", false);
+                anim.SetTrigger("isDead");
+            }
         }
 
         private void OnDeathStateChanged(bool oldVal, bool newVal)

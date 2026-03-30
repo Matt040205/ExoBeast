@@ -86,6 +86,7 @@ public class SelecaoManager : NetworkBehaviour
 
         yield return new WaitUntil(() => GameDataManager.Instance != null);
 
+        GameDataManager.Instance.RestaurarSelecao();
         ConfigurarBotoesPrincipais();
         CriarGridEquipe();
         PopularGridDeEscolha();
@@ -182,6 +183,7 @@ public class SelecaoManager : NetworkBehaviour
         GameDataManager.Instance.equipeSelecionada[slot] = novaInstancia;
         slotsEquipe[slot].SetPersonagem(novaInstancia);
         AtualizarEstadoBotaoJogar();
+        GameDataManager.Instance.SaveGame();
     }
 
     void RemoverLocal(int slot)
@@ -192,6 +194,7 @@ public class SelecaoManager : NetworkBehaviour
         GameDataManager.Instance.equipeSelecionada[slot] = null;
         slotsEquipe[slot].LimparSlot();
         AtualizarEstadoBotaoJogar();
+        GameDataManager.Instance.SaveGame();
     }
 
     // --- Paths de rede (multiplayer, NGO ativo) ---
@@ -260,13 +263,22 @@ public class SelecaoManager : NetworkBehaviour
             }
             else
             {
-                NetworkManager.Singleton.StartHost();
-                NetworkManager.Singleton.SceneManager.LoadScene(
-                    nomeDaCenaDoJogo, UnityEngine.SceneManagement.LoadSceneMode.Single);
+                if (NetworkManager.Singleton != null)
+                {
+                    NetworkManager.Singleton.StartHost();
+                    NetworkManager.Singleton.SceneManager.LoadScene(
+                        nomeDaCenaDoJogo, UnityEngine.SceneManagement.LoadSceneMode.Single);
+                }
+                else
+                {
+                    Debug.LogError("[SelecaoManager] NetworkManager não encontrado para StartHost!");
+                }
             }
         });
         botaoVoltarDaEscolha.onClick.AddListener(VoltarParaPainelEquipe);
         botaoVoltarDosDetalhes.onClick.AddListener(VoltarParaPainelEscolha);
+        if (botaoRemover != null)
+            botaoRemover.onClick.AddListener(ToggleRemoveMode);
     }
 
     void PopularGridDeEscolha()
@@ -286,14 +298,23 @@ public class SelecaoManager : NetworkBehaviour
 
     void AtualizarTextoBotoesCaminho(CharacterBase p)
     {
+        TextMeshProUGUI[] textosCaminho = { textoCaminho1, textoCaminho2, textoCaminho3 };
+
         for (int i = 0; i < botoesCaminhoTorre.Count; i++)
         {
             if (i < p.upgradePaths.Count)
             {
                 botoesCaminhoTorre[i].GetComponentInChildren<TextMeshProUGUI>().text = p.upgradePaths[i].pathName;
                 botoesCaminhoTorre[i].gameObject.SetActive(true);
+                if (i < textosCaminho.Length && textosCaminho[i] != null)
+                    textosCaminho[i].text = p.upgradePaths[i].pathName;
             }
-            else botoesCaminhoTorre[i].gameObject.SetActive(false);
+            else
+            {
+                botoesCaminhoTorre[i].gameObject.SetActive(false);
+                if (i < textosCaminho.Length && textosCaminho[i] != null)
+                    textosCaminho[i].text = "";
+            }
         }
     }
 

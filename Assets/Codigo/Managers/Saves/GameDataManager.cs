@@ -26,6 +26,7 @@ public class FullSaveData
 {
     public List<string> tutorials = new List<string>();
     public List<CharacterSaveData> characters = new List<CharacterSaveData>();
+    public string[] teamSelection = new string[8]; // nome do CharacterBase em cada slot ("" = vazio)
 }
 
 /// <summary>
@@ -52,6 +53,7 @@ public class GameDataManager : MonoBehaviour
     public List<string> tutoriaisConcluidos = new List<string>();
 
     private Dictionary<string, CharacterSaveData> loadedCharacterData = new Dictionary<string, CharacterSaveData>();
+    private string[] _savedTeamSelection;
     private string saveFilePath;
 
     private void Awake()
@@ -117,6 +119,10 @@ public class GameDataManager : MonoBehaviour
             }
         }
 
+        data.teamSelection = new string[equipeSelecionada.Length];
+        for (int i = 0; i < equipeSelecionada.Length; i++)
+            data.teamSelection[i] = equipeSelecionada[i] != null ? equipeSelecionada[i].name : "";
+
         string json = JsonUtility.ToJson(data, true);
         File.WriteAllText(saveFilePath, json);
         Debug.Log("JOGO SALVO em: " + saveFilePath);
@@ -137,11 +143,33 @@ public class GameDataManager : MonoBehaviour
                     if (!loadedCharacterData.ContainsKey(charData.characterName))
                         loadedCharacterData.Add(charData.characterName, charData);
                 }
+                if (data.teamSelection != null && data.teamSelection.Length > 0)
+                    _savedTeamSelection = data.teamSelection;
                 Debug.Log("JOGO CARREGADO.");
             }
             catch (System.Exception e)
             {
                 Debug.LogError("Erro ao carregar save: " + e.Message);
+            }
+        }
+    }
+
+    public void RestaurarSelecao()
+    {
+        if (_savedTeamSelection == null || bibliotecaOriginalPersonagens == null) return;
+
+        int count = Mathf.Min(_savedTeamSelection.Length, equipeSelecionada.Length);
+        for (int i = 0; i < count; i++)
+        {
+            if (string.IsNullOrEmpty(_savedTeamSelection[i])) continue;
+            if (equipeSelecionada[i] != null) continue; // respeita seleção já feita na sessão
+
+            CharacterBase found = bibliotecaOriginalPersonagens.Find(c => c.name == _savedTeamSelection[i]);
+            if (found != null)
+            {
+                CharacterBase instancia = Instantiate(found);
+                AplicarDadosCarregados(instancia);
+                equipeSelecionada[i] = instancia;
             }
         }
     }

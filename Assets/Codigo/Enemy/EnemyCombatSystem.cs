@@ -136,7 +136,8 @@ public class EnemyCombatSystem : NetworkBehaviour
             if (Random.value < 0.8f) return;
         }
 
-        Collider[] hitPlayers = Physics.OverlapSphere(attackPoint.position, attackRange, playerLayer);
+        Vector3 origin = attackPoint != null ? attackPoint.position : transform.position;
+        Collider[] hitPlayers = Physics.OverlapSphere(origin, attackRange, playerLayer);
 
         if (hitPlayers.Length > 0)
         {

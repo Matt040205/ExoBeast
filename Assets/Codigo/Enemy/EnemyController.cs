@@ -177,6 +177,14 @@ public class EnemyController : MonoBehaviour
             AttackObjectiveAndDie();
             return;
         }
+
+        // Detectar chegada ao waypoint via remainingDistance (mais robusto que OnTriggerEnter)
+        if (agent != null && !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
+        {
+            currentPointIndex++;
+            return;
+        }
+
         if (anim != null) anim.SetBool("isWalking", true);
         MoveTowardsPosition(patrolPoints[currentPointIndex].position);
     }
@@ -236,8 +244,12 @@ public class EnemyController : MonoBehaviour
     {
         if (IsDead) return;
         IsDead = true;
-        
-        if (anim != null) anim.SetBool("isWalking", false);
+
+        if (anim != null)
+        {
+            anim.SetBool("isWalking", false);
+            anim.SetTrigger("isDead");
+        }
         if (agent != null) agent.isStopped = true;
 
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
@@ -311,16 +323,5 @@ public class EnemyController : MonoBehaviour
         isRooted = false;
     }
 
-    void OnTriggerEnter(Collider other)
-    {
-        if (patrolPoints != null && currentPointIndex < patrolPoints.Count)
-        {
-            if (other.transform == patrolPoints[currentPointIndex])
-            {
-                currentPointIndex++;
-            }
-        }
-    }
-    
     public void SetPatrolPoints(List<Transform> points) => patrolPoints = points;
 }
