@@ -279,8 +279,8 @@ GameObject:
   - component: {fileID: 7905258126496636682}
   - component: {fileID: 1527235181715017189}
   - component: {fileID: 1988645179375761527}
-  - component: {fileID: 573096255506189436}
   - component: {fileID: 3358838759021377825}
+  - component: {fileID: 573096255506189436}
   - component: {fileID: 9215532886368702831}
   - component: {fileID: 6472170318049487491}
   - component: {fileID: 6330410534027532317}
@@ -416,6 +416,27 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &3358838759021377825
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2682399473942067493}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 1007017225
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!114 &573096255506189436
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -453,27 +474,6 @@ MonoBehaviour:
   isFloating: 0
   floatDuration: 0
   jumpHeightModifier: 1
---- !u!114 &3358838759021377825
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2682399473942067493}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 1007017225
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
 --- !u!114 &9215532886368702831
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -524,6 +524,8 @@ MonoBehaviour:
   healthSystem: {fileID: 6330410534027532317}
   meleeWeaponModel: {fileID: 0}
   rangedWeaponModel: {fileID: 0}
+  netCombatType:
+    m_InternalValue: 0
 --- !u!114 &6330410534027532317
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -539,10 +541,13 @@ MonoBehaviour:
   characterData: {fileID: 11400000, guid: 9630a35620054cf4db1008eb33d8d40a, type: 2}
   currentHealth:
     m_InternalValue: 0
+  damageMultiplier:
+    m_InternalValue: 1
+  speedMultiplier:
+    m_InternalValue: 1
+  damageResistance:
+    m_InternalValue: 0
   isRegenerating: 0
-  damageMultiplier: 1
-  speedMultiplier: 1
-  damageResistance: 0
   isBuffed: 0
   isCountering: 0
   respawnPointNameOrTag: RespawnPoint
@@ -614,7 +619,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterData: {fileID: 11400000, guid: 9630a35620054cf4db1008eb33d8d40a, type: 2}
   ultimateChargeThreshold: 100
-  currentUltimateCharge: 0
+  netUltimateCharge:
+    m_InternalValue: 0
 --- !u!114 &7517613348814378390
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -59,6 +59,7 @@ public class PlayerMovement : NetworkBehaviour
     private float rotationVelocity;
 
     private Animator animator;
+    private NetworkAnimator networkAnimator; // <--- CACHE SEGURO ADICIONADO AQUI
     private Vector3 direction;
     private float targetAngle;
 
@@ -82,6 +83,10 @@ public class PlayerMovement : NetworkBehaviour
         if (modelPivot != null)
             animator = modelPivot.GetComponentInChildren<Animator>();
 
+        // Tenta achar o NetworkAnimator na raiz, se não achar, procura nos filhos (onde o modelo 3D geralmente fica)
+        networkAnimator = GetComponent<NetworkAnimator>();
+        if (networkAnimator == null) networkAnimator = GetComponentInChildren<NetworkAnimator>();
+
         if (!string.IsNullOrEmpty(eventoPassos))
         {
             passosSoundInstance = RuntimeManager.CreateInstance(eventoPassos);
@@ -97,7 +102,7 @@ public class PlayerMovement : NetworkBehaviour
         {
             // Desabilitar CharacterController em remotos (ClientNetworkTransform controla a posição)
             if (controller != null) controller.enabled = false;
-            
+
             // Garante que o Rig de mira não interfira nos remotos se não estiver sincronizado
             if (aimRig != null) aimRig.weight = 0f;
 
@@ -136,7 +141,7 @@ public class PlayerMovement : NetworkBehaviour
         }
 
         // Vincular ao TopDownCameraManager se disponível
-        if (TopDownCameraManager.Instance != null) 
+        if (TopDownCameraManager.Instance != null)
             TopDownCameraManager.Instance.SetCameraTarget(transform);
     }
 
@@ -169,8 +174,11 @@ public class PlayerMovement : NetworkBehaviour
                 animator.ResetTrigger("Attack");
                 animator.ResetTrigger("Shoot");
                 animator.ResetTrigger("Reload");
-                GetComponent<NetworkAnimator>().SetTrigger("Jump");
             }
+
+            // CORREÇÃO DA LINHA 172: Usando a referência segura para o NetworkAnimator
+            if (networkAnimator != null) networkAnimator.SetTrigger("Jump");
+
             StopFootstepSound();
         }
         else if (canDoubleJump && !hasDoubleJumped)
@@ -183,8 +191,11 @@ public class PlayerMovement : NetworkBehaviour
                 animator.ResetTrigger("Attack");
                 animator.ResetTrigger("Shoot");
                 animator.ResetTrigger("Reload");
-                GetComponent<NetworkAnimator>().SetTrigger("Jump");
             }
+
+            // CORREÇÃO DO PULO DUPLO TAMBÉM:
+            if (networkAnimator != null) networkAnimator.SetTrigger("Jump");
+
             StopFootstepSound();
         }
     }

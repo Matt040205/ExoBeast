@@ -96,7 +96,7 @@ public class SelecaoManager : NetworkBehaviour
 
     public void CalcularLimitesDeSlots()
     {
-        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsConnectedClient)
+        if (NetworkManager.Singleton == null || (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer))
         {
             slotInicialPermitido = 0; slotFinalPermitido = 7;
             return;
@@ -137,12 +137,16 @@ public class SelecaoManager : NetworkBehaviour
         }
     }
 
+    // TRAVA DE SEGURANÇA: Garante que só tente usar RPC se o NGO estiver rodando E o manager estiver spawnado na rede
     private bool IsNetworkActive =>
-        NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        NetworkManager.Singleton != null &&
+        (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer) &&
+        IsSpawned;
 
     void OnSlotClicked(int slotIndex)
     {
         if (slotIndex < slotInicialPermitido || slotIndex > slotFinalPermitido) return;
+
         if (isRemoveMode)
         {
             if (IsNetworkActive)
@@ -156,10 +160,12 @@ public class SelecaoManager : NetworkBehaviour
     void ConfirmarEscolha()
     {
         int id = todosOsPersonagens.IndexOf(personagemEmVisualizacao);
+
         if (IsNetworkActive)
             ConfirmarEscolhaServerRpc(id, slotSendoEditado);
         else
             AplicarEscolhaLocal(id, slotSendoEditado);
+
         VoltarParaPainelEquipe();
     }
 
@@ -182,6 +188,7 @@ public class SelecaoManager : NetworkBehaviour
     {
         if (GameDataManager.Instance.equipeSelecionada[slot] != null)
             Destroy(GameDataManager.Instance.equipeSelecionada[slot]);
+
         GameDataManager.Instance.equipeSelecionada[slot] = null;
         slotsEquipe[slot].LimparSlot();
         AtualizarEstadoBotaoJogar();
@@ -246,7 +253,6 @@ public class SelecaoManager : NetworkBehaviour
         {
             if (GameModeManager.CurrentMode == GameMode.Multiplayer)
             {
-                // Multiplayer: LobbyManager.StartMatch() faz StartHost + publica SERVER_ADDRESS + LoadScene
                 if (LobbyManager.Instance != null)
                     LobbyManager.Instance.StartMatch();
                 else
@@ -254,7 +260,6 @@ public class SelecaoManager : NetworkBehaviour
             }
             else
             {
-                // Singleplayer: inicia como Host local e carrega a cena
                 NetworkManager.Singleton.StartHost();
                 NetworkManager.Singleton.SceneManager.LoadScene(
                     nomeDaCenaDoJogo, UnityEngine.SceneManagement.LoadSceneMode.Single);
