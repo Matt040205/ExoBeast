@@ -13,20 +13,16 @@ public class ProjectilePool : MonoBehaviour
     private Queue<GameObject> projectilePool = new Queue<GameObject>();
     private List<GameObject> activeProjectiles = new List<GameObject>();
 
-    void Awake()
+    private void Awake()
     {
-        if (Instance == null)
+        if (Instance != null && Instance != this)
         {
-            Instance = this;
-        }
-        else
-        {
-            Destroy(gameObject);
+            Destroy(this); // Apenas destrói o script duplicado, protegendo o resto do objeto!
             return;
         }
-
-        // A linha "InitializePool();" foi removida daqui.
+        Instance = this;
     }
+
 
     public void InitializePool()
     {

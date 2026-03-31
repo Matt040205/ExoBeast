@@ -8,11 +8,6 @@ using System.Collections.Generic;
 /// <summary>
 /// ── BuildManager ───────────────────────────────────────
 /// Gerencia construcao de torres e armadilhas com autoridade no servidor.
-///
-///  ▸ Owner: ghost preview local (zero lag), selecao de torre/trap
-///  ▸ RequestPlaceBuildingServerRpc: servidor valida custo, spawna NetworkObject
-///  ▸ Grid snapping e validacao de posicao via GridPlacement
-///  ▸ buildablePrefabs[]: indexacao de prefabs para referencia por indice em RPCs
 /// ─────────────────────────────────────────────────────
 /// </summary>
 public class BuildManager : NetworkBehaviour
@@ -28,8 +23,10 @@ public class BuildManager : NetworkBehaviour
     public Material invalidPlacementMaterial;
 
     [Header("Network Buildables")]
-    [Tooltip("Arraste aqui todos os prefabs de torres e armadilhas que podem ser construídos para indexação em rede.")]
     public List<GameObject> buildablePrefabs = new List<GameObject>();
+
+    [Header("Armadilhas Disponíveis")]
+    public List<TrapDataSO> availableTraps = new List<TrapDataSO>();
 
     [Header("Dono Local")]
     public static bool isBuildingMode = false;
@@ -38,11 +35,16 @@ public class BuildManager : NetworkBehaviour
     private GameObject selectedBuildablePrefab;
     private object selectedBuildableData;
     private int selectedBuildableCost;
+    private bool isCurrentPlacementValid = false;
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        if (Instance != null && Instance != this)
+        {
+            Destroy(this);
+            return;
+        }
+        Instance = this;
     }
 
     public void SelectTowerToBuild(CharacterBase towerData)
@@ -115,7 +117,7 @@ public class BuildManager : NetworkBehaviour
         if (currentBuildGhost == null)
         {
             currentBuildGhost = Instantiate(selectedBuildablePrefab);
-            
+
             var towerController = currentBuildGhost.GetComponentInChildren<TowerController>();
             if (towerController) towerController.enabled = false;
 
@@ -144,8 +146,8 @@ public class BuildManager : NetworkBehaviour
         var ghostRenderer = currentBuildGhost.GetComponentInChildren<MeshRenderer>();
         if (ghostRenderer != null)
         {
-            bool valid = isOverValidSurface && hasEnoughCurrency && isBuildAllowed;
-            ghostRenderer.material = (valid) ? validPlacementMaterial : invalidPlacementMaterial;
+            isCurrentPlacementValid = isOverValidSurface && hasEnoughCurrency && isBuildAllowed;
+            ghostRenderer.material = (isCurrentPlacementValid) ? validPlacementMaterial : invalidPlacementMaterial;
         }
     }
 
@@ -158,11 +160,32 @@ public class BuildManager : NetworkBehaviour
         return true;
     }
 
+    // =================================================================
+    // O RADAR BRUTO: Procura e conta tudo que existe fisicamente no mapa!
+    // =================================================================
     public int GetTrapCount(TrapDataSO trapData)
     {
-        // TODO: Em multiplayer, o servidor deveria expor essa contagem via NetworkVariable ou similar.
-        // Por enquanto retornamos 0 ou mantemos local.
-        return 0; 
+        if (trapData == null || trapData.prefab == null) return 0;
+
+        int count = 0;
+        string baseName = trapData.prefab.name.Trim();
+
+        GameObject[] allObjects = FindObjectsByType<GameObject>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+
+        foreach (GameObject obj in allObjects)
+        {
+            // Tira o (Clone) maldito do Unity para os nomes baterem
+            string objName = obj.name.Replace("(Clone)", "").Trim();
+
+            if (objName == baseName)
+            {
+                // Garante que não está contando o "holograma verde" que você tá segurando no mouse
+                if (currentBuildGhost != null && obj == currentBuildGhost) continue;
+
+                count++;
+            }
+        }
+        return count;
     }
 
     private float CalculateRequiredHeight(Vector3 hitPoint, GameObject prefab)
@@ -178,21 +201,18 @@ public class BuildManager : NetworkBehaviour
 
     void PlaceBuilding()
     {
+        if (!isCurrentPlacementValid) return;
         if (selectedBuildablePrefab == null || currentBuildGhost == null) return;
 
         int prefabIndex = buildablePrefabs.IndexOf(selectedBuildablePrefab);
-        if (prefabIndex == -1)
-        {
-            Debug.LogError("[BuildManager] Prefab selecionado não está na lista de BuildablePrefabs do BuildManager!");
-            return;
-        }
+        if (prefabIndex == -1) return;
 
         Vector3 finalPosition = currentBuildGhost.transform.position;
         finalPosition.x = Mathf.Round(finalPosition.x / gridSize) * gridSize;
         finalPosition.z = Mathf.Round(finalPosition.z / gridSize) * gridSize;
 
         RequestPlaceBuildingServerRpc(prefabIndex, finalPosition, selectedBuildableCost);
-        
+
         ClearSelection();
     }
 
@@ -201,9 +221,16 @@ public class BuildManager : NetworkBehaviour
     {
         if (!CurrencyManager.Instance.HasEnoughCurrency(cost, CurrencyType.Geodites)) return;
 
+        GameObject prefabToSpawn = buildablePrefabs[prefabIndex];
+
+        TrapDataSO trapData = availableTraps.Find(t => t.prefab == prefabToSpawn);
+        if (trapData != null && trapData.buildLimit > 0)
+        {
+            if (GetTrapCount(trapData) >= trapData.buildLimit) return;
+        }
+
         CurrencyManager.Instance.SpendCurrency(cost, CurrencyType.Geodites);
 
-        GameObject prefabToSpawn = buildablePrefabs[prefabIndex];
         GameObject newBuildObject = Instantiate(prefabToSpawn, pos, Quaternion.identity);
 
         if (newBuildObject.TryGetComponent<NetworkObject>(out var netObj))
@@ -217,15 +244,55 @@ public class BuildManager : NetworkBehaviour
     [ClientRpc]
     private void NotifyBuildingPlacedClientRpc(Vector3 pos)
     {
-        // TODO: Tocar som ou spawnar efeito de partícula de construção
+        // Espera 0.2 segundos para garantir que o objeto brotou no mapa antes de mandar a UI contar
+        StartCoroutine(UpdateUIAfterSpawn());
+    }
+
+    private IEnumerator UpdateUIAfterSpawn()
+    {
+        yield return new WaitForSeconds(0.2f);
+
+        if (GameDataManager.Instance != null)
+        {
+            SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);
+        }
     }
 
     public bool IsHoldingBuilding => currentBuildGhost != null;
 
     public void SetAvailableTowers(CharacterBase[] equipe)
     {
-        // Popula buildablePrefabs a partir da equipe selecionada
-        // Os prefabs de torre já devem estar na lista; este método é um hook para futuras restrições
+        List<CharacterBase> torres = new List<CharacterBase>();
+
+        if (equipe != null)
+        {
+            foreach (CharacterBase personagem in equipe)
+            {
+                if (personagem != null && !personagem.isCommander && personagem.towerPrefab != null)
+                {
+                    torres.Add(personagem);
+
+                    if (!buildablePrefabs.Contains(personagem.towerPrefab))
+                        buildablePrefabs.Add(personagem.towerPrefab);
+                }
+            }
+        }
+
+        if (availableTraps != null)
+        {
+            foreach (TrapDataSO trap in availableTraps)
+            {
+                if (trap != null && trap.prefab != null && !buildablePrefabs.Contains(trap.prefab))
+                {
+                    buildablePrefabs.Add(trap.prefab);
+                }
+            }
+        }
+
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.UpdateBuildUI(torres, availableTraps);
+        }
     }
 
     public void ClearSelection()
@@ -237,4 +304,3 @@ public class BuildManager : NetworkBehaviour
         selectedBuildableData = null;
     }
 }
-

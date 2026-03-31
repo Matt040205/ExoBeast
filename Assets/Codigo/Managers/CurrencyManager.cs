@@ -42,15 +42,14 @@ public class CurrencyManager : NetworkBehaviour
 
     private void Awake()
     {
-        if (Instance == null)
+        if (Instance != null && Instance != this)
         {
-            Instance = this;
+            Destroy(this); // Apenas destrói o script duplicado, protegendo o resto do objeto!
+            return;
         }
-        else
-        {
-            Destroy(gameObject);
-        }
+        Instance = this;
     }
+
 
     public override void OnNetworkSpawn()
     {
@@ -146,7 +145,7 @@ public class CurrencyManager : NetworkBehaviour
     {
         if (geoditesText != null)
         {
-            geoditesText.text = $"Geoditas: {networkedGeodites.Value}";
+            geoditesText.text = $"{networkedGeodites.Value}";
         }
 
         if (geoditesTextBuild != null)
@@ -156,7 +155,7 @@ public class CurrencyManager : NetworkBehaviour
 
         if (darkEtherText != null)
         {
-            darkEtherText.text = $"Éter Negro: {networkedDarkEther.Value}";
+            darkEtherText.text = $" {networkedDarkEther.Value}";
         }
     }
 }

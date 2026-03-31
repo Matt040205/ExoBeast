@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using Unity.Netcode;
 using System.Collections;
 using System.Collections.Generic;
@@ -7,9 +7,6 @@ using ExoBeasts.Multiplayer.GameServer;
 /// <summary>
 /// ── GameSetupManager ───────────────────────────────────
 /// Responsavel por spawnar o prefab do jogador quando um cliente conecta.
-///
-///  ▸ Pesca o prefab diretamente do GameDataManager via ScriptableObject (commanderPrefab).
-///  ▸ OnNetworkSpawn: Host spawna a si mesmo; escuta novos clientes.
 /// ─────────────────────────────────────────────────────
 /// </summary>
 public class GameSetupManager : NetworkBehaviour
@@ -43,7 +40,6 @@ public class GameSetupManager : NetworkBehaviour
     private void OnClientConnected(ulong clientId)
     {
         if (!IsServer) return;
-
         SpawnPlayerServerSide(clientId);
     }
 
@@ -51,42 +47,39 @@ public class GameSetupManager : NetworkBehaviour
     {
         if (!IsServer) return;
 
-        // Se o jogador já existe, não spawna de novo
         if (PlayerRegistry.Instance != null && PlayerRegistry.Instance.GetPlayerObject(clientId) != null)
             return;
 
         GameObject prefabToSpawn = null;
+        CharacterBase characterEscolhido = null; // <--- Guarda o cartão de dados selecionado
 
-        // 1. Tenta pegar a escolha exata do jogador via PlayerRegistry e GameDataManager
+        // 1. Pega os dados exatos do Singleton
         if (PlayerRegistry.Instance != null && GameDataManager.Instance != null)
         {
             int charIndex = PlayerRegistry.Instance.GetPlayerCharacterChoice(clientId);
 
             if (charIndex >= 0 && charIndex < GameDataManager.Instance.bibliotecaOriginalPersonagens.Count)
             {
-                CharacterBase baseChar = GameDataManager.Instance.bibliotecaOriginalPersonagens[charIndex];
-
-                // Puxando o commanderPrefab da sua script CharacterBase!
-                prefabToSpawn = baseChar.commanderPrefab;
+                characterEscolhido = GameDataManager.Instance.bibliotecaOriginalPersonagens[charIndex];
+                prefabToSpawn = characterEscolhido.commanderPrefab;
             }
         }
 
-        // 2. Fallback de Segurança: Se não achou pelo Registry, pega o Comandante do Slot 0 da Equipe Local
+        // 2. Fallback de Segurança
         if (prefabToSpawn == null && GameDataManager.Instance != null && GameDataManager.Instance.equipeSelecionada[0] != null)
         {
-            prefabToSpawn = GameDataManager.Instance.equipeSelecionada[0].commanderPrefab;
+            characterEscolhido = GameDataManager.Instance.equipeSelecionada[0];
+            prefabToSpawn = characterEscolhido.commanderPrefab;
         }
 
-        // Se chegou aqui e continua nulo, o jogo avisa o que você esqueceu no Unity
         if (prefabToSpawn == null)
         {
-            Debug.LogError("[GameSetupManager] Falha crítica: Nenhum 'commanderPrefab' foi encontrado no GameDataManager. Verifique se o seu CharacterBase selecionado tem um prefab associado nele!");
+            Debug.LogError("[GameSetupManager] Falha crítica: Nenhum 'commanderPrefab' encontrado.");
             return;
         }
 
         Vector3 pos = Vector3.zero;
         Quaternion rot = Quaternion.identity;
-
         int playerIndex = (PlayerRegistry.Instance != null) ? PlayerRegistry.Instance.GetAllPlayers().Count : 0;
 
         if (spawnPoints != null && spawnPoints.Length > 0)
@@ -101,18 +94,28 @@ public class GameSetupManager : NetworkBehaviour
             rot = spawnPoint.rotation;
         }
 
-        // Instancia o boneco do jogador
+        // Instancia o boneco físico
         GameObject playerInstance = Instantiate(prefabToSpawn, pos, rot);
-        NetworkObject netObj = playerInstance.GetComponent<NetworkObject>();
 
+        // =================================================================
+        // A INJEÇÃO MÁGICA: Cola o characterData no boneco ANTES dele ligar!
+        // =================================================================
+        if (characterEscolhido != null)
+        {
+            if (playerInstance.TryGetComponent<PlayerShooting>(out var shooting))
+                shooting.characterData = characterEscolhido;
+
+            if (playerInstance.TryGetComponent<PlayerHealthSystem>(out var health))
+                health.characterData = characterEscolhido;
+
+            if (playerInstance.TryGetComponent<CommanderAbilityController>(out var ability))
+                ability.characterData = characterEscolhido;
+        }
+
+        NetworkObject netObj = playerInstance.GetComponent<NetworkObject>();
         if (netObj != null)
         {
-            // Autoriza o jogador a controlar esse boneco na rede
             netObj.SpawnAsPlayerObject(clientId);
-        }
-        else
-        {
-            Debug.LogError("[GameSetupManager] O seu 'commanderPrefab' NÃO possui um componente NetworkObject! Ele precisa ter um para andar no Multiplayer.");
         }
 
         if (PlayerRegistry.Instance != null)
@@ -120,7 +123,6 @@ public class GameSetupManager : NetworkBehaviour
             PlayerRegistry.Instance.RegisterPlayer(clientId, playerInstance, 0);
         }
 
-        // Passa as torres escolhidas para o BuildManager (que você já tinha feito brilhantemente)
         if (BuildManager.Instance != null && GameDataManager.Instance != null)
         {
             BuildManager.Instance.SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);

@@ -27,7 +27,16 @@ public class MenuManager : MonoBehaviour
     [SerializeField] private Button botaoJogarSolo;
     [SerializeField] private Button botaoJogarOnline;
 
-    private void Awake() => Instance = this;
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(this); // Apenas destrói o script duplicado, protegendo o resto do objeto!
+            return;
+        }
+        Instance = this;
+    }
+
 
     void Start()
     {

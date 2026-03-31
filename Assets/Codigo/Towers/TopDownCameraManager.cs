@@ -23,15 +23,16 @@ public class TopDownCameraManager : MonoBehaviour
     private const int PriorityBuild = 20;
     private const int PriorityInactive = 0;
 
-    void Awake()
+    private void Awake()
     {
         if (Instance != null && Instance != this)
         {
-            Destroy(gameObject);
+            Destroy(this); // Apenas destrói o script duplicado, protegendo o resto do objeto!
             return;
         }
         Instance = this;
     }
+
 
     void Start()
     {

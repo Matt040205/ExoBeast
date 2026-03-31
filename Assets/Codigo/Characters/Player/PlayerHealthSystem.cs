@@ -59,7 +59,18 @@ public class PlayerHealthSystem : NetworkBehaviour
         FindRespawnPoint();
 
         // Registrar no HUD se for o dono
-        if (IsOwner && PlayerHUD.Instance != null) PlayerHUD.Instance.RegistrarJogador(this);
+        if (IsOwner)
+        {
+            StartCoroutine(WaitAndRegisterHUD());
+        }
+    }
+
+    private IEnumerator WaitAndRegisterHUD()
+    {
+        Debug.Log("[PlayerHealthSystem] Aguardando PlayerHUD ligar na cena...");
+        yield return new WaitUntil(() => PlayerHUD.Instance != null);
+        Debug.Log("[PlayerHealthSystem] PlayerHUD encontrado! Registrando referências de Vida e Munição...");
+        PlayerHUD.Instance.RegistrarJogador(this);
     }
 
     void Update()

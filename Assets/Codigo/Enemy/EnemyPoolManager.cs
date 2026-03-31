@@ -23,15 +23,14 @@ public class EnemyPoolManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance == null)
+        if (Instance != null && Instance != this)
         {
-            Instance = this;
+            Destroy(this); // Apenas destrói o script duplicado, protegendo o resto do objeto!
+            return;
         }
-        else
-        {
-            Destroy(gameObject);
-        }
+        Instance = this;
     }
+
 
     /// <summary>
     /// Retorna um inimigo pronto para ser spawnado no servidor.

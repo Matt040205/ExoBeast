@@ -1,16 +1,17 @@
 using UnityEngine;
-using Unity.Netcode;
 
 /// <summary>
 /// ── PauseControl ────────────────────────────────────
-/// Controle de pause local por jogador (visual-only, sem Time.timeScale).
+/// Controle de pause local (visual-only, sem Time.timeScale).
 ///
-///  ▸ Owner: detecta input Escape/P para toggle de pause
-///  ▸ isPaused eh static local — cada cliente pausa independentemente
+///  ▸ MonoBehaviour simples — funciona tanto em cena standalone quanto em sessao de rede
+///  ▸ O pause eh local por cliente; nao propaga pela rede (intencional)
 ///  ▸ Delega UI para MenuManager.AbrirPause() / Resume()
+///  ▸ CORREÇÃO: Removida heranca de NetworkBehaviour (era necessaria estar no prefab
+///    do jogador para ter IsOwner == true; como fica na cena, nunca capturava input)
 /// ─────────────────────────────────────────────────────
 /// </summary>
-public class PauseControl : NetworkBehaviour
+public class PauseControl : MonoBehaviour
 {
     public static bool isPaused = false;
 
@@ -19,8 +20,6 @@ public class PauseControl : NetworkBehaviour
 
     void Update()
     {
-        if (!IsOwner) return;
-
         if (Input.GetKeyDown(teclaPausePrincipal) || Input.GetKeyDown(teclaPauseSecundaria))
         {
             if (isPaused) ResumeGame();

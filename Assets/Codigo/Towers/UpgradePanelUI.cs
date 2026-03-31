@@ -1,4 +1,4 @@
-using TMPro;
+ï»¿using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
@@ -7,21 +7,21 @@ using System.Collections.Generic;
 
 public class UpgradePanelUI : MonoBehaviour
 {
-    [Header("Referências Gerais")]
+    [Header("ReferÃªncias Gerais")]
     public GameObject uiPanel;
     public UnityEngine.UI.Image towerImage;
 
-    [Header("Referências do Caminho 1 (DPS)")]
+    [Header("ReferÃªncias do Caminho 1 (DPS)")]
     public Button upgradeButton1;
     public TextMeshProUGUI costText1;
     public TextMeshProUGUI levelText1;
 
-    [Header("Referências do Caminho 2 (Controle)")]
+    [Header("ReferÃªncias do Caminho 2 (Controle)")]
     public Button upgradeButton2;
     public TextMeshProUGUI costText2;
     public TextMeshProUGUI levelText2;
 
-    [Header("Referências do Caminho 3 (Suporte)")]
+    [Header("ReferÃªncias do Caminho 3 (Suporte)")]
     public Button upgradeButton3;
     public TextMeshProUGUI costText3;
     public TextMeshProUGUI levelText3;
@@ -40,7 +40,7 @@ public class UpgradePanelUI : MonoBehaviour
         panelCanvasGroup = uiPanel.GetComponent<CanvasGroup>();
         if (panelCanvasGroup == null)
         {
-            Debug.LogError("CanvasGroup não encontrado no uiPanel! Adicione um componente CanvasGroup.", uiPanel);
+            Debug.LogError("CanvasGroup nÃ£o encontrado no uiPanel! Adicione um componente CanvasGroup.", uiPanel);
             panelCanvasGroup = uiPanel.AddComponent<CanvasGroup>();
         }
 
@@ -80,7 +80,7 @@ public class UpgradePanelUI : MonoBehaviour
         return uiPanel.activeSelf;
     }
 
-    // --- NOVA FUNÇÃO AUXILIAR: Pega o nível atual do sistema de habilidades ---
+    // --- NOVA FUNÃ‡ÃƒO AUXILIAR: Pega o nÃ­vel atual do sistema de habilidades ---
     private int GetCurrentLevel(int pathIndex)
     {
         if (currentTower == null) return 0;
@@ -90,9 +90,9 @@ public class UpgradePanelUI : MonoBehaviour
 
         if (paintSystem != null)
         {
-            // Os níveis internos são -1 (não tem), 0 (lvl 1)... 4 (lvl 5)
-            // A UI precisa de 0 (não tem), 1 (lvl 1)... 5 (lvl 5)
-            // Então somamos +1 ao valor interno
+            // Os nÃ­veis internos sÃ£o -1 (nÃ£o tem), 0 (lvl 1)... 4 (lvl 5)
+            // A UI precisa de 0 (nÃ£o tem), 1 (lvl 1)... 5 (lvl 5)
+            // EntÃ£o somamos +1 ao valor interno
             switch (pathIndex)
             {
                 case 0: return paintSystem.dpsLevel + 1;     // Caminho 1 = DPS
@@ -101,11 +101,10 @@ public class UpgradePanelUI : MonoBehaviour
             }
         }
 
-        // Fallback: Se for outro tipo de torre sem o sistema novo, retorna 0 (ou precisaria de outra lógica)
-        return 0;
+        if (currentTower.currentPathLevels != null && pathIndex < currentTower.currentPathLevels.Length) { return currentTower.currentPathLevels[pathIndex]; } return 0;
     }
 
-    // --- NOVA FUNÇÃO AUXILIAR: Converte Index para Enum ---
+    // --- NOVA FUNÃ‡ÃƒO AUXILIAR: Converte Index para Enum ---
     private TowerPath GetPathEnum(int pathIndex)
     {
         switch (pathIndex)
@@ -121,7 +120,7 @@ public class UpgradePanelUI : MonoBehaviour
     {
         if (currentTower == null || panelCanvasGroup == null) return;
 
-        // Calcula o total de pontos gastos somando os níveis atuais
+        // Calcula o total de pontos gastos somando os nÃ­veis atuais
         int totalPointsSpent = 0;
         for (int i = 0; i < 3; i++) totalPointsSpent += GetCurrentLevel(i);
 
@@ -161,17 +160,17 @@ public class UpgradePanelUI : MonoBehaviour
             if (levelText) levelText.gameObject.SetActive(true);
         }
 
-        // Usa a nova função auxiliar
+        // Usa a nova funÃ§Ã£o auxiliar
         int currentLevel = GetCurrentLevel(pathIndex);
         UpgradePath path = currentTower.towerData.upgradePaths[pathIndex];
         int maxLevelThisPath = path.upgradesInPath.Count;
 
-        // Conta quantos caminhos têm nível > 0
+        // Conta quantos caminhos tÃªm nÃ­vel > 0
         int pathsChosenCount = 0;
         for (int i = 0; i < 3; i++) if (GetCurrentLevel(i) > 0) pathsChosenCount++;
 
         bool anotherPathIsTier3Plus = false;
-        // Verifica se algum OUTRO caminho é tier 3 ou mais
+        // Verifica se algum OUTRO caminho Ã© tier 3 ou mais
         for (int i = 0; i < 3; i++)
         {
             if (i != pathIndex && GetCurrentLevel(i) > 2)
@@ -184,19 +183,19 @@ public class UpgradePanelUI : MonoBehaviour
         bool isLockedByChoice = false;
         string lockReason = "";
 
-        // Lógica de bloqueio (Pode ajustar conforme sua regra de jogo)
-        // Se já escolheu 2 caminhos e este ainda é 0, bloqueia
-        /* // Comentei essa lógica pois na árvore mista geralmente você pode pegar um pouco de tudo,
+        // LÃ³gica de bloqueio (Pode ajustar conforme sua regra de jogo)
+        // Se jÃ¡ escolheu 2 caminhos e este ainda Ã© 0, bloqueia
+        /* // Comentei essa lÃ³gica pois na Ã¡rvore mista geralmente vocÃª pode pegar um pouco de tudo,
         // mas se quiser manter a regra de "Max 2 caminhos", descomente abaixo:
         
         if (pathsChosenCount >= 2 && currentLevel == 0)
         {
             isLockedByChoice = true;
-            lockReason = "Só é possível escolher dois caminhos por torre.";
+            lockReason = "SÃ³ Ã© possÃ­vel escolher dois caminhos por torre.";
         }
         */
 
-        levelText.text = $"Nível {currentLevel}/{maxLevelThisPath}";
+        levelText.text = $"NÃ­vel {currentLevel}/{maxLevelThisPath}";
         string tooltipTitleBase = path.pathName ?? "Caminho Desconhecido";
         string tooltipDescription = "";
 
@@ -232,7 +231,7 @@ public class UpgradePanelUI : MonoBehaviour
             List<string> costs = new List<string>();
             if (geoditeCost > 0) costs.Add($"<color=#76D7C4>{geoditeCost}G</color>");
             if (darkEtherCost > 0) costs.Add($"<color=#C39BD3>{darkEtherCost}E</color>");
-            costString = costs.Count > 0 ? string.Join(" / ", costs) : "Grátis";
+            costString = costs.Count > 0 ? string.Join(" / ", costs) : "GrÃ¡tis";
 
             bool canAfford = CurrencyManager.Instance.HasEnoughCurrency(geoditeCost, CurrencyType.Geodites) &&
                              CurrencyManager.Instance.HasEnoughCurrency(darkEtherCost, CurrencyType.DarkEther);
@@ -240,16 +239,16 @@ public class UpgradePanelUI : MonoBehaviour
             button.interactable = canAfford && !isFullyUpgraded;
             costText.text = !isFullyUpgraded ? costString : "";
 
-            tooltipDescription = $"<b>Próximo Nível ({currentLevel + 1}): {nextUpgrade.upgradeName}</b>\n{nextUpgrade.description}";
+            tooltipDescription = $"<b>PrÃ³ximo NÃ­vel ({currentLevel + 1}): {nextUpgrade.upgradeName}</b>\n{nextUpgrade.description}";
             if (tooltip != null) tooltip.SetTooltipInfo(tooltipTitleBase, tooltipDescription);
         }
         else
         {
             button.interactable = false;
             costText.text = "";
-            levelText.text = "Nível MAX";
-            tooltipDescription = "Este caminho já está no nível máximo.";
-            if (tooltip != null) tooltip.SetTooltipInfo($"{tooltipTitleBase} (NÍVEL MÁXIMO)", tooltipDescription);
+            levelText.text = "NÃ­vel MAX";
+            tooltipDescription = "Este caminho jÃ¡ estÃ¡ no nÃ­vel mÃ¡ximo.";
+            if (tooltip != null) tooltip.SetTooltipInfo($"{tooltipTitleBase} (NÃVEL MÃXIMO)", tooltipDescription);
         }
     }
 
@@ -281,12 +280,12 @@ public class UpgradePanelUI : MonoBehaviour
 
         UpgradePath path = currentTower.towerData.upgradePaths[pathIndex];
 
-        // Pega o nível atual usando a nova função
+        // Pega o nÃ­vel atual usando a nova funÃ§Ã£o
         int currentLevel = GetCurrentLevel(pathIndex);
 
         if (currentLevel >= path.upgradesInPath.Count) return;
 
-        // Calcula total gasto usando a nova função
+        // Calcula total gasto usando a nova funÃ§Ã£o
         int totalPointsSpent = 0;
         for (int i = 0; i < 3; i++) totalPointsSpent += GetCurrentLevel(i);
 
@@ -309,7 +308,7 @@ public class UpgradePanelUI : MonoBehaviour
             // Determina qual ENUM passar para o Controller (DPS, Control, Support)
             TowerPath pathEnum = GetPathEnum(pathIndex);
 
-            // CORREÇÃO: Passa o pathEnum para o ApplyUpgrade
+            // CORREÃ‡ÃƒO: Passa o pathEnum para o ApplyUpgrade
             currentTower.ApplyUpgrade(nextUpgrade, geoditeCost, darkEtherCost, pathEnum);
 
             // REMOVIDO: currentTower.currentPathLevels[pathIndex]++; 

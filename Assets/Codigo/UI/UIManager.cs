@@ -3,23 +3,13 @@ using UnityEngine.UI;
 using System.Collections.Generic;
 using TMPro;
 
-/// <summary>
-/// ── UIManager ───────────────────────────────────────
-/// Gerencia paineis de UI da cena de jogo (HUD, pause, build, loja).
-///
-///  ▸ Timer: le MatchManager.MatchTime (NetworkVariable) com fallback local
-///  ▸ Vida do objetivo: observa OnHealthChanged do ObjectiveHealthSystem
-///  ▸ Paineis: HUD, pause e build com transicoes mutuamente exclusivas
-///  ▸ Nao usa Time.timeScale — pause eh visual-only
-/// ─────────────────────────────────────────────────────
-/// </summary>
 public class UIManager : MonoBehaviour
 {
     public static UIManager Instance;
     public GameObject hudPanel;
     public GameObject pausePanel;
     public GameObject buildPanel;
-    public BuildButtonUI buildButtonUI;
+    public BuildButtonUI buildButtonUI; // TEM QUE ESTAR PREENCHIDO!
 
     public TextMeshProUGUI timerText;
 
@@ -36,6 +26,11 @@ public class UIManager : MonoBehaviour
 
     private void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(this);
+            return;
+        }
         Instance = this;
     }
 
@@ -49,11 +44,8 @@ public class UIManager : MonoBehaviour
             UpdateObjectiveHealthUI();
         }
 
-        if (towerShopButton != null)
-            towerShopButton.onClick.AddListener(ShowTowerShop);
-
-        if (trapShopButton != null)
-            trapShopButton.onClick.AddListener(ShowTrapShop);
+        if (towerShopButton != null) towerShopButton.onClick.AddListener(ShowTowerShop);
+        if (trapShopButton != null) trapShopButton.onClick.AddListener(ShowTrapShop);
 
         if (buildPanel != null && buildPanel.activeInHierarchy)
         {
@@ -64,60 +56,44 @@ public class UIManager : MonoBehaviour
     void Update()
     {
         if (ExoBeasts.Multiplayer.GameServer.MatchManager.Instance != null)
-        {
             gameTime = ExoBeasts.Multiplayer.GameServer.MatchManager.Instance.MatchTime.Value;
-        }
         else
-        {
             gameTime += Time.deltaTime;
-        }
-        
+
         UpdateTimerDisplay(gameTime);
     }
 
     private void OnDestroy()
     {
-        if (objectiveHealthSystem != null)
-        {
-            objectiveHealthSystem.OnHealthChanged -= UpdateObjectiveHealthUI;
-        }
+        if (objectiveHealthSystem != null) objectiveHealthSystem.OnHealthChanged -= UpdateObjectiveHealthUI;
     }
 
     public void UpdateObjectiveHealthUI()
     {
         if (objectiveHealthSystem == null) return;
-
         float currentHealth = objectiveHealthSystem.currentHealth.Value;
         float maxHealth = objectiveHealthSystem.maxHealth;
 
-        if (objectiveHealthText != null)
-        {
-            objectiveHealthText.text = $"{currentHealth:F0} / {maxHealth:F0}";
-        }
+        if (objectiveHealthText != null) objectiveHealthText.text = $"{currentHealth:F0} / {maxHealth:F0}";
 
         if (objectiveHealthBar != null)
-        {
-            if (maxHealth > 0)
-            {
-                objectiveHealthBar.fillAmount = currentHealth / maxHealth;
-            }
-            else
-            {
-                objectiveHealthBar.fillAmount = 0;
-            }
-        }
+            objectiveHealthBar.fillAmount = maxHealth > 0 ? currentHealth / maxHealth : 0;
     }
 
     public void UpdateBuildUI(List<CharacterBase> towers, List<TrapDataSO> traps)
     {
-        if (buildButtonUI != null)
+        // O ALARME SE FALTAR A REFERÊNCIA NO UIMANAGER
+        if (buildButtonUI == null)
         {
-            buildButtonUI.ClearTowerButtons();
-            buildButtonUI.CreateTowerBuildButtons(towers);
-
-            buildButtonUI.ClearTrapButtons();
-            buildButtonUI.CreateTrapBuildButtons(traps);
+            Debug.LogError("<b>[UIManager]</b> ERRO CRÍTICO: O campo 'Build Button UI' está VAZIO no Inspector do UI Manager! Arraste a script pra lá!");
+            return;
         }
+
+        buildButtonUI.ClearTowerButtons();
+        buildButtonUI.CreateTowerBuildButtons(towers);
+
+        buildButtonUI.ClearTrapButtons();
+        buildButtonUI.CreateTrapBuildButtons(traps);
     }
 
     public void ShowHUD()
@@ -129,8 +105,7 @@ public class UIManager : MonoBehaviour
 
     public void ShowPauseMenu(bool show)
     {
-        if (pausePanel != null)
-            pausePanel.SetActive(show);
+        if (pausePanel != null) pausePanel.SetActive(show);
 
         if (show)
         {
@@ -138,14 +113,8 @@ public class UIManager : MonoBehaviour
         }
         else
         {
-            if (BuildManager.isBuildingMode)
-            {
-                ShowBuildUI(true);
-            }
-            else
-            {
-                ShowHUD();
-            }
+            if (BuildManager.isBuildingMode) ShowBuildUI(true);
+            else ShowHUD();
         }
     }
 
@@ -157,10 +126,7 @@ public class UIManager : MonoBehaviour
             if (hudPanel != null) hudPanel.SetActive(false);
             ShowTowerShop();
         }
-        else
-        {
-            ShowHUD();
-        }
+        else ShowHUD();
     }
 
     public void ShowTowerShop()
@@ -184,10 +150,8 @@ public class UIManager : MonoBehaviour
     public void UpdateTimerDisplay(float timeInSeconds)
     {
         if (timerText == null) return;
-
         int minutes = Mathf.FloorToInt(timeInSeconds / 60);
         int seconds = Mathf.FloorToInt(timeInSeconds % 60);
-
         timerText.text = string.Format("{0:00}:{1:00}", minutes, seconds);
     }
 }

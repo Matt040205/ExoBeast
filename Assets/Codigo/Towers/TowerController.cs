@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -43,7 +43,8 @@ public class TowerController : MonoBehaviour
 
     private List<TowerBehavior> activeBehaviors = new List<TowerBehavior>();
 
-    // REMOVIDO: currentPathLevels (Quem cuida disso agora é o AbilitySystem)
+    // Tracking universal dos níveis
+    public int[] currentPathLevels { get; private set; } = new int[3] { 0, 0, 0 };
 
     private Transform targetEnemy;
     private float fireCountdown = 0f;
@@ -131,7 +132,12 @@ public class TowerController : MonoBehaviour
             }
         }
 
-        // 3. Atualiza o Sistema de Habilidades Mistas
+        // 3. Incrementa o nível na base da torre para UI funcionar
+        if (path == TowerPath.DPS) currentPathLevels[0]++;
+        else if (path == TowerPath.Control) currentPathLevels[1]++;
+        else if (path == TowerPath.Support) currentPathLevels[2]++;
+
+        // 4. Atualiza o Sistema de Habilidades Mistas
         if (abilitySystem != null)
         {
             // Tenta converter para PaintAbilitySystem para usar a função nova UpgradePath
@@ -139,12 +145,6 @@ public class TowerController : MonoBehaviour
             if (paintSystem != null)
             {
                 paintSystem.UpgradePath(path);
-            }
-            else
-            {
-                // Fallback para outras torres que ainda usem o sistema antigo
-                // Se você tiver outras torres, precisará adicionar UpgradePath na base TowerAbilitySystem depois
-                Debug.LogWarning("AbilitySystem não é PaintAbilitySystem. O nível misto pode não funcionar.");
             }
         }
     }

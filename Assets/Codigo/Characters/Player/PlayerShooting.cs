@@ -4,6 +4,7 @@ using FMODUnity;
 using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Components;
+using ExoBeasts.Multiplayer.GameServer; // Necessário para achar o PlayerRegistry
 
 /// <summary>
 /// ── PlayerShooting ─────────────────────────────────────
@@ -40,6 +41,7 @@ public class PlayerShooting : NetworkBehaviour
 
     [Header("Estado")]
     public int currentAmmo;
+    public int maxAmmo;
     public bool isReloading;
     public bool isFiring;
     public float reloadStartTime;
@@ -50,7 +52,7 @@ public class PlayerShooting : NetworkBehaviour
     private ProjectilePool projectilePool;
     private Camera mainCamera;
     private Animator animator;
-    private NetworkAnimator networkAnimator; // <--- ADICIONADO AQUI
+    private NetworkAnimator networkAnimator;
 
     private PlayerHealthSystem playerHealth;
     private bool hasNextShotBonus = false;
@@ -70,11 +72,40 @@ public class PlayerShooting : NetworkBehaviour
         }
 
         InitializeShooting();
+
+        // Garante que a HUD seja avisada imediatamente assim que a arma liga!
+        if (PlayerHUD.Instance != null && playerHealth != null)
+        {
+            PlayerHUD.Instance.RegistrarJogador(playerHealth);
+        }
     }
 
     private void InitializeShooting()
     {
-        currentAmmo = (characterData != null) ? characterData.magazineSize : 10;
+        // =================================================================
+        // INJEÇÃO LOCAL: Como o ScriptableObject não viaja pela rede sozinho,
+        // o próprio Cliente busca os dados locais dele caso estejam nulos!
+        // =================================================================
+        if (characterData == null)
+        {
+            if (PlayerRegistry.Instance != null && GameDataManager.Instance != null)
+            {
+                int charIndex = PlayerRegistry.Instance.GetPlayerCharacterChoice(OwnerClientId);
+                if (charIndex >= 0 && charIndex < GameDataManager.Instance.bibliotecaOriginalPersonagens.Count)
+                {
+                    characterData = GameDataManager.Instance.bibliotecaOriginalPersonagens[charIndex];
+                }
+            }
+
+            // Fallback caso seja Singleplayer ou o Registry demore
+            if (characterData == null && GameDataManager.Instance != null && GameDataManager.Instance.equipeSelecionada[0] != null)
+            {
+                characterData = GameDataManager.Instance.equipeSelecionada[0];
+            }
+        }
+
+        maxAmmo = (characterData != null) ? characterData.magazineSize : 10;
+        currentAmmo = maxAmmo;
 
         mainCamera = Camera.main;
         playerHealth = GetComponent<PlayerHealthSystem>();
@@ -87,7 +118,6 @@ public class PlayerShooting : NetworkBehaviour
                 animator = modelPivot.GetComponentInChildren<Animator>();
         }
 
-        // CACHE DO NETWORK ANIMATOR SEGURO
         networkAnimator = GetComponent<NetworkAnimator>();
         if (networkAnimator == null) networkAnimator = GetComponentInChildren<NetworkAnimator>();
 
@@ -115,7 +145,7 @@ public class PlayerShooting : NetworkBehaviour
     {
         if (!IsOwner || !this.enabled) return;
 
-        if (ctx.performed && !isReloading && currentAmmo < characterData.magazineSize)
+        if (ctx.performed && !isReloading && currentAmmo < maxAmmo)
             RequestReloadServerRpc();
     }
 
@@ -131,7 +161,7 @@ public class PlayerShooting : NetworkBehaviour
 
         HandleShootingLogic();
 
-        if (Input.GetKeyDown(KeyCode.R) && currentAmmo < characterData.magazineSize)
+        if (Input.GetKeyDown(KeyCode.R) && currentAmmo < maxAmmo)
             RequestReloadServerRpc();
     }
 
@@ -142,7 +172,7 @@ public class PlayerShooting : NetworkBehaviour
             if (currentAmmo > 0)
             {
                 Shoot();
-                if (characterData.fireMode != FireMode.FullAuto) fireInputHeld = false;
+                if (characterData != null && characterData.fireMode != FireMode.FullAuto) fireInputHeld = false;
             }
             else RequestReloadServerRpc();
         }
@@ -178,7 +208,8 @@ public class PlayerShooting : NetworkBehaviour
         ExecuteShootVisual(shotDirection, true);
         ShootServerRpc(shotDirection);
 
-        nextShotTime = Time.time + (1f / characterData.attackSpeed);
+        float atkSpeed = (characterData != null && characterData.attackSpeed > 0) ? characterData.attackSpeed : 1f;
+        nextShotTime = Time.time + (1f / atkSpeed);
         currentAmmo--;
 
         if (currentAmmo <= 0) RequestReloadServerRpc();
@@ -199,7 +230,6 @@ public class PlayerShooting : NetworkBehaviour
 
     private void ExecuteShootVisual(Vector3 direction, bool isOwnerShot)
     {
-        // CORREÇÃO: Usando a variável segura networkAnimator
         if (networkAnimator != null) networkAnimator.SetTrigger("Shoot");
 
         PlayShootSound();
@@ -218,10 +248,12 @@ public class PlayerShooting : NetworkBehaviour
                     float damage = 0;
                     bool isCrit = false;
 
+                    float armPen = (characterData != null) ? characterData.armorPenetration : 0f;
+
                     if (isOwnerShot)
                         damage = CalculateDamage(out isCrit);
 
-                    visualScript.Initialize(damage, isCrit, characterData.armorPenetration, playerHealth, direction);
+                    visualScript.Initialize(damage, isCrit, armPen, playerHealth, direction);
                 }
             }
         }
@@ -230,7 +262,7 @@ public class PlayerShooting : NetworkBehaviour
     void PlayShootSound()
     {
         string eventToPlay = "";
-        bool isFullAuto = characterData.fireMode == FireMode.FullAuto;
+        bool isFullAuto = (characterData != null && characterData.fireMode == FireMode.FullAuto);
 
         if (tipoDeSom == "Arco")
             eventToPlay = isFullAuto ? eventoTiroContinuoArco : eventoTiroUnicoArco;
@@ -243,10 +275,10 @@ public class PlayerShooting : NetworkBehaviour
 
     float CalculateDamage(out bool isCritical)
     {
-        float finalDamage = characterData.damage;
+        float finalDamage = (characterData != null) ? characterData.damage : 10f;
         isCritical = false;
 
-        if (Random.value <= characterData.critChance)
+        if (characterData != null && Random.value <= characterData.critChance)
         {
             finalDamage *= characterData.critDamage;
             isCritical = true;
@@ -301,9 +333,9 @@ public class PlayerShooting : NetworkBehaviour
     {
         if (isReloading) return;
 
-        float multiplier = 3.0f / characterData.reloadSpeed;
+        float relSpeed = (characterData != null && characterData.reloadSpeed > 0) ? characterData.reloadSpeed : 2f;
+        float multiplier = 3.0f / relSpeed;
 
-        // CORREÇÃO: Usando a variável segura networkAnimator
         if (animator != null && networkAnimator != null)
         {
             animator.SetFloat("ReloadSpeedMultiplier", multiplier);
@@ -316,12 +348,12 @@ public class PlayerShooting : NetworkBehaviour
         isReloading = true;
         reloadStartTime = Time.time;
 
-        Invoke("FinishReload", characterData.reloadSpeed);
+        Invoke("FinishReload", relSpeed);
     }
 
     void FinishReload()
     {
-        currentAmmo = characterData.magazineSize;
+        currentAmmo = maxAmmo;
         isReloading = false;
     }
 
@@ -340,6 +372,7 @@ public class PlayerShooting : NetworkBehaviour
     public float GetRemainingReloadTime()
     {
         if (!isReloading) return 0;
-        return characterData.reloadSpeed - (Time.time - reloadStartTime);
+        float relSpeed = (characterData != null) ? characterData.reloadSpeed : 2f;
+        return relSpeed - (Time.time - reloadStartTime);
     }
 }

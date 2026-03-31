@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -86,7 +86,9 @@ public class SelecaoManager : NetworkBehaviour
 
         yield return new WaitUntil(() => GameDataManager.Instance != null);
 
-        GameDataManager.Instance.RestaurarSelecao();
+        // GameDataManager.Instance.RestaurarSelecao();
+        GameDataManager.Instance.LimparSelecao();
+        
         ConfigurarBotoesPrincipais();
         CriarGridEquipe();
         PopularGridDeEscolha();

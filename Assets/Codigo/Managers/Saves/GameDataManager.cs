@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -121,7 +121,16 @@ public class GameDataManager : MonoBehaviour
 
         data.teamSelection = new string[equipeSelecionada.Length];
         for (int i = 0; i < equipeSelecionada.Length; i++)
-            data.teamSelection[i] = equipeSelecionada[i] != null ? equipeSelecionada[i].name : "";
+        {
+            if (equipeSelecionada[i] != null)
+            {
+                data.teamSelection[i] = equipeSelecionada[i].name.Replace("(Clone)", "");
+            }
+            else
+            {
+                data.teamSelection[i] = "";
+            }
+        }
 
         string json = JsonUtility.ToJson(data, true);
         File.WriteAllText(saveFilePath, json);

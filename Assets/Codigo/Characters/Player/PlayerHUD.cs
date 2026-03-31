@@ -2,15 +2,11 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using System;
+using Unity.Netcode; // <--- Necessário para a HUD achar o boneco
 
 /// <summary>
 /// ── PlayerHUD ───────────────────────────────────────
 /// HUD local do jogador (Singleton, nao eh NetworkBehaviour).
-///
-///  ▸ RegistrarJogador(): jogador local se registra via OnNetworkSpawn
-///  ▸ Observa NetworkVariable de vida (jogador + objetivo) via OnValueChanged
-///  ▸ Exibe municao, cooldowns de habilidades e moeda lendo estado local do owner
-///  ▸ Nunca escreve dados de rede — apenas leitura
 /// ─────────────────────────────────────────────────────
 /// </summary>
 public class PlayerHUD : MonoBehaviour
@@ -24,7 +20,7 @@ public class PlayerHUD : MonoBehaviour
     [Header("Referências de Vida do Objetivo")]
     public Image objectiveHealthBarFill;
     public TMP_Text objectiveHealthText;
-    [Tooltip("A barra de vida que aparece DENTRO do menu de construção (certifique-se que é Image Type: Filled)")]
+    [Tooltip("A barra de vida que aparece DENTRO do menu de construção")]
     public Image BuildModeObjectiveHealthBarFill;
     public TMP_Text BuildModeObjectiveHealthText;
 
@@ -55,7 +51,7 @@ public class PlayerHUD : MonoBehaviour
     public Color reloadColor = new Color(1, 0.5f, 0);
 
     public static PlayerHUD Instance { get; private set; }
-    
+
     private PlayerHealthSystem playerHealth;
     private PlayerShooting playerShooting;
     private float targetHealthPercent = 1f;
@@ -67,11 +63,11 @@ public class PlayerHUD : MonoBehaviour
     private CommanderAbilityController abilityController;
     private bool isSubscribed = false;
 
-    void Awake()
+    private void Awake()
     {
         if (Instance != null && Instance != this)
         {
-            Destroy(gameObject);
+            Destroy(this);
             return;
         }
         Instance = this;
@@ -84,6 +80,8 @@ public class PlayerHUD : MonoBehaviour
 
     public void RegistrarJogador(PlayerHealthSystem health)
     {
+        if (health == null || !health.IsOwner) return;
+
         if (playerHealth != null)
         {
             playerHealth.currentHealth.OnValueChanged -= OnPlayerHealthChanged;
@@ -96,7 +94,7 @@ public class PlayerHUD : MonoBehaviour
         if (playerHealth != null)
         {
             playerHealth.currentHealth.OnValueChanged += OnPlayerHealthChanged;
-            
+
             if (abilityController != null && abilityController.characterData != null)
             {
                 AtualizarIconesHabilidades(abilityController.characterData);
@@ -104,12 +102,25 @@ public class PlayerHUD : MonoBehaviour
 
             OnHealthChanged();
         }
-        
+
         isSubscribed = true;
     }
 
     void Update()
     {
+        // =================================================================
+        // O RADAR: Se o jogador nascer antes da HUD, a HUD acha ele sozinha!
+        // =================================================================
+        if (!isSubscribed && NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
+        {
+            var localPlayer = NetworkManager.Singleton.SpawnManager.GetLocalPlayerObject();
+            if (localPlayer != null)
+            {
+                var health = localPlayer.GetComponent<PlayerHealthSystem>();
+                if (health != null) RegistrarJogador(health);
+            }
+        }
+
         if (playerHealth != null) UpdateHealthDisplay();
         if (playerShooting != null) UpdateAmmoDisplay();
         if (objectiveHealth != null) UpdateObjectiveHealthDisplay();
@@ -143,7 +154,8 @@ public class PlayerHUD : MonoBehaviour
 
     void OnHealthChanged()
     {
-        if (playerHealth == null) return;
+        if (playerHealth == null || playerHealth.characterData == null) return;
+
         targetHealthPercent = playerHealth.currentHealth.Value / playerHealth.characterData.maxHealth;
         isRegenerating = playerHealth.isRegenerating;
     }
@@ -153,7 +165,7 @@ public class PlayerHUD : MonoBehaviour
         if (healthBarFill != null)
             healthBarFill.fillAmount = Mathf.Lerp(healthBarFill.fillAmount, targetHealthPercent, healthLerpSpeed * Time.deltaTime);
 
-        if (healthText != null)
+        if (healthText != null && playerHealth.characterData != null)
             healthText.text = $"{Mathf.CeilToInt(playerHealth.currentHealth.Value)}/{playerHealth.characterData.maxHealth}";
 
         if (regenEffect != null) regenEffect.SetActive(isRegenerating);
@@ -194,9 +206,14 @@ public class PlayerHUD : MonoBehaviour
 
         if (ammoText != null)
         {
-            ammoText.text = $"{playerShooting.currentAmmo}/{playerShooting.characterData.magazineSize}";
-            bool isAmmoLow = playerShooting.currentAmmo <= playerShooting.characterData.magazineSize * 0.2f;
+            ammoText.text = $"{playerShooting.currentAmmo} / {playerShooting.maxAmmo}";
+
+            bool isAmmoLow = playerShooting.currentAmmo <= playerShooting.maxAmmo * 0.2f;
             ammoText.color = isAmmoLow ? ammoLowColor : ammoNormalColor;
+        }
+        else
+        {
+            Debug.LogWarning("<b>[PlayerHUD AVISO]</b> Você esqueceu de arrastar o 'Ammo Text' no Inspector da cena!");
         }
 
         if (reloadEffect != null) reloadEffect.SetActive(playerShooting.isReloading);
@@ -205,7 +222,7 @@ public class PlayerHUD : MonoBehaviour
         {
             reloadSlider.gameObject.SetActive(playerShooting.isReloading);
 
-            if (playerShooting.isReloading)
+            if (playerShooting.isReloading && playerShooting.characterData != null)
             {
                 float reloadProgress = 1f - (playerShooting.GetRemainingReloadTime() / playerShooting.characterData.reloadSpeed);
                 reloadSlider.value = reloadProgress;
