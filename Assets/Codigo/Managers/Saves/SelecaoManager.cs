@@ -86,6 +86,8 @@ public class SelecaoManager : NetworkBehaviour
 
         yield return new WaitUntil(() => GameDataManager.Instance != null);
 
+        todosOsPersonagens = new List<CharacterBase>(GameDataManager.Instance.personagensDoJogador);
+
         // GameDataManager.Instance.RestaurarSelecao();
         GameDataManager.Instance.LimparSelecao();
         
@@ -176,23 +178,15 @@ public class SelecaoManager : NetworkBehaviour
 
     void AplicarEscolhaLocal(int id, int slot)
     {
-        CharacterBase modelo = todosOsPersonagens[id];
-        if (GameDataManager.Instance.equipeSelecionada[slot] != null)
-            Destroy(GameDataManager.Instance.equipeSelecionada[slot]);
-
-        CharacterBase novaInstancia = Instantiate(modelo);
-        GameDataManager.Instance.AplicarDadosCarregados(novaInstancia);
-        GameDataManager.Instance.equipeSelecionada[slot] = novaInstancia;
-        slotsEquipe[slot].SetPersonagem(novaInstancia);
+        CharacterBase personagemLocal = todosOsPersonagens[id];
+        GameDataManager.Instance.equipeSelecionada[slot] = personagemLocal;
+        slotsEquipe[slot].SetPersonagem(personagemLocal);
         AtualizarEstadoBotaoJogar();
         GameDataManager.Instance.SaveGame();
     }
 
     void RemoverLocal(int slot)
     {
-        if (GameDataManager.Instance.equipeSelecionada[slot] != null)
-            Destroy(GameDataManager.Instance.equipeSelecionada[slot]);
-
         GameDataManager.Instance.equipeSelecionada[slot] = null;
         slotsEquipe[slot].LimparSlot();
         AtualizarEstadoBotaoJogar();
@@ -234,12 +228,20 @@ public class SelecaoManager : NetworkBehaviour
         painelEscolhaPersonagem.SetActive(false);
         painelDetalhes.SetActive(true);
         imagemDetalhes.sprite = p.characterIcon;
-        nomeDetalhes.text = p.name;
-        textoStatusPadrao.text = $"Vida: {p.maxHealth}\nDano: {p.damage}\nVel: {p.moveSpeed}";
+        nomeDetalhes.text = p.name.Replace("(Clone)", "");
+        textoStatusPadrao.text = $"Vida: {p.maxHealth}\nDano: {p.damage}\nVelocidade: {p.moveSpeed}";
 
+        // Monta texto com TODAS as habilidades do comandante
         string s = "";
-        if (p.passive != null) s += $"<b>{p.passive.abilityName}:</b> {p.passive.description}\n\n";
-        if (p.ability1 != null) s += $"<b>{p.ability1.abilityName}:</b> {p.ability1.description}\n\n";
+        if (p.passive != null)
+            s += $"<b>{p.passive.abilityName} (Passiva):</b>\n{p.passive.description}\n\n";
+        if (p.ability1 != null)
+            s += $"<b>{p.ability1.abilityName}:</b>\n{p.ability1.description}\n\n";
+        if (p.ability2 != null)
+            s += $"<b>{p.ability2.abilityName}:</b>\n{p.ability2.description}\n\n";
+        if (p.ultimate != null)
+            s += $"<b>{p.ultimate.abilityName} (Ultimate):</b>\n{p.ultimate.description}";
+
         textoHabilidadesComandante.text = s;
 
         botaoConfirmarEscolha.onClick.RemoveAllListeners();
@@ -298,29 +300,105 @@ public class SelecaoManager : NetworkBehaviour
     public void VoltarParaPainelEquipe() { painelEscolhaPersonagem.SetActive(false); painelDetalhes.SetActive(false); painelEquipe.SetActive(true); }
     public void VoltarParaPainelEscolha() { painelDetalhes.SetActive(false); painelEscolhaPersonagem.SetActive(true); }
 
+    public void IrParaCenaRastros()
+    {
+        if (personagemEmVisualizacao != null && GameDataManager.Instance != null)
+        {
+            GameDataManager.Instance.personagemParaRastros = personagemEmVisualizacao;
+            UnityEngine.SceneManagement.SceneManager.LoadScene("Rastros");
+        }
+    }
+
+    public void MostrarPainelHabilidades() 
+    { 
+        painelHabilidades.SetActive(true); 
+        painelUpgradesTorre.SetActive(false); 
+        
+        // Esconder os botões de caminho quando estiver na aba Comandante
+        foreach (var btn in botoesCaminhoTorre)
+        {
+            if (btn != null) btn.gameObject.SetActive(false);
+        }
+    }
+
+    public void MostrarPainelUpgradesTorre() 
+    { 
+        painelHabilidades.SetActive(false); 
+        painelUpgradesTorre.SetActive(true); 
+        
+        // Religa os botões de caminho de acordo com as habilidades
+        if (personagemEmVisualizacao != null)
+        {
+            AtualizarTextoBotoesCaminho(personagemEmVisualizacao);
+        }
+    }
+
     void AtualizarTextoBotoesCaminho(CharacterBase p)
     {
         TextMeshProUGUI[] textosCaminho = { textoCaminho1, textoCaminho2, textoCaminho3 };
 
         for (int i = 0; i < botoesCaminhoTorre.Count; i++)
         {
-            if (i < p.upgradePaths.Count)
+            int index = i; // Captura local para o listener do botão
+            botoesCaminhoTorre[index].onClick.RemoveAllListeners();
+
+            if (index < p.upgradePaths.Count && p.upgradePaths[index] != null)
             {
-                botoesCaminhoTorre[i].GetComponentInChildren<TextMeshProUGUI>().text = p.upgradePaths[i].pathName;
-                botoesCaminhoTorre[i].gameObject.SetActive(true);
-                if (i < textosCaminho.Length && textosCaminho[i] != null)
-                    textosCaminho[i].text = p.upgradePaths[i].pathName;
+                var path = p.upgradePaths[index];
+                botoesCaminhoTorre[index].GetComponentInChildren<TextMeshProUGUI>().text = path.pathName;
+                
+                // Exibe os botões apenas se estivermos na aba de torre selecionada
+                botoesCaminhoTorre[index].gameObject.SetActive(painelUpgradesTorre.activeSelf);
+                
+                if (index < textosCaminho.Length && textosCaminho[index] != null)
+                {
+                    string desc = $"<b>{path.pathName}</b>\n\n";
+                    if (path.upgradesInPath != null)
+                    {
+                        foreach (var upg in path.upgradesInPath)
+                        {
+                            desc += $"• <b>{upg.upgradeName}</b>: {upg.description} (Custo: <color=#90EE90>{upg.geoditeCost}G</color>)\n";
+                        }
+                    }
+                    textosCaminho[index].text = desc;
+                    
+                    // Inicializa mostrando APENAS a primeira aba se a aba principal de torres estiver visível
+                    textosCaminho[index].gameObject.SetActive(index == 0 && painelUpgradesTorre.activeSelf); 
+                }
+
+                // Configura o visual do botão ativado/desativado (o clicado brilha, os outros ficam acinzentados)
+                var img = botoesCaminhoTorre[index].GetComponent<Image>();
+                if (img != null) img.color = (index == 0) ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
+
+                // Interliga os botões Dano/Velocidade/Proteção para alternar o texto exibido e a cor
+                botoesCaminhoTorre[index].onClick.AddListener(() => {
+                    for(int j = 0; j < botoesCaminhoTorre.Count; j++)
+                    {
+                        if (textosCaminho.Length > j && textosCaminho[j] != null)
+                            textosCaminho[j].gameObject.SetActive(j == index);
+
+                        if (botoesCaminhoTorre[j] != null)
+                        {
+                            var bImg = botoesCaminhoTorre[j].GetComponent<Image>();
+                            if (bImg != null)
+                            {
+                                bImg.color = (j == index) ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
+                            }
+                        }
+                    }
+                });
             }
             else
             {
-                botoesCaminhoTorre[i].gameObject.SetActive(false);
-                if (i < textosCaminho.Length && textosCaminho[i] != null)
-                    textosCaminho[i].text = "";
+                botoesCaminhoTorre[index].gameObject.SetActive(false);
+                if (index < textosCaminho.Length && textosCaminho[index] != null)
+                {
+                    textosCaminho[index].text = "";
+                    textosCaminho[index].gameObject.SetActive(false);
+                }
             }
         }
     }
-
-    public void MostrarPainelHabilidades() { painelHabilidades.SetActive(true); painelUpgradesTorre.SetActive(false); }
-    public void MostrarPainelUpgradesTorre() { painelHabilidades.SetActive(false); painelUpgradesTorre.SetActive(true); }
+    
     void ToggleRemoveMode() { isRemoveMode = !isRemoveMode; if (botaoRemover != null) botaoRemover.image.color = isRemoveMode ? corModoRemover : corOriginalBotaoRemover; }
 }

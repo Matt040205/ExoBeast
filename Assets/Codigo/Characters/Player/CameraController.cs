@@ -66,6 +66,8 @@ public class CameraController : NetworkBehaviour
 
     private void Update()
     {
+        if (PauseControl.isPaused) return;
+
         HandleCameraRotation();
         HandleAimToggle();
         UpdateCameraOffsets();

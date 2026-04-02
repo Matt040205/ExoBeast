@@ -14,9 +14,26 @@ using UnityEngine;
 public class PauseControl : MonoBehaviour
 {
     public static bool isPaused = false;
+    private static PauseControl activeInstance;
 
     public KeyCode teclaPausePrincipal = KeyCode.Escape;
     public KeyCode teclaPauseSecundaria = KeyCode.P;
+
+    void Awake()
+    {
+        // Apenas a primeira instância processa input
+        if (activeInstance != null && activeInstance != this)
+        {
+            this.enabled = false;
+            return;
+        }
+        activeInstance = this;
+    }
+
+    void OnDestroy()
+    {
+        if (activeInstance == this) activeInstance = null;
+    }
 
     void Update()
     {
@@ -29,16 +46,35 @@ public class PauseControl : MonoBehaviour
 
     public void PauseGame()
     {
-        if (MenuManager.Instance != null)
+        isPaused = true;
+
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.ShowPauseMenu(true);
+        }
+        else if (MenuManager.Instance != null)
+        {
             MenuManager.Instance.AbrirPause();
+        }
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
-        isPaused = true;
     }
 
     public void ResumeGame()
     {
-        if (MenuManager.Instance != null) MenuManager.Instance.Resume();
+        isPaused = false;
+
+        if (UIManager.Instance != null)
+        {
+            UIManager.Instance.ShowPauseMenu(false);
+        }
+        else if (MenuManager.Instance != null)
+        {
+            MenuManager.Instance.Resume();
+        }
+
+        Cursor.lockState = BuildManager.isBuildingMode ? CursorLockMode.None : CursorLockMode.Locked;
+        Cursor.visible = BuildManager.isBuildingMode;
     }
 }

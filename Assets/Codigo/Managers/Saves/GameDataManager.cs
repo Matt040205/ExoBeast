@@ -45,6 +45,9 @@ public class GameDataManager : MonoBehaviour
     [Header("Banco de Dados")]
     public List<CharacterBase> bibliotecaOriginalPersonagens;
 
+    [Header("Sessão do Jogador (Runtime)")]
+    public List<CharacterBase> personagensDoJogador = new List<CharacterBase>();
+
     [Header("Estado Atual")]
     public CharacterBase[] equipeSelecionada = new CharacterBase[8];
     public CharacterBase personagemParaRastros;
@@ -62,6 +65,24 @@ public class GameDataManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            
+            // Instancia os SOs Originais para runtime isolada local
+            personagensDoJogador.Clear();
+            foreach (var original in bibliotecaOriginalPersonagens)
+            {
+                if (original != null)
+                {
+                    CharacterBase clone = Instantiate(original);
+                    
+                    // Força a limpeza de 'sujeiras' e DESACOPLA o ponteiro da pasta da Engine!
+                    clone.habilidadesDesbloqueadas = new List<string>();
+                    clone.pontosPorCaminho = new List<CaminhoRastrosData>();
+                    clone.pontosRastrosGastos = 0;
+
+                    personagensDoJogador.Add(clone);
+                }
+            }
+
             saveFilePath = Path.Combine(Application.persistentDataPath, "savegame.json");
             LoadGame();
         }
@@ -154,6 +175,13 @@ public class GameDataManager : MonoBehaviour
                 }
                 if (data.teamSelection != null && data.teamSelection.Length > 0)
                     _savedTeamSelection = data.teamSelection;
+                
+                // Distribui o profile para os personagens master atuais em Play Mode
+                foreach (var personagem in personagensDoJogador)
+                {
+                    AplicarDadosCarregados(personagem);
+                }
+
                 Debug.Log("JOGO CARREGADO.");
             }
             catch (System.Exception e)
@@ -173,12 +201,10 @@ public class GameDataManager : MonoBehaviour
             if (string.IsNullOrEmpty(_savedTeamSelection[i])) continue;
             if (equipeSelecionada[i] != null) continue; // respeita seleção já feita na sessão
 
-            CharacterBase found = bibliotecaOriginalPersonagens.Find(c => c.name == _savedTeamSelection[i]);
+            CharacterBase found = personagensDoJogador.Find(c => c.name.Replace("(Clone)", "") == _savedTeamSelection[i]);
             if (found != null)
             {
-                CharacterBase instancia = Instantiate(found);
-                AplicarDadosCarregados(instancia);
-                equipeSelecionada[i] = instancia;
+                equipeSelecionada[i] = found; // Reaproveita a cópia mestra sem recriar
             }
         }
     }

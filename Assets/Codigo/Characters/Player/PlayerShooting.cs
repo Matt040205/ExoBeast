@@ -152,6 +152,7 @@ public class PlayerShooting : NetworkBehaviour
     void Update()
     {
         if (!IsOwner) return;
+        if (PauseControl.isPaused) return;
 
         if (PauseControl.isPaused || BuildManager.isBuildingMode) return;
 
