@@ -1,49 +1,103 @@
 using UnityEngine;
 using Unity.Netcode;
+using System.Collections;
 
 /// <summary>
 /// ── HabilidadeCacadoraNoturna ────────────────────────────
-/// ScriptableObject that spawns the CacadoraNoturnaLogic beam on the server.
-///
-///  ▸ Only runs on IsServer — HabilidadeVooGracioso gate prevents client calls
-///  ▸ Spawn position derived from firePoint for accurate beam origin
-///  ▸ StartUltimateEffect called after Spawn so NetworkVariables are ready
+/// Suprema da Coruja: dispara um beam que percorre todo o mapa,
+/// causando dano massivo em todos os inimigos no caminho.
 /// ─────────────────────────────────────────────────────────
 /// </summary>
 [CreateAssetMenu(fileName = "Cacadora Noturna", menuName = "ExoBeasts/Personagens/Coruja/Habilidade/Cacadora Noturna")]
 public class HabilidadeCacadoraNoturna : Ability
 {
     [Header("Configuracoes da Habilidade")]
-    public float damage = 500f;
+    public float damage = 300f;
     public float range = 100f;
     public float width = 3f;
 
-    [Tooltip("Arraste o prefab da logica da habilidade aqui.")]
-    public CacadoraNoturnaLogic logicPrefab;
+    [Header("Visual & Feedback")]
+    [Tooltip("Arraste o Prefab que contém os efeitos de partícula originais ou o CacadoraNoturnaLogic")]
+    public GameObject logicVisualPrefab;
+
+    [Tooltip("Tempo (em segundos) que a script espera a animação rodar antes de atirar o raio/dano.")]
+    public float delayTiro = 1.0f;
 
     public override bool Activate(GameObject quemUsou)
     {
-        if (logicPrefab == null)
-        {
-            Debug.LogError("O prefab da logica da habilidade esta NULO no ScriptableObject 'Cacadora Noturna'!");
-            return true;
-        }
-
-        if (!NetworkManager.Singleton.IsServer) return true;
+        Debug.Log("[CacadoraNoturna] Activate() chamado!");
 
         PlayerShooting shootingScript = quemUsou.GetComponent<PlayerShooting>();
         PlayerMovement movementScript = quemUsou.GetComponent<PlayerMovement>();
+        Animator anim = quemUsou.GetComponentInChildren<Animator>();
 
         Transform modelPivot = (movementScript != null) ? movementScript.GetModelPivot() : quemUsou.transform;
-        Transform firePoint = (shootingScript != null && shootingScript.firePoint != null) ? shootingScript.firePoint : quemUsou.transform;
+        Transform firePoint = (shootingScript != null && shootingScript.firePoint != null)
+            ? shootingScript.firePoint
+            : quemUsou.transform;
 
-        Vector3 spawnPosition = firePoint.position;
-        Quaternion spawnRotation = Quaternion.LookRotation(modelPivot.forward);
+        Vector3 startPoint = firePoint.position;
+        Vector3 direction = modelPivot.forward;
 
-        CacadoraNoturnaLogic logic = Object.Instantiate(logicPrefab, spawnPosition, spawnRotation);
-        logic.GetComponent<NetworkObject>().Spawn();
-        logic.StartUltimateEffect(quemUsou, damage, range, width);
+        Debug.Log($"[CacadoraNoturna] Posição: {startPoint}, Direção: {direction}, Range: {range}, Dano: {damage}");
+
+        // Toca animação da suprema (Animação de preparar o arco começa agora!)
+        if (anim != null)
+        {
+            anim.SetTrigger("CacadoraUltimate");
+        }
+
+        // Delega o disparo e o dano para acontecer APÓS o tempo de delay da animação
+        MonoBehaviour mb = quemUsou.GetComponent<MonoBehaviour>();
+        if (mb != null)
+        {
+            mb.StartCoroutine(DisparoDelayCoroutine(startPoint, direction));
+        }
 
         return true;
+    }
+
+    private System.Collections.IEnumerator DisparoDelayCoroutine(Vector3 startPoint, Vector3 direction)
+    {
+        // Espera a personagem terminar a pose da animação e "soltar" o tiro
+        yield return new WaitForSeconds(delayTiro);
+
+        // Instancia o prefab de Efeitos Visuais (Partículas, LineRenderers originais)
+        if (logicVisualPrefab != null)
+        {
+            GameObject vfx = Object.Instantiate(logicVisualPrefab, startPoint, Quaternion.LookRotation(direction));
+            
+            // Toca eventuais partículas configuradas no topo do prefab
+            ParticleSystem[] particles = vfx.GetComponentsInChildren<ParticleSystem>();
+            foreach (var p in particles) p.Play();
+
+            // Destroi o visual de lógica depois da duração
+            Object.Destroy(vfx, 4.0f);
+        }
+
+        // Aplica dano via SphereCast inline (já atinge todos na linha de forma confiável local/rede)
+        ApplyBeamDamage(startPoint, direction);
+    }
+
+    private void ApplyBeamDamage(Vector3 startPoint, Vector3 direction)
+    {
+        LayerMask enemyLayer = LayerMask.GetMask("Enemy");
+
+        RaycastHit[] hits = Physics.SphereCastAll(startPoint, width, direction, range, enemyLayer);
+
+        Debug.Log($"[CacadoraNoturna] SphereCast atingiu {hits.Length} alvos");
+
+        foreach (var hit in hits)
+        {
+            EnemyHealthSystem health = hit.collider.GetComponent<EnemyHealthSystem>();
+            if (health == null)
+                health = hit.collider.GetComponentInParent<EnemyHealthSystem>();
+
+            if (health != null)
+            {
+                health.TakeDamage(damage, 0f, false);
+                Debug.Log($"[CacadoraNoturna] {hit.collider.name} recebeu {damage} de dano!");
+            }
+        }
     }
 }

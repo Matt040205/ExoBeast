@@ -1,13 +1,11 @@
 using UnityEngine;
 using Unity.Netcode;
+using System.Collections;
 
 /// <summary>
 /// ── HabilidadeVooGracioso ────────────────────────────────
-/// ScriptableObject that spawns the VooGraciosoLogic on the server.
-///
-///  ▸ Cannot activate while grounded — ability is airborne-only
-///  ▸ Spawn parented to player so the logic moves with the character
-///  ▸ Server calls StartEffect after Spawn to set NetworkVariables before clients receive the object
+/// Habilidade 1 da Coruja: ao ativar no ar, a personagem flutua por alguns
+/// segundos e a próxima flecha ganha dano bônus + área de explosão.
 /// ─────────────────────────────────────────────────────────
 /// </summary>
 [CreateAssetMenu(fileName = "Voo Gracioso", menuName = "ExoBeasts/Personagens/Coruja/Habilidade/Voo Gracioso")]
@@ -19,36 +17,56 @@ public class HabilidadeVooGracioso : Ability
     public float bonusDamageMultiplier = 1.5f;
     public float bonusExplosionRadius = 5f;
 
-    [Tooltip("Arraste o prefab da logica da habilidade aqui.")]
-    public VooGraciosoLogic logicPrefab;
-
     public override bool Activate(GameObject quemUsou)
     {
-        if (logicPrefab == null)
-            return true;
-
-        if (!NetworkManager.Singleton.IsServer) return true;
+        Debug.Log("[VooGracioso] Activate() chamado!");
 
         PlayerMovement movement = quemUsou.GetComponent<PlayerMovement>();
-        if (movement != null && movement.isGrounded)
+        if (movement == null)
         {
-            return false; // Cannot activate while grounded
+            Debug.LogWarning("[VooGracioso] PlayerMovement não encontrado!");
+            return false;
         }
 
-        CommanderAbilityController abilityController = quemUsou.GetComponent<CommanderAbilityController>();
+        if (movement.isGrounded)
+        {
+            Debug.Log("[VooGracioso] Jogador está no chão — habilidade requer estar no ar!");
+            return false;
+        }
 
-        VooGraciosoLogic logic = Object.Instantiate(logicPrefab, quemUsou.transform);
-        logic.GetComponent<NetworkObject>().Spawn();
-        logic.StartEffect(
-            quemUsou,
-            jumpHeightModifier,
-            staticAimDuration,
-            bonusDamageMultiplier,
-            bonusExplosionRadius,
-            abilityController,
-            this
-        );
+        PlayerShooting shooting = quemUsou.GetComponent<PlayerShooting>();
+
+        // Aplica flutuação
+        movement.isFloating = true;
+        movement.floatDuration = staticAimDuration;
+        movement.jumpHeightModifier = jumpHeightModifier;
+        Debug.Log($"[VooGracioso] Flutuando por {staticAimDuration}s. jumpMod={jumpHeightModifier}");
+
+        // Aplica bônus na próxima flecha
+        if (shooting != null)
+        {
+            shooting.SetNextShotBonus(bonusDamageMultiplier, bonusExplosionRadius);
+            Debug.Log($"[VooGracioso] Próxima flecha: {bonusDamageMultiplier}x dano, raio {bonusExplosionRadius}");
+        }
+        else
+        {
+            Debug.LogWarning("[VooGracioso] PlayerShooting não encontrado!");
+        }
+
+        // Reseta modificadores após a duração
+        movement.StartCoroutine(ResetAfterFloat(movement));
 
         return true;
+    }
+
+    private IEnumerator ResetAfterFloat(PlayerMovement movement)
+    {
+        yield return new WaitForSeconds(staticAimDuration + 0.5f);
+        if (movement != null)
+        {
+            movement.jumpHeightModifier = 1f;
+            movement.isFloating = false;
+            Debug.Log("[VooGracioso] Float encerrado. Modificadores resetados.");
+        }
     }
 }

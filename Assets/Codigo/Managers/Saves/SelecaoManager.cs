@@ -296,7 +296,48 @@ public class SelecaoManager : NetworkBehaviour
         }
     }
 
-    public void AbrirPainelEscolha(int i) { slotSendoEditado = i; painelEquipe.SetActive(false); painelEscolhaPersonagem.SetActive(true); }
+    public void AbrirPainelEscolha(int i) 
+    { 
+        slotSendoEditado = i; 
+        
+        // Atualiza a disponibilidade e as cores dos botões de seleção
+        foreach(var kvp in botoesDeEscolha)
+        {
+            CharacterBase p = kvp.Key;
+            Button btn = kvp.Value;
+            
+            bool jaSelecionadoEmOutroSlot = false;
+            if (GameDataManager.Instance != null && GameDataManager.Instance.equipeSelecionada != null)
+            {
+                for(int slotIndex = 0; slotIndex < GameDataManager.Instance.equipeSelecionada.Length; slotIndex++)
+                {
+                    // Ignora o meu próprio slot (pra eu poder ver/re-selecionar o que estou tentando trocar, ou não)
+                    if (slotIndex == slotSendoEditado) continue;
+                    
+                    if (GameDataManager.Instance.equipeSelecionada[slotIndex] == p)
+                    {
+                        jaSelecionadoEmOutroSlot = true;
+                        break;
+                    }
+                }
+            }
+
+            if (jaSelecionadoEmOutroSlot)
+            {
+                btn.interactable = false;
+                btn.image.color = new Color(0.3f, 0.3f, 0.3f, 1f); // Preto/cinza escuro
+            }
+            else
+            {
+                btn.interactable = true;
+                btn.image.color = Color.white; // Original/limpo
+            }
+        }
+
+        painelEquipe.SetActive(false); 
+        painelEscolhaPersonagem.SetActive(true); 
+    }
+
     public void VoltarParaPainelEquipe() { painelEscolhaPersonagem.SetActive(false); painelDetalhes.SetActive(false); painelEquipe.SetActive(true); }
     public void VoltarParaPainelEscolha() { painelDetalhes.SetActive(false); painelEscolhaPersonagem.SetActive(true); }
 

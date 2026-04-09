@@ -81,11 +81,29 @@ public class EnemyController : MonoBehaviour
         nivel = level;
         currentPointIndex = 0;
         IsDead = false;
+        target = null;
+        currentChaseTimer = 0f;
+        speedModifier = 1f;
+        isRooted = false;
+        isSlipping = false;
+        isKnockedBack = false;
+        isSlowed = false;
+        IsBlinded = false;
 
         if (healthSystem != null) healthSystem.InitializeHealth(level);
         if (combatSystem != null) combatSystem.InitializeCombat(data, level);
 
-        if (agent != null) agent.speed = originalMoveSpeed;
+        // Garante que o NavMeshAgent está na posição correta no NavMesh
+        if (agent != null)
+        {
+            agent.enabled = false;
+            agent.enabled = true;
+            agent.Warp(transform.position);
+            agent.isStopped = false;
+            agent.speed = originalMoveSpeed;
+        }
+
+        currentMoveSpeed = originalMoveSpeed;
     }
 
     void Update()
@@ -148,25 +166,35 @@ public class EnemyController : MonoBehaviour
 
     private Transform FindNearestPlayer()
     {
-        if (PlayerRegistry.Instance == null) return playerTransform;
-
-        var players = PlayerRegistry.Instance.GetAllPlayers();
-        if (players.Count == 0) return null;
-
-        float minDistance = float.MaxValue;
-        Transform nearest = null;
-
-        foreach (var p in players.Values)
+        // Tenta via PlayerRegistry (modo rede)
+        if (PlayerRegistry.Instance != null)
         {
-            if (p == null) continue;
-            float dist = Vector3.Distance(transform.position, p.transform.position);
-            if (dist < minDistance)
+            var players = PlayerRegistry.Instance.GetAllPlayers();
+            if (players.Count > 0)
             {
-                minDistance = dist;
-                nearest = p.transform;
+                float minDistance = float.MaxValue;
+                Transform nearest = null;
+
+                foreach (var p in players.Values)
+                {
+                    if (p == null) continue;
+                    float dist = Vector3.Distance(transform.position, p.transform.position);
+                    if (dist < minDistance)
+                    {
+                        minDistance = dist;
+                        nearest = p.transform;
+                    }
+                }
+                if (nearest != null) return nearest;
             }
         }
-        return nearest;
+
+        // Fallback: busca por tag "Player"
+        GameObject player = GameObject.FindWithTag("Player");
+        if (player != null) return player.transform;
+
+        // Último recurso: mantém o alvo atual
+        return playerTransform;
     }
 
     private void Patrol()
@@ -178,15 +206,36 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        // Detectar chegada ao waypoint via remainingDistance (mais robusto que OnTriggerEnter)
-        if (agent != null && !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance + 0.5f)
+        // Se o agent não está no NavMesh, tenta recolocar (não morre)
+        if (agent == null || !agent.enabled || !agent.isOnNavMesh)
         {
+            if (agent != null)
+            {
+                agent.enabled = false;
+                agent.enabled = true;
+                agent.Warp(transform.position);
+            }
+            return;
+        }
+
+        Transform waypoint = patrolPoints[currentPointIndex];
+        if (waypoint == null) { currentPointIndex++; return; }
+
+        // Usa distância HORIZONTAL (ignora Y) para detectar chegada — evita problemas com altura
+        Vector3 flatPos = new Vector3(transform.position.x, 0, transform.position.z);
+        Vector3 flatWaypoint = new Vector3(waypoint.position.x, 0, waypoint.position.z);
+        float distToWaypoint = Vector3.Distance(flatPos, flatWaypoint);
+
+        if (distToWaypoint <= 3.0f)
+        {
+            // Chegou ao waypoint, avança para o próximo
             currentPointIndex++;
             return;
         }
 
+        // Move em direção ao waypoint
         if (anim != null) anim.SetBool("isWalking", true);
-        MoveTowardsPosition(patrolPoints[currentPointIndex].position);
+        MoveTowardsPosition(waypoint.position);
     }
 
     private void ChaseTarget()
@@ -197,7 +246,7 @@ public class EnemyController : MonoBehaviour
 
         if (distanceToTarget <= attackDistance)
         {
-            if (agent != null && agent.enabled) agent.isStopped = true;
+            if (agent != null && agent.enabled && agent.isOnNavMesh) agent.isStopped = true;
             
             if (anim != null)
             {
@@ -215,7 +264,7 @@ public class EnemyController : MonoBehaviour
         }
         else
         {
-            if (agent != null && agent.enabled) agent.isStopped = false;
+            if (agent != null && agent.enabled && agent.isOnNavMesh) agent.isStopped = false;
             if (anim != null) anim.SetBool("isWalking", true);
             MoveTowardsPosition(target.position);
         }
@@ -248,14 +297,38 @@ public class EnemyController : MonoBehaviour
         if (anim != null)
         {
             anim.SetBool("isWalking", false);
-            anim.SetTrigger("isDead");
+            // Só tenta trigger se o parâmetro existir no Animator
+            foreach (var param in anim.parameters)
+            {
+                if (param.name == "isDead" && param.type == AnimatorControllerParameterType.Trigger)
+                {
+                    anim.SetTrigger("isDead");
+                    break;
+                }
+            }
         }
-        if (agent != null) agent.isStopped = true;
 
-        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
+            agent.isStopped = true;
+
+        // Notifica o HordeManager sobre a morte do inimigo
+        if (HordeManager.Instance != null)
         {
-            EnemyPoolManager.Instance.ReturnToPool(gameObject);
+            if (HordeManager.Instance.IsLocalMode)
+                HordeManager.Instance.OnEnemyKilled();
+            else
+                HordeManager.Instance.OnEnemyKilledServerRpc();
         }
+
+        // Sempre devolve ao pool após delay (funciona em local E Host)
+        StartCoroutine(ReturnToPoolAfterDelay(1.5f));
+    }
+
+    private IEnumerator ReturnToPoolAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (EnemyPoolManager.Instance != null)
+            EnemyPoolManager.Instance.ReturnToPool(gameObject);
     }
 
     public void ApplySlow(float percentage, float duration) { StartCoroutine(SlowRoutine(percentage, duration)); }

@@ -100,7 +100,9 @@ public class EnemyHealthSystem : MonoBehaviour
 
     public bool TakeDamage(float damage, float armorPenetration = 0f, bool isCritical = false)
     {
-        if (networkedEnemy != null && !networkedEnemy.IsServer) return false;
+        // Só bloqueia se NGO está ativo E não somos o servidor (somos cliente puro)
+        bool isNGOSpawned = networkedEnemy != null && networkedEnemy.IsSpawned;
+        if (isNGOSpawned && !networkedEnemy.IsServer) return false;
         if (isDead) return false;
 
         float damageWithMark = damage * markedDamageMultiplier * vulnerabilityMultiplier;
@@ -166,7 +168,8 @@ public class EnemyHealthSystem : MonoBehaviour
 
     public void ApplyArmorShred(float percentage, int maxStacks)
     {
-        if (networkedEnemy != null && !networkedEnemy.IsServer) return;
+        bool isNGOSpawned = networkedEnemy != null && networkedEnemy.IsSpawned;
+        if (isNGOSpawned && !networkedEnemy.IsServer) return;
         if (armorShredStacks < maxStacks)
         {
             armorShredStacks++;
@@ -176,8 +179,32 @@ public class EnemyHealthSystem : MonoBehaviour
 
     public void ApplyMarkedStatus(float multiplier)
     {
-        if (networkedEnemy != null && !networkedEnemy.IsServer) return;
+        bool isNGOSpawned = networkedEnemy != null && networkedEnemy.IsSpawned;
+        if (isNGOSpawned && !networkedEnemy.IsServer) return;
+        
         markedDamageMultiplier = multiplier;
+
+        // Feedback visual da marcação: Substitui materiais temporariamente
+        if (multiplier > 1.0f && enemyRenderer != null && markedMaterial != null)
+        {
+            // Força o material a renderizar através de paredes independentemente do Shader URP
+            markedMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+
+            Material[] markMats = new Material[originalMaterials.Length];
+            for (int i = 0; i < markMats.Length; i++)
+            {
+                markMats[i] = markedMaterial;
+            }
+            enemyRenderer.materials = markMats;
+            isMarked = true;
+        }
+        else if (multiplier <= 1.0f && enemyRenderer != null && originalMaterials != null && isMarked)
+        {
+            // Retorna aos materiais originais e reseta o Property Block
+            enemyRenderer.materials = originalMaterials;
+            enemyRenderer.SetPropertyBlock(propBlock);
+            isMarked = false;
+        }
     }
 
     public bool IsArmorShredded => armorShredStacks > 0;
@@ -210,12 +237,18 @@ public class EnemyHealthSystem : MonoBehaviour
         if (isDead) return;
         isDead = true;
 
-        if (networkedEnemy != null && networkedEnemy.IsServer)
-        {
-            // Iniciar sequência de morte sincronizada
-            StartCoroutine(networkedEnemy.DieRoutine());
+        bool isNGOSpawned = networkedEnemy != null && networkedEnemy.IsSpawned;
+        bool isLocalMode = !isNGOSpawned;
 
-            // Recompensas entregues pelo servidor
+        if (isNGOSpawned && networkedEnemy.IsServer)
+        {
+            // Modo rede: Iniciar sequência de morte sincronizada
+            StartCoroutine(networkedEnemy.DieRoutine());
+        }
+
+        // Recompensas entregues em modo local OU pelo servidor em modo rede
+        if (isLocalMode || (isNGOSpawned && networkedEnemy.IsServer))
+        {
             if (CurrencyManager.Instance != null && enemyData != null)
             {
                 CurrencyManager.Instance.AddCurrency(enemyData.geoditasOnDeath, CurrencyType.Geodites);

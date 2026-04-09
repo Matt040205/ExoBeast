@@ -1,14 +1,13 @@
 using UnityEngine;
 using FMODUnity;
 using Unity.Netcode;
+using System.Collections;
+using System.Collections.Generic;
 
 /// <summary>
 /// ── HabilidadePerseguindoPresas ──────────────────────────
-/// ScriptableObject that spawns the PreyMarkLogic on the server to mark all active enemies.
-///
-///  ▸ Server-only spawn gate prevents duplicate logic objects
-///  ▸ FMOD activation sound delegated to CommanderAbilityController feedback layer
-///  ▸ PreyMarkLogic iterates SpawnedObjects directly — no FindGameObjectsWithTag
+/// Habilidade 2 da Coruja: marca todos os inimigos ativos, fazendo-os
+/// receber mais dano e ficarem visíveis (highlight) por uma duração.
 /// ─────────────────────────────────────────────────────────
 /// </summary>
 [CreateAssetMenu(fileName = "Perseguindo as Presas", menuName = "ExoBeasts/Personagens/Coruja/Habilidade/Perseguindo as Presas")]
@@ -18,27 +17,59 @@ public class HabilidadePerseguindoPresas : Ability
     public float markDuration = 5f;
     public float bonusDamageMultiplier = 1.25f;
 
-    [Tooltip("Arraste o prefab da logica da habilidade aqui.")]
-    public PreyMarkLogic logicPrefab;
-
     [Header("FMOD")]
     [EventRef]
     public string eventoTEC = "event:/SFX/TEC";
 
     public override bool Activate(GameObject quemUsou)
     {
-        if (logicPrefab == null)
-            return true;
+        Debug.Log("[PerseguindoPresas] Activate() chamado!");
 
-        if (!NetworkManager.Singleton.IsServer) return true;
+        // Encontra todos os inimigos ativos na cena
+        EnemyHealthSystem[] enemies = Object.FindObjectsByType<EnemyHealthSystem>(FindObjectsSortMode.None);
 
-        // Activation sound handled by CommanderAbilityController's visual/audio feedback layer
-        CommanderAbilityController abilityController = quemUsou.GetComponent<CommanderAbilityController>();
+        if (enemies.Length == 0)
+        {
+            Debug.Log("[PerseguindoPresas] Nenhum inimigo encontrado na cena.");
+            return true; // Consome habilidade mesmo sem inimigos
+        }
 
-        PreyMarkLogic logic = Object.Instantiate(logicPrefab, quemUsou.transform.position, Quaternion.identity);
-        logic.GetComponent<NetworkObject>().Spawn();
-        logic.StartEffect(markDuration, bonusDamageMultiplier, abilityController, this);
+        Debug.Log($"[PerseguindoPresas] Marcando {enemies.Length} inimigos por {markDuration}s ({bonusDamageMultiplier}x dano)");
+
+        List<EnemyHealthSystem> markedEnemies = new List<EnemyHealthSystem>();
+
+        foreach (var enemy in enemies)
+        {
+            if (enemy != null && enemy.gameObject.activeInHierarchy)
+            {
+                enemy.ApplyMarkedStatus(bonusDamageMultiplier);
+                markedEnemies.Add(enemy);
+                Debug.Log($"[PerseguindoPresas] Marcado: {enemy.gameObject.name}");
+            }
+        }
+
+        // Usa MonoBehaviour do jogador para rodar a coroutine de remoção
+        MonoBehaviour mb = quemUsou.GetComponent<MonoBehaviour>();
+        if (mb != null)
+        {
+            mb.StartCoroutine(RemoveMarksAfterDuration(markedEnemies));
+        }
 
         return true;
+    }
+
+    private IEnumerator RemoveMarksAfterDuration(List<EnemyHealthSystem> enemies)
+    {
+        yield return new WaitForSeconds(markDuration);
+
+        foreach (var enemy in enemies)
+        {
+            if (enemy != null)
+            {
+                enemy.ApplyMarkedStatus(1.0f);
+            }
+        }
+
+        Debug.Log("[PerseguindoPresas] Marcação removida de todos os inimigos.");
     }
 }

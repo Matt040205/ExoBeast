@@ -96,10 +96,8 @@ public class GameDataManager : MonoBehaviour
     {
         for (int i = 0; i < equipeSelecionada.Length; i++)
         {
-            if (equipeSelecionada[i] != null)
-            {
-                Destroy(equipeSelecionada[i]);
-            }
+            // Apenas remove a referência daquele "slot", sem destruir a master-copy
+            // original que está guardada no personagensDoJogador! 
             equipeSelecionada[i] = null;
         }
     }

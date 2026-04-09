@@ -162,6 +162,14 @@ public class MenuManager : MonoBehaviour
             NetworkManager.Singleton.Shutdown();
         }
 
+        // Se voltar pro Menu, reseta automaticamente qualquer time da partida anterior
+        if (nomeDaCena.ToLower().Contains("menu") && GameDataManager.Instance != null)
+        {
+            GameDataManager.Instance.LimparSelecao();
+            // Salva isso no perfil para não ter conflito se alguém fechar o jogo
+            GameDataManager.Instance.SaveGame(); 
+        }
+
         GameModeManager.LoadSceneSafe(nomeDaCena);
     }
 }
