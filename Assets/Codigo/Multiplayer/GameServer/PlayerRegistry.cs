@@ -56,17 +56,20 @@ namespace ExoBeasts.Multiplayer.GameServer
         {
             if (!IsServer) return;
 
-            if (playerObjects.ContainsKey(clientId))
-                playerObjects[clientId] = playerObj;
-            else
-                playerObjects.Add(clientId, playerObj);
+            if (playerObjects.TryGetValue(clientId, out var existing) && existing != null && existing != playerObj)
+            {
+                Debug.LogWarning(
+                    $"[PlayerRegistry] RegisterPlayer sobrescrevendo jogador existente para clientId={clientId}. " +
+                    $"Anterior: {existing.name}, novo: {playerObj.name}. " +
+                    "Possivel duplo spawn — verificar GameSetupManager.");
+            }
+            playerObjects[clientId] = playerObj;
 
             var netObj = playerObj.GetComponent<NetworkObject>();
             if (netObj != null)
                 playerNetworkObjects[clientId] = netObj;
-                
-            playerCharacterChoices[clientId] = characterIndex;
 
+            playerCharacterChoices[clientId] = characterIndex;
         }
 
         public void SetPlayerCharacterChoice(ulong clientId, int index)

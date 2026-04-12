@@ -41,6 +41,8 @@ namespace ExoBeasts.Multiplayer.Auth
         [SerializeField] private string currentProductUserId = "";
         [SerializeField] private string deviceIdName = "ExoBeastsPlayer";
 
+        private bool _loginInProgress = false;
+
         public bool IsLoggedIn => isLoggedIn;
         public string CurrentProductUserId => currentProductUserId;
 
@@ -70,16 +72,18 @@ namespace ExoBeasts.Multiplayer.Auth
         public void LoginWithDeviceId()
         {
 #if !EOS_DISABLE
-            if (isLoggedIn)
+            if (isLoggedIn || _loginInProgress)
             {
-                Debug.LogWarning("[EOSAuthenticator] Ja esta logado");
+                Debug.LogWarning($"[EOSAuthenticator] Login ja {(isLoggedIn ? "concluido" : "em progresso")} — ignorando chamada duplicada");
                 return;
             }
+            _loginInProgress = true;
 
             var eosManager = EOSManagerWrapper.Instance;
             if (!eosManager.IsInitialized)
             {
                 Debug.LogError("[EOSAuthenticator] EOS nao inicializado. Chame EOSManagerWrapper.Initialize() primeiro");
+                _loginInProgress = false;
                 OnLoginFailed?.Invoke("EOS nao inicializado");
                 return;
             }
@@ -88,12 +92,25 @@ namespace ExoBeasts.Multiplayer.Auth
             if (connectInterface == null)
             {
                 Debug.LogError("[EOSAuthenticator] ConnectInterface nao disponivel");
+                _loginInProgress = false;
                 OnLoginFailed?.Invoke("ConnectInterface nao disponivel");
                 return;
             }
 
             Debug.Log("[EOSAuthenticator] Iniciando login via Device ID...");
-            CreateDeviceIdAndLogin(connectInterface);
+
+            if (Core.MppmHelper.IsClone)
+            {
+                // Clones MPPM: deletar credenciais antigas garante ProductUserId fresco.
+                DeleteDeviceIdThenCreate(connectInterface);
+            }
+            else
+            {
+                // Instancia principal: CreateDeviceId e necessario para ATIVAR as credenciais
+                // da sessao atual, mesmo que ja existam (EOS retorna DuplicateNotAllowed, que
+                // e tratado como sucesso). O log de Error do SDK e cosmetico — nao indica falha.
+                CreateDeviceIdAndLogin(connectInterface);
+            }
 #else
             Debug.LogWarning("[EOSAuthenticator] EOS desabilitado");
             OnLoginFailed?.Invoke("EOS desabilitado");
@@ -101,6 +118,23 @@ namespace ExoBeasts.Multiplayer.Auth
         }
 
 #if !EOS_DISABLE
+        private void DeleteDeviceIdThenCreate(ConnectInterface connectInterface)
+        {
+            var deleteOptions = new DeleteDeviceIdOptions();
+            connectInterface.DeleteDeviceId(ref deleteOptions, null,
+                (ref DeleteDeviceIdCallbackInfo data) =>
+                {
+                    if (data.ResultCode == Result.Success)
+                        Debug.Log("[EOSAuthenticator] Device ID deletado (clone MPPM)");
+                    else if (data.ResultCode == Result.NotFound)
+                        Debug.Log("[EOSAuthenticator] Device ID nao existia (clone MPPM) — OK");
+                    else
+                        Debug.LogWarning($"[EOSAuthenticator] Delete DeviceId: {data.ResultCode}");
+
+                    CreateDeviceIdAndLogin(connectInterface);
+                });
+        }
+
         private void CreateDeviceIdAndLogin(ConnectInterface connectInterface)
         {
             string baseModel = $"{SystemInfo.deviceModel}_{SystemInfo.deviceName}";
@@ -147,7 +181,9 @@ namespace ExoBeasts.Multiplayer.Auth
 
             if (connectInterface == null)
             {
-                OnLoginFailed?.Invoke("ConnectInterface nao disponivel");
+                Debug.LogError("[EOSAuthenticator] ConnectInterface nulo em PerformDeviceIdLogin — EOS pode ter sido reinicializado durante o callback. Abortando login.");
+                _loginInProgress = false;
+                OnLoginFailed?.Invoke("ConnectInterface nulo");
                 return;
             }
 
@@ -179,11 +215,15 @@ namespace ExoBeasts.Multiplayer.Auth
                 localProductUserId = data.LocalUserId;
                 currentProductUserId = localProductUserId.ToString();
                 isLoggedIn = true;
+                _loginInProgress = false;
 
                 Debug.Log($"[EOSAuthenticator] Login bem-sucedido! ProductUserId: {currentProductUserId}");
 
                 EOSManagerWrapper.Instance.SetConnected(true);
-                SessionManager.Instance.StartSession(currentProductUserId, deviceIdName);
+                if (SessionManager.Instance != null)
+                    SessionManager.Instance.StartSession(currentProductUserId, deviceIdName);
+                else
+                    Debug.LogWarning("[EOSAuthenticator] SessionManager.Instance nulo — sessao nao registrada");
                 OnLoginSuccess?.Invoke(currentProductUserId);
             }
             else if (data.ResultCode == Result.InvalidUser)
@@ -194,6 +234,7 @@ namespace ExoBeasts.Multiplayer.Auth
             else
             {
                 Debug.LogError($"[EOSAuthenticator] Falha no login: {data.ResultCode}");
+                _loginInProgress = false;
                 OnLoginFailed?.Invoke($"Falha no login: {data.ResultCode}");
             }
         }
@@ -225,16 +266,21 @@ namespace ExoBeasts.Multiplayer.Auth
                 localProductUserId = data.LocalUserId;
                 currentProductUserId = localProductUserId.ToString();
                 isLoggedIn = true;
+                _loginInProgress = false;
 
                 Debug.Log($"[EOSAuthenticator] Usuario criado e logado! ProductUserId: {currentProductUserId}");
 
                 EOSManagerWrapper.Instance.SetConnected(true);
-                SessionManager.Instance.StartSession(currentProductUserId, deviceIdName);
+                if (SessionManager.Instance != null)
+                    SessionManager.Instance.StartSession(currentProductUserId, deviceIdName);
+                else
+                    Debug.LogWarning("[EOSAuthenticator] SessionManager.Instance nulo — sessao nao registrada");
                 OnLoginSuccess?.Invoke(currentProductUserId);
             }
             else
             {
                 Debug.LogError($"[EOSAuthenticator] Falha ao criar usuario: {data.ResultCode}");
+                _loginInProgress = false;
                 OnLoginFailed?.Invoke($"Falha ao criar usuario: {data.ResultCode}");
             }
         }
@@ -253,6 +299,7 @@ namespace ExoBeasts.Multiplayer.Auth
             Debug.Log("[EOSAuthenticator] Realizando logout...");
 
             isLoggedIn = false;
+            _loginInProgress = false;
             currentProductUserId = "";
             localProductUserId = null;
 

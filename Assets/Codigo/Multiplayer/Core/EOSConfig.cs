@@ -43,7 +43,14 @@ namespace ExoBeasts.Multiplayer.Core
 
         public void LoadCredentialsFromFile()
         {
-            string filePath = System.IO.Path.Combine(Application.dataPath, "..", credentialsFilePath);
+            // Clones MPPM têm Application.dataPath apontando para Library/VP/{vpId}/Assets
+            // em vez da raiz real do projeto. Precisamos subir 4 níveis para chegar em PI3D/.
+            string dataParent = MppmHelper.IsClone
+                ? System.IO.Path.Combine(Application.dataPath, "..", "..", "..", "..")
+                : System.IO.Path.Combine(Application.dataPath, "..");
+
+            string filePath = System.IO.Path.GetFullPath(
+                System.IO.Path.Combine(dataParent, credentialsFilePath));
 
             if (!System.IO.File.Exists(filePath))
             {

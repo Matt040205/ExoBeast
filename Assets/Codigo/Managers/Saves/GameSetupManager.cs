@@ -3,6 +3,7 @@ using Unity.Netcode;
 using System.Collections;
 using System.Collections.Generic;
 using ExoBeasts.Multiplayer.GameServer;
+using ExoBeasts.Multiplayer.Core;
 
 /// <summary>
 /// ── GameSetupManager ───────────────────────────────────
@@ -20,6 +21,11 @@ public class GameSetupManager : NetworkBehaviour
     [Header("References")]
     public Transform spawnPoint;
 
+    // Guarda anti-duplo-spawn: preenchido assim que SpawnPlayerServerSide comeca a processar
+    // o clientId e antes de qualquer await/instanciacao. Evita race entre OnNetworkSpawn (host)
+    // e OnClientConnectedCallback disparando para o mesmo clientId na mesma frame.
+    private readonly HashSet<ulong> _spawnedClientIds = new HashSet<ulong>();
+
     private void Awake()
     {
         if (Instance == null) Instance = this;
@@ -32,8 +38,9 @@ public class GameSetupManager : NetworkBehaviour
 
         if (IsServer)
         {
-            SpawnPlayerServerSide(NetworkManager.Singleton.LocalClientId);
             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
+            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+            SpawnPlayerServerSide(NetworkManager.Singleton.LocalClientId);
         }
     }
 
@@ -43,9 +50,27 @@ public class GameSetupManager : NetworkBehaviour
         SpawnPlayerServerSide(clientId);
     }
 
+    private void OnClientDisconnected(ulong clientId)
+    {
+        if (!IsServer) return;
+        // Libera a entry do dedupe para permitir respawn se o cliente reconectar.
+        _spawnedClientIds.Remove(clientId);
+    }
+
     private void SpawnPlayerServerSide(ulong clientId)
     {
         if (!IsServer) return;
+
+        // Dedupe — cobre os dois caminhos que podem disparar para o host:
+        //   (1) OnNetworkSpawn chama SpawnPlayerServerSide(LocalClientId) explicitamente.
+        //   (2) OnClientConnectedCallback(0) dispara quando o host se "conecta" a si mesmo.
+        // Adicionar ao HashSet ANTES de qualquer Instantiate/RegisterPlayer — o check do
+        // PlayerRegistry nao e suficiente porque ele so e populado no fim deste metodo.
+        if (!_spawnedClientIds.Add(clientId))
+        {
+            Debug.Log($"[GameSetupManager] Spawn para clientId={clientId} ja em progresso/concluido. Ignorando chamada duplicada.");
+            return;
+        }
 
         if (PlayerRegistry.Instance != null && PlayerRegistry.Instance.GetPlayerObject(clientId) != null)
             return;
@@ -54,27 +79,38 @@ public class GameSetupManager : NetworkBehaviour
         CharacterBase characterEscolhido = null; // <--- Guarda o cartão de dados selecionado
 
         // 1. Pega os dados exatos do Singleton
-        if (PlayerRegistry.Instance != null && GameDataManager.Instance != null)
-        {
-            int charIndex = PlayerRegistry.Instance.GetPlayerCharacterChoice(clientId);
+        // Fonte primaria: CharacterChoiceCache (populado pelo LobbyManager via ConnectionApproval).
+        // PlayerRegistry e mantido como espelho para codigo legado que le de la.
+        int charIndex = CharacterChoiceCache.Get(clientId, fallback: 0);
 
-            if (charIndex >= 0 && charIndex < GameDataManager.Instance.bibliotecaOriginalPersonagens.Count)
-            {
-                characterEscolhido = GameDataManager.Instance.bibliotecaOriginalPersonagens[charIndex];
-                prefabToSpawn = characterEscolhido.commanderPrefab;
-            }
+        if (GameDataManager.Instance == null)
+        {
+            Debug.LogError("[GameSetupManager] GameDataManager.Instance nulo — scene setup incompleto. Abortando spawn.");
+            return;
         }
 
-        // 2. Fallback de Segurança
-        if (prefabToSpawn == null && GameDataManager.Instance != null && GameDataManager.Instance.equipeSelecionada[0] != null)
+        var biblioteca = GameDataManager.Instance.bibliotecaOriginalPersonagens;
+        if (biblioteca != null && charIndex >= 0 && charIndex < biblioteca.Count)
         {
-            characterEscolhido = GameDataManager.Instance.equipeSelecionada[0];
+            characterEscolhido = biblioteca[charIndex];
+            prefabToSpawn = characterEscolhido?.commanderPrefab;
+        }
+        else
+        {
+            Debug.LogWarning($"[GameSetupManager] charIndex={charIndex} fora de range (biblioteca.Count={biblioteca?.Count ?? 0}). Tentando fallback equipeSelecionada[0].");
+        }
+
+        // 2. Fallback de Segurança — com bounds check (C6 audit).
+        var equipe = GameDataManager.Instance.equipeSelecionada;
+        if (prefabToSpawn == null && equipe != null && equipe.Length > 0 && equipe[0] != null)
+        {
+            characterEscolhido = equipe[0];
             prefabToSpawn = characterEscolhido.commanderPrefab;
         }
 
         if (prefabToSpawn == null)
         {
-            Debug.LogError("[GameSetupManager] Falha crítica: Nenhum 'commanderPrefab' encontrado.");
+            Debug.LogError($"[GameSetupManager] Falha crítica: nenhum 'commanderPrefab' encontrado para clientId={clientId} (charIndex={charIndex}). Configure GameDataManager.bibliotecaOriginalPersonagens ou equipeSelecionada[0] no Inspector.");
             return;
         }
 
@@ -117,11 +153,20 @@ public class GameSetupManager : NetworkBehaviour
         {
             netObj.SpawnAsPlayerObject(clientId);
         }
+        else
+        {
+            Debug.LogError(
+                $"[GameSetupManager] Prefab '{prefabToSpawn.name}' nao tem NetworkObject! " +
+                "Adicione o componente e registre o prefab em NetworkManager > NetworkPrefabsList. " +
+                "Spawn local criado mas NAO e visivel para outros clientes.");
+        }
 
         if (PlayerRegistry.Instance != null)
         {
-            PlayerRegistry.Instance.RegisterPlayer(clientId, playerInstance, 0);
+            PlayerRegistry.Instance.RegisterPlayer(clientId, playerInstance, charIndex);
         }
+
+        Debug.Log($"[GameSetupManager] Spawnou clientId={clientId} como charIndex={charIndex} ({characterEscolhido?.name})");
 
         if (BuildManager.Instance != null && GameDataManager.Instance != null)
         {
@@ -131,10 +176,12 @@ public class GameSetupManager : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
-        if (IsServer)
+        if (IsServer && NetworkManager.Singleton != null)
         {
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
         }
+        _spawnedClientIds.Clear();
         base.OnNetworkDespawn();
     }
 }

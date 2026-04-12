@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using Unity.Netcode;
 using ExoBeasts.Multiplayer.Core;
@@ -37,19 +38,35 @@ namespace ExoBeasts.Multiplayer.Sync
         private void SetupAsLocalPlayer()
         {
             Debug.Log($"[PlayerNetworkSetup] Jogador LOCAL inicializado | ClientId: {OwnerClientId}");
-            RegisterIdentityWithBridge();
+            StartCoroutine(RegisterIdentityWithBridgeWhenReady());
         }
 
         /// <summary>
         /// Envia productUserId + sessionToken do EOS para o servidor via PlayerIdentityBridge.
         /// Permite que o servidor saiba qual jogador EOS corresponde a este clientId NGO.
+        ///
+        /// Retry: NGO nao garante ordem de OnNetworkSpawn entre objetos da cena, entao o
+        /// PlayerIdentityBridge pode ainda nao ter sido spawnado quando este jogador inicia.
+        /// Aguarda ate 2s (60 frames a 30 TPS) pelo bridge aparecer. Se falhar, loga erro.
         /// </summary>
-        private void RegisterIdentityWithBridge()
+        private IEnumerator RegisterIdentityWithBridgeWhenReady()
         {
-            if (PlayerIdentityBridge.Instance == null)
+            const float timeoutSeconds = 2f;
+            float elapsed = 0f;
+
+            while (PlayerIdentityBridge.Instance == null ||
+                   (PlayerIdentityBridge.Instance.NetworkObject != null && !PlayerIdentityBridge.Instance.NetworkObject.IsSpawned))
             {
-                Debug.LogWarning("[PlayerNetworkSetup] PlayerIdentityBridge nao encontrado na cena.");
-                return;
+                elapsed += Time.deltaTime;
+                if (elapsed >= timeoutSeconds)
+                {
+                    Debug.LogError(
+                        "[PlayerNetworkSetup] Timeout aguardando PlayerIdentityBridge spawnar. " +
+                        "Verifique se o NetworkObject esta presente em CenaMapaTeste. " +
+                        "Identidade EOS nao sera vinculada ao clientId.");
+                    yield break;
+                }
+                yield return null;
             }
 
             string userId = "";

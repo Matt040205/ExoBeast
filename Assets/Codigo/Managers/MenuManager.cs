@@ -60,13 +60,25 @@ public class MenuManager : MonoBehaviour
     /// </summary>
     public void HostGame()
     {
-        if (NetworkManager.Singleton != null)
+        if (NetworkManager.Singleton == null) return;
+
+        // Guard MPPM: clones nunca devem iniciar como Host — apenas o processo principal pode.
+        // Este botão existe no MenuScene e é visível em TODOS os Virtual Players do MPPM.
+        if (ExoBeasts.Multiplayer.Core.MppmHelper.IsClone)
         {
-            NetworkManager.Singleton.StartHost();
-            Debug.Log("[MenuManager] Iniciando como HOST...");
-            // Se você quiser carregar a cena do mapa logo após dar host:
-            // NetworkManager.Singleton.SceneManager.LoadScene("NomeDoSeuMapa", LoadSceneMode.Single);
+            Debug.LogWarning("[MenuManager] HostGame() ignorado — este processo é um clone MPPM. Remova o botão 'Host Game' da MenuScene para eliminar este aviso.");
+            return;
         }
+
+        // Guard: evita StartHost duplicado se NGO já está rodando (ex: sessão anterior pendurada).
+        if (NetworkManager.Singleton.IsListening)
+        {
+            Debug.LogWarning("[MenuManager] HostGame() ignorado — NetworkManager já está em execução.");
+            return;
+        }
+
+        NetworkManager.Singleton.StartHost();
+        Debug.Log("[MenuManager] Iniciando como HOST...");
     }
 
     /// <summary>
