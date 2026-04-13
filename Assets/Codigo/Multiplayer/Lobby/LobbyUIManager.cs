@@ -376,7 +376,7 @@ public class LobbyUIManager : MonoBehaviour
                     lobbyName  = string.IsNullOrWhiteSpace(_nomeSala) ? "Minha Sala" : _nomeSala,
                     maxPlayers = _maxPlayers,
                     isPublic   = _publico,
-                    mapName    = "SceneMapTest",
+                    mapName    = "CenaMapaTeste",
                 });
                 _showCriar = false;
             }
