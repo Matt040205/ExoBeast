@@ -54,7 +54,6 @@ namespace ExoBeasts.Multiplayer.GameServer
 
         private void InitializeMatch()
         {
-            Debug.Log("[MatchManager] Inicializando partida...");
             CurrentMatchState.Value = MatchState.WaitingForPlayers;
 
             if (autoStartMatch)
@@ -83,7 +82,6 @@ namespace ExoBeasts.Multiplayer.GameServer
 
         private void StartMatch()
         {
-            Debug.Log("[MatchManager] Iniciando partida!");
             CurrentMatchState.Value = MatchState.Starting;
 
             OnMatchStartingClientRpc();
@@ -96,31 +94,23 @@ namespace ExoBeasts.Multiplayer.GameServer
             CurrentMatchState.Value = MatchState.Playing;
             MatchTime.Value = 0f;
             CurrentWave.Value = 1;
-
-            Debug.Log("[MatchManager] Partida em andamento!");
         }
 
         public void PauseMatch()
         {
             if (!IsServer) return;
-
-            Debug.Log("[MatchManager] Partida pausada");
             CurrentMatchState.Value = MatchState.Paused;
         }
 
         public void ResumeMatch()
         {
             if (!IsServer) return;
-
-            Debug.Log("[MatchManager] Partida retomada");
             CurrentMatchState.Value = MatchState.Playing;
         }
 
         public void EndMatchVictory()
         {
             if (!IsServer) return;
-
-            Debug.Log("[MatchManager] Partida terminada - VITORIA!");
             CurrentMatchState.Value = MatchState.Victory;
             OnMatchEndedClientRpc(true);
         }
@@ -128,8 +118,6 @@ namespace ExoBeasts.Multiplayer.GameServer
         public void EndMatchDefeat()
         {
             if (!IsServer) return;
-
-            Debug.Log("[MatchManager] Partida terminada - DERROTA!");
             CurrentMatchState.Value = MatchState.Defeat;
             OnMatchEndedClientRpc(false);
         }
@@ -137,23 +125,21 @@ namespace ExoBeasts.Multiplayer.GameServer
         [ClientRpc]
         private void OnMatchStartingClientRpc()
         {
-            Debug.Log("[MatchManager] Partida iniciando em breve...");
+            // Stub: adicionar countdown visual ou SFX aqui
         }
 
         [ClientRpc]
         private void OnMatchEndedClientRpc(bool victory)
         {
-            Debug.Log($"[MatchManager] Partida encerrada - {(victory ? "VITORIA" : "DERROTA")}");
+            // Stub: adicionar efeito visual/sonoro de fim de partida aqui
         }
 
-        private void OnMatchStateChanged(MatchState oldState, MatchState newState)
-        {
-            Debug.Log($"[MatchManager] Estado mudou: {oldState} -> {newState}");
-        }
+        private void OnMatchStateChanged(MatchState oldState, MatchState newState) { }
 
-        private void OnDestroy()
+        public override void OnNetworkDespawn()
         {
             CurrentMatchState.OnValueChanged -= OnMatchStateChanged;
+            base.OnNetworkDespawn();
         }
     }
 

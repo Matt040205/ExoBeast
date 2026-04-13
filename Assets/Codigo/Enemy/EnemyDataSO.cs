@@ -5,10 +5,13 @@ public enum EnemyType { Terrestre, Voador }
 [CreateAssetMenu(fileName = "New Enemy Data", menuName = "ScriptableObjects/Base de Dados/Enemy")]
 public class EnemyDataSO : ScriptableObject
 {
+    [Header("Prefab")]
+    public GameObject enemyPrefab;
+
     [Header("Tipo de Inimigo")]
     public EnemyType enemyType = EnemyType.Terrestre;
 
-    [Header("Status Básicos")]
+    [Header("Status Bï¿½sicos")]
     public float baseHP = 100f;
     public float baseATQ = 10f;
     public float moveSpeed = 3f;
@@ -16,7 +19,7 @@ public class EnemyDataSO : ScriptableObject
     [Range(0f, 1f)]
     public float baseArmor = 0f;
 
-    [Header("Escala por Nível")]
+    [Header("Escala por Nï¿½vel")]
     public float hpPerLevel = 10f;
     public float atqPerLevel = 2f;
     public float speedPerLevel = 0.5f;

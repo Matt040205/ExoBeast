@@ -23,10 +23,12 @@ namespace ExoBeasts.Multiplayer.Testing
         private enum Screen { Auth, LobbyList, LobbyRoom }
         private Screen _screen = Screen.Auth;
 
+        private enum AuthState { InitializingEOS, WaitingForName, Connecting, Error }
+        private AuthState _authState = AuthState.InitializingEOS;
+
         private string _displayName = "Jogador";
         private bool   _isMppmClone = false;
         private string _mppmCloneId = "";
-        private bool   _loggingIn   = false;
 
         private string          _lobbyNameFilter  = "";
         private string          _joinByIdInput    = "";
@@ -37,6 +39,9 @@ namespace ExoBeasts.Multiplayer.Testing
         private string _newLobbyName   = "Minha Sala";
         private int    _newMaxPlayers  = 4;
         private bool   _newIsPublic    = true;
+
+        private bool   _showingNickChange = false;
+        private string _pendingNick       = "";
 
         private bool   _isReady        = false;
         private string _currentLobbyId = "";
@@ -57,12 +62,20 @@ namespace ExoBeasts.Multiplayer.Testing
             // Detectar clone MPPM via command-line args (Unity 6 MPPM v1.6+)
             _isMppmClone = MppmHelper.IsClone;
             _mppmCloneId = MppmHelper.CloneId;
+
+            // Carregar nome salvo (MPPM clones usam nome automatico, ignorando PlayerPrefs)
             if (_isMppmClone)
             {
                 string shortId = _mppmCloneId.Length > 4
                     ? _mppmCloneId.Substring(0, 4)
                     : _mppmCloneId;
                 _displayName = $"Clone_{shortId}";
+            }
+            else
+            {
+                string saved = PlayerPrefs.GetString("PlayerDisplayName", "");
+                if (!string.IsNullOrWhiteSpace(saved))
+                    _displayName = saved;
             }
 
             _eosCache   = EOSManagerWrapper.Instance;
@@ -73,15 +86,25 @@ namespace ExoBeasts.Multiplayer.Testing
             _eosCache.OnEOSInitialized       += OnEOSReady;
             _eosCache.OnInitializationFailed += OnEOSFailed;
 
-            if (_eosReady)
-                AddLog("EOS SDK pronto.");
-            else
-                AddLog("Aguardando inicializacao do EOS SDK...");
-
+            // Se ja esta logado (reentrada na cena), ir direto para lobby list
             if (_authCache.IsLoggedIn)
             {
                 _displayName = SessionManager.Instance.GetDisplayName();
                 _screen = Screen.LobbyList;
+                SubscribeToEvents();
+                return;
+            }
+
+            // Se EOS ja esta pronto, decidir proximo passo imediatamente
+            if (_eosReady)
+            {
+                AddLog("EOS SDK pronto.");
+                DecideAuthState();
+            }
+            else
+            {
+                _authState = AuthState.InitializingEOS;
+                AddLog("Inicializando EOS SDK...");
             }
 
             SubscribeToEvents();
@@ -90,12 +113,33 @@ namespace ExoBeasts.Multiplayer.Testing
         private void OnEOSReady()
         {
             _eosReady = true;
-            AddLog("EOS SDK pronto. Faca login para continuar.");
+            AddLog("EOS SDK pronto.");
+            if (!_authCache.IsLoggedIn)
+                DecideAuthState();
         }
 
         private void OnEOSFailed(string error)
         {
+            _authState = AuthState.Error;
             AddLog($"Falha EOS: {error}");
+        }
+
+        private void DecideAuthState()
+        {
+            bool hasName = !string.IsNullOrWhiteSpace(_displayName) && _displayName != "Jogador";
+
+            if (hasName)
+            {
+                _authState = AuthState.Connecting;
+                AddLog($"Conectando como '{_displayName}'...");
+                _authCache.SetDeviceIdName(_displayName);
+                _authCache.LoginWithDeviceId();
+            }
+            else
+            {
+                _authState = AuthState.WaitingForName;
+                AddLog("Bem-vindo! Digite seu nome para continuar.");
+            }
         }
 
         private void OnDestroy()
@@ -155,7 +199,7 @@ namespace ExoBeasts.Multiplayer.Testing
 
         private void OnLoginSuccess(string userId)
         {
-            _loggingIn   = false;
+            _authState   = AuthState.Connecting; // mantém estado até mudar de tela
             _displayName = SessionManager.Instance.GetDisplayName();
             AddLog($"Logado como '{_displayName}'");
             _screen = Screen.LobbyList;
@@ -163,7 +207,7 @@ namespace ExoBeasts.Multiplayer.Testing
 
         private void OnLoginFailed(string error)
         {
-            _loggingIn = false;
+            _authState = AuthState.Error;
             AddLog($"Falha no login: {error}");
         }
 
@@ -316,31 +360,89 @@ namespace ExoBeasts.Multiplayer.Testing
             GUILayout.Label("─── Autenticacao EOS ───");
             GUILayout.Space(6);
 
-            GUILayout.Label("Nome de exibicao:");
-            _displayName = GUILayout.TextField(_displayName, GUILayout.Width(260));
-
-            GUILayout.Space(8);
-
-            GUI.enabled = _eosReady && !_loggingIn;
-            string btnLabel = !_eosReady    ? "Aguardando EOS SDK..." :
-                               _loggingIn   ? "Conectando..." :
-                                              "Login via Device ID (anonimo)";
-            if (GUILayout.Button(btnLabel, GUILayout.Height(42)))
+            switch (_authState)
             {
-                _loggingIn = true;
-                AddLog("Conectando ao EOS...");
-                _authCache.SetDeviceIdName(_displayName);
-                _authCache.LoginWithDeviceId();
-            }
-            GUI.enabled = true;
+                case AuthState.InitializingEOS:
+                {
+                    string dots = (Time.time % 1f > 0.5f) ? ".." : ".";
+                    GUILayout.Label($"Inicializando EOS SDK{dots}");
+                    break;
+                }
 
-            GUILayout.Space(6);
-            GUILayout.Label("(Device ID = login anonimo, sem conta Epic necessaria)");
+                case AuthState.Connecting:
+                {
+                    GUILayout.Label("Conectando...");
+                    break;
+                }
+
+                case AuthState.WaitingForName:
+                {
+                    GUILayout.Label("Bem-vindo! Como quer ser chamado?");
+                    GUILayout.Space(6);
+                    _displayName = GUILayout.TextField(_displayName, GUILayout.Width(260));
+                    GUILayout.Space(8);
+                    if (GUILayout.Button("Jogar", GUILayout.Height(42)))
+                    {
+                        string name = _displayName.Trim();
+                        if (string.IsNullOrEmpty(name)) name = "Jogador";
+                        _displayName = name;
+                        if (!_isMppmClone)
+                        {
+                            PlayerPrefs.SetString("PlayerDisplayName", _displayName);
+                            PlayerPrefs.Save();
+                        }
+                        _authState = AuthState.Connecting;
+                        AddLog($"Conectando como '{_displayName}'...");
+                        _authCache.SetDeviceIdName(_displayName);
+                        _authCache.LoginWithDeviceId();
+                    }
+                    GUILayout.Space(6);
+                    GUILayout.Label("(Device ID = login anonimo, sem conta Epic necessaria)");
+                    break;
+                }
+
+                case AuthState.Error:
+                {
+                    var errStyle = new GUIStyle(GUI.skin.label);
+                    errStyle.normal.textColor = Color.red;
+                    GUILayout.Label("Falha na conexao.", errStyle);
+                    GUILayout.Space(6);
+                    if (GUILayout.Button("Tentar novamente", GUILayout.Height(38)))
+                    {
+                        if (_eosReady)
+                        {
+                            DecideAuthState();
+                        }
+                        else
+                        {
+                            _authState = AuthState.InitializingEOS;
+                            AddLog("Aguardando EOS SDK...");
+                        }
+                    }
+                    break;
+                }
+            }
         }
 
         private void DrawLobbyListScreen()
         {
+            GUILayout.BeginHorizontal();
             GUILayout.Label($"─── Lobbies Disponiveis | Logado: {_displayName} ───");
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Alterar Nick", GUILayout.Width(90)))
+            {
+                _pendingNick       = _displayName;
+                _showingNickChange = !_showingNickChange;
+                _showingCreate     = false;
+            }
+            GUILayout.EndHorizontal();
+
+            if (_showingNickChange)
+            {
+                DrawNickChangeSubPanel();
+                return;
+            }
+
             GUILayout.Space(4);
 
             GUILayout.BeginHorizontal();
@@ -452,6 +554,46 @@ namespace ExoBeasts.Multiplayer.Testing
             GUILayout.Space(8);
             if (GUILayout.Button("Cancelar", GUILayout.Height(38), GUILayout.Width(100)))
                 _showingCreate = false;
+            GUILayout.EndHorizontal();
+        }
+
+        private void DrawNickChangeSubPanel()
+        {
+            GUILayout.Label("─── Alterar Nick ───");
+            GUILayout.Space(6);
+
+            GUILayout.Label("Novo nome:");
+            _pendingNick = GUILayout.TextField(_pendingNick, GUILayout.Width(260));
+
+            GUILayout.Space(8);
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Confirmar", GUILayout.Height(38), GUILayout.Width(120)))
+            {
+                string name = _pendingNick.Trim();
+                if (string.IsNullOrEmpty(name)) name = _displayName;
+
+                _displayName = name;
+
+                if (!_isMppmClone)
+                {
+                    PlayerPrefs.SetString("PlayerDisplayName", _displayName);
+                    PlayerPrefs.Save();
+                }
+
+                SessionManager.Instance?.SetDisplayName(_displayName);
+                _authCache.SetDeviceIdName(_displayName);
+
+                // Se estiver num lobby, atualizar o atributo de membro imediatamente
+                if (!string.IsNullOrEmpty(_currentLobbyId))
+                    _lobbyCache.SetMemberAttribute(MemberAttributes.DISPLAY_NAME, _displayName);
+
+                AddLog($"Nick alterado para '{_displayName}'");
+                _showingNickChange = false;
+            }
+            GUILayout.Space(8);
+            if (GUILayout.Button("Cancelar", GUILayout.Height(38), GUILayout.Width(100)))
+                _showingNickChange = false;
             GUILayout.EndHorizontal();
         }
 

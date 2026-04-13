@@ -480,7 +480,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 1640674918
+  GlobalObjectIdHash: 671670237
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -541,10 +541,13 @@ MonoBehaviour:
   characterData: {fileID: 11400000, guid: 6be7037535adf3347bc4a1b2a3d84af7, type: 2}
   currentHealth:
     m_InternalValue: 0
+  damageMultiplier:
+    m_InternalValue: 1
+  speedMultiplier:
+    m_InternalValue: 1
+  damageResistance:
+    m_InternalValue: 0
   isRegenerating: 0
-  damageMultiplier: 1
-  speedMultiplier: 1
-  damageResistance: 0
   isBuffed: 0
   isCountering: 0
   respawnPointNameOrTag: RespawnPoint
@@ -577,6 +580,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   currentAmmo: 0
+  maxAmmo: 5
   isReloading: 0
   isFiring: 0
   reloadStartTime: 0
@@ -594,7 +598,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterData: {fileID: 11400000, guid: 6be7037535adf3347bc4a1b2a3d84af7, type: 2}
   ultimateChargeThreshold: 100
-  currentUltimateCharge: 0
+  netUltimateCharge:
+    m_InternalValue: 0
 --- !u!114 &-2180344061450423232
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -661,7 +666,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b4d577a2c26dea049819c5de70bca308, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  pauseAction: {fileID: -9037946779579287163, guid: 052faaac586de48259a63d0c4782560b, type: 3}
+  teclaPausePrincipal: 27
+  teclaPauseSecundaria: 112
 --- !u!114 &-2034026881209421602
 MonoBehaviour:
   m_ObjectHideFlags: 0

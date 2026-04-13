@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /c/Users/zegil/Documents/GitHub/ExoBeasts_V3/PI3D log --oneline -5)",
+      "Bash(find \"/c/Users/zegil/Documents/GitHub/ExoBeasts_V3/PI3D/Assets\" -name \"*.cs\" -type f -exec grep -l \"multiplayer.playmode\\\\|Multiplayer.Playmode\\\\|UNITY_MULTIPLAYER_PLAY_MODE\" {} ;)",
+      "Bash(find \"/c/Users/zegil/Documents/GitHub/ExoBeasts_V3/PI3D/Assets/Codigo/Multiplayer\" -name \"*.cs\" -type f -exec grep -l \"playmode\\\\|PLAYER_INDEX\\\\|CurrentPlayer\" {} ;)",
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(data[0][''text'']\\)\")"
+    ]
+  }
+}

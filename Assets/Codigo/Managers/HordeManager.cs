@@ -4,175 +4,390 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.SceneManagement;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.GameServer;
 
+/// <summary>
+/// ── HordeManager ───────────────────────────────────────
+/// Gerencia ondas de inimigos. Suporta modo local (singleplayer offline)
+/// e modo rede (NGO Host/Server).
+///
+///  ▸ Modo Local: usa Start() para iniciar, variáveis locais para estado
+///  ▸ Modo Rede: usa OnNetworkSpawn(), NetworkVariables, ServerRpcs
+///  ▸ Escala de dificuldade via nível da horda (EnemyDataSO.GetHealth/Damage/etc)
+/// ─────────────────────────────────────────────────────
+/// </summary>
 public class HordeManager : NetworkBehaviour
 {
-    public int enemiesPerHordeMin = 5;
-    public int enemiesPerHordeMax = 10;
-    public int victoryHorde = 5;
+    public static HordeManager Instance { get; private set; }
+    public bool IsLocalMode { get; private set; }
 
+    [Header("Configuracoes da Horda")]
+    public int victoryHorde = 5;
+    public float timeBetweenWaves = 10f;
     public float spawnInterval = 1f;
     public int enemiesPerInterval = 1;
 
+    [Header("Inimigos e Dificuldade")]
     public EnemyDataSO[] enemyTypes;
+    public int enemiesPerHordeMin = 5;
+    public int enemiesPerHordeMax = 10;
 
+    [Header("Caminhos de Spawn")]
     public List<SpawnPath> spawnPaths;
     private int lastPathIndex = -1;
 
-    public int currentHorde = 0;
-    public int enemyLevel = 1;
-
+    [Header("Interface (UI)")]
     public TextMeshProUGUI hordeText;
     public TextMeshProUGUI hordeTextBuild;
 
-    private List<GameObject> aliveEnemies = new List<GameObject>();
-    private bool waveIsActive = false;
-    private Transform playerTransform;
+    [Header("Network Variables")]
+    public NetworkVariable<int> currentHorde = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<int> enemiesRemaining = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<bool> isWaveActive = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    // ── Fallback local (quando NGO não está ativo) ──
+    private int localCurrentHorde = 0;
+    private int localEnemiesRemaining = 0;
+    private bool localIsWaveActive = false;
 
     private int enemiesToSpawnTotal;
     private int enemiesSpawnedCount = 0;
     private Coroutine spawnCoroutine;
 
-    public override void OnNetworkSpawn()
+    // ── Propriedades de acesso transparente (local / rede) ──
+    private int CurrentHorde
     {
-        if (IsServer)
+        get => IsLocalMode ? localCurrentHorde : currentHorde.Value;
+        set
         {
-            StartCoroutine(FindPlayerAndBeginHorde());
+            if (IsLocalMode) { localCurrentHorde = value; UpdateHordeUI(value); }
+            else currentHorde.Value = value;
+        }
+    }
+    private int EnemiesRemaining
+    {
+        get => IsLocalMode ? localEnemiesRemaining : enemiesRemaining.Value;
+        set { if (IsLocalMode) localEnemiesRemaining = value; else enemiesRemaining.Value = value; }
+    }
+    private bool WaveActive
+    {
+        get => IsLocalMode ? localIsWaveActive : isWaveActive.Value;
+        set { if (IsLocalMode) localIsWaveActive = value; else isWaveActive.Value = value; }
+    }
+
+    /// <summary>Tem autoridade para controlar a horda (server ou local)</summary>
+    private bool HasAuthority => IsLocalMode || IsServer;
+
+    // ════════════════════════════════════════════════════
+    //  CICLO DE VIDA
+    // ════════════════════════════════════════════════════
+
+    private void Awake()
+    {
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
+    }
+
+    private bool hordeStarted = false;
+
+    void Start()
+    {
+        // Inicia detecção robusta com 1 frame de atraso (para NGO finalizar inicialização)
+        StartCoroutine(InitializeHordeSystem());
+    }
+
+    private IEnumerator InitializeHordeSystem()
+    {
+        // Espera 1 frame para o NGO terminar sua inicialização
+        yield return null;
+
+        // Se OnNetworkSpawn já disparou e iniciou a horda, não duplicar
+        if (hordeStarted)
+        {
+            Debug.Log("[HordeManager] InitializeHordeSystem: OnNetworkSpawn já iniciou. Abortando.");
+            yield break;
+        }
+
+        bool ngoExiste = NetworkManager.Singleton != null;
+        bool ngoServer = ngoExiste && NetworkManager.Singleton.IsServer;
+        bool ngoClient = ngoExiste && NetworkManager.Singleton.IsClient;
+
+        Debug.Log($"[HordeManager] InitializeHordeSystem - NGO existe={ngoExiste}, IsServer={ngoServer}, IsClient={ngoClient}");
+
+        if (ngoServer)
+        {
+            // Modo rede como Host/Server — OnNetworkSpawn cuida disso
+            // Mas se por algum motivo OnNetworkSpawn não tiver disparado, cobrimos aqui
+            IsLocalMode = false;
+            Debug.Log("[HordeManager] Modo REDE (Host/Server) detectado.");
+
+            // Espera jogadores com TIMEOUT de 10 segundos
+            float timeout = 10f;
+            float timer = 0f;
+            while ((PlayerRegistry.Instance == null || PlayerRegistry.Instance.GetPlayerCount() == 0) && timer < timeout)
+            {
+                // Checa a cada segundo se OnNetworkSpawn já assumiu
+                if (hordeStarted) { Debug.Log("[HordeManager] OnNetworkSpawn assumiu durante a espera."); yield break; }
+                timer += 1f;
+                yield return new WaitForSeconds(1f);
+            }
+
+            // Última checagem antes de iniciar
+            if (hordeStarted) yield break;
+
+            if (timer >= timeout)
+                Debug.LogWarning("[HordeManager] Timeout esperando PlayerRegistry! Iniciando mesmo assim.");
+
+            yield return new WaitForSeconds(3f);
+            if (hordeStarted) yield break;
+
+            hordeStarted = true;
+            StartNextHorde();
+        }
+        else if (!ngoClient)
+        {
+            // Modo local puro (sem NGO ativo)
+            IsLocalMode = true;
+            Debug.Log("[HordeManager] Modo LOCAL detectado. Iniciando em 3s...");
+            UpdateHordeUI(0);
+
+            yield return new WaitForSeconds(3f);
+            if (hordeStarted) yield break;
+
+            hordeStarted = true;
+            StartNextHorde();
+        }
+        else
+        {
+            // Somos cliente puro - servidor controla as hordas
+            IsLocalMode = false;
+            Debug.Log("[HordeManager] Modo REDE (Cliente) - servidor controla hordas.");
         }
     }
 
-    private IEnumerator FindPlayerAndBeginHorde()
+    public override void OnNetworkSpawn()
     {
-        while (playerTransform == null)
+        base.OnNetworkSpawn();
+
+        currentHorde.OnValueChanged += OnCurrentHordeChanged;
+        UpdateHordeUI(currentHorde.Value);
+
+        // Se a InitializeHordeSystem ainda não detectou o servidor, e somos servidor,
+        // garantir que a horda vai começar
+        if (IsServer && !hordeStarted)
         {
-            GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
-            if (playerObject != null)
-            {
-                playerTransform = playerObject.transform;
-            }
-            yield return new WaitForSeconds(0.5f);
+            Debug.Log("[HordeManager] OnNetworkSpawn: IsServer=true, forçando início via rede.");
+            IsLocalMode = false;
+            hordeStarted = true;
+            StartCoroutine(WaitForPlayersAndBeginWithTimeout());
+        }
+    }
+
+    private void OnCurrentHordeChanged(int oldVal, int newVal) => UpdateHordeUI(newVal);
+
+    public override void OnNetworkDespawn()
+    {
+        currentHorde.OnValueChanged -= OnCurrentHordeChanged;
+        base.OnNetworkDespawn();
+    }
+
+    // ════════════════════════════════════════════════════
+    //  INICIALIZAÇÃO
+    // ════════════════════════════════════════════════════
+
+    private IEnumerator WaitForPlayersAndBeginWithTimeout()
+    {
+        // Aguarda jogadores com timeout de 10 segundos
+        float timeout = 10f;
+        float timer = 0f;
+        while ((PlayerRegistry.Instance == null || PlayerRegistry.Instance.GetPlayerCount() == 0) && timer < timeout)
+        {
+            timer += 1f;
+            yield return new WaitForSeconds(1f);
         }
 
+        if (timer >= timeout)
+            Debug.LogWarning("[HordeManager] OnNetworkSpawn: Timeout esperando jogadores!");
+
+        yield return new WaitForSeconds(3f);
         StartNextHorde();
     }
 
-    void Update()
+    // ════════════════════════════════════════════════════
+    //  UI
+    // ════════════════════════════════════════════════════
+
+    private void UpdateHordeUI(int current)
+    {
+        if (hordeTextBuild != null) hordeTextBuild.text = $"{current}/{victoryHorde}";
+        if (hordeText != null) hordeText.text = $"{current}/{victoryHorde}";
+    }
+
+    // ════════════════════════════════════════════════════
+    //  MORTE DE INIMIGO
+    // ════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Chamado em modo LOCAL (sem RPC). Decrementa inimigos e verifica fim de onda.
+    /// </summary>
+    public void OnEnemyKilled()
+    {
+        localEnemiesRemaining = Mathf.Max(0, localEnemiesRemaining - 1);
+        Debug.Log($"[HordeManager] Inimigo morto (local). Restam: {localEnemiesRemaining}");
+
+        if (localEnemiesRemaining <= 0 && localIsWaveActive && enemiesSpawnedCount >= enemiesToSpawnTotal)
+        {
+            OnWaveCompleted();
+        }
+    }
+
+    /// <summary>
+    /// Chamado em modo REDE via ServerRpc.
+    /// </summary>
+    [ServerRpc(RequireOwnership = false)]
+    public void OnEnemyKilledServerRpc()
     {
         if (!IsServer) return;
 
-        if (waveIsActive)
+        enemiesRemaining.Value = Mathf.Max(0, enemiesRemaining.Value - 1);
+
+        if (enemiesRemaining.Value <= 0 && isWaveActive.Value && enemiesSpawnedCount >= enemiesToSpawnTotal)
         {
-            CheckForRemainingEnemies();
-
-            bool allEnemiesSpawned = enemiesSpawnedCount >= enemiesToSpawnTotal;
-            bool allAliveEnemiesDefeated = aliveEnemies.Count == 0;
-
-            if (allEnemiesSpawned && allAliveEnemiesDefeated)
-            {
-                waveIsActive = false;
-
-                if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
-
-                if (currentHorde >= victoryHorde)
-                {
-                    SceneManager.LoadScene("Win");
-                }
-                else
-                {
-                    Invoke("StartNextHorde", 5f);
-                }
-            }
+            OnWaveCompleted();
         }
     }
 
-    private void UpdateHordeUI()
+    // ════════════════════════════════════════════════════
+    //  FLUXO DE ONDA
+    // ════════════════════════════════════════════════════
+
+    private void OnWaveCompleted()
     {
-        UpdateHordeUIClientRpc(currentHorde, victoryHorde);
+        if (!HasAuthority) return;
+
+        WaveActive = false;
+        Debug.Log($"[HordeManager] Horda {CurrentHorde} completada!");
+
+        if (CurrentHorde >= victoryHorde)
+        {
+            // Vitória!
+            if (IsLocalMode)
+                SceneManager.LoadScene("Win");
+            else
+                NetworkManager.Singleton.SceneManager.LoadScene("Win", LoadSceneMode.Single);
+        }
+        else
+        {
+            StartCoroutine(WaitAndStartNextWave());
+        }
     }
 
-    [ClientRpc]
-    private void UpdateHordeUIClientRpc(int curHorde, int vicHorde)
+    private IEnumerator WaitAndStartNextWave()
     {
-        if (hordeTextBuild != null) hordeTextBuild.text = $"{curHorde}/{vicHorde}";
-        if (hordeText != null) hordeText.text = $"{curHorde}/{vicHorde}";
+        Debug.Log($"[HordeManager] Próxima horda em {timeBetweenWaves}s...");
+        yield return new WaitForSeconds(timeBetweenWaves);
+        if (HasAuthority) StartNextHorde();
     }
 
-    void StartNextHorde()
+    private void StartNextHorde()
     {
-        currentHorde++;
-        enemyLevel = currentHorde;
+        if (!HasAuthority) return;
+
+        CurrentHorde++;
+        WaveActive = true;
 
         enemiesToSpawnTotal = Random.Range(enemiesPerHordeMin, enemiesPerHordeMax + 1);
         enemiesSpawnedCount = 0;
+        EnemiesRemaining = enemiesToSpawnTotal;
 
-        if (enemiesToSpawnTotal > 0)
-        {
-            if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
-            spawnCoroutine = StartCoroutine(SpawnEnemiesOverTime());
-        }
+        Debug.Log($"[HordeManager] Iniciando Horda {CurrentHorde} com {enemiesToSpawnTotal} inimigos!");
 
-        waveIsActive = true;
-        UpdateHordeUI();
+        if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
+        spawnCoroutine = StartCoroutine(SpawnEnemiesOverTime());
     }
+
+    // ════════════════════════════════════════════════════
+    //  SPAWN DE INIMIGOS
+    // ════════════════════════════════════════════════════
 
     private IEnumerator SpawnEnemiesOverTime()
     {
-        if (spawnPaths == null || spawnPaths.Count == 0) yield break;
-        if (enemyTypes.Length == 0) yield break;
-
         while (enemiesSpawnedCount < enemiesToSpawnTotal)
         {
-            int enemiesThisInterval = Mathf.Min(enemiesPerInterval, enemiesToSpawnTotal - enemiesSpawnedCount);
+            int batchSize = Mathf.Min(enemiesPerInterval, enemiesToSpawnTotal - enemiesSpawnedCount);
 
-            for (int i = 0; i < enemiesThisInterval; i++)
+            for (int i = 0; i < batchSize; i++)
             {
                 SpawnSingleEnemy();
             }
 
-            enemiesSpawnedCount += enemiesThisInterval;
-
-            if (enemiesSpawnedCount < enemiesToSpawnTotal)
-            {
-                yield return new WaitForSeconds(spawnInterval);
-            }
+            enemiesSpawnedCount += batchSize;
+            yield return new WaitForSeconds(spawnInterval);
         }
     }
 
-    void SpawnSingleEnemy()
+    private void SpawnSingleEnemy()
     {
+        if (spawnPaths == null || spawnPaths.Count == 0 || enemyTypes.Length == 0) return;
+
         int pathIndex = GetRandomPathIndex();
         SpawnPath selectedPath = spawnPaths[pathIndex];
 
-        if (selectedPath.spawnPoint == null || selectedPath.patrolPoints == null || selectedPath.patrolPoints.Count == 0) return;
+        if (selectedPath.spawnPoint == null) return;
 
         int enemyTypeIndex = Random.Range(0, enemyTypes.Length);
         EnemyDataSO enemyData = enemyTypes[enemyTypeIndex];
 
-        GameObject newEnemy = EnemyPoolManager.Instance.GetPooledEnemy();
-        newEnemy.transform.position = selectedPath.spawnPoint.position;
-        newEnemy.transform.rotation = selectedPath.spawnPoint.rotation;
+        GameObject newEnemy = null;
 
-        EnemyController enemyController = newEnemy.GetComponent<EnemyController>();
-        if (enemyController != null)
+        if (EnemyPoolManager.Instance != null)
         {
-            enemyController.InitializeEnemy(playerTransform, selectedPath.patrolPoints, enemyData, enemyLevel);
+            newEnemy = EnemyPoolManager.Instance.GetPooledEnemy(enemyData.enemyPrefab, selectedPath.spawnPoint.position, selectedPath.spawnPoint.rotation);
+        }
+        else if (IsLocalMode)
+        {
+            // Fallback caso o pool não exista em local
+            newEnemy = Instantiate(enemyData.enemyPrefab, selectedPath.spawnPoint.position, selectedPath.spawnPoint.rotation);
         }
 
-        aliveEnemies.Add(newEnemy);
-    }
-
-    void CheckForRemainingEnemies()
-    {
-        for (int i = aliveEnemies.Count - 1; i >= 0; i--)
+        if (newEnemy != null)
         {
-            if (aliveEnemies[i] == null || !aliveEnemies[i].activeInHierarchy)
+            EnemyController enemyController = newEnemy.GetComponent<EnemyController>();
+            if (enemyController != null)
             {
-                aliveEnemies.RemoveAt(i);
+                Transform target = GetRandomPlayerTarget();
+                enemyController.InitializeEnemy(target, selectedPath.patrolPoints, enemyData, CurrentHorde);
             }
         }
     }
 
-    int GetRandomPathIndex()
+    // ════════════════════════════════════════════════════
+    //  ALVO DO JOGADOR
+    // ════════════════════════════════════════════════════
+
+    private Transform GetRandomPlayerTarget()
+    {
+        // Tenta via PlayerRegistry (modo rede)
+        if (PlayerRegistry.Instance != null && PlayerRegistry.Instance.GetPlayerCount() > 0)
+        {
+            var players = PlayerRegistry.Instance.GetAllPlayers();
+            var clientIds = new List<ulong>(players.Keys);
+            ulong randomId = clientIds[Random.Range(0, clientIds.Count)];
+            return players[randomId].transform;
+        }
+
+        // Fallback local: busca por tag "Player"
+        GameObject player = GameObject.FindWithTag("Player");
+        if (player != null) return player.transform;
+
+        return null;
+    }
+
+    // ════════════════════════════════════════════════════
+    //  UTILIDADES
+    // ════════════════════════════════════════════════════
+
+    private int GetRandomPathIndex()
     {
         if (spawnPaths.Count <= 1) return 0;
         int newIndex;

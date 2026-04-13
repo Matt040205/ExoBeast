@@ -1338,7 +1338,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &776797916
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1606,10 +1606,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   menuPanel: {fileID: 0}
   optionsPanel: {fileID: 0}
-  creditosPanel: {fileID: 0}
-  sonsPanel: {fileID: 0}
-  PausePanel: {fileID: 0}
-  HUDPanel: {fileID: 0}
+  pausePanel: {fileID: 0}
+  hudPanel: {fileID: 0}
+  pauseButtons: []
+  optionsCenterX: -117
+  botaoJogarSolo: {fileID: 0}
+  botaoJogarOnline: {fileID: 0}
 --- !u!1 &834600338
 GameObject:
   m_ObjectHideFlags: 0
@@ -3625,10 +3627,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7889ab073619888499c2ce5bf5002574, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  painelRoot: {fileID: 1208097212}
-  tituloText: {fileID: 780446121}
-  descricaoText: {fileID: 1522795634}
-  botaoFechar: {fileID: 1213059779}
+  titleText: {fileID: 0}
+  descriptionText: {fileID: 0}
+  closeButton: {fileID: 0}
 --- !u!1 &2038807007
 GameObject:
   m_ObjectHideFlags: 0

@@ -11,7 +11,6 @@ public class CharacterSaveData
     public int pointsSpent;
     public int pointsAvailable;
 
-    // Status
     public float maxHealth;
     public float damage;
     public float moveSpeed;
@@ -27,14 +26,27 @@ public class FullSaveData
 {
     public List<string> tutorials = new List<string>();
     public List<CharacterSaveData> characters = new List<CharacterSaveData>();
+    public string[] teamSelection = new string[8]; // nome do CharacterBase em cada slot ("" = vazio)
 }
 
+/// <summary>
+/// ── GameDataManager ─────────────────────────────────────
+/// Gerencia o banco de dados de personagens e o sistema de Save/Load.
+/// 
+///  ▸ Persistência via JSON no PersistentDataPath.
+///  ▸ Cache de dados para aplicação em instâncias de CharacterBase.
+///  ▸ Singleton persistente entre cenas.
+/// ───────────────────────────────────────────────────────
+/// </summary>
 public class GameDataManager : MonoBehaviour
 {
     public static GameDataManager Instance;
 
-    [Header("Banco de Dados (IMPORTANTE: Arraste os Assets Originais aqui)")]
+    [Header("Banco de Dados")]
     public List<CharacterBase> bibliotecaOriginalPersonagens;
+
+    [Header("Sessão do Jogador (Runtime)")]
+    public List<CharacterBase> personagensDoJogador = new List<CharacterBase>();
 
     [Header("Estado Atual")]
     public CharacterBase[] equipeSelecionada = new CharacterBase[8];
@@ -43,8 +55,8 @@ public class GameDataManager : MonoBehaviour
     [Header("Progresso dos Tutoriais")]
     public List<string> tutoriaisConcluidos = new List<string>();
 
-    // Cache dos dados carregados
     private Dictionary<string, CharacterSaveData> loadedCharacterData = new Dictionary<string, CharacterSaveData>();
+    private string[] _savedTeamSelection;
     private string saveFilePath;
 
     private void Awake()
@@ -53,6 +65,23 @@ public class GameDataManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
+            
+            // Instancia os SOs Originais para runtime isolada local
+            personagensDoJogador.Clear();
+            foreach (var original in bibliotecaOriginalPersonagens)
+            {
+                if (original != null)
+                {
+                    CharacterBase clone = Instantiate(original);
+                    
+                    // Força a limpeza de 'sujeiras' e DESACOPLA o ponteiro da pasta da Engine!
+                    clone.habilidadesDesbloqueadas = new List<string>();
+                    clone.pontosPorCaminho = new List<CaminhoRastrosData>();
+                    clone.pontosRastrosGastos = 0;
+
+                    personagensDoJogador.Add(clone);
+                }
+            }
 
             saveFilePath = Path.Combine(Application.persistentDataPath, "savegame.json");
             LoadGame();
@@ -65,28 +94,19 @@ public class GameDataManager : MonoBehaviour
 
     public void LimparSelecao()
     {
-        Debug.Log("GAMEDATA_MANAGER: Limpando sele��o e destruindo inst�ncias.");
         for (int i = 0; i < equipeSelecionada.Length; i++)
         {
-            if (equipeSelecionada[i] != null)
-            {
-                Debug.Log($"GAMEDATA_MANAGER: Destruindo {equipeSelecionada[i].name}");
-                Destroy(equipeSelecionada[i]);
-            }
+            // Apenas remove a referência daquele "slot", sem destruir a master-copy
+            // original que está guardada no personagensDoJogador! 
             equipeSelecionada[i] = null;
         }
     }
 
-    // --- SISTEMA DE SAVE ---
-
     public void SaveGame()
     {
         FullSaveData data = new FullSaveData();
-
-        // 1. Salva Tutoriais
         data.tutorials = new List<string>(tutoriaisConcluidos);
 
-        // 2. Mescla dados existentes com dados atuais da equipe
         foreach (var kvp in loadedCharacterData)
         {
             data.characters.Add(kvp.Value);
@@ -97,8 +117,6 @@ public class GameDataManager : MonoBehaviour
             if (charInstance != null)
             {
                 string cleanName = charInstance.name.Replace("(Clone)", "");
-
-                // Remove dados antigos desse personagem para atualizar
                 data.characters.RemoveAll(x => x.characterName == cleanName);
 
                 CharacterSaveData charData = new CharacterSaveData();
@@ -106,8 +124,6 @@ public class GameDataManager : MonoBehaviour
                 charData.unlockedSkills = new List<string>(charInstance.habilidadesDesbloqueadas);
                 charData.pointsSpent = charInstance.pontosRastrosGastos;
                 charData.pointsAvailable = charInstance.pontosRastrosDisponiveis;
-
-                // Salva os status
                 charData.maxHealth = charInstance.maxHealth;
                 charData.damage = charInstance.damage;
                 charData.moveSpeed = charInstance.moveSpeed;
@@ -118,40 +134,21 @@ public class GameDataManager : MonoBehaviour
                 charData.armorPenetration = charInstance.armorPenetration;
 
                 data.characters.Add(charData);
-
-                // Atualiza cache local
-                if (loadedCharacterData.ContainsKey(cleanName))
-                    loadedCharacterData[cleanName] = charData;
-                else
-                    loadedCharacterData.Add(cleanName, charData);
+                loadedCharacterData[cleanName] = charData;
             }
         }
 
-        // Se estiver editando um personagem nos Rastros que n�o est� na equipe, salva ele tamb�m
-        if (personagemParaRastros != null)
+        data.teamSelection = new string[equipeSelecionada.Length];
+        for (int i = 0; i < equipeSelecionada.Length; i++)
         {
-            string cleanName = personagemParaRastros.name.Replace("(Clone)", "");
-            data.characters.RemoveAll(x => x.characterName == cleanName);
-
-            CharacterSaveData charData = new CharacterSaveData();
-            charData.characterName = cleanName;
-            charData.unlockedSkills = new List<string>(personagemParaRastros.habilidadesDesbloqueadas);
-            charData.pointsSpent = personagemParaRastros.pontosRastrosGastos;
-            charData.pointsAvailable = personagemParaRastros.pontosRastrosDisponiveis;
-
-            charData.maxHealth = personagemParaRastros.maxHealth;
-            charData.damage = personagemParaRastros.damage;
-            charData.moveSpeed = personagemParaRastros.moveSpeed;
-            charData.attackSpeed = personagemParaRastros.attackSpeed;
-            charData.armor = personagemParaRastros.armor;
-            charData.critChance = personagemParaRastros.critChance;
-            charData.critDamage = personagemParaRastros.critDamage;
-            charData.armorPenetration = personagemParaRastros.armorPenetration;
-
-            data.characters.Add(charData);
-
-            if (loadedCharacterData.ContainsKey(cleanName)) loadedCharacterData[cleanName] = charData;
-            else loadedCharacterData.Add(cleanName, charData);
+            if (equipeSelecionada[i] != null)
+            {
+                data.teamSelection[i] = equipeSelecionada[i].name.Replace("(Clone)", "");
+            }
+            else
+            {
+                data.teamSelection[i] = "";
+            }
         }
 
         string json = JsonUtility.ToJson(data, true);
@@ -167,17 +164,22 @@ public class GameDataManager : MonoBehaviour
             {
                 string json = File.ReadAllText(saveFilePath);
                 FullSaveData data = JsonUtility.FromJson<FullSaveData>(json);
-
                 tutoriaisConcluidos = data.tutorials;
-
                 loadedCharacterData.Clear();
                 foreach (var charData in data.characters)
                 {
                     if (!loadedCharacterData.ContainsKey(charData.characterName))
-                    {
                         loadedCharacterData.Add(charData.characterName, charData);
-                    }
                 }
+                if (data.teamSelection != null && data.teamSelection.Length > 0)
+                    _savedTeamSelection = data.teamSelection;
+                
+                // Distribui o profile para os personagens master atuais em Play Mode
+                foreach (var personagem in personagensDoJogador)
+                {
+                    AplicarDadosCarregados(personagem);
+                }
+
                 Debug.Log("JOGO CARREGADO.");
             }
             catch (System.Exception e)
@@ -187,19 +189,33 @@ public class GameDataManager : MonoBehaviour
         }
     }
 
+    public void RestaurarSelecao()
+    {
+        if (_savedTeamSelection == null || bibliotecaOriginalPersonagens == null) return;
+
+        int count = Mathf.Min(_savedTeamSelection.Length, equipeSelecionada.Length);
+        for (int i = 0; i < count; i++)
+        {
+            if (string.IsNullOrEmpty(_savedTeamSelection[i])) continue;
+            if (equipeSelecionada[i] != null) continue; // respeita seleção já feita na sessão
+
+            CharacterBase found = personagensDoJogador.Find(c => c.name.Replace("(Clone)", "") == _savedTeamSelection[i]);
+            if (found != null)
+            {
+                equipeSelecionada[i] = found; // Reaproveita a cópia mestra sem recriar
+            }
+        }
+    }
+
     public void AplicarDadosCarregados(CharacterBase instanciaPersonagem)
     {
         string cleanName = instanciaPersonagem.name.Replace("(Clone)", "");
-
         if (loadedCharacterData.ContainsKey(cleanName))
         {
             CharacterSaveData data = loadedCharacterData[cleanName];
-
             instanciaPersonagem.pontosRastrosGastos = data.pointsSpent;
             instanciaPersonagem.pontosRastrosDisponiveis = data.pointsAvailable;
             instanciaPersonagem.habilidadesDesbloqueadas = new List<string>(data.unlockedSkills);
-
-            // Restaura Status
             instanciaPersonagem.maxHealth = data.maxHealth;
             instanciaPersonagem.damage = data.damage;
             instanciaPersonagem.moveSpeed = data.moveSpeed;
@@ -211,16 +227,15 @@ public class GameDataManager : MonoBehaviour
         }
     }
 
-    // Para Debug: Apagar Save
     [ContextMenu("Apagar Save")]
     public void DeleteSave()
     {
         if (File.Exists(saveFilePath))
         {
             File.Delete(saveFilePath);
-            Debug.Log("Save apagado!");
             tutoriaisConcluidos.Clear();
             loadedCharacterData.Clear();
+            Debug.Log("Save apagado!");
         }
     }
 }
