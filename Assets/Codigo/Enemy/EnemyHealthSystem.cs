@@ -4,31 +4,17 @@ using System.Collections.Generic;
 using System.Linq;
 using ExoBeasts.Multiplayer.Sync;
 
-/// <summary>
-/// ── EnemyHealthSystem ──────────────────────────────────
-/// Sistema de vida do inimigo vinculado ao NetworkedEnemy.
-///
-///  ▸ Server: processa dano (armor, crit, mark, vulnerability), sincroniza NetworkHealth
-///  ▸ Client: recebe ShowHitVisualLocal via ClientRpc para flash e popup de dano
-///  ▸ Die(): inicia DieRoutine do NetworkedEnemy e entrega recompensas
-///  ▸ Suporta armor shred, marked status e vulnerability stacks
-/// ─────────────────────────────────────────────────────
-/// </summary>
 public class EnemyHealthSystem : MonoBehaviour
 {
     [Header("Referências")]
     public EnemyDataSO enemyData;
     public Material markedMaterial;
     private Renderer enemyRenderer;
-    private WorldSpaceEnemyUI worldSpaceUI; 
-
+    private WorldSpaceEnemyUI worldSpaceUI;
     private Material[] originalMaterials;
 
     [Header("Feedback Visual")]
-    [Tooltip("Ponto de spawn dos números de dano")]
     public Transform popupSpawnPoint;
-
-    [Header("Hit Flash (Juice)")]
     public Color flashColor = new Color(0.8f, 0.8f, 0.8f, 1f);
     public float flashDuration = 0.05f;
     public string flashAmountProperty = "_FlashAmount";
@@ -57,10 +43,9 @@ public class EnemyHealthSystem : MonoBehaviour
         enemyController = GetComponent<EnemyController>();
         networkedEnemy = GetComponent<NetworkedEnemy>();
         worldSpaceUI = GetComponentInChildren<WorldSpaceEnemyUI>();
-        
+
         enemyRenderer = GetComponent<Renderer>();
-        if (enemyRenderer == null)
-            enemyRenderer = GetComponentInChildren<Renderer>();
+        if (enemyRenderer == null) enemyRenderer = GetComponentInChildren<Renderer>();
 
         propBlock = new MaterialPropertyBlock();
 
@@ -73,7 +58,7 @@ public class EnemyHealthSystem : MonoBehaviour
     public void InitializeHealth(int level)
     {
         if (enemyData == null) return;
-        
+
         currentHealth = enemyData.GetHealth(level);
         baseArmor = enemyData.GetArmor(level);
         currentArmorModifier = 0f;
@@ -98,11 +83,9 @@ public class EnemyHealthSystem : MonoBehaviour
         }
     }
 
-    public bool TakeDamage(float damage, float armorPenetration = 0f, bool isCritical = false)
+    public bool TakeDamage(float damage, float armorPenetration = 0f, bool isCritical = false, ulong attackerId = 0)
     {
-        // Só bloqueia se NGO está ativo E não somos o servidor (somos cliente puro)
-        bool isNGOSpawned = networkedEnemy != null && networkedEnemy.IsSpawned;
-        if (isNGOSpawned && !networkedEnemy.IsServer) return false;
+        if (networkedEnemy != null && networkedEnemy.IsSpawned && !networkedEnemy.IsServer) return false;
         if (isDead) return false;
 
         float damageWithMark = damage * markedDamageMultiplier * vulnerabilityMultiplier;
@@ -117,7 +100,7 @@ public class EnemyHealthSystem : MonoBehaviour
         {
             networkedEnemy.NetworkHealth.Value = currentHealth;
             if (finalDamage > 0)
-                networkedEnemy.TriggerHitVisual(finalDamage, isCritical);
+                networkedEnemy.TriggerHitVisual(finalDamage, isCritical, attackerId);
         }
 
         if (currentHealth <= 0)
@@ -128,12 +111,15 @@ public class EnemyHealthSystem : MonoBehaviour
         return false;
     }
 
-    public void ShowHitVisualLocal(float damageAmount, bool isCritical)
+    public void ShowHitVisualLocal(float damageAmount, bool isCritical, bool showPopup)
     {
-            if (flashCoroutine != null) StopCoroutine(flashCoroutine);
+        if (flashCoroutine != null) StopCoroutine(flashCoroutine);
         flashCoroutine = StartCoroutine(HitFlashRoutine());
 
-        SpawnDamagePopupLocal((int)damageAmount, isCritical);
+        if (showPopup)
+        {
+            SpawnDamagePopupLocal((int)damageAmount, isCritical);
+        }
     }
 
     private IEnumerator HitFlashRoutine()
@@ -159,17 +145,13 @@ public class EnemyHealthSystem : MonoBehaviour
     private void SpawnDamagePopupLocal(int damageAmount, bool isCritical)
     {
         Vector3 spawnPos = popupSpawnPoint != null ? popupSpawnPoint.position : transform.position + Vector3.up * 1.5f;
-        
         if (UIPoolManager.Instance != null)
             UIPoolManager.Instance.SpawnDamagePopup(spawnPos, damageAmount, isCritical);
-        else if (worldSpaceUI != null)
-            worldSpaceUI.ShowDamageNumber((float)damageAmount, isCritical);
     }
 
     public void ApplyArmorShred(float percentage, int maxStacks)
     {
-        bool isNGOSpawned = networkedEnemy != null && networkedEnemy.IsSpawned;
-        if (isNGOSpawned && !networkedEnemy.IsServer) return;
+        if (networkedEnemy != null && !networkedEnemy.IsServer) return;
         if (armorShredStacks < maxStacks)
         {
             armorShredStacks++;
@@ -179,30 +161,19 @@ public class EnemyHealthSystem : MonoBehaviour
 
     public void ApplyMarkedStatus(float multiplier)
     {
-        bool isNGOSpawned = networkedEnemy != null && networkedEnemy.IsSpawned;
-        if (isNGOSpawned && !networkedEnemy.IsServer) return;
-        
+        if (networkedEnemy != null && !networkedEnemy.IsServer) return;
         markedDamageMultiplier = multiplier;
 
-        // Feedback visual da marcação: Substitui materiais temporariamente
         if (multiplier > 1.0f && enemyRenderer != null && markedMaterial != null)
         {
-            // Força o material a renderizar através de paredes independentemente do Shader URP
-            markedMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
-
             Material[] markMats = new Material[originalMaterials.Length];
-            for (int i = 0; i < markMats.Length; i++)
-            {
-                markMats[i] = markedMaterial;
-            }
+            for (int i = 0; i < markMats.Length; i++) markMats[i] = markedMaterial;
             enemyRenderer.materials = markMats;
             isMarked = true;
         }
         else if (multiplier <= 1.0f && enemyRenderer != null && originalMaterials != null && isMarked)
         {
-            // Retorna aos materiais originais e reseta o Property Block
             enemyRenderer.materials = originalMaterials;
-            enemyRenderer.SetPropertyBlock(propBlock);
             isMarked = false;
         }
     }
@@ -222,44 +193,24 @@ public class EnemyHealthSystem : MonoBehaviour
         vulnerabilityMultiplier = 1f;
     }
 
-    public void AplicarVulnerabilidade(float multiplier)
-    {
-        vulnerabilityMultiplier = multiplier;
-    }
-
-    public void RemoverVulnerabilidade()
-    {
-        vulnerabilityMultiplier = 1f;
-    }
+    public void AplicarVulnerabilidade(float multiplier) => vulnerabilityMultiplier = multiplier;
+    public void RemoverVulnerabilidade() => vulnerabilityMultiplier = 1f;
 
     private void Die()
     {
         if (isDead) return;
         isDead = true;
 
-        bool isNGOSpawned = networkedEnemy != null && networkedEnemy.IsSpawned;
-        bool isLocalMode = !isNGOSpawned;
-
-        if (isNGOSpawned && networkedEnemy.IsServer)
-        {
-            // Modo rede: Iniciar sequência de morte sincronizada
+        if (networkedEnemy != null && networkedEnemy.IsServer)
             StartCoroutine(networkedEnemy.DieRoutine());
-        }
 
-        // Recompensas entregues em modo local OU pelo servidor em modo rede
-        if (isLocalMode || (isNGOSpawned && networkedEnemy.IsServer))
+        if (CurrencyManager.Instance != null && enemyData != null && (networkedEnemy == null || networkedEnemy.IsServer))
         {
-            if (CurrencyManager.Instance != null && enemyData != null)
-            {
-                CurrencyManager.Instance.AddCurrency(enemyData.geoditasOnDeath, CurrencyType.Geodites);
-                if (Random.value <= enemyData.etherDropChance)
-                    CurrencyManager.Instance.AddCurrency(1, CurrencyType.DarkEther);
-            }
+            CurrencyManager.Instance.AddCurrency(enemyData.geoditasOnDeath, CurrencyType.Geodites);
+            if (Random.value <= enemyData.etherDropChance)
+                CurrencyManager.Instance.AddCurrency(1, CurrencyType.DarkEther);
         }
 
-        if (enemyController != null)
-            enemyController.HandleDeath();
-        else if (networkedEnemy == null)
-            gameObject.SetActive(false);
+        if (enemyController != null) enemyController.HandleDeath();
     }
 }

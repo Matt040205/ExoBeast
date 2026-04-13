@@ -136,21 +136,15 @@ public class MeleeCombatSystem : NetworkBehaviour
                     float finalDamage = damageToApply;
                     if (isCrit && characterData != null) finalDamage *= characterData.critDamage;
 
-                    RequestMeleeDamageServerRpc(netObj.NetworkObjectId, finalDamage, armorPen, isCrit);
+                    // Passo 2: Acesso rápido e direto ao sistema de rede do alvo.
+                    var networkedEnemy = netObj.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedEnemy>();
+                    if (networkedEnemy != null && networkedEnemy.IsSpawned)
+                    {
+                        // Chamamos o RPC descentralizado direto do inimigo.
+                        // O NGO irá encapsular nosso ID (1, 2, etc.) automaticamente na chegada ao servidor.
+                        networkedEnemy.TakeDamageServerRpc(finalDamage, armorPen, isCrit);
+                    }
                 }
-            }
-        }
-    }
-
-    [ServerRpc(RequireOwnership = false)] // Adicionado para garantir que o dano rode em Multiplayer
-    private void RequestMeleeDamageServerRpc(ulong targetId, float damage, float armorPen, bool isCrit)
-    {
-        if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(targetId, out NetworkObject target))
-        {
-            EnemyHealthSystem enHealth = target.GetComponent<EnemyHealthSystem>();
-            if (enHealth != null)
-            {
-                enHealth.TakeDamage(damage, armorPen, isCrit);
             }
         }
     }

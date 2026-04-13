@@ -300,20 +300,17 @@ public class PlayerShooting : NetworkBehaviour
     public void RequestDamageOnEnemy(ulong enemyNetworkObjectId, float damage, float armorPenetration, bool isCritical)
     {
         if (!IsOwner) return;
-        RequestDealDamageServerRpc(enemyNetworkObjectId, damage, armorPenetration, isCritical);
-    }
-
-    [ServerRpc(RequireOwnership = false)]
-    public void RequestDealDamageServerRpc(ulong enemyNetworkObjectId, float damage, float armorPenetration, bool isCritical)
-    {
-        if (!IsServer) return;
-
+        
+        // Passo 2: Em vez de disparar um ServerRpc desta arma, chamamos diretamente 
+        // o ponto centralizado de dano que fica no próprio inimigo.
         if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(enemyNetworkObjectId, out NetworkObject enemyNetObj))
         {
-            EnemyHealthSystem enemyHealth = enemyNetObj.GetComponent<EnemyHealthSystem>();
-            if (enemyHealth != null)
+            var networkedEnemy = enemyNetObj.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedEnemy>();
+            if (networkedEnemy != null && networkedEnemy.IsSpawned)
             {
-                enemyHealth.TakeDamage(damage, armorPenetration, isCritical);
+                // Como chamamos a função do inimigo a partir deste script local, o NGO 
+                // usa nosso SenderClientId embutido automaticamente nos pacotes de rede.
+                networkedEnemy.TakeDamageServerRpc(damage, armorPenetration, isCritical);
             }
         }
     }

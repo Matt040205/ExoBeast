@@ -9934,6 +9934,7 @@ GameObject:
   - component: {fileID: 227151037}
   - component: {fileID: 227151047}
   - component: {fileID: 227151046}
+  - component: {fileID: 227151049}
   m_Layer: 0
   m_Name: ManagersDaPartida
   m_TagString: Untagged
@@ -10259,6 +10260,22 @@ MonoBehaviour:
   SpawnWithObservers: 1
   DontDestroyWithOwner: 0
   AutoObjectParentSync: 1
+--- !u!114 &227151049
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4f0669480cacb40428bc7160a600e9b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  damagePopupPrefab: {fileID: 8326272338086162720, guid: f477467543ef0e14f90695c866eb1aae, type: 3}
+  magicStarPrefab: {fileID: 3646232356749302539, guid: d79e485ef3fc7134caf8813170b490be, type: 3}
+  initialPopupCount: 30
+  initialStarCount: 60
 --- !u!1001 &227908105
 PrefabInstance:
   m_ObjectHideFlags: 0

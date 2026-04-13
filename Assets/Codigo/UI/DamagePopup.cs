@@ -44,11 +44,25 @@ public class DamagePopup : MonoBehaviour
         textRenderer = GetComponent<Renderer>();
 
         if (textRenderer != null) textRenderer.sortingOrder = sortingOrder;
-        if (Camera.main != null) camTransform = Camera.main.transform;
+
+        UpdateCameraReference();
+    }
+
+    private void UpdateCameraReference()
+    {
+        if (camTransform == null || !camTransform.gameObject.activeInHierarchy)
+        {
+            if (Camera.main != null)
+            {
+                camTransform = Camera.main.transform;
+            }
+        }
     }
 
     public void Setup(int damageAmount, bool isCriticalHit)
     {
+        UpdateCameraReference();
+
         lifetime = 0f;
         disappearTimer = disappearTimerBase;
         transform.localScale = Vector3.zero;
@@ -81,7 +95,6 @@ public class DamagePopup : MonoBehaviour
 
         textMesh.color = textColor;
 
-        // Pede as estrelas para o PoolManager
         if (UIPoolManager.Instance != null)
         {
             for (int i = 0; i < finalStarAmount; i++)
@@ -118,7 +131,6 @@ public class DamagePopup : MonoBehaviour
 
             if (textColor.a <= 0)
             {
-                // DEVOLVE PARA O POOL
                 if (UIPoolManager.Instance != null)
                 {
                     UIPoolManager.Instance.ReturnPopupToPool(this);
@@ -133,6 +145,9 @@ public class DamagePopup : MonoBehaviour
 
     private void LateUpdate()
     {
-        if (camTransform != null) transform.forward = camTransform.forward;
+        if (camTransform != null)
+        {
+            transform.forward = camTransform.forward;
+        }
     }
 }

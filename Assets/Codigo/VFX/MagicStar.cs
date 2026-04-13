@@ -50,7 +50,7 @@ public class MagicStar : MonoBehaviour
         canvasGroup = GetComponent<CanvasGroup>();
         TryGetComponent(out spriteRenderer);
 
-        if (Camera.main != null) camTransform = Camera.main.transform;
+        UpdateCameraReference();
 
         particleMain.loop = false;
         particleMain.playOnAwake = false;
@@ -65,9 +65,19 @@ public class MagicStar : MonoBehaviour
         particleEmission.SetBursts(new ParticleSystem.Burst[] { new ParticleSystem.Burst(0.0f, 1) });
     }
 
+    private void UpdateCameraReference()
+    {
+        if (camTransform == null || !camTransform.gameObject.activeInHierarchy)
+        {
+            if (Camera.main != null)
+            {
+                camTransform = Camera.main.transform;
+            }
+        }
+    }
+
     void OnEnable()
     {
-        // OBRIGATÓRIO PARA POOL: Limpa as partículas velhas ao renascer
         if (particleSys != null)
         {
             particleSys.Clear();
@@ -76,6 +86,8 @@ public class MagicStar : MonoBehaviour
 
     public void StartParabolicMovement()
     {
+        UpdateCameraReference();
+
         float randomX = Random.Range(-scatterForce, scatterForce);
         if (Mathf.Abs(randomX) < 1f) randomX = randomX >= 0 ? 1.5f : -1.5f;
 
@@ -122,7 +134,7 @@ public class MagicStar : MonoBehaviour
         if (fractionOfJourney >= 1f)
         {
             isMoving = false;
-            // DEVOLVE PARA O POOL em vez de Destruir
+
             if (UIPoolManager.Instance != null)
             {
                 UIPoolManager.Instance.ReturnStarToPool(this);

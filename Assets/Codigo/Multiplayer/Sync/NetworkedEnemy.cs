@@ -5,29 +5,11 @@ using System.Collections;
 
 namespace ExoBeasts.Multiplayer.Sync
 {
-    /// <summary>
-    /// ── NetworkedEnemy ──────────────────────────────────────
-    /// Wrapper de rede para o inimigo — servidor roda AI, clientes recebem estado via NGO.
-    ///
-    ///  ▸ TakeDamageServerRpc: delega para EnemyHealthSystem no servidor
-    ///  ▸ DieRoutine (server): sinaliza HordeManager, dispara ClientRpc de morte, Despawn
-    ///  ▸ OnDeathStateChanged: desativa AI nos clientes ao receber IsDead = true
-    /// ─────────────────────────────────────────────────────
-    /// </summary>
     public class NetworkedEnemy : NetworkBehaviour
     {
         [Header("Estado de Rede")]
-        public NetworkVariable<float> NetworkHealth = new NetworkVariable<float>(
-            100f,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server
-        );
-
-        public NetworkVariable<bool> IsDead = new NetworkVariable<bool>(
-            false,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server
-        );
+        public NetworkVariable<float> NetworkHealth = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<bool> IsDead = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
         private EnemyController enemyController;
         private NavMeshAgent navMeshAgent;
@@ -39,56 +21,75 @@ namespace ExoBeasts.Multiplayer.Sync
             navMeshAgent = GetComponent<NavMeshAgent>();
             localHealth = GetComponent<EnemyHealthSystem>();
 
-            bool runAI = IsServer;
-            if (enemyController != null) enemyController.enabled = runAI;
-            if (navMeshAgent != null) navMeshAgent.enabled = runAI;
+            if (enemyController != null) enemyController.enabled = IsServer;
+            if (navMeshAgent != null) navMeshAgent.enabled = IsServer;
 
             IsDead.OnValueChanged += OnDeathStateChanged;
         }
 
         [ServerRpc(RequireOwnership = false)]
-        public void TakeDamageServerRpc(float damage, float armorPen, bool isCrit)
+        public void TakeDamageServerRpc(float damage, float armorPen, bool isCrit, ServerRpcParams rpcParams = default)
         {
             if (IsDead.Value) return;
 
-            // Delegar para o EnemyHealthSystem processar a lógica no servidor
+            // PASSO 3 - A MÁGICA: O `ServerRpcParams rpcParams = default` diz ao Netcode para preencher
+            // automaticamente os metadados da mensagem na chegada ao Servidor.
+            // Aqui ele captura exatamente de onde a requisição veio, resolvendo o bug do 'ID 0' (pois
+            // o `SenderClientId` conterá o ID verdadeiro de quem disparou o ServerRpc na ponta cliente).
+            ulong attackerId = rpcParams.Receive.SenderClientId;
+
             if (localHealth != null)
             {
-                localHealth.TakeDamage(damage, armorPen, isCrit);
-            }
-            else
-            {
-                // Fallback redundante
-                NetworkHealth.Value = Mathf.Max(0f, NetworkHealth.Value - damage);
-                if (NetworkHealth.Value <= 0f) StartCoroutine(DieRoutine());
+                // Passamos o ID salvo do atacante para o próximo sistema, garantindo o rastreio
+                localHealth.TakeDamage(damage, armorPen, isCrit, attackerId);
             }
         }
 
-        // Chamado apenas pelo servidor quando o dano é validado no EnemyHealthSystem
-        public void TriggerHitVisual(float finalDamage, bool isCritical)
+        public void TriggerHitVisual(float finalDamage, bool isCritical, ulong attackerId)
         {
             if (!IsServer) return;
-            ShowHitVisualClientRpc(finalDamage, isCritical);
+
+            // Flash branco → todos os clientes veem
+            ShowHitFlashClientRpc();
+
+            // Aqui montamos o envio seletivo: a variável Send agrupa as regras do ClientRpc.
+            // Passamos especificamente o `attackerId` que foi capturado via ServerRpcParams lá de cima.
+            ClientRpcParams popupParams = new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams
+                {
+                    // Se não for fornecido, ou ficar vazio, faria broadcast.
+                    // Com o ID verdadeiro (ex: 2) invés do default '0', apenas o cliente '2' receberá isso.
+                    TargetClientIds = new ulong[] { attackerId }
+                }
+            };
+            
+            // Disparamos o ClientRpc de volta para a UI, embutindo as ClientRpcParams exclusivas para o alvo
+            ShowDamagePopupClientRpc(finalDamage, isCritical, popupParams);
         }
 
         [ClientRpc]
-        private void ShowHitVisualClientRpc(float damageAmount, bool isCritical)
+        private void ShowHitFlashClientRpc()
         {
-            // Executado em TODOS os clientes
+            // Flash aparece para todo mundo, sem popup
             if (localHealth != null)
-            {
-                // Mostra o flash visual e o popup de dano no cliente atual
-                localHealth.ShowHitVisualLocal(damageAmount, isCritical);
-            }
+                localHealth.ShowHitVisualLocal(0f, false, showPopup: false);
+        }
+
+        [ClientRpc]
+        private void ShowDamagePopupClientRpc(float damageAmount, bool isCritical,
+                                       ClientRpcParams clientRpcParams = default)
+        {
+            // Se você recebeu este RPC, você É o atacante — mostra o popup sem comparação
+            if (localHealth != null)
+                localHealth.ShowHitVisualLocal(damageAmount, isCritical, showPopup: true);
         }
 
         public IEnumerator DieRoutine()
         {
             if (IsDead.Value) yield break;
-
             IsDead.Value = true;
 
-            // Notificar o HordeManager unificado para progressão de ondas
             if (HordeManager.Instance != null)
             {
                 HordeManager.Instance.OnEnemyKilledServerRpc();
@@ -100,7 +101,7 @@ namespace ExoBeasts.Multiplayer.Sync
 
             var netObj = GetComponent<NetworkObject>();
             if (netObj != null && netObj.IsSpawned)
-                netObj.Despawn(false); // Retorna ao pool via handler
+                netObj.Despawn(false);
         }
 
         [ClientRpc]
