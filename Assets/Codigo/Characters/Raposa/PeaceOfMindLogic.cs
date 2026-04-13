@@ -3,6 +3,7 @@ using System.Collections;
 using FMODUnity;
 using FMOD.Studio;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 
 /// <summary>
 /// ── PeaceOfMindLogic ─────────────────────────────────────
@@ -35,6 +36,10 @@ public class PeaceOfMindLogic : NetworkBehaviour
         healthSystem = GetComponent<PlayerHealthSystem>();
         if (healthSystem != null)
         {
+            // Disparar animacao sincronizada para todos os clientes via NetworkAnimator
+            var netAnim = GetComponent<NetworkAnimator>() ?? GetComponentInChildren<NetworkAnimator>();
+            if (netAnim != null) netAnim.SetTrigger("Heal");
+
             PlayHealSFXClientRpc();
             StartCoroutine(HealCoroutine(totalHeal, duration));
         }

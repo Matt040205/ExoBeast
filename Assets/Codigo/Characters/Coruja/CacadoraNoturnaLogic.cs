@@ -37,34 +37,48 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
         LayerMask playerLayer = LayerMask.GetMask("Player");
         visualRaycastMask = ~(enemyLayer | playerLayer);
 
-        if (netCaster.Value.TryGet(out NetworkObject casterNO))
-        {
-            this.caster = casterNO.gameObject;
-            this.anim = caster.GetComponentInChildren<Animator>();
-
-            AnimationEventProxy proxy = caster.GetComponentInChildren<AnimationEventProxy>();
-            if (proxy != null)
-            {
-                // Only the owning client and server register for the anim event to avoid duplicate beam fire
-                if (casterNO.IsOwner || IsServer)
-                {
-                    proxy.magiaAtualDaCacadora = this;
-                }
-            }
-        }
-
         if (effectParticles != null)
-        {
             effectParticles.Play();
+
+        // O caster pode chegar antes ou depois do OnNetworkSpawn dependendo do timing de rede.
+        // Registramos o callback para ambos os casos.
+        netCaster.OnValueChanged += OnCasterAssigned;
+
+        // Tentar setup imediato (funciona no servidor, onde StartUltimateEffect() jah rodou)
+        if (netCaster.Value.TryGet(out NetworkObject casterNO))
+            SetupCaster(casterNO);
+    }
+
+    private void OnCasterAssigned(NetworkObjectReference oldVal, NetworkObjectReference newVal)
+    {
+        if (newVal.TryGet(out NetworkObject casterNO))
+            SetupCaster(casterNO);
+    }
+
+    private void SetupCaster(NetworkObject casterNO)
+    {
+        this.caster = casterNO.gameObject;
+        this.anim = caster.GetComponentInChildren<Animator>();
+
+        AnimationEventProxy proxy = caster.GetComponentInChildren<AnimationEventProxy>();
+        if (proxy != null && (casterNO.IsOwner || IsServer))
+        {
+            proxy.magiaAtualDaCacadora = this;
         }
 
-        // Server drives the animation trigger — NetworkAnimator replicates it to all clients
+        // Servidor dispara o trigger via NetworkAnimator — replica para todos os clientes
         if (IsServer && anim != null)
         {
             var networkAnimator = caster.GetComponentInChildren<NetworkAnimator>();
             if (networkAnimator != null) networkAnimator.SetTrigger("CacadoraUltimate");
             else anim.SetTrigger("CacadoraUltimate");
         }
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        netCaster.OnValueChanged -= OnCasterAssigned;
+        base.OnNetworkDespawn();
     }
 
     public void StartUltimateEffect(GameObject caster, float damage, float range, float width)

@@ -204,16 +204,45 @@ public class BuildManager : NetworkBehaviour
         if (!isCurrentPlacementValid) return;
         if (selectedBuildablePrefab == null || currentBuildGhost == null) return;
 
-        int prefabIndex = buildablePrefabs.IndexOf(selectedBuildablePrefab);
-        if (prefabIndex == -1) return;
-
         Vector3 finalPosition = currentBuildGhost.transform.position;
         finalPosition.x = Mathf.Round(finalPosition.x / gridSize) * gridSize;
         finalPosition.z = Mathf.Round(finalPosition.z / gridSize) * gridSize;
 
-        RequestPlaceBuildingServerRpc(prefabIndex, finalPosition, selectedBuildableCost);
+        // Verificar se e armadilha ou torre (armadilhas nao estao em buildablePrefabs)
+        if (selectedBuildableData is TrapDataSO trapDataSO)
+        {
+            int trapIndex = availableTraps.IndexOf(trapDataSO);
+            if (trapIndex == -1) return;
+            RequestPlaceTrapServerRpc(trapIndex, finalPosition, selectedBuildableCost);
+        }
+        else
+        {
+            int prefabIndex = buildablePrefabs.IndexOf(selectedBuildablePrefab);
+            if (prefabIndex == -1) return;
+            RequestPlaceBuildingServerRpc(prefabIndex, finalPosition, selectedBuildableCost);
+        }
 
         ClearSelection();
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestPlaceTrapServerRpc(int trapIndex, Vector3 pos, int cost, ServerRpcParams rpcParams = default)
+    {
+        if (trapIndex < 0 || trapIndex >= availableTraps.Count) return;
+        if (!CurrencyManager.Instance.HasEnoughCurrency(cost, CurrencyType.Geodites)) return;
+
+        TrapDataSO trapData = availableTraps[trapIndex];
+        if (trapData == null || trapData.prefab == null) return;
+
+        if (trapData.buildLimit > 0 && GetTrapCount(trapData) >= trapData.buildLimit) return;
+
+        CurrencyManager.Instance.SpendCurrency(cost, CurrencyType.Geodites);
+
+        GameObject newTrap = Instantiate(trapData.prefab, pos, Quaternion.identity);
+        if (newTrap.TryGetComponent<NetworkObject>(out var netObj))
+            netObj.Spawn();
+
+        NotifyBuildingPlacedClientRpc(pos);
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -222,12 +251,6 @@ public class BuildManager : NetworkBehaviour
         if (!CurrencyManager.Instance.HasEnoughCurrency(cost, CurrencyType.Geodites)) return;
 
         GameObject prefabToSpawn = buildablePrefabs[prefabIndex];
-
-        TrapDataSO trapData = availableTraps.Find(t => t.prefab == prefabToSpawn);
-        if (trapData != null && trapData.buildLimit > 0)
-        {
-            if (GetTrapCount(trapData) >= trapData.buildLimit) return;
-        }
 
         CurrencyManager.Instance.SpendCurrency(cost, CurrencyType.Geodites);
 

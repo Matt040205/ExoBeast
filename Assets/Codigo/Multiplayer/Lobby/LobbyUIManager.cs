@@ -49,6 +49,10 @@ public class LobbyUIManager : MonoBehaviour
     private bool   _publico       = true;
     private bool   _showCriar     = false;
 
+    // Nick
+    private bool   _showNickEdit = false;
+    private string _pendingNick  = "";
+
     // View Buscar
     private List<LobbyInfo> _lobbyResults = new List<LobbyInfo>();
     private bool            _searching    = false;
@@ -291,6 +295,50 @@ public class LobbyUIManager : MonoBehaviour
             GUILayout.Space(4);
         }
 
+        // --- Nick do jogador ---
+        string currentNick = SessionManager.Instance?.GetDisplayName() ?? "";
+        if (!_showNickEdit)
+        {
+            GUILayout.BeginHorizontal();
+            var nickStyle = new GUIStyle(GUI.skin.label);
+            nickStyle.normal.textColor = Color.yellow;
+            GUILayout.Label(string.IsNullOrEmpty(currentNick) ? "Nick: —" : $"Nick: {currentNick}", nickStyle);
+            GUILayout.FlexibleSpace();
+            if (GUILayout.Button("Alterar Nick", GUILayout.Width(90)))
+            {
+                _pendingNick  = currentNick;
+                _showNickEdit = true;
+                _showCriar    = false;
+            }
+            GUILayout.EndHorizontal();
+        }
+        else
+        {
+            GUILayout.Label("─── Alterar Nick ───");
+            _pendingNick = GUILayout.TextField(_pendingNick, GUILayout.Width(260));
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Confirmar", GUILayout.Width(100)))
+            {
+                string name = _pendingNick.Trim();
+                if (!string.IsNullOrEmpty(name))
+                {
+                    SessionManager.Instance?.SetDisplayName(name);
+                    _auth?.SetDeviceIdName(name);
+                    PlayerPrefs.SetString("PlayerDisplayName", name);
+                    PlayerPrefs.Save();
+                    AddLog($"Nick alterado para '{name}'");
+                }
+                _showNickEdit = false;
+            }
+            if (GUILayout.Button("Cancelar", GUILayout.Width(80)))
+                _showNickEdit = false;
+            GUILayout.EndHorizontal();
+            GUILayout.Space(6);
+            return; // esconde o resto enquanto edita o nick
+        }
+
+        GUILayout.Space(6);
+
         // --- Criar sala ---
         if (!_showCriar)
         {
@@ -328,7 +376,7 @@ public class LobbyUIManager : MonoBehaviour
                     lobbyName  = string.IsNullOrWhiteSpace(_nomeSala) ? "Minha Sala" : _nomeSala,
                     maxPlayers = _maxPlayers,
                     isPublic   = _publico,
-                    mapName    = "CenaMapaTeste",
+                    mapName    = "SceneMapTest",
                 });
                 _showCriar = false;
             }

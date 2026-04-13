@@ -57,7 +57,9 @@ public class VooGraciosoLogic : NetworkBehaviour
             playerShooting = ownerObject.GetComponent<PlayerShooting>();
             abilityController = ownerObject.GetComponent<CommanderAbilityController>();
 
-            if (IsOwner)
+            // ownerNO.IsOwner = verdadeiro na maquina DO JOGADOR que usou a habilidade
+            // (nao confundir com IsOwner deste NetworkObject, que e sempre o servidor)
+            if (ownerNO.IsOwner)
             {
                 if (playerMovement != null)
                 {
@@ -79,13 +81,15 @@ public class VooGraciosoLogic : NetworkBehaviour
     {
         if (!isActive || playerMovement == null) return;
 
-        if (IsOwner && playerMovement.isGrounded)
+        // Checa se ESTE cliente e o dono do jogador (nao do helper object)
+        bool isPlayerOwner = netOwner.Value.TryGet(out NetworkObject ownerNO) && ownerNO.IsOwner;
+
+        if (isPlayerOwner && playerMovement.isGrounded)
         {
-            // Owner detects landing and asks server to clean up
             RequestDestroyServerRpc();
         }
 
-        // Server mirrors the grounded check — handles the case where the owner is the Host
+        // Servidor tambem monitora o pouso para garantir cleanup mesmo se o RPC falhar
         if (IsServer && playerMovement.isGrounded)
         {
             DestroyLogic();
@@ -109,7 +113,8 @@ public class VooGraciosoLogic : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
-        if (IsOwner && playerMovement != null)
+        // Resetar modificadores na maquina do jogador dono (nao do helper object)
+        if (netOwner.Value.TryGet(out NetworkObject ownerNO) && ownerNO.IsOwner && playerMovement != null)
         {
             playerMovement.jumpHeightModifier = 1f;
             playerMovement.isFloating = false;
