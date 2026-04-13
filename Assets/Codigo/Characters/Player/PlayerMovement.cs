@@ -69,6 +69,16 @@ public class PlayerMovement : NetworkBehaviour
     public float floatDuration = 0f;
     public float jumpHeightModifier = 1f;
 
+    [Header("Network Sync")]
+    private NetworkVariable<float> netModelYRot = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    private NetworkVariable<bool> netIsGrounded = new NetworkVariable<bool>(
+        true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    private NetworkVariable<float> netMovementSpeed = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    private NetworkVariable<float> netYVelocity = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+
     private bool jaMoveuTutorial = false;
     private PlayerHealthSystem healthSystem;
 
@@ -100,13 +110,13 @@ public class PlayerMovement : NetworkBehaviour
 
         if (!IsOwner)
         {
-            // Desabilitar CharacterController em remotos (ClientNetworkTransform controla a posição)
+            // CharacterController desabilitado: ClientNetworkTransform controla a posicao
             if (controller != null) controller.enabled = false;
 
-            // Garante que o Rig de mira não interfira nos remotos se não estiver sincronizado
+            // Rig de mira nao interfere nos remotos
             if (aimRig != null) aimRig.weight = 0f;
 
-            this.enabled = false;
+            // Script permanece ATIVO para que o Update() possa aplicar animacoes sincronizadas
             return;
         }
 
@@ -221,7 +231,24 @@ public class PlayerMovement : NetworkBehaviour
 
     private void Update()
     {
-        if (!IsOwner) return;
+        if (!IsOwner)
+        {
+            // Remotos: aplicar estado sincronizado ao Animator
+            if (animator != null)
+            {
+                bool syncedGrounded = netIsGrounded.Value;
+                float syncedYVel = netYVelocity.Value;
+
+                animator.SetBool("isGrounded", syncedGrounded);
+                animator.SetFloat("yVelocity", syncedYVel);
+                animator.SetFloat("MovementSpeed", netMovementSpeed.Value);
+
+                bool aboutToLand = !syncedGrounded && syncedYVel < 0 &&
+                    Physics.Raycast(transform.position, Vector3.down, landingRaycastDistance, groundMask);
+                animator.SetBool("isAboutToLand", syncedGrounded || aboutToLand);
+            }
+            return;
+        }
 
         isGrounded = controller.isGrounded;
         if (isGrounded) hasDoubleJumped = false;
@@ -229,6 +256,7 @@ public class PlayerMovement : NetworkBehaviour
         if (PauseControl.isPaused || BuildManager.isBuildingMode || isDashing)
         {
             if (animator != null && !isDashing) animator.SetFloat("MovementSpeed", 0f);
+            netMovementSpeed.Value = 0f;
             StopFootstepSound();
             return;
         }
@@ -276,11 +304,22 @@ public class PlayerMovement : NetworkBehaviour
 
             animator.SetBool("isAboutToLand", isAboutToLand);
         }
+
+        // Publicar estado para remotos
+        netIsGrounded.Value = isGrounded;
+        netYVelocity.Value = velocity.y;
     }
 
     private void LateUpdate()
     {
-        if (!IsOwner) return;
+        if (!IsOwner)
+        {
+            // Remotos: aplicar rotacao sincronizada ao modelPivot
+            if (modelPivot != null)
+                modelPivot.rotation = Quaternion.Euler(0f, netModelYRot.Value, 0f);
+            return;
+        }
+
         if (PauseControl.isPaused || BuildManager.isBuildingMode || isFloating || isDashing) return;
 
         if (isAiming || direction.sqrMagnitude > 0.01f)
@@ -291,6 +330,9 @@ public class PlayerMovement : NetworkBehaviour
             }
             float angle = Mathf.SmoothDampAngle(modelPivot.eulerAngles.y, targetAngle, ref rotationVelocity, 0.1f);
             modelPivot.rotation = Quaternion.Euler(0f, angle, 0f);
+
+            // Publicar rotacao para remotos
+            netModelYRot.Value = angle;
         }
     }
 
@@ -333,6 +375,7 @@ public class PlayerMovement : NetworkBehaviour
                     float animSpeed = (inputRun ? 1.0f : 0.5f) * direction.magnitude;
                     if (healthSystem != null && healthSystem.speedMultiplier.Value > 1.1f) animSpeed *= 1.2f;
                     animator.SetFloat("MovementSpeed", animSpeed, 0.1f, Time.deltaTime);
+                    netMovementSpeed.Value = animSpeed;
                 }
             }
 
@@ -349,6 +392,7 @@ public class PlayerMovement : NetworkBehaviour
                 animator.SetFloat("AimMoveX", 0f, 0.1f, Time.deltaTime);
                 animator.SetFloat("AimMoveY", 0f, 0.1f, Time.deltaTime);
             }
+            netMovementSpeed.Value = 0f;
             StopFootstepSound();
         }
     }

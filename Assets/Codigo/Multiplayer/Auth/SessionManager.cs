@@ -82,6 +82,7 @@ namespace ExoBeasts.Multiplayer.Auth
 
         public string GetUserId() => userId;
         public string GetDisplayName() => displayName;
+        public void SetDisplayName(string newName) { displayName = newName; }
         public bool IsInSession() => isInSession;
         public string GetCurrentLobbyId() => currentLobbyId;
         public string GetCurrentMatchId() => currentMatchId;

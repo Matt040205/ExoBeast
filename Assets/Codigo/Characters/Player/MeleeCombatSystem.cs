@@ -61,15 +61,20 @@ public class MeleeCombatSystem : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
+        // Inicializar anim para TODOS (owner e remotos): AnimEvents de som precisam rodar em todos
+        anim = GetComponentInChildren<Animator>();
+
+        // Garantir velocidade de ataque correta desde o spawn (evita animacoes congeladas em 0)
+        if (anim != null)
+            anim.SetFloat("AttackSpeedMultiplier", 1f);
+
         if (!IsOwner)
         {
-            this.enabled = false;
+            // Script permanece ativo para AnimEvents de som (DetectHits dispara som em todos)
+            // Apenas input e logica de deteccao de hit sao bloqueados via guard no Update/OnFire
             return;
         }
 
-        anim = GetComponentInChildren<Animator>();
-
-        // Cache seguro do NetworkAnimator
         networkAnimator = GetComponent<NetworkAnimator>();
         if (networkAnimator == null) networkAnimator = GetComponentInChildren<NetworkAnimator>();
 
@@ -89,8 +94,7 @@ public class MeleeCombatSystem : NetworkBehaviour
 
     void Update()
     {
-        if (!IsOwner) return;
-
+        // Velocidade de ataque deve ser aplicada em todos os clientes para animar corretamente
         UpdateCurrentStats();
 
         if (anim != null)

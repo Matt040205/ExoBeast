@@ -25,58 +25,50 @@ public class HabilidadeCacadoraNoturna : Ability
 
     public override bool Activate(GameObject quemUsou)
     {
-        Debug.Log("[CacadoraNoturna] Activate() chamado!");
+        if (logicVisualPrefab == null) return false;
 
         PlayerShooting shootingScript = quemUsou.GetComponent<PlayerShooting>();
         PlayerMovement movementScript = quemUsou.GetComponent<PlayerMovement>();
-        Animator anim = quemUsou.GetComponentInChildren<Animator>();
 
+        // modelPivot.rotation agora esta sincronizado via netModelYRot (fix BUG A)
         Transform modelPivot = (movementScript != null) ? movementScript.GetModelPivot() : quemUsou.transform;
         Transform firePoint = (shootingScript != null && shootingScript.firePoint != null)
             ? shootingScript.firePoint
             : quemUsou.transform;
 
         Vector3 startPoint = firePoint.position;
-        Vector3 direction = modelPivot.forward;
+        Quaternion spawnRotation = modelPivot.rotation;
 
-        Debug.Log($"[CacadoraNoturna] Posição: {startPoint}, Direção: {direction}, Range: {range}, Dano: {damage}");
-
-        // Toca animação da suprema (Animação de preparar o arco começa agora!)
-        if (anim != null)
-        {
-            anim.SetTrigger("CacadoraUltimate");
-        }
-
-        // Delega o disparo e o dano para acontecer APÓS o tempo de delay da animação
         MonoBehaviour mb = quemUsou.GetComponent<MonoBehaviour>();
         if (mb != null)
-        {
-            mb.StartCoroutine(DisparoDelayCoroutine(startPoint, direction));
-        }
+            mb.StartCoroutine(DisparoDelayCoroutine(quemUsou, startPoint, spawnRotation));
 
         return true;
     }
 
-    private System.Collections.IEnumerator DisparoDelayCoroutine(Vector3 startPoint, Vector3 direction)
+    private System.Collections.IEnumerator DisparoDelayCoroutine(GameObject quemUsou, Vector3 startPoint, Quaternion spawnRotation)
     {
-        // Espera a personagem terminar a pose da animação e "soltar" o tiro
         yield return new WaitForSeconds(delayTiro);
 
-        // Instancia o prefab de Efeitos Visuais (Partículas, LineRenderers originais)
-        if (logicVisualPrefab != null)
+        GameObject vfx = Object.Instantiate(logicVisualPrefab, startPoint, spawnRotation);
+
+        if (vfx.TryGetComponent<NetworkObject>(out var netObj))
         {
-            GameObject vfx = Object.Instantiate(logicVisualPrefab, startPoint, Quaternion.LookRotation(direction));
-            
-            // Toca eventuais partículas configuradas no topo do prefab
+            // Spawnar em rede: todos os clientes verao o VFX
+            netObj.Spawn();
+            CacadoraNoturnaLogic logic = vfx.GetComponent<CacadoraNoturnaLogic>();
+            if (logic != null)
+                logic.StartUltimateEffect(quemUsou, damage, range, width);
+        }
+        else
+        {
+            // Fallback sem NGO (singleplayer)
             ParticleSystem[] particles = vfx.GetComponentsInChildren<ParticleSystem>();
             foreach (var p in particles) p.Play();
-
-            // Destroi o visual de lógica depois da duração
             Object.Destroy(vfx, 4.0f);
-        }
 
-        // Aplica dano via SphereCast inline (já atinge todos na linha de forma confiável local/rede)
-        ApplyBeamDamage(startPoint, direction);
+            ApplyBeamDamage(startPoint, spawnRotation * Vector3.forward);
+        }
     }
 
     private void ApplyBeamDamage(Vector3 startPoint, Vector3 direction)

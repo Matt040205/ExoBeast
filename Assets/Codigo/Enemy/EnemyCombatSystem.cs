@@ -141,12 +141,18 @@ public class EnemyCombatSystem : NetworkBehaviour
 
         if (hitPlayers.Length > 0)
         {
-            // Ataca o primeiro jogador detectado (autoritativo no servidor)
-            PlayerHealthSystem playerHealth = hitPlayers[0].GetComponent<PlayerHealthSystem>();
-            if (playerHealth != null)
+            // Aplica dano em TODOS os jogadores na area (nao apenas o primeiro)
+            bool acertouAlguem = false;
+            foreach (Collider col in hitPlayers)
             {
-                playerHealth.TakeDamage(currentDamage, transform);
+                PlayerHealthSystem playerHealth = col.GetComponent<PlayerHealthSystem>();
+                if (playerHealth != null)
+                {
+                    playerHealth.TakeDamage(currentDamage, transform);
+                    acertouAlguem = true;
+                }
             }
+            if (!acertouAlguem) playerIsInside = false;
         }
         else
         {

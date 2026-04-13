@@ -60,10 +60,6 @@ public class CommanderAbilityController : NetworkBehaviour
             }
         }
 
-        if (!IsOwner)
-        {
-            this.enabled = false;
-        }
     }
 
     void OnDestroy()
@@ -81,15 +77,14 @@ public class CommanderAbilityController : NetworkBehaviour
 
     void Update()
     {
-        if (!IsOwner) return;
-
-        if (IsServer)
+        // Acumulacao de carga roda no servidor para TODOS os jogadores (nao apenas o host)
+        if (IsServer && netUltimateCharge.Value < ultimateChargeThreshold && characterData != null && characterData.ultimateChargePerSecond > 0)
         {
-            if (netUltimateCharge.Value < ultimateChargeThreshold && characterData != null && characterData.ultimateChargePerSecond > 0)
-            {
-                netUltimateCharge.Value = Mathf.Min(netUltimateCharge.Value + characterData.ultimateChargePerSecond * Time.deltaTime, ultimateChargeThreshold);
-            }
+            netUltimateCharge.Value = Mathf.Min(netUltimateCharge.Value + characterData.ultimateChargePerSecond * Time.deltaTime, ultimateChargeThreshold);
         }
+
+        // Tudo abaixo e exclusivo do dono (input + countdown de cooldowns)
+        if (!IsOwner) return;
 
         List<Ability> keys = new List<Ability>(abilityCooldowns.Keys);
         foreach (Ability ability in keys)
