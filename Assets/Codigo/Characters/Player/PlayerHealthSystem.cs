@@ -136,8 +136,13 @@ public class PlayerHealthSystem : NetworkBehaviour
         if (timeSinceLastDamage >= 3f)
         {
             isRegenerating = true;
+            float previousHealth = currentHealth.Value;
+            
             currentHealth.Value += characterData.maxHealth * 0.01f * Time.deltaTime;
             currentHealth.Value = Mathf.Min(currentHealth.Value, characterData.maxHealth);
+
+            // VFX de cura passiva é acionado automaticamente pelo HealVFXReactor
+            // via currentHealth.OnValueChanged, que propaga para todos os clientes.
         }
     }
 
@@ -168,6 +173,7 @@ public class PlayerHealthSystem : NetworkBehaviour
         if (finalDamage < 0) finalDamage = 0;
 
         currentHealth.Value -= finalDamage;
+        // Zera o tempo para não curar o efeito visual de uma vez e interrompe regen normal
         timeSinceLastDamage = 0f;
         isRegenerating = false;
 
@@ -181,8 +187,15 @@ public class PlayerHealthSystem : NetworkBehaviour
     {
         if (!IsServer) return;
         if (characterData != null)
+        {
+            float previousHealth = currentHealth.Value;
             currentHealth.Value = Mathf.Min(currentHealth.Value + amount, characterData.maxHealth);
+
+            // VFX de cura é acionado automaticamente pelo HealVFXReactor
+            // via currentHealth.OnValueChanged, que propaga para todos os clientes.
+        }
     }
+
 
     void Die()
     {
