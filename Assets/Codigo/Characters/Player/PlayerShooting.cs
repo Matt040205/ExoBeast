@@ -231,7 +231,9 @@ public class PlayerShooting : NetworkBehaviour
 
     private void ExecuteShootVisual(Vector3 direction, bool isOwnerShot)
     {
-        if (networkAnimator != null) networkAnimator.SetTrigger("Shoot");
+        // Trigger apenas pelo owner: NGO NetworkAnimator propaga automaticamente para os remotos.
+        // Remotos receberiam o trigger via ClientRpc E via propagação do NetworkAnimator — duplicata.
+        if (isOwnerShot && networkAnimator != null) networkAnimator.SetTrigger("Shoot");
 
         PlayShootSound();
 

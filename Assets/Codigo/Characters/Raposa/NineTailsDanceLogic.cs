@@ -50,18 +50,27 @@ public class NineTailsDanceLogic : NetworkBehaviour
 
     public void StartEffect(float duration)
     {
-        if (!IsOwner) return;
+        // StartEffect é chamado pelo servidor (via Activate() no RequestActivateAbilityServerRpc)
+        if (!IsServer) return;
 
-        SetUltimateStateServerRpc(true);
+        netIsUltimateActive.Value = true;
+        if (combatManager != null)
+        {
+            previousCombatType = combatManager.netCombatType.Value;
+            combatManager.netCombatType.Value = CombatType.Melee;
+        }
+
         StartCoroutine(UltimateTimerCoroutine(duration));
     }
 
     private IEnumerator UltimateTimerCoroutine(float duration)
     {
         yield return new WaitForSeconds(duration);
-        if (IsOwner)
+        if (IsServer)
         {
-            SetUltimateStateServerRpc(false);
+            netIsUltimateActive.Value = false;
+            if (combatManager != null)
+                combatManager.netCombatType.Value = previousCombatType;
         }
     }
 

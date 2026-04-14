@@ -25,8 +25,6 @@ public class PeaceOfMindLogic : NetworkBehaviour
 
     public void StartEffect(float totalHeal, float duration, Ability sourceAbility)
     {
-        if (!IsOwner) return;
-
         RequestPeaceOfMindServerRpc(totalHeal, duration);
     }
 
@@ -36,13 +34,20 @@ public class PeaceOfMindLogic : NetworkBehaviour
         healthSystem = GetComponent<PlayerHealthSystem>();
         if (healthSystem != null)
         {
-            // Disparar animacao sincronizada para todos os clientes via NetworkAnimator
-            var netAnim = GetComponent<NetworkAnimator>() ?? GetComponentInChildren<NetworkAnimator>();
-            if (netAnim != null) netAnim.SetTrigger("Heal");
-
+            PlayHealAnimationClientRpc();
             PlayHealSFXClientRpc();
             StartCoroutine(HealCoroutine(totalHeal, duration));
         }
+    }
+
+    // NetworkAnimator.SetTrigger só propaga quando chamado pelo owner.
+    // Enviar de volta ao owner para que a propagação automática do NGO alcance todos.
+    [ClientRpc]
+    private void PlayHealAnimationClientRpc()
+    {
+        if (!IsOwner) return;
+        var netAnim = GetComponent<NetworkAnimator>() ?? GetComponentInChildren<NetworkAnimator>();
+        if (netAnim != null) netAnim.SetTrigger("Heal");
     }
 
     [ClientRpc]

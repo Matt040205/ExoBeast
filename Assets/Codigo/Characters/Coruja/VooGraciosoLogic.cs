@@ -36,12 +36,8 @@ public class VooGraciosoLogic : NetworkBehaviour
         netStaticAimDuration.Value = staticAimDuration;
         netBonusDamage.Value = bonusDamage;
         netBonusRadius.Value = bonusRadius;
-
-        var serverShooting = quemUsou.GetComponent<PlayerShooting>();
-        if (serverShooting != null)
-        {
-            serverShooting.SetNextShotBonus(bonusDamage, bonusRadius);
-        }
+        // SetNextShotBonus aplicado no owner via OnNetworkSpawn — não chamar aqui,
+        // pois PlayerShooting está desabilitado no servidor para jogadores remotos.
 
         isActive = true;
     }
@@ -70,6 +66,12 @@ public class VooGraciosoLogic : NetworkBehaviour
                         playerMovement.isFloating = true;
                         playerMovement.floatDuration = netStaticAimDuration.Value;
                     }
+                }
+
+                // Bônus de tiro aplicado localmente no owner — componente habilitado aqui
+                if (playerShooting != null)
+                {
+                    playerShooting.SetNextShotBonus(netBonusDamage.Value, netBonusRadius.Value);
                 }
             }
         }

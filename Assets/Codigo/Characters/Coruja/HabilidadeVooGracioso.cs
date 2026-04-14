@@ -1,6 +1,5 @@
 using UnityEngine;
 using Unity.Netcode;
-using System.Collections;
 
 /// <summary>
 /// ── HabilidadeVooGracioso ────────────────────────────────
@@ -34,39 +33,16 @@ public class HabilidadeVooGracioso : Ability
             return false;
         }
 
-        PlayerShooting shooting = quemUsou.GetComponent<PlayerShooting>();
-
-        // Aplica flutuação
-        movement.isFloating = true;
-        movement.floatDuration = staticAimDuration;
-        movement.jumpHeightModifier = jumpHeightModifier;
-        Debug.Log($"[VooGracioso] Flutuando por {staticAimDuration}s. jumpMod={jumpHeightModifier}");
-
-        // Aplica bônus na próxima flecha
-        if (shooting != null)
+        // Delegar ao VooGraciosoLogic (NetworkBehaviour) para sincronização correta
+        VooGraciosoLogic logic = quemUsou.GetComponent<VooGraciosoLogic>();
+        if (logic == null)
         {
-            shooting.SetNextShotBonus(bonusDamageMultiplier, bonusExplosionRadius);
-            Debug.Log($"[VooGracioso] Próxima flecha: {bonusDamageMultiplier}x dano, raio {bonusExplosionRadius}");
-        }
-        else
-        {
-            Debug.LogWarning("[VooGracioso] PlayerShooting não encontrado!");
+            Debug.LogWarning("[VooGracioso] VooGraciosoLogic não encontrado no player!");
+            return false;
         }
 
-        // Reseta modificadores após a duração
-        movement.StartCoroutine(ResetAfterFloat(movement));
-
+        logic.StartEffect(quemUsou, jumpHeightModifier, staticAimDuration, bonusDamageMultiplier, bonusExplosionRadius, null, this);
+        Debug.Log($"[VooGracioso] StartEffect delegado ao VooGraciosoLogic. jumpMod={jumpHeightModifier}, dur={staticAimDuration}");
         return true;
-    }
-
-    private IEnumerator ResetAfterFloat(PlayerMovement movement)
-    {
-        yield return new WaitForSeconds(staticAimDuration + 0.5f);
-        if (movement != null)
-        {
-            movement.jumpHeightModifier = 1f;
-            movement.isFloating = false;
-            Debug.Log("[VooGracioso] Float encerrado. Modificadores resetados.");
-        }
     }
 }

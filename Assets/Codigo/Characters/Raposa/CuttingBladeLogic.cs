@@ -10,6 +10,7 @@ using Unity.Netcode;
 ///
 ///  ▸ Owner drives movement: dash runs locally for responsiveness
 ///  ▸ Server validates: PerformDashDamageServerRpc applies damage authoritatively
+///  ▸ Remote owner: server delegates dash execution via owner-targeted ClientRpc
 ///  ▸ Kill-reset: server notifies owner via ClientRpc to reset cooldown on kill
 /// ─────────────────────────────────────────────────────────
 /// </summary>
@@ -27,24 +28,47 @@ public class CuttingBladeLogic : NetworkBehaviour
 
     public void StartDash(GameObject quemUsou, CharacterController cont, Transform pivot, float dist, float dmg, string som, CommanderAbilityController abCont, Ability ability, bool resetOnKill)
     {
-        if (!IsOwner) return;
-
-        controller = cont;
-        modelPivot = pivot;
         dashDistance = dist;
         damage = dmg;
         eventoDash = som;
         abilityController = abCont;
         sourceAbility = ability;
         resetCooldownOnKill = resetOnKill;
-        playerMovement = quemUsou.GetComponent<PlayerMovement>();
+        modelPivot = pivot;
 
-        if (abilityController != null)
+        if (IsOwner)
         {
+            // Caminho direto para o jogador local
+            controller = cont;
+            playerMovement = quemUsou.GetComponent<PlayerMovement>();
             abilityController.SetAbilityUsage(sourceAbility, true);
+            StartCoroutine(DashCoroutine(quemUsou));
         }
+        else if (IsServer)
+        {
+            // Servidor executando para jogador remoto — delega ao owner via ClientRpc
+            var clientRpcParams = new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { OwnerClientId } }
+            };
+            ExecuteDashOnOwnerClientRpc(dist, dmg, som, resetOnKill, clientRpcParams);
+        }
+    }
 
-        StartCoroutine(DashCoroutine(quemUsou));
+    // Executa o dash na máquina do owner (tem acesso ao CharacterController local)
+    [ClientRpc]
+    private void ExecuteDashOnOwnerClientRpc(float dist, float dmg, string som, bool resetOnKill, ClientRpcParams _ = default)
+    {
+        dashDistance = dist;
+        damage = dmg;
+        eventoDash = som;
+        resetCooldownOnKill = resetOnKill;
+        modelPivot = transform;
+        controller = GetComponent<CharacterController>();
+        playerMovement = GetComponent<PlayerMovement>();
+        abilityController = GetComponent<CommanderAbilityController>();
+        // sourceAbility fica null aqui — SetAbilityUsage/ResetCooldown tolerarão null via null-check
+        StartCoroutine(DashCoroutine(gameObject));
     }
 
     private IEnumerator DashCoroutine(GameObject quemUsou)
