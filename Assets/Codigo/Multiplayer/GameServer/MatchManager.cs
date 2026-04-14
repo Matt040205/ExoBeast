@@ -44,12 +44,24 @@ namespace ExoBeasts.Multiplayer.GameServer
 
         public override void OnNetworkSpawn()
         {
+            Debug.Log($"[MatchManager] OnNetworkSpawn! IsServer={IsServer}, IsClient={IsClient}, MatchTime={MatchTime.Value:F1}s, State={CurrentMatchState.Value}");
+
             if (IsServer)
             {
                 InitializeMatch();
             }
 
             CurrentMatchState.OnValueChanged += OnMatchStateChanged;
+
+            // ── Sync imediato do timer para TODOS os clientes ──
+            if (UIManager.Instance != null)
+            {
+                UIManager.Instance.ForceTimerSync(MatchTime.Value);
+            }
+            else
+            {
+                Debug.LogWarning("[MatchManager] UIManager.Instance é null no OnNetworkSpawn! Timer será sincronizado quando UIManager aparecer.");
+            }
         }
 
         private void InitializeMatch()
@@ -62,9 +74,19 @@ namespace ExoBeasts.Multiplayer.GameServer
             }
         }
 
+        private float _debugLogTimer = 0f;
+
         private void Update()
         {
             if (!IsServer) return;
+
+            // Log de diagnóstico a cada 5 segundos para verificar o estado
+            _debugLogTimer += Time.deltaTime;
+            if (_debugLogTimer >= 5f)
+            {
+                _debugLogTimer = 0f;
+                Debug.Log($"[MatchManager] Update - State={CurrentMatchState.Value}, MatchTime={MatchTime.Value:F1}s, autoStartMatch={autoStartMatch}");
+            }
 
             if (CurrentMatchState.Value == MatchState.Playing)
             {

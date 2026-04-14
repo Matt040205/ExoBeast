@@ -23,6 +23,8 @@ public class UIManager : MonoBehaviour
     public GameObject trapShopPanel;
 
     private float gameTime = 0f;
+    private bool matchManagerFound = false;
+    private float lastServerTime = -1f;
 
     private void Awake()
     {
@@ -55,11 +57,57 @@ public class UIManager : MonoBehaviour
 
     void Update()
     {
-        if (ExoBeasts.Multiplayer.GameServer.MatchManager.Instance != null)
-            gameTime = ExoBeasts.Multiplayer.GameServer.MatchManager.Instance.MatchTime.Value;
-        else
-            gameTime += Time.deltaTime;
+        if (HordeManager.Instance != null && !HordeManager.Instance.IsLocalMode)
+        {
+            var hm = HordeManager.Instance;
 
+            if (!matchManagerFound)
+            {
+                matchManagerFound = true;
+                // Registrar callback para quando o servidor manda um valor novos
+                hm.currentMatchTime.OnValueChanged += OnServerTimeSynced;
+                Debug.Log($"[UIManager] HordeManager encontrado! MatchTime={hm.currentMatchTime.Value:F1}s. Registrando callback de sync.");
+            }
+
+            float serverTime = hm.currentMatchTime.Value;
+
+            if (serverTime != lastServerTime)
+            {
+                // Servidor mandou um valor novo — resincronizar
+                gameTime = serverTime;
+                lastServerTime = serverTime;
+            }
+            else
+            {
+                // Entre ticks de rede: predição local para manter o timer suave
+                gameTime += Time.deltaTime;
+            }
+        }
+        else
+        {
+            // Fallback local (singleplayer ou antes do HordeManager spawnar)
+            gameTime += Time.deltaTime;
+        }
+
+        UpdateTimerDisplay(gameTime);
+    }
+
+    private void OnServerTimeSynced(float oldVal, float newVal)
+    {
+        // Quando chega valor novo do servidor, forçar resync
+        gameTime = newVal;
+        lastServerTime = newVal;
+    }
+
+    /// <summary>
+    /// Chamado externamente (ex: MatchManager.OnNetworkSpawn) para forçar sync imediato.
+    /// </summary>
+    public void ForceTimerSync(float serverTime)
+    {
+        Debug.Log($"[UIManager] ForceTimerSync chamado! serverTime={serverTime:F1}s, gameTime anterior={gameTime:F1}s");
+        gameTime = serverTime;
+        lastServerTime = serverTime;
+        matchManagerFound = true;
         UpdateTimerDisplay(gameTime);
     }
 
