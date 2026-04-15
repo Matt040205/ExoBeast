@@ -78,6 +78,9 @@ crashlytics-build.properties
 /[Aa]ssets/Plugins/FMOD/Cache/
 /[Aa]ssets/Plugins/FMOD/OnImport/
 
+# Cache de build do FMOD Studio (gerado localmente, não commitar)
+/[Aa]ssets/[Ss]treamingAssets/.cache/
+
 # Ignora logs de runtime do FMOD
 fmod_editor.log
 
