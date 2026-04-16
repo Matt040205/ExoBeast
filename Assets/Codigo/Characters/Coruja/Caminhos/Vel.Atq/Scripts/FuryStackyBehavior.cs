@@ -32,7 +32,7 @@ public class FuryStackyBehavior : TowerBehavior
         if (currentStacks < maxStacks)
         {
             currentStacks++;
-            // Stack bonus applied to tower's fire-rate (server-side stat)
+            towerController.AddAttackSpeedBonus(bonusPerStack);
         }
     }
 
@@ -41,6 +41,11 @@ public class FuryStackyBehavior : TowerBehavior
         if (towerController != null)
         {
             towerController.OnCriticalHit -= HandleCriticalHit;
+            for (int i = 0; i < currentStacks; i++)
+            {
+                towerController.AddAttackSpeedBonus(-bonusPerStack);
+            }
+            currentStacks = 0;
         }
     }
 }

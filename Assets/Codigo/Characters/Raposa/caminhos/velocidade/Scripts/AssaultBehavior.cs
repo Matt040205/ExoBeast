@@ -61,7 +61,10 @@ public class AssaultBehavior : TowerBehavior
 
     private void ResetBuff()
     {
-        towerController.AddAttackSpeedBonus(-(currentStacks * attackSpeedBonus));
+        for (int i = 0; i < currentStacks; i++)
+        {
+            towerController.AddAttackSpeedBonus(-attackSpeedBonus);
+        }
         currentStacks = 0;
         buffTimer = 0f;
     }

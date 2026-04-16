@@ -30,7 +30,7 @@ public class PreyMarkBehavior : TowerBehavior
     {
         if (target != null)
         {
-            target.ApplyMarkedStatus(1.0f + damageBonusToMarked);
+            target.ApplyMarkedStatus(1.0f + damageBonusToMarked, markDuration);
         }
     }
 

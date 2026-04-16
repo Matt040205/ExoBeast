@@ -81,6 +81,8 @@ public class MeleeCombatSystem : NetworkBehaviour
         UpdateCurrentStats();
     }
 
+    private bool hitProcessedForCurrentAttack = false;
+
     public void OnFire(InputAction.CallbackContext ctx)
     {
         if (!IsOwner || !this.enabled) return;
@@ -89,6 +91,22 @@ public class MeleeCombatSystem : NetworkBehaviour
         {
             // CORREÇÃO DA LINHA 79: Usando a referência segura para o NetworkAnimator
             if (networkAnimator != null) networkAnimator.SetTrigger("Attack");
+            
+            hitProcessedForCurrentAttack = false;
+            StartCoroutine(FallbackHitRoutine());
+        }
+    }
+
+    private System.Collections.IEnumerator FallbackHitRoutine()
+    {
+        float targetSpeed = overrideAttackSpeed.HasValue ? overrideAttackSpeed.Value : currentStats.animationSpeed;
+        float delay = 0.4f / (targetSpeed > 0.1f ? targetSpeed : 1f);
+        
+        yield return new WaitForSeconds(delay);
+
+        if (!hitProcessedForCurrentAttack)
+        {
+            AnimEvent_Hit1(); // Força o hit pro caso da animação não existir ou falhar!
         }
     }
 
@@ -153,10 +171,26 @@ public class MeleeCombatSystem : NetworkBehaviour
         }
     }
 
-    public void AnimEvent_Hit1() => DetectHits(currentStats.damageHit1, currentStats.sfxHit1);
-    public void AnimEvent_Hit2() => DetectHits(currentStats.damageHit2, currentStats.sfxHit2);
-    public void AnimEvent_Hit3() => DetectHits(currentStats.damageHit3, currentStats.sfxHit3);
-    public void AnimEvent_Hit4() => DetectHits(currentStats.damageHit4, currentStats.sfxHit4);
+    public void AnimEvent_Hit1() 
+    { 
+        hitProcessedForCurrentAttack = true; 
+        DetectHits(currentStats.damageHit1, currentStats.sfxHit1); 
+    }
+    public void AnimEvent_Hit2() 
+    { 
+        hitProcessedForCurrentAttack = true; 
+        DetectHits(currentStats.damageHit2, currentStats.sfxHit2); 
+    }
+    public void AnimEvent_Hit3() 
+    { 
+        hitProcessedForCurrentAttack = true; 
+        DetectHits(currentStats.damageHit3, currentStats.sfxHit3); 
+    }
+    public void AnimEvent_Hit4() 
+    { 
+        hitProcessedForCurrentAttack = true; 
+        DetectHits(currentStats.damageHit4, currentStats.sfxHit4); 
+    }
 
     void OnDrawGizmosSelected()
     {

@@ -170,6 +170,19 @@ public class PlayerHealthSystem : NetworkBehaviour
         }
 
         float finalDamage = damage * (1f - damageResistance.Value);
+
+        AllyShield shield = GetComponent<AllyShield>();
+        if (shield != null && shield.IsActive)
+        {
+            finalDamage = shield.AbsorbDamage(finalDamage);
+        }
+
+        DragonAuraBuff auraBuff = GetComponent<DragonAuraBuff>();
+        if (auraBuff != null && auraBuff.DamageReduction > 0)
+        {
+            finalDamage *= (1f - auraBuff.DamageReduction);
+        }
+
         if (finalDamage < 0) finalDamage = 0;
 
         currentHealth.Value -= finalDamage;

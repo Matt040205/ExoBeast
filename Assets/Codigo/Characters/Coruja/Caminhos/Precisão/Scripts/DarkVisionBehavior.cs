@@ -19,6 +19,10 @@ public class DarkVisionBehavior : TowerBehavior
         base.Initialize(owner);
         if (!IsServer) return;
 
-        // darkVisionBonus applied to TowerController range when night/dark conditions are met
+        if (towerController != null)
+        {
+            // Since there is no day/night system yet, we apply it as a flat range extension
+            towerController.AddRangeBonus(darkVisionBonus); 
+        }
     }
 }

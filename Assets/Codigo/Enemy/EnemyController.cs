@@ -125,8 +125,29 @@ public class EnemyController : MonoBehaviour
         if (paintStacks > 0 && Time.time > paintStackResetTime) paintStacks = 0;
     }
 
+    private Coroutine tauntCoroutine;
+    public void ApplyTaunt(Transform tauntTarget, float duration)
+    {
+        if (IsDead) return;
+        if (tauntCoroutine != null) StopCoroutine(tauntCoroutine);
+        tauntCoroutine = StartCoroutine(TauntRoutine(tauntTarget, duration));
+    }
+    private System.Collections.IEnumerator TauntRoutine(Transform tauntTarget, float duration)
+    {
+        float timer = 0f;
+        while (timer < duration && tauntTarget != null && !IsDead)
+        {
+            target = tauntTarget;
+            yield return null;
+            timer += Time.deltaTime;
+        }
+        tauntCoroutine = null;
+    }
+
     private void DecideTarget()
     {
+        if (tauntCoroutine != null) return;
+
         Transform nearestPlayer = FindNearestPlayer();
         if (nearestPlayer != null) playerTransform = nearestPlayer;
 
@@ -387,12 +408,14 @@ public class EnemyController : MonoBehaviour
         speedModifier = 1f;
         isSlowed = false;
     }
+    public void ApplyStun(float duration) { if (!IsDead) StartCoroutine(RootRoutine(duration)); }
+
     private IEnumerator RootRoutine(float duration)
     {
         isRooted = true;
-        if (agent != null) agent.isStopped = true;
+        if (agent != null && agent.enabled && agent.isOnNavMesh) agent.isStopped = true;
         yield return new WaitForSeconds(duration);
-        if (agent != null) agent.isStopped = false;
+        if (agent != null && agent.enabled && agent.isOnNavMesh) agent.isStopped = false;
         isRooted = false;
     }
 

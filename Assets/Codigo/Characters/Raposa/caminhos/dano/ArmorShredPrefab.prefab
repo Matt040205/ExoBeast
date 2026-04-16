@@ -9,6 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1778046134582854915}
+  - component: {fileID: -1815130681592450513}
   - component: {fileID: 2296978256645576257}
   m_Layer: 0
   m_Name: ArmorShredPrefab
@@ -32,6 +33,27 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &-1815130681592450513
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7389678322158217555}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 201400952
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!114 &2296978256645576257
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -44,5 +66,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f7974b53a8d03f4fa93c8711415e672, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  towerController: {fileID: 0}
   armorReductionPercentage: 0.05
   maxStacks: 3
