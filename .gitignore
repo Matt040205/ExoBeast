@@ -79,6 +79,9 @@ crashlytics-build.properties
 # Cache de build do FMOD Studio (gerado localmente, não commitar)
 Assets/Plugins/FMOD/Cache/
 
+# Cache de build dos banks (gerado pelo FMOD a cada build/play — causa merge conflicts)
+Assets/StreamingAssets/.cache/
+
 # Ignora logs de runtime do FMOD
 fmod_editor.log
 
