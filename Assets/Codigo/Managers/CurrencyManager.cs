@@ -94,12 +94,17 @@ public class CurrencyManager : NetworkBehaviour
         else
             networkedDarkEther.Value += amount;
 
-        if (!jaGanhouRecursoTutorial && GameDataManager.Instance != null && GameDataManager.Instance.tutoriaisConcluidos.Contains("USE_SKILLS"))
+        if (!jaGanhouRecursoTutorial && GameDataManager.Instance != null)
         {
             jaGanhouRecursoTutorial = true;
             if (TutorialManager.Instance != null)
             {
-                TutorialManager.Instance.TriggerTutorial("EXPLAIN_UPGRADE");
+                TutorialManager.Instance.TriggerTutorial("EXPLAIN_UPGRADE", () => 
+                {
+                    // Se ele fechou o EXPLAIN_UPGRADE e não está no modo de construção, toca o USE_SKILLS
+                    if (!BuildManager.isBuildingMode && TutorialManager.Instance != null)
+                        TutorialManager.Instance.TriggerTutorial("USE_SKILLS");
+                });
             }
         }
     }

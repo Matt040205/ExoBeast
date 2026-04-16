@@ -583,9 +583,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7889ab073619888499c2ce5bf5002574, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  titleText: {fileID: 0}
-  descriptionText: {fileID: 0}
-  closeButton: {fileID: 0}
+  titleText: {fileID: 1353003303}
+  descriptionText: {fileID: 2107975644}
+  closeButton: {fileID: 1280089929}
 --- !u!1 &23436998
 GameObject:
   m_ObjectHideFlags: 0
@@ -7805,9 +7805,6 @@ MonoBehaviour:
   posSelecaoLado: {x: -400, y: 0}
   posLobbyEscondido: {x: 5000, y: 0}
   posLobbyVisivel: {x: 1000, y: 40}
-  inputNomeSala: {fileID: 1281613878}
-  textoMaxJogadores: {fileID: 1486056536}
-  togglePublico: {fileID: 242773315}
 --- !u!1 &1721107829
 GameObject:
   m_ObjectHideFlags: 0

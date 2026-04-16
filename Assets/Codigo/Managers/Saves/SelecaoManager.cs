@@ -97,6 +97,16 @@ public class SelecaoManager : NetworkBehaviour
 
         painelEquipe.SetActive(true);
         AtualizarEstadoBotaoJogar();
+
+        // TUTORIAL: Ao iniciar a cena, explica como escolher o comandante
+        if (TutorialManager.Instance != null)
+        {
+            // Se ja voltou dos Rastros, mostra GO_TO_ACTION
+            if (GameDataManager.Instance.tutoriaisConcluidos.Contains("RETURN_TO_SELECTION"))
+                TutorialManager.Instance.TriggerTutorial("GO_TO_ACTION");
+            else
+                TutorialManager.Instance.TriggerTutorial("SELECT_COMMANDER");
+        }
     }
 
     public void CalcularLimitesDeSlots()
@@ -165,13 +175,23 @@ public class SelecaoManager : NetworkBehaviour
     void ConfirmarEscolha()
     {
         int id = todosOsPersonagens.IndexOf(personagemEmVisualizacao);
+        int slotConfirmado = slotSendoEditado;
 
         if (IsNetworkActive)
-            ConfirmarEscolhaServerRpc(id, slotSendoEditado);
+            ConfirmarEscolhaServerRpc(id, slotConfirmado);
         else
-            AplicarEscolhaLocal(id, slotSendoEditado);
+            AplicarEscolhaLocal(id, slotConfirmado);
 
         VoltarParaPainelEquipe();
+
+        // TUTORIAL: Ao confirmar o comandante (slot 0) -> pede pra escolher torre
+        if (TutorialManager.Instance != null)
+        {
+            if (slotConfirmado == slotInicialPermitido)
+                TutorialManager.Instance.TriggerTutorial("SELECT_TOWER");
+            else if (!GameDataManager.Instance.tutoriaisConcluidos.Contains("EXPLAIN_TRAILS"))
+                TutorialManager.Instance.TriggerTutorial("EXPLAIN_TRAILS");
+        }
     }
 
     // --- Paths locais (singleplayer, sem NGO) ---
@@ -249,6 +269,15 @@ public class SelecaoManager : NetworkBehaviour
         AtualizarTextoBotoesCaminho(p);
 
         if (slotSendoEditado == 0) MostrarPainelHabilidades(); else MostrarPainelUpgradesTorre();
+
+        // TUTORIAL: Mostra tutorial de habilidades ou upgrades de torre
+        if (TutorialManager.Instance != null)
+        {
+            if (slotSendoEditado == slotInicialPermitido)
+                TutorialManager.Instance.TriggerTutorial("COMMANDER_SKILLS");
+            else
+                TutorialManager.Instance.TriggerTutorial("TOWER_UPGRADES");
+        }
     }
 
     void LimparGrid(Transform g) { if (g == null) return; foreach (Transform t in g) Destroy(t.gameObject); }

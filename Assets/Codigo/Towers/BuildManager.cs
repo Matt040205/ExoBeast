@@ -101,6 +101,24 @@ public class BuildManager : NetworkBehaviour
         {
             ClearSelection();
             if (TowerSelectionManager.Instance != null) TowerSelectionManager.Instance.DeselectAll();
+
+            // TUTORIAL: USE_SKILLS toca logo depos de sair do build mode
+            if (TutorialManager.Instance != null && GameDataManager.Instance != null)
+            {
+                if (!GameDataManager.Instance.tutoriaisConcluidos.Contains("USE_SKILLS"))
+                    TutorialManager.Instance.TriggerTutorial("USE_SKILLS");
+            }
+        }
+        else
+        {
+            // TUTORIAL: Primeira vez entrando no build mode
+            if (TutorialManager.Instance != null)
+            {
+                if (!GameDataManager.Instance.tutoriaisConcluidos.Contains("HOW_TO_BUILD"))
+                    TutorialManager.Instance.TriggerTutorial("HOW_TO_BUILD");
+                else if (GameDataManager.Instance.tutoriaisConcluidos.Contains("EXPLAIN_UPGRADE"))
+                    TutorialManager.Instance.TriggerTutorial("HOW_TO_UPGRADE");
+            }
         }
 
         if (UIManager.Instance != null) UIManager.Instance.ShowBuildUI(state);
@@ -238,12 +256,28 @@ public class BuildManager : NetworkBehaviour
 
         CurrencyManager.Instance.SpendCurrency(cost, CurrencyType.Geodites);
 
+        // 1. Spawna o prefab VISUAL
         GameObject newTrap = Instantiate(trapData.prefab, pos, Quaternion.identity);
         if (newTrap.TryGetComponent<NetworkObject>(out var netObj))
             netObj.Spawn();
 
+        // 2. Spawna o prefab de LOGICA (onde ficam os scripts de efeito)
+        if (trapData.logicPrefab != null)
+        {
+            GameObject logicObj = Instantiate(trapData.logicPrefab, pos, Quaternion.identity);
+
+            // Injeta a referência ao SO para que a lógica possa se vender
+            TrapLogicBase logicBase = logicObj.GetComponent<TrapLogicBase>();
+            if (logicBase != null) logicBase.trapData = trapData;
+
+            // Se tiver NetworkObject, spawna na rede; senão, deixa local no servidor
+            if (logicObj.TryGetComponent<NetworkObject>(out var logicNetObj))
+                logicNetObj.Spawn();
+        }
+
         NotifyBuildingPlacedClientRpc(pos);
     }
+
 
     [ServerRpc(RequireOwnership = false)]
     private void RequestPlaceBuildingServerRpc(int prefabIndex, Vector3 pos, int cost, ServerRpcParams rpcParams = default)
@@ -267,7 +301,12 @@ public class BuildManager : NetworkBehaviour
     [ClientRpc]
     private void NotifyBuildingPlacedClientRpc(Vector3 pos)
     {
-        // Espera 0.2 segundos para garantir que o objeto brotou no mapa antes de mandar a UI contar
+        // TUTORIAL: Primeira torre colocada -> explica como sair do build mode
+        if (TutorialManager.Instance != null)
+        {
+            TutorialManager.Instance.TriggerTutorial("RETURN_TO_COMMANDER");
+        }
+
         StartCoroutine(UpdateUIAfterSpawn());
     }
 
@@ -287,11 +326,44 @@ public class BuildManager : NetworkBehaviour
     {
         List<CharacterBase> torres = new List<CharacterBase>();
 
+        int meuStartSlot = 0;
+        int meuEndSlot = equipe != null ? equipe.Length - 1 : 7;
+
+        if (NetworkManager.Singleton != null && (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer))
+        {
+            if (ExoBeasts.Multiplayer.Lobby.LobbyManager.Instance != null && ExoBeasts.Multiplayer.Auth.SessionManager.Instance != null)
+            {
+                var membros = ExoBeasts.Multiplayer.Lobby.LobbyManager.Instance.GetMembers();
+                string meuId = ExoBeasts.Multiplayer.Auth.SessionManager.Instance.GetUserId();
+                int meuIndice = membros.FindIndex(m => m.productUserId == meuId);
+                int total = membros.Count;
+
+                if (meuIndice != -1)
+                {
+                    if (total == 2) { meuStartSlot = meuIndice * 4; meuEndSlot = meuStartSlot + 3; }
+                    else if (total == 3)
+                    {
+                        if (meuIndice == 0) { meuStartSlot = 0; meuEndSlot = 3; }
+                        else if (meuIndice == 1) { meuStartSlot = 4; meuEndSlot = 5; }
+                        else { meuStartSlot = 6; meuEndSlot = 7; }
+                    }
+                    else if (total == 4) { meuStartSlot = meuIndice * 2; meuEndSlot = meuStartSlot + 1; }
+                }
+            }
+        }
+
         if (equipe != null)
         {
-            foreach (CharacterBase personagem in equipe)
+            for (int i = meuStartSlot; i <= meuEndSlot; i++)
             {
-                if (personagem != null && !personagem.isCommander && personagem.towerPrefab != null)
+                if (i >= equipe.Length) break;
+
+                CharacterBase personagem = equipe[i];
+                
+                // Ignora o primeiro slot do range local, pois ele é sempre o seu Comandante
+                bool isMyCommanderSlot = (i == meuStartSlot);
+
+                if (personagem != null && !isMyCommanderSlot && personagem.towerPrefab != null)
                 {
                     torres.Add(personagem);
 

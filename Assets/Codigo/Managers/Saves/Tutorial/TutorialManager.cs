@@ -1,12 +1,11 @@
-using UnityEngine;
+﻿using UnityEngine;
 using System.Collections.Generic;
 
 public class TutorialManager : MonoBehaviour
 {
     public static TutorialManager Instance;
 
-    [Header("Referncias")]
-    [Tooltip("Arraste o GameObject 'TutorialPopupPanel' (o que est desativado) aqui.")]
+    [Header("Referencias")]
     public GameObject popupPanelObject;
     public List<TutorialData> todosOsTutoriais;
 
@@ -15,68 +14,55 @@ public class TutorialManager : MonoBehaviour
 
     void Awake()
     {
-        if (Instance != null)
-        {
-            Destroy(gameObject);
-            return;
-        }
+        if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
 
         foreach (TutorialData tutorial in todosOsTutoriais)
         {
-            if (tutorial != null && !string.IsNullOrEmpty(tutorial.tutorialID))
-            {
-                if (!databaseTutoriais.ContainsKey(tutorial.tutorialID))
-                {
-                    databaseTutoriais.Add(tutorial.tutorialID, tutorial);
-                }
-                else
-                {
-                    Debug.LogWarning($"TUTORIAL_MANAGER: ID Duplicado encontrado na lista 'todosOsTutoriais': {tutorial.tutorialID}. Apenas o primeiro ser� usado.");
-                }
-            }
+            if (tutorial == null || string.IsNullOrEmpty(tutorial.tutorialID)) continue;
+            string cleanID = tutorial.tutorialID.Trim();
+            tutorial.tutorialID = cleanID;
+            if (!databaseTutoriais.ContainsKey(cleanID))
+                databaseTutoriais.Add(cleanID, tutorial);
+        }
+
+        if (popupPanelObject != null)
+        {
+            popupUIScript = popupPanelObject.GetComponent<TutorialPopupUI>();
+            if (popupUIScript == null)
+                popupUIScript = popupPanelObject.GetComponentInChildren<TutorialPopupUI>(true);
+            if (popupUIScript == null && popupPanelObject.transform.parent != null)
+                popupUIScript = popupPanelObject.transform.parent.GetComponent<TutorialPopupUI>();
+            if (popupUIScript == null)
+                popupUIScript = popupPanelObject.transform.root.GetComponentInChildren<TutorialPopupUI>(true);
         }
     }
 
-    public void TriggerTutorial(string tutorialID)
+    /// <summary>
+    /// Dispara um tutorial. onClose e chamado quando o jogador fechar o popup.
+    /// </summary>
+    public void TriggerTutorial(string tutorialID, System.Action onClose = null)
     {
-        if (GameDataManager.Instance == null) return;
+        if (GameDataManager.Instance == null || popupUIScript == null) return;
 
-        if (popupPanelObject == null)
+        string cleanID = tutorialID.Trim();
+        if (GameDataManager.Instance.tutoriaisConcluidos.Contains(cleanID)) return;
+
+        if (databaseTutoriais.ContainsKey(cleanID))
         {
-            Debug.LogError("TUTORIAL_MANAGER: 'popupPanelObject' n�o foi anexado no Inspetor!", this.gameObject);
-            return;
-        }
-
-        if (GameDataManager.Instance.tutoriaisConcluidos.Contains(tutorialID)) return;
-
-        if (databaseTutoriais.ContainsKey(tutorialID))
-        {
-            TutorialData data = databaseTutoriais[tutorialID];
+            TutorialData data = databaseTutoriais[cleanID];
             if (data == null) return;
 
-            popupPanelObject.SetActive(true);
-            popupUIScript = popupPanelObject.GetComponent<TutorialPopupUI>();
-
-            if (popupUIScript != null)
-            {
-                popupUIScript.Show(data);
-            }
-
-            ConcluirTutorial(tutorialID);
-        }
-        else
-        {
-            Debug.LogError($"TUTORIAL_MANAGER: O ID [{tutorialID}] n�o foi encontrado no 'databaseTutoriais'.", this.gameObject);
+            popupUIScript.Show(data, onClose);
+            ConcluirTutorial(cleanID);
         }
     }
 
     private void ConcluirTutorial(string tutorialID)
     {
-        if (GameDataManager.Instance != null && !GameDataManager.Instance.tutoriaisConcluidos.Contains(tutorialID))
-        {
-            GameDataManager.Instance.tutoriaisConcluidos.Add(tutorialID);
-            GameDataManager.Instance.SaveGame(); // <--- SALVA AQUI
-        }
+        if (GameDataManager.Instance == null) return;
+        if (GameDataManager.Instance.tutoriaisConcluidos.Contains(tutorialID)) return;
+        GameDataManager.Instance.tutoriaisConcluidos.Add(tutorialID);
+        GameDataManager.Instance.SaveGame();
     }
 }
