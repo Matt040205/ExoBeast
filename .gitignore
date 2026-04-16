@@ -75,11 +75,9 @@ crashlytics-build.properties
 # FMOD Specific (ADICIONADO)
 # =========================
 # Ignora caches que mudam sozinhos e travam merges
-/[Aa]ssets/Plugins/FMOD/Cache/
-/[Aa]ssets/Plugins/FMOD/OnImport/
 
 # Cache de build do FMOD Studio (gerado localmente, não commitar)
-/[Aa]ssets/[Ss]treamingAssets/.cache/
+Assets/Plugins/FMOD/Cache/
 
 # Ignora logs de runtime do FMOD
 fmod_editor.log
