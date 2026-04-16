@@ -19,6 +19,9 @@ public class ProjectileSpeedBehavior : TowerBehavior
         base.Initialize(owner);
         if (!IsServer) return;
 
-        // projectileSpeedBonus read by TowerController when constructing each projectile
+        if (towerController != null)
+        {
+            towerController.AddAttackSpeedBonus(projectileSpeedBonus);
+        }
     }
 }

@@ -26,9 +26,29 @@ public class ReloadSpeedBehavior : TowerBehavior
         }
     }
 
+    private float buffTimer;
+    private bool isBuffed;
+
     private void HandleCriticalHit(EnemyHealthSystem target)
     {
-        // Apply timed reload-speed buff via TowerController when API is available
+        if (!isBuffed)
+        {
+            towerController.AddAttackSpeedBonus(reloadSpeedBonus);
+            isBuffed = true;
+        }
+        buffTimer = bonusDuration;
+    }
+
+    private void Update()
+    {
+        if (!IsServer || !isBuffed) return;
+
+        buffTimer -= Time.deltaTime;
+        if (buffTimer <= 0)
+        {
+            towerController.AddAttackSpeedBonus(-reloadSpeedBonus);
+            isBuffed = false;
+        }
     }
 
     private void OnDestroy()
@@ -36,6 +56,7 @@ public class ReloadSpeedBehavior : TowerBehavior
         if (towerController != null)
         {
             towerController.OnCriticalHit -= HandleCriticalHit;
+            if (isBuffed) towerController.AddAttackSpeedBonus(-reloadSpeedBonus);
         }
     }
 }

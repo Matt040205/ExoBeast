@@ -159,7 +159,22 @@ public class EnemyHealthSystem : MonoBehaviour
         }
     }
 
-    public void ApplyMarkedStatus(float multiplier)
+    public void ApplyTemporaryArmorShred(float percentage, float duration)
+    {
+        if (networkedEnemy != null && !networkedEnemy.IsServer) return;
+        StartCoroutine(TemporaryArmorShredRoutine(percentage, duration));
+    }
+
+    private System.Collections.IEnumerator TemporaryArmorShredRoutine(float percentage, float duration)
+    {
+        float actualArmorVal = baseArmor * percentage;
+        currentArmorModifier += actualArmorVal;
+        yield return new WaitForSeconds(duration);
+        currentArmorModifier -= actualArmorVal;
+    }
+
+    private Coroutine markCoroutine;
+    public void ApplyMarkedStatus(float multiplier, float duration = 0f)
     {
         if (networkedEnemy != null && !networkedEnemy.IsServer) return;
         markedDamageMultiplier = multiplier;
@@ -170,11 +185,65 @@ public class EnemyHealthSystem : MonoBehaviour
             for (int i = 0; i < markMats.Length; i++) markMats[i] = markedMaterial;
             enemyRenderer.materials = markMats;
             isMarked = true;
+
+            if (duration > 0)
+            {
+                if (markCoroutine != null) StopCoroutine(markCoroutine);
+                markCoroutine = StartCoroutine(MarkExpirationRoutine(duration));
+            }
         }
         else if (multiplier <= 1.0f && enemyRenderer != null && originalMaterials != null && isMarked)
         {
             enemyRenderer.materials = originalMaterials;
             isMarked = false;
+        }
+    }
+
+    private IEnumerator MarkExpirationRoutine(float duration)
+    {
+        yield return new WaitForSeconds(duration);
+        ApplyMarkedStatus(1.0f);
+    }
+
+    public void ApplyBleed(float dps, float duration)
+    {
+        if (networkedEnemy != null && !networkedEnemy.IsServer) return;
+        StartCoroutine(BleedRoutine(dps, duration));
+    }
+    private IEnumerator BleedRoutine(float dps, float duration)
+    {
+        float t = 0;
+        while (t < duration)
+        {
+            yield return new WaitForSeconds(1f);
+            if (isDead) break;
+            TakeDamage(dps, 1f); 
+            t += 1f;
+        }
+    }
+
+    private int revealCounter = 0;
+    public void ApplyReveal(float duration)
+    {
+        if (networkedEnemy != null && !networkedEnemy.IsServer) return;
+        StartCoroutine(RevealRoutine(duration));
+    }
+    private IEnumerator RevealRoutine(float duration)
+    {
+        revealCounter++;
+        if (enemyRenderer != null && markedMaterial != null)
+        {
+            Material[] markMats = new Material[originalMaterials.Length];
+            for (int i = 0; i < markMats.Length; i++) markMats[i] = markedMaterial;
+            enemyRenderer.materials = markMats;
+        }
+
+        yield return new WaitForSeconds(duration);
+        revealCounter--;
+
+        if (revealCounter <= 0 && enemyRenderer != null && originalMaterials != null && !isMarked)
+        {
+            enemyRenderer.materials = originalMaterials;
         }
     }
 

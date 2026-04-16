@@ -46,7 +46,7 @@ public class MultiShotBehavior : TowerBehavior
         for (int i = 0; i < extraProjectiles && validTargets.Count > 0; i++)
         {
             EnemyHealthSystem randomTarget = validTargets[Random.Range(0, validTargets.Count)];
-            // towerController.FireProjectileAt(randomTarget.transform, towerController.CurrentDamage * damageMultiplier);
+            towerController.FireExtraProjectileAt(randomTarget, damageMultiplier);
         }
     }
 

@@ -27,7 +27,20 @@ public class ArrowRainBehavior : TowerBehavior
 
     private void HandleEnemyKilled(EnemyHealthSystem target)
     {
-        // Fire freeArrows extra shots via TowerController when API is available
+        Collider[] colliders = Physics.OverlapSphere(transform.position, towerController.CurrentRange);
+        System.Collections.Generic.List<EnemyHealthSystem> validTargets = new System.Collections.Generic.List<EnemyHealthSystem>();
+
+        foreach (var col in colliders)
+        {
+            EnemyHealthSystem ehs = col.GetComponent<EnemyHealthSystem>();
+            if (ehs != null && !ehs.isDead && ehs != target) validTargets.Add(ehs);
+        }
+
+        for (int i = 0; i < freeArrows && validTargets.Count > 0; i++)
+        {
+            EnemyHealthSystem randomTarget = validTargets[Random.Range(0, validTargets.Count)];
+            towerController.FireExtraProjectileAt(randomTarget, 1f);
+        }
     }
 
     private void OnDestroy()

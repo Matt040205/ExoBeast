@@ -132,6 +132,8 @@ GameObject:
   - component: {fileID: -7805911734455766873}
   - component: {fileID: 2308866288876760805}
   - component: {fileID: -7455273069582053334}
+  - component: {fileID: 961821673171643992}
+  - component: {fileID: -1997046969559067820}
   m_Layer: 8
   m_Name: TorretaDragao
   m_TagString: Untagged
@@ -265,7 +267,6 @@ MonoBehaviour:
   towerModeBool: IsTower
   rotationOffset: {x: 0, y: 0, z: 0}
   enemyTag: Enemy
-  currentPathLevels: 
 --- !u!114 &-7455273069582053334
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -280,3 +281,38 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   circleVisual: {fileID: 4991672053577661071}
   highlightMaterial: {fileID: 2100000, guid: 51cf0a9826ba27448a353b1ac7a3850f, type: 2}
+--- !u!114 &961821673171643992
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8490162969109981554}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b54f94583bca95d42a58a3caea7e63bb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  moveSpeed: 3.5
+--- !u!195 &-1997046969559067820
+NavMeshAgent:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8490162969109981554}
+  m_Enabled: 1
+  m_AgentTypeID: 0
+  m_Radius: 0.5
+  m_Speed: 3.5
+  m_Acceleration: 8
+  avoidancePriority: 50
+  m_AngularSpeed: 120
+  m_StoppingDistance: 0
+  m_AutoTraverseOffMeshLink: 1
+  m_AutoBraking: 1
+  m_AutoRepath: 1
+  m_Height: 1
+  m_BaseOffset: 0.5
+  m_WalkableMask: 4294967295
+  m_ObstacleAvoidanceType: 4
