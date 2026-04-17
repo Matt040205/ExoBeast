@@ -59,51 +59,32 @@ public class EnemyCombatSystem : NetworkBehaviour
         {
             currentDamage = enemyData.GetDamage(nivel);
 
-            // Tentar encontrar ou adicionar um SphereCollider para o gatilho de detecção
-            SphereCollider sphereCollider = (attackPoint != null && attackPoint.GetComponent<SphereCollider>() != null)
-                ? attackPoint.GetComponent<SphereCollider>()
-                : GetComponent<SphereCollider>();
-
-            if (sphereCollider == null)
-            {
-                sphereCollider = gameObject.AddComponent<SphereCollider>();
-            }
-
-            if (sphereCollider != null)
-            {
-                sphereCollider.isTrigger = true;
-                sphereCollider.radius = attackRange;
-            }
-
             if (towerAuraCoroutine != null) StopCoroutine(towerAuraCoroutine);
             towerAuraCoroutine = StartCoroutine(TowerAuraCycle());
         }
     }
 
-    void OnTriggerEnter(Collider other)
+    void Update()
     {
-        if (!IsServer) return;
+        if (!IsServer || enemyController == null || enemyController.IsDead || enemyData == null) return;
 
-        if (((1 << other.gameObject.layer) & playerLayer) != 0)
+        // Recupera o alvo do controlador
+        Transform currentTarget = enemyController.Target;
+        
+        if (currentTarget != null && currentTarget.CompareTag("Player"))
         {
-            if (!playerIsInside)
+            float dist = Vector3.Distance(transform.position, currentTarget.position);
+            
+            // Se está no range de atacar
+            if (dist <= enemyController.attackDistance)
             {
-                playerIsInside = true;
-                if (attackCoroutine != null) StopCoroutine(attackCoroutine);
-                attackCoroutine = StartCoroutine(PlayerAttackCycle());
+                if (attackCoroutine == null)
+                {
+                    attackCoroutine = StartCoroutine(PlayerAttackCycleStateDriven());
+                }
             }
-        }
-    }
-
-    void OnTriggerExit(Collider other)
-    {
-        if (!IsServer) return;
-
-        if (((1 << other.gameObject.layer) & playerLayer) != 0)
-        {
-            if (playerIsInside)
+            else
             {
-                playerIsInside = false;
                 if (attackCoroutine != null)
                 {
                     StopCoroutine(attackCoroutine);
@@ -111,20 +92,58 @@ public class EnemyCombatSystem : NetworkBehaviour
                 }
             }
         }
+        else
+        {
+            if (attackCoroutine != null)
+            {
+                StopCoroutine(attackCoroutine);
+                attackCoroutine = null;
+            }
+        }
     }
 
-    private IEnumerator PlayerAttackCycle()
+    private IEnumerator PlayerAttackCycleStateDriven()
     {
         yield return new WaitForSeconds(timeToDamage);
 
-        while (playerIsInside && enemyController != null && !enemyController.IsDead)
+        while (enemyController != null && !enemyController.IsDead && enemyController.Target != null)
         {
-            ApplyDamageInArea();
+            float dist = Vector3.Distance(transform.position, enemyController.Target.position);
+            if (dist > enemyController.attackDistance) break;
+
+            ProcessAttack(enemyController.Target);
 
             float cooldown = (enemyData != null && enemyData.attackSpeed > 0) ? (1f / enemyData.attackSpeed) : 1f;
             yield return new WaitForSeconds(cooldown);
         }
+        
         attackCoroutine = null;
+    }
+
+    private void ProcessAttack(Transform targetTransform)
+    {
+        if (enemyData.enemyType == EnemyType.Voador)
+        {
+            // ATAQUE RANGED (Hitscan)
+            Vector3 origin = attackPoint != null ? attackPoint.position : transform.position;
+            Vector3 dir = (targetTransform.position - origin).normalized;
+            
+            // Atira o raycast até a distância máxima que ele conseguiria ver
+            if (Physics.Raycast(origin, dir, out RaycastHit hit, enemyController.loseSightDistance, playerLayer))
+            {
+                PlayerHealthSystem playerHealth = hit.collider.GetComponent<PlayerHealthSystem>();
+                if (playerHealth != null)
+                {
+                    // No futuro: se você criar efeitos, chame um ClientRpc(origin, hit.point) aqui
+                    playerHealth.TakeDamage(currentDamage, transform);
+                }
+            }
+        }
+        else
+        {
+            // ATAQUE CORPO A CORPO (Área)
+            ApplyDamageInArea();
+        }
     }
 
     void ApplyDamageInArea()
@@ -149,14 +168,8 @@ public class EnemyCombatSystem : NetworkBehaviour
                 if (playerHealth != null)
                 {
                     playerHealth.TakeDamage(currentDamage, transform);
-                    acertouAlguem = true;
                 }
             }
-            if (!acertouAlguem) playerIsInside = false;
-        }
-        else
-        {
-            playerIsInside = false;
         }
     }
 

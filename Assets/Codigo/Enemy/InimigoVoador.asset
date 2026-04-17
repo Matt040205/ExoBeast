@@ -12,10 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b99c2fcabcc0ff9418ea43cf94220c11, type: 3}
   m_Name: InimigoVoador
   m_EditorClassIdentifier: 
+  enemyPrefab: {fileID: 5947394682883320567, guid: 6a85f1bfb163e4a4bb0959147ef5da6c, type: 3}
   enemyType: 1
   baseHP: 70
   baseATQ: 10
-  moveSpeed: 3
+  moveSpeed: 4
   attackSpeed: 1
   baseArmor: 0
   hpPerLevel: 10

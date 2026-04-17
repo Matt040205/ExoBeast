@@ -50,6 +50,16 @@ public class DragonPatrolBehavior : MonoBehaviour
                     EnemyHealthSystem ehs = col.GetComponent<EnemyHealthSystem>();
                     if (ehs != null && ehs.isDead) continue; 
 
+                    // Ignorar inimigos voadores se a torre não puder atingi-los
+                    if (tower != null && !tower.TargetsFlyingEnemies)
+                    {
+                        EnemyController ec = col.GetComponent<EnemyController>();
+                        if (ec != null && ec.enemyData != null && ec.enemyData.enemyType == EnemyType.Voador)
+                        {
+                            continue;
+                        }
+                    }
+
                     float d = Vector3.Distance(homePosition, col.transform.position);
                     if (d < shortestDist)
                     {

@@ -22,9 +22,10 @@ public class EnemyController : MonoBehaviour
 {
     [Header("Inteligência Artificial")]
     public AITargetPriority mainPriority = AITargetPriority.Player;
-    public float chaseDistance = 15f;
-    public float selfDefenseRadius = 5f;
+    public float findDistance = 15f;
     public float attackDistance = 2f;
+    public float loseSightDistance = 25f;
+    public float selfDefenseRadius = 5f;
     public float maxChaseTime = 10f;
     public float maxChaseDistance = 20f;
 
@@ -42,6 +43,8 @@ public class EnemyController : MonoBehaviour
     private EnemyCombatSystem combatSystem;
 
     private Transform target;
+    public Transform Target => target;
+
     private Transform playerTransform; // Alvo atual de jogador
     private List<Transform> patrolPoints;
     private int currentPointIndex = 0;
@@ -164,7 +167,7 @@ public class EnemyController : MonoBehaviour
             currentChaseTimer += Time.deltaTime;
             float distanceTraveled = Vector3.Distance(transform.position, initialChasePosition);
 
-            if (currentChaseTimer >= maxChaseTime || distanceTraveled >= maxChaseDistance || distanceToPlayer > chaseDistance * 1.5f)
+            if (currentChaseTimer >= maxChaseTime || distanceTraveled >= maxChaseDistance || distanceToPlayer > loseSightDistance)
             {
                 target = null;
                 currentChaseTimer = 0f;
@@ -173,7 +176,7 @@ public class EnemyController : MonoBehaviour
         else
         {
             bool shouldChase = false;
-            if (mainPriority == AITargetPriority.Player && distanceToPlayer <= chaseDistance) shouldChase = true;
+            if (mainPriority == AITargetPriority.Player && distanceToPlayer <= findDistance) shouldChase = true;
             else if (mainPriority == AITargetPriority.Objective && distanceToPlayer <= selfDefenseRadius) shouldChase = true;
 
             if (shouldChase)

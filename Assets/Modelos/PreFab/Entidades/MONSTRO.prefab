@@ -1831,9 +1831,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mainPriority: 1
-  chaseDistance: 15
-  selfDefenseRadius: 5
+  findDistance: 15
   attackDistance: 2
+  loseSightDistance: 25
+  selfDefenseRadius: 5
   maxChaseTime: 10
   maxChaseDistance: 20
   originalMoveSpeed: 3.5
@@ -1894,7 +1895,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   attackRange: 2
-  timeToDamage: 2
+  timeToDamage: 1.5
   towerAuraRadius: 10
   towerAuraDamage: 14
   towerAuraInterval: 3
