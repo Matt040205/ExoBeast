@@ -141,7 +141,14 @@ public class PlayerMovement : NetworkBehaviour
             }
             else
             {
-                TutorialManager.Instance.TriggerTutorial("PLAYER_MOVEMENT");
+                // PLAYER_MOVEMENT -> quando fechar -> EXPLAIN_BUILD_MODE
+                TutorialManager.Instance.TriggerTutorial("PLAYER_MOVEMENT", () =>
+                {
+                    Cursor.lockState = CursorLockMode.Locked;
+                    Cursor.visible = false;
+                    if (TutorialManager.Instance != null)
+                        TutorialManager.Instance.TriggerTutorial("EXPLAIN_BUILD_MODE");
+                });
             }
         }
         else
@@ -346,11 +353,8 @@ public class PlayerMovement : NetworkBehaviour
 
         if (direction.sqrMagnitude > 0.01f)
         {
-            if (!jaMoveuTutorial && GameDataManager.Instance != null && GameDataManager.Instance.tutoriaisConcluidos.Contains("PLAYER_MOVEMENT"))
-            {
-                jaMoveuTutorial = true;
-                if (TutorialManager.Instance != null) TutorialManager.Instance.TriggerTutorial("EXPLAIN_BUILD_MODE");
-            }
+            // Tutorial de build mode agora e encadeado via callback no PLAYER_MOVEMENT
+            // Nao precisa mais do trigger aqui
 
             Vector3 moveDir;
 

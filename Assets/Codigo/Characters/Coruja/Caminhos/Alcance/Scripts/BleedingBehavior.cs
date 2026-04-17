@@ -30,7 +30,7 @@ public class BleedingBehavior : TowerBehavior
     {
         if (target != null)
         {
-            // target.ApplyBleed(bleedDamagePerSecond, bleedDuration); — pending EnemyHealthSystem implementation
+            target.ApplyBleed(bleedDamagePerSecond, bleedDuration); 
         }
     }
 

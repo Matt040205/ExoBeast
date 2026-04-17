@@ -29,7 +29,7 @@ public class OwlEyeBehavior : TowerBehavior
     {
         if (target != null)
         {
-            // target.ApplyReveal(revealDuration); — pending EnemyHealthSystem + ClientRpc for visual
+            target.ApplyReveal(revealDuration); 
         }
     }
 

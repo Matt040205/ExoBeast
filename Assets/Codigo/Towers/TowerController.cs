@@ -47,6 +47,8 @@ public class TowerController : MonoBehaviour
     public int[] currentPathLevels { get; private set; } = new int[3] { 0, 0, 0 };
 
     private Transform targetEnemy;
+    public Transform TargetEnemy => targetEnemy;
+
     private float fireCountdown = 0f;
 
     private TowerAbilitySystem abilitySystem;
@@ -136,17 +138,6 @@ public class TowerController : MonoBehaviour
         if (path == TowerPath.DPS) currentPathLevels[0]++;
         else if (path == TowerPath.Control) currentPathLevels[1]++;
         else if (path == TowerPath.Support) currentPathLevels[2]++;
-
-        // 4. Atualiza o Sistema de Habilidades Mistas
-        if (abilitySystem != null)
-        {
-            // Tenta converter para PaintAbilitySystem para usar a função nova UpgradePath
-            PaintAbilitySystem paintSystem = abilitySystem as PaintAbilitySystem;
-            if (paintSystem != null)
-            {
-                paintSystem.UpgradePath(path);
-            }
-        }
     }
 
     private void ApplyModifier(StatModifier modifier)
@@ -196,47 +187,70 @@ public class TowerController : MonoBehaviour
     public void Shoot()
     {
         if (targetEnemy == null) return;
+        if (animator != null) animator.SetTrigger(shootTrigger);
 
-        if (animator != null)
+        PiercingBehavior piercer = GetComponent<PiercingBehavior>();
+        if (piercer != null)
         {
-            animator.SetTrigger(shootTrigger);
-        }
+            Vector3 originPoint = firePoint != null ? firePoint.position : (partToRotate != null ? partToRotate.position : transform.position);
+            Vector3 dir = (targetEnemy.position - originPoint).normalized;
+            RaycastHit[] hits = Physics.SphereCastAll(originPoint, 1f, dir, CurrentRange);
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            
+            int hitsDone = 0;
+            int maxHits = 1 + piercer.enemiesToPierce;
+            HashSet<EnemyHealthSystem> processed = new HashSet<EnemyHealthSystem>();
 
-        EnemyHealthSystem healthSystem = targetEnemy.GetComponent<EnemyHealthSystem>();
-
-        if (healthSystem != null)
-        {
-            float damageToDeal = currentDamage;
-            bool isCritical = UnityEngine.Random.value <= currentCritChance;
-
-            if (isCritical)
+            EnemyHealthSystem primary = targetEnemy.GetComponent<EnemyHealthSystem>();
+            if (primary != null)
             {
-                damageToDeal *= currentCritDamage;
+                ProcessDamageInstance(primary);
+                hitsDone++;
+                processed.Add(primary);
             }
 
-            if (OnCalculateDamage != null)
+            foreach (var hit in hits)
             {
-                foreach (Func<EnemyHealthSystem, float, float> modifier in OnCalculateDamage.GetInvocationList())
+                if (hitsDone >= maxHits) break;
+                EnemyHealthSystem ehs = hit.collider.GetComponentInParent<EnemyHealthSystem>();
+                if (ehs == null) ehs = hit.collider.GetComponent<EnemyHealthSystem>();
+
+                if (ehs != null && !processed.Contains(ehs) && !ehs.isDead)
                 {
-                    damageToDeal = modifier(healthSystem, damageToDeal);
+                    ProcessDamageInstance(ehs);
+                    hitsDone++;
+                    processed.Add(ehs);
                 }
             }
+        }
+        else
+        {
+            EnemyHealthSystem healthSystem = targetEnemy.GetComponent<EnemyHealthSystem>();
+            if (healthSystem != null) ProcessDamageInstance(healthSystem);
+        }
+    }
 
-            bool enemyDied = healthSystem.TakeDamage(damageToDeal, currentArmorPenetration);
+    private void ProcessDamageInstance(EnemyHealthSystem healthSystem)
+    {
+        if (healthSystem == null) return;
+        float damageToDeal = currentDamage;
+        bool isCritical = UnityEngine.Random.value <= currentCritChance;
 
-            if (enemyDied)
+        if (isCritical) damageToDeal *= currentCritDamage;
+
+        if (OnCalculateDamage != null)
+        {
+            foreach (Func<EnemyHealthSystem, float, float> modifier in OnCalculateDamage.GetInvocationList())
             {
-                OnEnemyKilled?.Invoke(healthSystem);
-            }
-
-            // Isso aciona o PaintAbilitySystem.OnHit()
-            OnTargetDamaged?.Invoke(healthSystem);
-
-            if (isCritical)
-            {
-                OnCriticalHit?.Invoke(healthSystem);
+                damageToDeal = modifier(healthSystem, damageToDeal);
             }
         }
+
+        bool enemyDied = healthSystem.TakeDamage(damageToDeal, currentArmorPenetration);
+
+        if (enemyDied) OnEnemyKilled?.Invoke(healthSystem);
+        OnTargetDamaged?.Invoke(healthSystem);
+        if (isCritical) OnCriticalHit?.Invoke(healthSystem);
     }
 
     void RotateTowardsTarget()
@@ -304,9 +318,22 @@ public class TowerController : MonoBehaviour
         DestroyTower();
     }
 
-    public void TakeDamage(float amount)
+    [HideInInspector] public bool IsInvulnerable = false;
+    public delegate void DamageEvent(float damage, Transform attacker);
+    public event DamageEvent OnDamageTaken;
+    public delegate bool FatalDamageEvent();
+    public event FatalDamageEvent OnFatalDamagePrevented;
+
+    public void AddMaxHealth(float amount)
     {
-        if (IsDestroyed) return;
+        MaxHealth += amount;
+        if (MaxHealth < 1) MaxHealth = 1;
+        currentHealth += amount;
+    }
+
+    public void TakeDamage(float amount, Transform attacker = null)
+    {
+        if (IsDestroyed || IsInvulnerable) return;
         float remainingDamage = amount;
 
         Collider[] colliders = Physics.OverlapSphere(transform.position, 5f);
@@ -319,13 +346,31 @@ public class TowerController : MonoBehaviour
             }
         }
 
-        float finalDamage = remainingDamage * (1 - currentArmor);
+        AllyShield shield = GetComponent<AllyShield>();
+        if (shield != null && shield.IsActive)
+        {
+            remainingDamage = shield.AbsorbDamage(remainingDamage);
+        }
+
+        DragonAuraBuff auraBuff = GetComponent<DragonAuraBuff>();
+        float dmgRed = auraBuff != null ? auraBuff.DamageReduction : 0f;
+
+        float finalDamage = remainingDamage * (1 - currentArmor) * (1 - dmgRed);
         currentHealth -= finalDamage;
+        
+        OnDamageTaken?.Invoke(finalDamage, attacker);
 
         if (currentHealth <= 0)
         {
-            currentHealth = 0;
-            DestroyTower();
+            if (OnFatalDamagePrevented != null && OnFatalDamagePrevented.Invoke())
+            {
+                currentHealth = 1f; // Preveniu a morte
+            }
+            else
+            {
+                currentHealth = 0;
+                DestroyTower();
+            }
         }
     }
 
@@ -338,7 +383,11 @@ public class TowerController : MonoBehaviour
         {
             TowerSelectionManager.Instance.DeselectAll();
         }
-        Destroy(gameObject);
+        // Ao invés de Destruir o GameObject (que quebra os scripts de Reviver), nós apenas escondemos a torre visualmente
+        foreach (Renderer r in GetComponentsInChildren<Renderer>()) 
+        {
+            r.enabled = false;
+        }
     }
 
     public void Revive(float healthPercentage)
@@ -346,13 +395,55 @@ public class TowerController : MonoBehaviour
         if (!IsDestroyed) return;
         IsDestroyed = false;
         currentHealth = MaxHealth * healthPercentage;
+        
+        // Reativa a torre visualmente
+        foreach (Renderer r in GetComponentsInChildren<Renderer>()) 
+        {
+            r.enabled = true;
+        }
     }
 
     public void Heal(float amount) { currentHealth = Mathf.Min(currentHealth + amount, MaxHealth); }
     public void AddArmorBonus(float amount) { currentArmor += amount; }
-    public void AddAttackSpeedBonus(float amount) { currentAttackSpeed *= (1 + amount); }
-    public void AddDamageBonus(float amount) { currentDamage *= (1 + amount); }
+    public void AddAttackSpeedBonus(float amount) 
+    { 
+        if (amount >= 0) currentAttackSpeed *= (1 + amount); 
+        else currentAttackSpeed /= (1 + Mathf.Abs(amount)); 
+    }
+    public void AddDamageBonus(float amount) 
+    { 
+        if (amount >= 0) currentDamage *= (1 + amount); 
+        else currentDamage /= (1 + Mathf.Abs(amount)); 
+    }
+    public float CurrentDamage => currentDamage;
+
+    public void AddRangeBonus(float amount)
+    {
+        if (amount >= 0) CurrentRange *= (1 + amount);
+        else CurrentRange /= (1 + Mathf.Abs(amount));
+    }
     public void PerformExtraAttack() { Shoot(); }
+
+    public void FireExtraProjectileAt(EnemyHealthSystem target, float damagePercent)
+    {
+        if (target == null) return;
+        float damageToDeal = currentDamage * damagePercent;
+        
+        bool isCritical = UnityEngine.Random.value <= currentCritChance;
+        if (isCritical) damageToDeal *= currentCritDamage;
+
+        if (OnCalculateDamage != null)
+        {
+            foreach (Func<EnemyHealthSystem, float, float> modifier in OnCalculateDamage.GetInvocationList())
+            {
+                damageToDeal = modifier(target, damageToDeal);
+            }
+        }
+
+        bool enemyDied = target.TakeDamage(damageToDeal, currentArmorPenetration);
+        if (enemyDied) OnEnemyKilled?.Invoke(target);
+        if (isCritical) OnCriticalHit?.Invoke(target);
+    }
 
     void OnDrawGizmosSelected()
     {

@@ -1,4 +1,4 @@
-﻿using TMPro;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
@@ -84,23 +84,6 @@ public class UpgradePanelUI : MonoBehaviour
     private int GetCurrentLevel(int pathIndex)
     {
         if (currentTower == null) return 0;
-
-        // Tenta pegar o sistema de tinta (Novo sistema misto)
-        PaintAbilitySystem paintSystem = currentTower.GetComponent<PaintAbilitySystem>();
-
-        if (paintSystem != null)
-        {
-            // Os níveis internos são -1 (não tem), 0 (lvl 1)... 4 (lvl 5)
-            // A UI precisa de 0 (não tem), 1 (lvl 1)... 5 (lvl 5)
-            // Então somamos +1 ao valor interno
-            switch (pathIndex)
-            {
-                case 0: return paintSystem.dpsLevel + 1;     // Caminho 1 = DPS
-                case 1: return paintSystem.controlLevel + 1; // Caminho 2 = Control
-                case 2: return paintSystem.supportLevel + 1; // Caminho 3 = Support
-            }
-        }
-
         if (currentTower.currentPathLevels != null && pathIndex < currentTower.currentPathLevels.Length) { return currentTower.currentPathLevels[pathIndex]; } return 0;
     }
 

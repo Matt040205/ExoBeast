@@ -1,7 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
-using Unity.Netcode;
 
 /// <summary>
 /// ── LegacyAuraBehavior ───────────────────────────────────
@@ -70,21 +69,17 @@ public class LegacyAuraBehavior : TowerBehavior
             .ToList();
     }
 
-    public override void OnNetworkDespawn()
+    private void OnDestroy()
     {
-        if (IsServer)
+        foreach (var tower in affectedTowers)
         {
-            foreach (var tower in affectedTowers)
+            if (tower != null)
             {
-                if (tower != null)
-                {
-                    tower.AddDamageBonus(-damageBonus);
-                    tower.AddAttackSpeedBonus(-attackSpeedBonus);
-                }
+                tower.AddDamageBonus(-damageBonus);
+                tower.AddAttackSpeedBonus(-attackSpeedBonus);
             }
-            affectedTowers.Clear();
         }
-        base.OnNetworkDespawn();
+        affectedTowers.Clear();
     }
 
     private void OnDrawGizmosSelected()

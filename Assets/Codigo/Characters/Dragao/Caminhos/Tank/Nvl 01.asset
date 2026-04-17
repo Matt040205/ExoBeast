@@ -16,5 +16,8 @@ MonoBehaviour:
   description: +30% Vida da Torre.
   geoditeCost: 0
   darkEtherCost: 0
-  modifiers: []
-  behaviorToUnlock: {fileID: 0}
+  modifiers:
+  - statToModify: 0
+    modType: 0
+    value: 0
+  behaviorToUnlock: {fileID: 4971872785049602766, guid: 46459a4e9fb335741992944013cd4c00, type: 3}

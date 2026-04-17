@@ -9,6 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4678849108658113739}
+  - component: {fileID: -7982112624960786816}
   - component: {fileID: 2150504506211938309}
   m_Layer: 0
   m_Name: MultiShotPrefab
@@ -32,6 +33,27 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &-7982112624960786816
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8740491674497950195}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 680400051
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!114 &2150504506211938309
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -44,5 +66,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c9b0897d0f2d94342be9b51d21969e43, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  towerController: {fileID: 0}
   extraProjectiles: 3
   damageMultiplier: 0.5

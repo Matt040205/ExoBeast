@@ -1,6 +1,9 @@
-using UnityEngine;
+ï»¿using UnityEngine;
+using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
 
+[RequireComponent(typeof(BoxCollider))]
 public class Piche : TrapLogicBase
 {
     public float percentualDesaceleracao = 0.5f;
@@ -8,50 +11,59 @@ public class Piche : TrapLogicBase
     public float duracaoVulneravelAposSair = 3f;
 
     private Dictionary<EnemyController, Coroutine> inimigosAfetados = new Dictionary<EnemyController, Coroutine>();
+    private bool isServerMode = false;
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        isServerMode = IsServer;
+    }
+
+    void Start()
+    {
+        isServerMode = NetworkManager.Singleton == null || NetworkManager.Singleton.IsServer;
+        var bc = GetComponent<BoxCollider>();
+        bc.isTrigger = true;
+        bc.size = new Vector3(3f, 0.5f, 3f);
+    }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Enemy"))
+        if (!isServerMode) return;
+        if (!other.CompareTag("Enemy")) return;
+
+        EnemyController inimigo = other.GetComponent<EnemyController>();
+        EnemyHealthSystem saude = other.GetComponent<EnemyHealthSystem>();
+        if (inimigo == null || saude == null) return;
+
+        if (inimigosAfetados.ContainsKey(inimigo))
         {
-            EnemyController inimigo = other.GetComponent<EnemyController>();
-            EnemyHealthSystem saudeInimigo = other.GetComponent<EnemyHealthSystem>();
-
-            if (inimigo == null || saudeInimigo == null) return;
-
-            if (inimigosAfetados.ContainsKey(inimigo))
-            {
-                StopCoroutine(inimigosAfetados[inimigo]);
-                inimigosAfetados.Remove(inimigo);
-            }
-
-            inimigo.AplicarDesaceleracao(percentualDesaceleracao);
-            saudeInimigo.AplicarVulnerabilidade(multiplicadorDanoVulneravel);
+            StopCoroutine(inimigosAfetados[inimigo]);
+            inimigosAfetados.Remove(inimigo);
         }
+
+        inimigo.AplicarDesaceleracao(percentualDesaceleracao);
+        saude.AplicarVulnerabilidade(multiplicadorDanoVulneravel);
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag("Enemy"))
-        {
-            EnemyController inimigo = other.GetComponent<EnemyController>();
-            EnemyHealthSystem saudeInimigo = other.GetComponent<EnemyHealthSystem>();
+        if (!isServerMode) return;
+        if (!other.CompareTag("Enemy")) return;
 
-            if (inimigo == null || saudeInimigo == null) return;
+        EnemyController inimigo = other.GetComponent<EnemyController>();
+        EnemyHealthSystem saude = other.GetComponent<EnemyHealthSystem>();
+        if (inimigo == null || saude == null) return;
 
-            inimigo.RemoverDesaceleracao();
-
-            Coroutine rotinaVulneravel = StartCoroutine(ManterVulnerabilidadeTemporaria(saudeInimigo));
-            inimigosAfetados[inimigo] = rotinaVulneravel;
-        }
+        inimigo.RemoverDesaceleracao();
+        Coroutine r = StartCoroutine(ManterVulnerabilidadeTemporaria(saude));
+        inimigosAfetados[inimigo] = r;
     }
 
-    private System.Collections.IEnumerator ManterVulnerabilidadeTemporaria(EnemyHealthSystem saude)
-    {
-        if (saude == null) yield break;
-        yield return new WaitForSeconds(duracaoVulneravelAposSair);
-        if (saude != null)
-        {
-            saude.RemoverVulnerabilidade();
-        }
-    }
+    private IEnumerator ManterVulnerabilidadeTemporaria(EnemyHealthSystem saude)
+    {
+        if (saude == null) yield break;
+        yield return new WaitForSeconds(duracaoVulneravelAposSair);
+        if (saude != null) saude.RemoverVulnerabilidade();
+    }
 }
