@@ -46,11 +46,18 @@ public class MenuManager : MonoBehaviour
         if (hudPanel != null) { if (menuPanel) menuPanel.SetActive(false); }
         else { if (menuPanel) menuPanel.SetActive(true); }
 
-        // Mantendo suas lógicas de GameModeManager
         if (botaoJogarSolo != null)
+        {
+            // Substitui o evento inteiro para apagar listeners persistentes do Inspector
+            botaoJogarSolo.onClick = new Button.ButtonClickedEvent();
             botaoJogarSolo.onClick.AddListener(() => GameModeManager.Instance.StartSingleplayer());
+        }
         if (botaoJogarOnline != null)
+        {
+            // Substitui o evento inteiro — remove ChangeScene("EscolherPersonagem") e HostGame() persistentes
+            botaoJogarOnline.onClick = new Button.ButtonClickedEvent();
             botaoJogarOnline.onClick.AddListener(() => GameModeManager.Instance.StartMultiplayer());
+        }
     }
 
     #region Funções de Conexão (NGO)

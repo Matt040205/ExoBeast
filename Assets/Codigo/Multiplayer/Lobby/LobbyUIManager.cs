@@ -107,30 +107,11 @@ public class LobbyUIManager : MonoBehaviour
 
     public void AbrirPainelMultiplayer()
     {
-        if (_auth  == null) _auth  = EOSAuthenticator.Instance;
-        if (_lobby == null) _lobby = LobbyManager.Instance;
-
-        if (_lobby != null && _lobby.IsInLobby())
-        {
-            var l = _lobby.GetCurrentLobby();
-            if (l != null) { _lobbyId = l.lobbyId; _lobbyNome = l.lobbyName; }
-            _view = ViewState.Sala;
-        }
+        // Redireciona para a nova cena de lobby Canvas (LobbyScene.unity)
+        if (GameModeManager.Instance != null)
+            GameModeManager.Instance.StartMultiplayer();
         else
-        {
-            _view = ViewState.Criar;
-        }
-
-        _visible = true;
-
-        // Se EOS não estiver autenticado e nenhum fluxo de auth está rodando, inicia agora
-        if (!_eosFlowRunning && (_auth == null || !_auth.IsLoggedIn))
-            StartCoroutine(InitMultiplayerFlow(openPanel: false));
-
-        if (painelSelecao != null)
-            painelSelecao.DOAnchorPos(posSelecaoLado, 0.5f).SetEase(Ease.OutBack);
-        if (painelLobby != null)
-            painelLobby.DOAnchorPos(posLobbyVisivel, 0.5f).SetEase(Ease.OutBack);
+            GameModeManager.LoadSceneSafe("LobbyScene");
     }
 
     public void FecharPainelMultiplayer()

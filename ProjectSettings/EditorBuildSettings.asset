@@ -12,6 +12,9 @@ EditorBuildSettings:
     path: Assets/Scenes/EscolherPersonagem.unity
     guid: 079c93695e52d2f4190c3519e0af8737
   - enabled: 1
+    path: Assets/Scenes/LobbyScene.unity
+    guid: 5ea820e70f1c5bc4da6edd7b825faa6c
+  - enabled: 1
     path: Assets/Scenes/Rastros.unity
     guid: 09ffe242ca7a451429730bc7f11ebc06
   - enabled: 1
@@ -23,9 +26,6 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/Win.unity
     guid: dedd2e0b1ece75d47828ae8c6c50459d
-  - enabled: 0
-    path: Assets/Codigo/Multiplayer/Network Test.unity
-    guid: 8b2a84aa2188afd44a76c2d2b4642455
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
