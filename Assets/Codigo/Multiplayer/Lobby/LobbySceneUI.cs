@@ -64,7 +64,8 @@ public class LobbySceneUI : MonoBehaviour
     private bool   _isReady      = false;
     private int    _selectedChar = -1;
     private int    _maxPlayers   = 4;
-    private bool   _eosRunning   = false;
+    private bool   _eosRunning      = false;
+    private bool   _isCreatingLobby = false;
 
     private static readonly string[] _charNames = { "Coruja", "Samurai" };
 
@@ -111,7 +112,7 @@ public class LobbySceneUI : MonoBehaviour
         // InputFields
         if (nickField      == null) nickField      = FindIn<TMP_InputField>("DigitarNick");
         if (lobbyNameField == null) lobbyNameField = FindIn<TMP_InputField>("DigitarNomeSala");
-        if (joinIdField    == null) joinIdField    = FindIn<TMP_InputField>("PrcurarLobbyID");
+        if (joinIdField    == null) joinIdField    = FindIn<TMP_InputField>("ProcurarLobbyID");
 
         // Texto
         if (maxPlayersText == null) maxPlayersText = FindIn<TMP_Text>("MaxJogadores");
@@ -166,8 +167,7 @@ public class LobbySceneUI : MonoBehaviour
         WireBtn("BtnLogin",       Login);
 
         // Criar Lobby
-        WireBtnInParent("painel CriarLobby", "CreateLobby", CriarSala);
-        WireBtnInParent("painel CriarLobby ", "CreateLobby", CriarSala);
+        WireBtn("CreateLobby", CriarSala);
         WireBtn("-",              () => AlterarMaxPlayers(-1));
         WireBtn("+",              () => AlterarMaxPlayers(+1));
         WireBtn("'-'",            () => AlterarMaxPlayers(-1));
@@ -196,11 +196,11 @@ public class LobbySceneUI : MonoBehaviour
             readyToggle.onValueChanged.AddListener(val => { _isReady = val; _lobby?.SetReady(_isReady); });
         }
 
-        // Inspector refs diretos
-        if (btnLogin    != null) btnLogin.onClick.AddListener(Login);
-        if (btnCoruja   != null) btnCoruja.onClick.AddListener(() => SelecionarPersonagem(0));
-        if (btnSamurai  != null) btnSamurai.onClick.AddListener(() => SelecionarPersonagem(1));
-        if (iniciarPartidaButton != null) iniciarPartidaButton.onClick.AddListener(IniciarPartida);
+        // Inspector refs diretos — RemoveAll garante idempotência se WireBtn já wired pelo nome
+        if (btnLogin    != null) { btnLogin.onClick.RemoveAllListeners(); btnLogin.onClick.AddListener(Login); }
+        if (btnCoruja   != null) { btnCoruja.onClick.RemoveAllListeners(); btnCoruja.onClick.AddListener(() => SelecionarPersonagem(0)); }
+        if (btnSamurai  != null) { btnSamurai.onClick.RemoveAllListeners(); btnSamurai.onClick.AddListener(() => SelecionarPersonagem(1)); }
+        if (iniciarPartidaButton != null) { iniciarPartidaButton.onClick.RemoveAllListeners(); iniciarPartidaButton.onClick.AddListener(IniciarPartida); }
     }
 
     private void WireBtn(string goName, Action handler)
@@ -245,7 +245,8 @@ public class LobbySceneUI : MonoBehaviour
 
     public void CriarSala()
     {
-        if (_lobby == null) return;
+        if (_lobby == null || _isCreatingLobby) return;
+        _isCreatingLobby = true;
         string nome = lobbyNameField != null && !string.IsNullOrWhiteSpace(lobbyNameField.text)
             ? lobbyNameField.text.Trim() : "Minha Sala";
 
@@ -322,6 +323,7 @@ public class LobbySceneUI : MonoBehaviour
 
     private void OnLobbyCreated(LobbyInfo lobby)
     {
+        _isCreatingLobby = false;
         _lobbyId = lobby.lobbyId; _lobbyNome = lobby.lobbyName;
         _isReady = false; _selectedChar = -1;
         SetState(State.Sala);
@@ -358,7 +360,11 @@ public class LobbySceneUI : MonoBehaviour
         if (_state == State.Sala) AtualizarSlots();
     }
 
-    private void OnErro(string err) => SetStatus($"[ERRO] {err}");
+    private void OnErro(string err)
+    {
+        _isCreatingLobby = false;
+        SetStatus($"[ERRO] {err}");
+    }
 
     // ──────────────────────────────────────────────────────────────────────
     // Eventos — EOSAuthenticator
@@ -636,6 +642,7 @@ public class LobbySceneUI : MonoBehaviour
         // Re-cacheia singletons (podem ter sido criados durante o wait)
         if (_auth  == null) _auth  = EOSAuthenticator.Instance;
         if (_lobby == null) _lobby = LobbyManager.Instance;
+        UnsubscribeEvents();
         SubscribeEvents();
 
         if (_auth.IsLoggedIn)
