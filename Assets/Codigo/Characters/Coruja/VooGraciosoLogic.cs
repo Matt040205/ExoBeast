@@ -1,126 +1,109 @@
 using UnityEngine;
 using Unity.Netcode;
-using System.Collections;
 
 /// <summary>
 /// ── VooGraciosoLogic ─────────────────────────────────────
-/// Spawned NetworkObject that grants improved jump height and a bonus shot while airborne.
+/// Componente persistente no prefab do player que gerencia o estado
+/// de "voo gracioso" (Q da Coruja).
 ///
-///  ▸ Owner applies local movement modifiers (jump, float) for immediate responsiveness
-///  ▸ Server applies SetNextShotBonus so damage is authoritative
-///  ▸ Despawn is requested when the owner lands; OnNetworkDespawn resets movement state
+///  ▸ Server: recebe StartEffect(), seta parâmetros e netIsActive = true
+///  ▸ Owner (via OnValueChanged): aplica jumpHeightModifier, floating e bonus de tiro
+///  ▸ Owner/Server monitoram pouso em Update() para resetar netIsActive = false
 /// ─────────────────────────────────────────────────────────
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class VooGraciosoLogic : NetworkBehaviour
 {
-    private NetworkVariable<NetworkObjectReference> netOwner = new NetworkVariable<NetworkObjectReference>();
+    private NetworkVariable<bool> netIsActive = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
     private NetworkVariable<float> netJumpHeightModifier = new NetworkVariable<float>();
     private NetworkVariable<float> netStaticAimDuration = new NetworkVariable<float>();
     private NetworkVariable<float> netBonusDamage = new NetworkVariable<float>();
     private NetworkVariable<float> netBonusRadius = new NetworkVariable<float>();
 
-    private GameObject ownerObject;
     private PlayerMovement playerMovement;
     private PlayerShooting playerShooting;
-    private CommanderAbilityController abilityController;
-    private Ability sourceAbility;
-    private bool isActive = false;
-
-    public void StartEffect(GameObject quemUsou, float jumpHeightModifier, float staticAimDuration, float bonusDamage, float bonusRadius, CommanderAbilityController controller, Ability ability)
-    {
-        if (!IsServer) return;
-
-        netOwner.Value = new NetworkObjectReference(quemUsou.GetComponent<NetworkObject>());
-        netJumpHeightModifier.Value = jumpHeightModifier;
-        netStaticAimDuration.Value = staticAimDuration;
-        netBonusDamage.Value = bonusDamage;
-        netBonusRadius.Value = bonusRadius;
-        // SetNextShotBonus aplicado no owner via OnNetworkSpawn — não chamar aqui,
-        // pois PlayerShooting está desabilitado no servidor para jogadores remotos.
-
-        isActive = true;
-    }
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
-        if (netOwner.Value.TryGet(out NetworkObject ownerNO))
-        {
-            ownerObject = ownerNO.gameObject;
-            playerMovement = ownerObject.GetComponent<PlayerMovement>();
-            playerShooting = ownerObject.GetComponent<PlayerShooting>();
-            abilityController = ownerObject.GetComponent<CommanderAbilityController>();
+        // Componente está no prefab do player — GetComponent é direto e seguro aqui.
+        playerMovement = GetComponent<PlayerMovement>();
+        playerShooting = GetComponent<PlayerShooting>();
 
-            // ownerNO.IsOwner = verdadeiro na maquina DO JOGADOR que usou a habilidade
-            // (nao confundir com IsOwner deste NetworkObject, que e sempre o servidor)
-            if (ownerNO.IsOwner)
-            {
-                if (playerMovement != null)
-                {
-                    playerMovement.jumpHeightModifier = netJumpHeightModifier.Value;
-
-                    if (!playerMovement.isGrounded)
-                    {
-                        playerMovement.isFloating = true;
-                        playerMovement.floatDuration = netStaticAimDuration.Value;
-                    }
-                }
-
-                // Bônus de tiro aplicado localmente no owner — componente habilitado aqui
-                if (playerShooting != null)
-                {
-                    playerShooting.SetNextShotBonus(netBonusDamage.Value, netBonusRadius.Value);
-                }
-            }
-        }
-
-        isActive = true;
-    }
-
-    private void Update()
-    {
-        if (!isActive || playerMovement == null) return;
-
-        // Checa se ESTE cliente e o dono do jogador (nao do helper object)
-        bool isPlayerOwner = netOwner.Value.TryGet(out NetworkObject ownerNO) && ownerNO.IsOwner;
-
-        if (isPlayerOwner && playerMovement.isGrounded)
-        {
-            RequestDestroyServerRpc();
-        }
-
-        // Servidor tambem monitora o pouso para garantir cleanup mesmo se o RPC falhar
-        if (IsServer && playerMovement.isGrounded)
-        {
-            DestroyLogic();
-        }
-    }
-
-    [ServerRpc]
-    private void RequestDestroyServerRpc()
-    {
-        DestroyLogic();
-    }
-
-    private void DestroyLogic()
-    {
-        if (!IsServer) return;
-
-        // jumpHeightModifier reset is handled client-side in OnNetworkDespawn
-        if (NetworkObject.IsSpawned)
-            NetworkObject.Despawn();
+        netIsActive.OnValueChanged += OnActiveChanged;
     }
 
     public override void OnNetworkDespawn()
     {
-        // Resetar modificadores na maquina do jogador dono (nao do helper object)
-        if (netOwner.Value.TryGet(out NetworkObject ownerNO) && ownerNO.IsOwner && playerMovement != null)
-        {
-            playerMovement.jumpHeightModifier = 1f;
-            playerMovement.isFloating = false;
-        }
+        netIsActive.OnValueChanged -= OnActiveChanged;
         base.OnNetworkDespawn();
+    }
+
+    public void StartEffect(GameObject quemUsou, float jumpHeightModifier, float staticAimDuration,
+        float bonusDamage, float bonusRadius, CommanderAbilityController controller, Ability ability)
+    {
+        if (!IsServer) return;
+
+        netJumpHeightModifier.Value = jumpHeightModifier;
+        netStaticAimDuration.Value = staticAimDuration;
+        netBonusDamage.Value = bonusDamage;
+        netBonusRadius.Value = bonusRadius;
+        netIsActive.Value = true;
+    }
+
+    private void OnActiveChanged(bool oldVal, bool newVal)
+    {
+        if (!IsOwner) return;
+
+        if (newVal)
+        {
+            if (playerMovement != null)
+            {
+                playerMovement.jumpHeightModifier = netJumpHeightModifier.Value;
+
+                if (!playerMovement.isGrounded)
+                {
+                    playerMovement.isFloating = true;
+                    playerMovement.floatDuration = netStaticAimDuration.Value;
+                }
+            }
+
+            if (playerShooting != null)
+                playerShooting.SetNextShotBonus(netBonusDamage.Value, netBonusRadius.Value);
+        }
+        else
+        {
+            if (playerMovement != null)
+            {
+                playerMovement.jumpHeightModifier = 1f;
+                playerMovement.isFloating = false;
+            }
+        }
+    }
+
+    private void Update()
+    {
+        if (!netIsActive.Value || playerMovement == null) return;
+
+        if (IsOwner && playerMovement.isGrounded)
+            RequestDeactivateServerRpc();
+
+        if (IsServer && playerMovement.isGrounded)
+            Deactivate();
+    }
+
+    [ServerRpc]
+    private void RequestDeactivateServerRpc()
+    {
+        Deactivate();
+    }
+
+    private void Deactivate()
+    {
+        if (!IsServer) return;
+        netIsActive.Value = false;
     }
 }

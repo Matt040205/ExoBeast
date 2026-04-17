@@ -1,12 +1,13 @@
 using UnityEngine;
 using FMODUnity;
+using Unity.Netcode;
 
 [CreateAssetMenu(fileName = "Temor Sismico", menuName = "ExoBeasts/Personagens/Dragao/Habilidade/Temor Sismico")]
 public class HabilidadeTemorSismico : Ability
 {
-    [Header("Configurações de Combate")]
+    [Header("Configuracoes de Combate")]
     public float range = 15f;
-    [Range(0, 360)] public float angle = 45f; // Ângulo do cone
+    [Range(0, 360)] public float angle = 45f;
     public float damage = 100f;
 
     [Header("Controle de Grupo")]
@@ -18,7 +19,7 @@ public class HabilidadeTemorSismico : Ability
     public float vulnerabilityMultiplier = 1.5f;
     public float vulnerabilityDuration = 5f;
 
-    [Header("Visual e Lógica")]
+    [Header("Visual e Logica")]
     public TemorSismicoLogic logicPrefab;
 
     [Header("FMOD")]
@@ -29,28 +30,32 @@ public class HabilidadeTemorSismico : Ability
     {
         if (logicPrefab == null)
         {
-            Debug.LogError("Prefab do Temor Sísmico não configurado na Habilidade!");
+            Debug.LogError("[TemorSismico] Prefab nao configurado na Habilidade!");
             return false;
         }
 
-        // 1. Gerencia o Cooldown e Uso na UI (Lógica do Player)
         CommanderAbilityController controller = quemUsou.GetComponent<CommanderAbilityController>();
         if (controller != null)
-        {
             controller.SetAbilityUsage(this, true);
-        }
 
-        // 2. Toca o Som
         if (!string.IsNullOrEmpty(sfxSlam))
-        {
             RuntimeManager.PlayOneShot(sfxSlam, quemUsou.transform.position);
+
+        // Instancia, configura e spawna em rede â€” todos os clientes veem o VFX.
+        TemorSismicoLogic logic = Object.Instantiate(
+            logicPrefab, quemUsou.transform.position, quemUsou.transform.rotation);
+
+        logic.Setup(quemUsou, range, angle, damage, knockUpDuration, knockUpForce,
+            vulnerabilityMultiplier, vulnerabilityDuration);
+
+        if (logic.TryGetComponent<NetworkObject>(out var netObj))
+        {
+            netObj.Spawn();
         }
-
-        // 3. Instancia o efeito visual/lógico
-        TemorSismicoLogic logic = Instantiate(logicPrefab, quemUsou.transform.position, quemUsou.transform.rotation);
-
-        // 4. Passa os dados (INCLUINDO VULNERABILIDADE) para a lógica executar
-        logic.Setup(quemUsou, range, angle, damage, knockUpDuration, knockUpForce, vulnerabilityMultiplier, vulnerabilityDuration);
+        else
+        {
+            Debug.LogWarning("[TemorSismico] Prefab sem NetworkObject â€” VFX visivel apenas no servidor. Adicione NetworkObject ao prefab.");
+        }
 
         return true;
     }

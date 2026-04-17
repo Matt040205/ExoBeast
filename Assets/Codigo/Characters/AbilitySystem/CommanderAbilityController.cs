@@ -83,18 +83,24 @@ public class CommanderAbilityController : NetworkBehaviour
             netUltimateCharge.Value = Mathf.Min(netUltimateCharge.Value + characterData.ultimateChargePerSecond * Time.deltaTime, ultimateChargeThreshold);
         }
 
-        // Tudo abaixo e exclusivo do dono (input + countdown de cooldowns)
-        if (!IsOwner) return;
-
-        List<Ability> keys = new List<Ability>(abilityCooldowns.Keys);
-        foreach (Ability ability in keys)
+        // Cooldown: roda no servidor (onde o check ocorre) E no owner (para feedback de UI local).
+        // CRITICO: sem IsServer aqui, o cooldown de jogadores nao-host nunca decrementa no servidor,
+        // bloqueando Q e E permanentemente apos o primeiro uso.
+        if (IsServer || IsOwner)
         {
-            if (abilityCooldowns[ability] > 0)
+            List<Ability> keys = new List<Ability>(abilityCooldowns.Keys);
+            foreach (Ability ability in keys)
             {
-                abilityCooldowns[ability] -= Time.deltaTime;
-                if (abilityCooldowns[ability] < 0) abilityCooldowns[ability] = 0;
+                if (abilityCooldowns[ability] > 0)
+                {
+                    abilityCooldowns[ability] -= Time.deltaTime;
+                    if (abilityCooldowns[ability] < 0) abilityCooldowns[ability] = 0;
+                }
             }
         }
+
+        // Input: exclusivo do dono local
+        if (!IsOwner) return;
 
         if (Input.GetKeyDown(KeyCode.Q)) RequestActivateAbilityServerRpc(0);
         if (Input.GetKeyDown(KeyCode.E)) RequestActivateAbilityServerRpc(1);
@@ -125,17 +131,18 @@ public class CommanderAbilityController : NetworkBehaviour
     [ClientRpc]
     private void ActivateAbilityVisualClientRpc(int abilityIndex)
     {
+        if (characterData == null) return; // guard: clientes que nao tem characterData no prefab
+
         Ability ability = null;
         if (abilityIndex == 0) ability = characterData.ability1;
         else if (abilityIndex == 1) ability = characterData.ability2;
 
         if (ability == null) return;
 
-        // Sincronizar cooldown nos clientes remotos
-        if (!IsOwner)
-        {
-            abilityCooldowns[ability] = ability.cooldown;
-        }
+        // Sincronizar cooldown em TODOS os clientes, inclusive o owner.
+        // Sem isso o Player 2 (owner) nunca sabe que a habilidade entrou em cooldown:
+        // abilityCooldowns fica em 0 local, gerando ausencia de feedback e ativacoes inconsistentes.
+        abilityCooldowns[ability] = ability.cooldown;
     }
 
     [ServerRpc]
