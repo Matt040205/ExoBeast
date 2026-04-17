@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEngine.EventSystems;
 using System.Collections.Generic;
 using TMPro;
@@ -16,7 +16,7 @@ public class TowerSelectionManager : MonoBehaviour
     public Button trapSellButton;
     public TextMeshProUGUI trapSellPriceText;
 
-    [Header("Configuração da Seleção")]
+    [Header("Configuraï¿½ï¿½o da Seleï¿½ï¿½o")]
     public LayerMask towerLayerMask;
 
     private TowerController selectedTower;
@@ -35,7 +35,7 @@ public class TowerSelectionManager : MonoBehaviour
         mainCamera = Camera.main;
         if (mainCamera == null)
         {
-            Debug.LogError("[TowerSelectionManager] Câmera principal não encontrada!");
+            Debug.LogError("[TowerSelectionManager] Cï¿½mera principal nï¿½o encontrada!");
             this.enabled = false;
         }
 
@@ -67,9 +67,7 @@ public class TowerSelectionManager : MonoBehaviour
 
     private void HandleHoverHighlighting()
     {
-        if (EventSystem.current.IsPointerOverGameObject())
-        {
-            if (currentlyHighlighted != null)
+        if (EventSystem.current.IsPointerOverGameObject()) { Debug.Log("[TowerSelection] Mouse is over UI!"); if (currentlyHighlighted != null)
             {
                 (currentlyHighlighted as TowerController)?.GetComponent<TowerSelectionCircle>()?.Unhighlight();
                 currentlyHighlighted = null;
@@ -78,8 +76,7 @@ public class TowerSelectionManager : MonoBehaviour
         }
 
         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        RaycastHit hit;
-        Component hitComponent = null;
+        RaycastHit hit; Component hitComponent = null; Debug.Log($"[TowerSelection] Raycast shot at {Input.mousePosition}");
 
         if (Physics.Raycast(ray, out hit, 1000f, towerLayerMask))
         {
@@ -90,7 +87,7 @@ public class TowerSelectionManager : MonoBehaviour
             }
         }
 
-        if (hitComponent != currentlyHighlighted)
+        Debug.Log($"[TowerSelection] Hit component: {(hitComponent != null ? hitComponent.name : "null")}"); if (hitComponent != currentlyHighlighted)
         {
             if (currentlyHighlighted != null)
             {
