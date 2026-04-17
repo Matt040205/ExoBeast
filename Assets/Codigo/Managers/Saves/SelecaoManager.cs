@@ -64,8 +64,15 @@ public class SelecaoManager : NetworkBehaviour
     private int slotSendoEditado = -1;
     private CharacterBase personagemEmVisualizacao;
 
-    private int slotInicialPermitido = 0;
-    private int slotFinalPermitido = 7;
+    private List<int> slotsPermitidos = new List<int> { 0, 1, 2, 3, 4, 5, 6, 7 };
+
+    [Header("Cores dos Jogadores")]
+    public Color[] coresPorJogador = new Color[] {
+        new Color(0.2f, 0.6f, 1f, 1f), // P1 Azul
+        new Color(1f, 0.4f, 0.4f, 1f), // P2 Vermelho
+        new Color(0.4f, 1f, 0.4f, 1f), // P3 Verde
+        new Color(1f, 1f, 0.4f, 1f)    // P4 Amarelo
+    };
 
     private void Awake() => Instance = this;
 
@@ -113,7 +120,7 @@ public class SelecaoManager : NetworkBehaviour
     {
         if (NetworkManager.Singleton == null || (!NetworkManager.Singleton.IsClient && !NetworkManager.Singleton.IsServer))
         {
-            slotInicialPermitido = 0; slotFinalPermitido = 7;
+            slotsPermitidos = new List<int> { 0, 1, 2, 3, 4, 5, 6, 7 };
             return;
         }
 
@@ -122,20 +129,53 @@ public class SelecaoManager : NetworkBehaviour
         int meuIndice = membros.FindIndex(m => m.productUserId == meuId);
         int total = membros.Count;
 
+        if (GameDataManager.Instance != null)
+        {
+            GameDataManager.Instance.totalDeJogadores = total;
+        }
+
         if (meuIndice == -1) return;
 
-        if (total == 2) { slotInicialPermitido = meuIndice * 4; slotFinalPermitido = slotInicialPermitido + 3; }
-        else if (total == 3)
+        slotsPermitidos = ObterSlotsDoJogador(total, meuIndice);
+    }
+
+    private List<int> ObterSlotsDoJogador(int totalJogadores, int indiceJogador)
+    {
+        List<int> slots = new List<int>();
+        if (totalJogadores == 2)
         {
-            if (meuIndice == 0) { slotInicialPermitido = 0; slotFinalPermitido = 3; }
-            else if (meuIndice == 1) { slotInicialPermitido = 4; slotFinalPermitido = 5; }
-            else { slotInicialPermitido = 6; slotFinalPermitido = 7; }
+            if (indiceJogador == 0) slots.AddRange(new int[]{0, 1, 4, 5});
+            else if (indiceJogador == 1) slots.AddRange(new int[]{2, 3, 6, 7});
         }
-        else if (total == 4) { slotInicialPermitido = meuIndice * 2; slotFinalPermitido = slotInicialPermitido + 1; }
+        else if (totalJogadores == 3)
+        {
+            if (indiceJogador == 0) slots.AddRange(new int[]{0, 1, 4, 5});
+            else if (indiceJogador == 1) slots.AddRange(new int[]{2, 3});
+            else if (indiceJogador == 2) slots.AddRange(new int[]{6, 7});
+        }
+        else if (totalJogadores == 4)
+        {
+            if (indiceJogador == 0) slots.AddRange(new int[]{0, 1});
+            else if (indiceJogador == 1) slots.AddRange(new int[]{2, 3});
+            else if (indiceJogador == 2) slots.AddRange(new int[]{4, 5});
+            else if (indiceJogador == 3) slots.AddRange(new int[]{6, 7});
+        }
+        else 
+        {
+            slots.AddRange(new int[]{0, 1, 2, 3, 4, 5, 6, 7});
+        }
+        return slots;
     }
 
     void CriarGridEquipe()
     {
+        int totalJogadores = 1;
+        if (GameDataManager.Instance != null && GameDataManager.Instance.totalDeJogadores > 1) {
+            totalJogadores = GameDataManager.Instance.totalDeJogadores;
+        } else if (NetworkManager.Singleton != null && (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer)) {
+            totalJogadores = ExoBeasts.Multiplayer.Lobby.LobbyManager.Instance.GetMembers().Count;
+        }
+
         for (int i = 0; i < 8; i++)
         {
             GameObject obj = Instantiate(slotEquipePrefab, gridEquipeContainer);
@@ -147,6 +187,13 @@ public class SelecaoManager : NetworkBehaviour
                 ui.SetPersonagem(GameDataManager.Instance.equipeSelecionada[i]);
             else
                 ui.LimparSlot();
+
+            int dono = -1;
+            for(int p = 0; p < totalJogadores; p++) {
+                if (ObterSlotsDoJogador(totalJogadores, p).Contains(idx)) { dono = p; break; }
+            }
+            if(dono >= 0 && dono < coresPorJogador.Length) ui.DefinirCorDoJogador(coresPorJogador[dono]);
+            else ui.DefinirCorDoJogador(Color.white);
 
             slotsEquipe.Add(ui);
         }
@@ -160,7 +207,7 @@ public class SelecaoManager : NetworkBehaviour
 
     void OnSlotClicked(int slotIndex)
     {
-        if (slotIndex < slotInicialPermitido || slotIndex > slotFinalPermitido) return;
+        if (!slotsPermitidos.Contains(slotIndex)) return;
 
         if (isRemoveMode)
         {
@@ -187,7 +234,8 @@ public class SelecaoManager : NetworkBehaviour
         // TUTORIAL: Ao confirmar o comandante (slot 0) -> pede pra escolher torre
         if (TutorialManager.Instance != null)
         {
-            if (slotConfirmado == slotInicialPermitido)
+            int slotComandante = slotsPermitidos.Count > 0 ? slotsPermitidos[0] : 0;
+            if (slotConfirmado == slotComandante)
                 TutorialManager.Instance.TriggerTutorial("SELECT_TOWER");
             else if (!GameDataManager.Instance.tutoriaisConcluidos.Contains("EXPLAIN_TRAILS"))
                 TutorialManager.Instance.TriggerTutorial("EXPLAIN_TRAILS");
@@ -273,7 +321,8 @@ public class SelecaoManager : NetworkBehaviour
         // TUTORIAL: Mostra tutorial de habilidades ou upgrades de torre
         if (TutorialManager.Instance != null)
         {
-            if (slotSendoEditado == slotInicialPermitido)
+            int slotComandante = slotsPermitidos.Count > 0 ? slotsPermitidos[0] : 0;
+            if (slotSendoEditado == slotComandante)
                 TutorialManager.Instance.TriggerTutorial("COMMANDER_SKILLS");
             else
                 TutorialManager.Instance.TriggerTutorial("TOWER_UPGRADES");

@@ -55,6 +55,9 @@ public class GameDataManager : MonoBehaviour
     [Header("Progresso dos Tutoriais")]
     public List<string> tutoriaisConcluidos = new List<string>();
 
+    [Header("Sessão Multiplayer")]
+    public int totalDeJogadores = 1;
+
     private Dictionary<string, CharacterSaveData> loadedCharacterData = new Dictionary<string, CharacterSaveData>();
     private string[] _savedTeamSelection;
     private string saveFilePath;

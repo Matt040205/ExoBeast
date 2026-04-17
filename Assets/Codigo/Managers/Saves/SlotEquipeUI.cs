@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
@@ -13,6 +13,7 @@ public class SlotEquipeUI : MonoBehaviour
     [Header("Referências Visuais")]
     public Image imagemDoPersonagem;
     public GameObject iconeSinalMais;
+    public Image molduraDeFundo; // Adicionado para exibir a cor do player
 
     public void LimparSlot()
     {
@@ -34,6 +35,14 @@ public class SlotEquipeUI : MonoBehaviour
         {
             imagemDoPersonagem.sprite = personagem.characterIcon;
             imagemDoPersonagem.gameObject.SetActive(true);
+        }
+    }
+
+    public void DefinirCorDoJogador(Color corDoPlayer)
+    {
+        if (molduraDeFundo != null)
+        {
+            molduraDeFundo.color = corDoPlayer;
         }
     }
 }
