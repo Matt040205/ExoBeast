@@ -10,7 +10,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8987182849631250749, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 802658817
+      value: 876944576
       objectReference: {fileID: 0}
     - target: {fileID: -6925019414044004627, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: visualEffect
@@ -76,6 +76,10 @@ PrefabInstance:
       propertyPath: maxChaseDistance
       value: 20
       objectReference: {fileID: 0}
+    - target: {fileID: 6837223848380582383, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 51cf0a9826ba27448a353b1ac7a3850f, type: 2}
     - target: {fileID: 8001866522814007648, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: enemyData
       value: 
