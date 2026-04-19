@@ -95,7 +95,9 @@ public class LobbyUIManager : MonoBehaviour
         _lobby = LobbyManager.Instance;
         SubscribeToEvents();
 
-        if (GameModeManager.CurrentMode == GameMode.Multiplayer)
+        // Se o NGO já está rodando, significa que viemos do lobby via StartMatch.
+        // NÃO redirecionar de volta para LobbyScene.
+        if (GameModeManager.CurrentMode == GameMode.Multiplayer && !GameModeManager.IsNetworkSession)
             StartCoroutine(InitMultiplayerFlow());
     }
 

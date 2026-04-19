@@ -601,7 +601,19 @@ namespace ExoBeasts.Multiplayer.Lobby
         }
 
         public void SetReady(bool ready)
-            => SetMemberAttribute(MemberAttributes.IS_READY, ready.ToString());
+        {
+            string myUid = SessionManager.Instance?.GetUserId();
+            if (!string.IsNullOrEmpty(myUid))
+            {
+                var me = _members.Find(m => m.productUserId == myUid);
+                if (me != null)
+                {
+                    me.isReady = ready;
+                    OnMemberUpdated?.Invoke(me);
+                }
+            }
+            SetMemberAttribute(MemberAttributes.IS_READY, ready.ToString());
+        }
 
         public void SelectCharacter(int characterIndex)
         {
@@ -666,7 +678,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         ///
         /// Clientes recebem OnLobbyAttributeUpdated, leem SERVER_ADDRESS e chamam StartClient.
         /// </summary>
-        public void StartMatch()
+        public void StartMatch(string mapOverride = null)
         {
             if (!_isInLobby || _currentLobby == null)
             {
@@ -684,10 +696,10 @@ namespace ExoBeasts.Multiplayer.Lobby
                 return;
             }
 
-            StartCoroutine(StartMatchCoroutine(nm));
+            StartCoroutine(StartMatchCoroutine(nm, mapOverride));
         }
 
-        private System.Collections.IEnumerator StartMatchCoroutine(NetworkManager nm)
+        private System.Collections.IEnumerator StartMatchCoroutine(NetworkManager nm, string mapOverride = null)
         {
             // Guarda: se uma sessao anterior ficou pendurada (comum entre reloads de play mode),
             // precisamos derrubar antes de tentar StartHost. Shutdown() é assíncrono —
@@ -789,15 +801,17 @@ namespace ExoBeasts.Multiplayer.Lobby
                 AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, port, LobbyAttributeVisibility.Public);
                 AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.InGame.ToString(), LobbyAttributeVisibility.Public);
 
+                string capturedMapOverride = mapOverride;
                 var updateOpts = new UpdateLobbyOptions { LobbyModificationHandle = mod };
                 lobbyInterface.UpdateLobby(ref updateOpts, null, (ref UpdateLobbyCallbackInfo info) =>
                 {
                     mod.Release();
                     if (info.ResultCode == Result.Success)
                     {
-                        Debug.Log($"[LobbyManager] Endereco publicado. Carregando cena '{_currentLobby.mapName}'...");
+                        string sceneName = !string.IsNullOrEmpty(capturedMapOverride) ? capturedMapOverride : _currentLobby.mapName;
+                        Debug.Log($"[LobbyManager] Endereco publicado. Carregando cena '{sceneName}'...");
                         NetworkManager.Singleton.SceneManager.LoadScene(
-                            _currentLobby.mapName, LoadSceneMode.Single);
+                            sceneName, LoadSceneMode.Single);
                     }
                     else
                     {

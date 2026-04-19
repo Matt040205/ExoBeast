@@ -32,7 +32,13 @@ public class SelecaoManager : NetworkBehaviour
     public GameObject slotEquipePrefab;
     public Transform gridEquipeContainer;
     public Button botaoJogar;
+    public Toggle togglePronto;
     public string nomeDaCenaDoJogo = "CenaMapaTeste";
+
+    [Header("Lista de Jogadores da Sala")]
+    public GameObject painelJogadoresLobby; // O painel base que contém a lista
+    public Transform containerListaJogadores;
+    public GameObject prefabSlotJogadorLobby;
 
     [Header("Modo Remover")]
     public Button botaoRemover;
@@ -74,12 +80,31 @@ public class SelecaoManager : NetworkBehaviour
         new Color(1f, 1f, 0.4f, 1f)    // P4 Amarelo
     };
 
+    private bool _isReady = false;
+
     private void Awake() => Instance = this;
 
     void Start()
     {
         if (botaoRemover != null) corOriginalBotaoRemover = botaoRemover.image.color;
+
+        // Inscreve nos eventos do lobby para detectar quando todos estão prontos
+        if (GameModeManager.CurrentMode == GameMode.Multiplayer && LobbyManager.Instance != null)
+        {
+            LobbyManager.Instance.OnMemberUpdated += OnMemberUpdatedCheck;
+            LobbyManager.Instance.OnMemberJoined  += OnMemberUpdatedCheck;
+        }
+
         StartCoroutine(SetupScene());
+    }
+
+    private void OnDestroy()
+    {
+        if (LobbyManager.Instance != null)
+        {
+            LobbyManager.Instance.OnMemberUpdated -= OnMemberUpdatedCheck;
+            LobbyManager.Instance.OnMemberJoined  -= OnMemberUpdatedCheck;
+        }
     }
 
     public override void OnNetworkSpawn() => CalcularLimitesDeSlots();
@@ -104,6 +129,7 @@ public class SelecaoManager : NetworkBehaviour
 
         painelEquipe.SetActive(true);
         AtualizarEstadoBotaoJogar();
+        AtualizarListaJogadores();
 
         // TUTORIAL: Ao iniciar a cena, explica como escolher o comandante
         if (TutorialManager.Instance != null)
@@ -279,15 +305,33 @@ public class SelecaoManager : NetworkBehaviour
     {
         if (botaoJogar == null || GameDataManager.Instance == null) return;
 
-        if (IsNetworkActive)
-            botaoJogar.gameObject.SetActive(IsServer);
+        bool localPronto = GameDataManager.Instance.equipeSelecionada[0] != null &&
+                           GameDataManager.Instance.equipeSelecionada[1] != null;
+
+        if (GameModeManager.CurrentMode == GameMode.Multiplayer)
+        {
+            // Habilita o Toggle Pronto se o jogador local escolheu os 2 chars
+            if (togglePronto != null)
+                togglePronto.interactable = localPronto;
+
+            // Apenas o Host vê o botão de iniciar (ele será habilitado quando todos estiverem prontos)
+            var lobby = LobbyManager.Instance?.GetCurrentLobby();
+            string myUid = ExoBeasts.Multiplayer.Auth.SessionManager.Instance?.GetUserId() ?? "";
+            bool isHost = lobby != null && lobby.hostProductUserId == myUid;
+            
+            botaoJogar.gameObject.SetActive(isHost);
+            VerificarTodosProntos(); // Re-checa o interactable do Host
+            
+            if (painelJogadoresLobby != null) painelJogadoresLobby.SetActive(true);
+        }
         else
-            botaoJogar.gameObject.SetActive(true);
-
-        bool pronto = GameDataManager.Instance.equipeSelecionada[0] != null &&
-                      GameDataManager.Instance.equipeSelecionada[1] != null;
-
-        botaoJogar.interactable = pronto;
+        {
+            if (togglePronto != null) togglePronto.gameObject.SetActive(false);
+            if (painelJogadoresLobby != null) painelJogadoresLobby.SetActive(false);
+            
+            botaoJogar.gameObject.SetActive(IsNetworkActive ? IsServer : true);
+            botaoJogar.interactable = localPronto;
+        }
     }
 
     public void AbrirPainelDetalhes(CharacterBase p)
@@ -333,18 +377,33 @@ public class SelecaoManager : NetworkBehaviour
 
     void ConfigurarBotoesPrincipais()
     {
+        if (togglePronto != null)
+        {
+            togglePronto.SetIsOnWithoutNotify(false);
+            _isReady = false;
+            
+            togglePronto.onValueChanged.RemoveAllListeners();
+            togglePronto.onValueChanged.AddListener((isOn) => {
+                _isReady = isOn;
+                if (GameModeManager.CurrentMode == GameMode.Multiplayer && LobbyManager.Instance != null)
+                {
+                    LobbyManager.Instance.SetReady(_isReady);
+                    Debug.Log($"[SelecaoManager] Jogador marcou pronto: {_isReady}");
+                }
+            });
+        }
+
         botaoJogar.onClick.RemoveAllListeners();
         botaoJogar.onClick.AddListener(() =>
         {
             if (GameModeManager.CurrentMode == GameMode.Multiplayer)
             {
                 if (LobbyManager.Instance != null)
-                    LobbyManager.Instance.StartMatch();
-                else
-                    Debug.LogError("[SelecaoManager] LobbyManager nao encontrado para StartMatch!");
+                    LobbyManager.Instance.StartMatch(nomeDaCenaDoJogo);
             }
             else
             {
+                // Singleplayer: inicia direto
                 if (NetworkManager.Singleton != null)
                 {
                     NetworkManager.Singleton.StartHost();
@@ -361,6 +420,83 @@ public class SelecaoManager : NetworkBehaviour
         botaoVoltarDosDetalhes.onClick.AddListener(VoltarParaPainelEscolha);
         if (botaoRemover != null)
             botaoRemover.onClick.AddListener(ToggleRemoveMode);
+    }
+
+    // Chamado quando um membro do lobby atualiza (inclusive ready)
+    private void OnMemberUpdatedCheck(LobbyMember _)
+    {
+        VerificarTodosProntos();
+        AtualizarListaJogadores();
+    }
+
+    private void VerificarTodosProntos()
+    {
+        if (GameModeManager.CurrentMode != GameMode.Multiplayer) return;
+        if (LobbyManager.Instance == null) return;
+
+        // Só o host pode iniciar a partida. O botão 'Jogar' fica habilitado apenas quando todos estao prontos.
+        var lobby = LobbyManager.Instance.GetCurrentLobby();
+        string localUid = ExoBeasts.Multiplayer.Auth.SessionManager.Instance?.GetUserId() ?? "";
+        bool isHost = lobby != null
+            && !string.IsNullOrEmpty(lobby.hostProductUserId)
+            && lobby.hostProductUserId == localUid;
+        
+        if (!isHost) return;
+
+        var members = LobbyManager.Instance.GetMembers();
+        bool todosProntos = false;
+        
+        if (members != null && members.Count >= 1) // Em testes pode estar sozinho, ou >1
+        {
+            todosProntos = members.TrueForAll(m => m.isReady);
+        }
+
+        if (botaoJogar != null)
+        {
+            botaoJogar.interactable = todosProntos;
+        }
+    }
+
+    private void AtualizarListaJogadores()
+    {
+        if (containerListaJogadores == null || GameModeManager.CurrentMode != GameMode.Multiplayer) return;
+        
+        var members = LobbyManager.Instance?.GetMembers() ?? new List<LobbyMember>();
+        string localUid = ExoBeasts.Multiplayer.Auth.SessionManager.Instance?.GetUserId() ?? "";
+        var lobby = LobbyManager.Instance?.GetCurrentLobby();
+        
+        LimparGrid(containerListaJogadores);
+        
+        int cont = 0;
+        foreach (var m in members)
+        {
+            cont++;
+            bool isMe = m.productUserId == localUid;
+            bool isHost = lobby != null && lobby.hostProductUserId == m.productUserId;
+
+            string tags = "";
+            if (isHost) tags += " <color=#FFD700>[Host]</color>";
+            if (m.isReady) tags += " <color=green>✓</color>";
+            if (isMe) tags += " <color=yellow>◄ VOCÊ</color>";
+
+            GameObject slot;
+            if (prefabSlotJogadorLobby != null) 
+            {
+                slot = Instantiate(prefabSlotJogadorLobby, containerListaJogadores);
+                var ts = slot.GetComponentsInChildren<TextMeshProUGUI>();
+                if (ts.Length > 0) ts[0].text = $"{cont}. {m.displayName}{tags}";
+            }
+            else
+            {
+                // Fallback dinâmico se n tiver prefab
+                slot = new GameObject("PlayerSlot", typeof(RectTransform));
+                slot.transform.SetParent(containerListaJogadores, false);
+                var txt = slot.AddComponent<TextMeshProUGUI>();
+                txt.fontSize = 24;
+                txt.alignment = TextAlignmentOptions.MidlineLeft;
+                txt.text = $"{cont}. {m.displayName}{tags}";
+            }
+        }
     }
 
     void PopularGridDeEscolha()

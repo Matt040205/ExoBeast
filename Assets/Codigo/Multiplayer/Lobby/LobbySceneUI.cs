@@ -22,15 +22,11 @@ using ExoBeasts.Managers;
 public class LobbySceneUI : MonoBehaviour
 {
     // ── Painéis ────────────────────────────────────────────────────────────
+    // Fluxo: painel Lobby → painel CriarLobby → painel Jogadores
     [Header("Painéis (auto-detectados por nome se não atribuídos)")]
-    [SerializeField] private GameObject painelCriar;
-    [SerializeField] private GameObject painelSala;
-    [SerializeField] private GameObject painelJogadores;
-
-    [Header("Sub-painéis dentro de painelCriar")]
-    [SerializeField] private GameObject painelSelecao;
-    [SerializeField] private GameObject painelSubHost;
-    [SerializeField] private GameObject painelSubCliente;
+    [SerializeField] private GameObject painelLobby;       // Menu inicial: nick, login, criar/entrar
+    [SerializeField] private GameObject painelCriarLobby;   // Config: nome, max jogadores, publico
+    [SerializeField] private GameObject painelJogadores;    // Sala de espera: jogadores, iniciar
 
     [Header("Botões de navegação Host/Cliente")]
     [SerializeField] private Button btnCriarHost;
@@ -57,10 +53,7 @@ public class LobbySceneUI : MonoBehaviour
     [Header("Sala")]
     [SerializeField] private TMP_Text lobbyCopyIdText;
     [SerializeField] private TMP_Text lobbyNameText;
-    [SerializeField] private Toggle   readyToggle;
     [SerializeField] private Button   iniciarPartidaButton;
-    [SerializeField] private Button   btnCoruja;
-    [SerializeField] private Button   btnSamurai;
 
     // ── Slots de Jogadores ────────────────────────────────────────────────
     [Header("Jogadores")]
@@ -68,13 +61,12 @@ public class LobbySceneUI : MonoBehaviour
     [SerializeField] private GameObject playerSlotPrefab;
 
     // ── Estado Interno ────────────────────────────────────────────────────
-    private enum State { LobbyMenu, HostConfig, ClientSearch, Sala }
+    private enum State { LobbyMenu, HostConfig, Sala }
 
     private State  _state        = State.LobbyMenu;
     private string _lobbyId      = "";
     private string _lobbyNome    = "";
     private bool   _isReady      = false;
-    private int    _selectedChar = -1;
     private int    _maxPlayers   = 4;
     private bool   _eosRunning      = false;
     private bool   _isCreatingLobby = false;
@@ -115,15 +107,10 @@ public class LobbySceneUI : MonoBehaviour
 
     private void AutoDetectElements()
     {
-        // Painéis outer
-        if (painelCriar     == null) painelCriar     = FindGO("painel CriarLobby");
-        if (painelSala      == null) painelSala      = FindGO("painel Lobby");
-        if (painelJogadores == null) painelJogadores = FindGO("painel Jogadores");
-
-        // Sub-painéis dentro de painelCriar
-        if (painelSelecao    == null) painelSelecao    = FindGO("painelSelecao");
-        if (painelSubHost    == null) painelSubHost    = FindGO("painelSubHost");
-        if (painelSubCliente == null) painelSubCliente = FindGO("painelSubCliente");
+        // Painéis — nomes batem com a Hierarchy da cena
+        if (painelLobby      == null) painelLobby      = FindGO("painel Lobby");
+        if (painelCriarLobby == null) painelCriarLobby = FindGO("painel CriarLobby");
+        if (painelJogadores  == null) painelJogadores  = FindGO("painel Jogadores");
 
         // Botões de navegação
         if (btnCriarHost     == null) btnCriarHost     = FindIn<Button>("BtnCriarHost");
@@ -144,12 +131,9 @@ public class LobbySceneUI : MonoBehaviour
 
         // Toggles
         if (publicoToggle == null) publicoToggle = FindIn<Toggle>("Publico/Privado");
-        if (readyToggle   == null) readyToggle   = FindIn<Toggle>("Pronto");
 
         // Botões
         if (btnLogin    == null) btnLogin    = FindIn<Button>("BtnLogin");
-        if (btnCoruja   == null) btnCoruja   = FindIn<Button>("BtnCoruja");
-        if (btnSamurai  == null) btnSamurai  = FindIn<Button>("BtnSamurai");
         if (iniciarPartidaButton == null) iniciarPartidaButton = FindIn<Button>("BtnIniciarPartida");
 
         // Slots / Lista
@@ -188,11 +172,9 @@ public class LobbySceneUI : MonoBehaviour
         // Auth
         WireBtn("BtnLogin",       Login);
 
-        // Navegação Host / Cliente
+        // Navegação
         WireBtn("BtnCriarHost",     AbrirModoHost);
-        WireBtn("BtnEntrarCliente", AbrirModoCliente);
         WireBtn("BtnVoltarHost",    VoltarParaMenu);
-        WireBtn("BtnVoltarCliente", VoltarParaMenu);
 
         // Criar Lobby
         WireBtn("CreateLobby", CriarSala);
@@ -201,34 +183,24 @@ public class LobbySceneUI : MonoBehaviour
         WireBtn("'-'",            () => AlterarMaxPlayers(-1));
         WireBtn("'+'",            () => AlterarMaxPlayers(+1));
 
-        // Buscar
-        WireBtn("BtnBuscarSalas", BuscarSalas);
-        WireBtn("BuscarSalas",    BuscarSalas);
-
-        // Entrar por ID
+        // Entrar por ID (está no painel Lobby)
         WireBtn("BtnEntrarId",    EntrarPorId);
         WireBtn("EntrarId",       EntrarPorId);
+        WireBtn("EntrarLobby",    EntrarPorId);
+
+        // Buscar salas públicas (está no painel Lobby)
+        WireBtn("BtnBuscarSalas", BuscarSalas);
+        WireBtn("BuscarSalas",    BuscarSalas);
+        WireBtn("LobbyPublico",   BuscarSalas);
 
         // Sala
         WireBtn("Copiar",         CopiarId);
         WireBtn("SairLobby",      SairDaSala);
         WireBtn("BtnSairLobby",   SairDaSala);
         WireBtn("BtnIniciarPartida", IniciarPartida);
-        WireBtn("BtnCoruja",      () => SelecionarPersonagem(0));
-        WireBtn("BtnSamurai",     () => SelecionarPersonagem(1));
 
-        // Toggles
-        if (readyToggle != null)
-        {
-            readyToggle.onValueChanged.RemoveAllListeners();
-            readyToggle.onValueChanged.AddListener(val => { _isReady = val; _lobby?.SetReady(_isReady); });
-        }
-
-        // Inspector refs diretos — fallback para botões com nome diferente do padrão WireBtn
-        // GetPersistentEventCount > 0 significa que o Inspector já tem a função conectada
-        if (btnLogin    != null) { btnLogin.onClick.RemoveAllListeners(); if (btnLogin.onClick.GetPersistentEventCount() == 0) btnLogin.onClick.AddListener(Login); }
-        if (btnCoruja   != null) { btnCoruja.onClick.RemoveAllListeners(); if (btnCoruja.onClick.GetPersistentEventCount() == 0) btnCoruja.onClick.AddListener(() => SelecionarPersonagem(0)); }
-        if (btnSamurai  != null) { btnSamurai.onClick.RemoveAllListeners(); if (btnSamurai.onClick.GetPersistentEventCount() == 0) btnSamurai.onClick.AddListener(() => SelecionarPersonagem(1)); }
+        // Inspector refs diretos
+        if (btnLogin != null) { btnLogin.onClick.RemoveAllListeners(); if (btnLogin.onClick.GetPersistentEventCount() == 0) btnLogin.onClick.AddListener(Login); }
         if (iniciarPartidaButton != null) { iniciarPartidaButton.onClick.RemoveAllListeners(); if (iniciarPartidaButton.onClick.GetPersistentEventCount() == 0) iniciarPartidaButton.onClick.AddListener(IniciarPartida); }
     }
 
@@ -273,8 +245,20 @@ public class LobbySceneUI : MonoBehaviour
         _auth.LoginWithDeviceId();
     }
 
+    private void AtualizarNickLocal()
+    {
+        if (nickField != null && !string.IsNullOrWhiteSpace(nickField.text))
+        {
+            string nick = nickField.text.Trim();
+            SessionManager.Instance?.SetDisplayName(nick);
+            PlayerPrefs.SetString("PlayerDisplayName", nick);
+            PlayerPrefs.Save();
+        }
+    }
+
     public void CriarSala()
     {
+        AtualizarNickLocal();
         if (_lobby == null || _isCreatingLobby) return;
         _isCreatingLobby = true;
         string nome = lobbyNameField != null && !string.IsNullOrWhiteSpace(lobbyNameField.text)
@@ -285,7 +269,7 @@ public class LobbySceneUI : MonoBehaviour
             lobbyName  = nome,
             maxPlayers = _maxPlayers,
             isPublic   = publicoToggle != null ? publicoToggle.isOn : true,
-            mapName    = "CenaMapaTeste",
+            mapName    = "EscolherPersonagem",
         });
         SetStatus("Criando sala...");
     }
@@ -308,6 +292,7 @@ public class LobbySceneUI : MonoBehaviour
 
     public void EntrarPorId()
     {
+        AtualizarNickLocal();
         if (_lobby == null || joinIdField == null) return;
         string id = joinIdField.text.Trim();
         if (string.IsNullOrEmpty(id)) { SetStatus("Cole o ID da sala!"); return; }
@@ -315,16 +300,8 @@ public class LobbySceneUI : MonoBehaviour
         _lobby.JoinLobby(id);
     }
 
-    public void ToggleReady()
-    {
-        _isReady = !_isReady;
-        if (readyToggle != null) readyToggle.SetIsOnWithoutNotify(_isReady);
-        _lobby?.SetReady(_isReady);
-    }
-
     public void SelecionarPersonagem(int idx)
     {
-        _selectedChar = idx;
         _lobby?.SelectCharacter(idx);
         SetStatus($"Personagem: {(idx < _charNames.Length ? _charNames[idx] : idx.ToString())}");
     }
@@ -348,8 +325,12 @@ public class LobbySceneUI : MonoBehaviour
     }
 
     public void AbrirModoHost()    => SetState(State.HostConfig);
-    public void AbrirModoCliente() => SetState(State.ClientSearch);
     public void VoltarParaMenu()   => SetState(State.LobbyMenu);
+
+    // Navegação Pública para vincular no Inspecionar do Unity
+    public void IrParaCriarLobby() => SetState(State.HostConfig);
+    public void IrParaMenuPrincipal() => SetState(State.LobbyMenu);
+    public void IrParaPainelJogadores() => SetState(State.Sala);
 
     // ──────────────────────────────────────────────────────────────────────
     // Eventos — LobbyManager
@@ -359,7 +340,6 @@ public class LobbySceneUI : MonoBehaviour
     {
         _isCreatingLobby = false;
         _lobbyId = lobby.lobbyId; _lobbyNome = lobby.lobbyName;
-        _isReady = false; _selectedChar = -1;
         SetState(State.Sala);
         AtualizarInfoSala();
         SetStatus($"Sala '{lobby.lobbyName}' criada!");
@@ -368,7 +348,6 @@ public class LobbySceneUI : MonoBehaviour
     private void OnLobbyJoined(LobbyInfo lobby)
     {
         _lobbyId = lobby.lobbyId; _lobbyNome = lobby.lobbyName;
-        _isReady = false; _selectedChar = -1;
         SetState(State.Sala);
         AtualizarInfoSala();
         SetStatus($"Entrou em '{lobby.lobbyName}'");
@@ -377,7 +356,6 @@ public class LobbySceneUI : MonoBehaviour
     private void OnLobbyLeft()
     {
         _lobbyId = ""; _lobbyNome = "";
-        _isReady = false; _selectedChar = -1;
         SetState(State.LobbyMenu);
         SetStatus("Saiu da sala.");
     }
@@ -421,24 +399,18 @@ public class LobbySceneUI : MonoBehaviour
     {
         _state = s;
 
-        bool inSala    = s == State.Sala;
-        bool inMenu    = s == State.LobbyMenu;
-        bool inHost    = s == State.HostConfig;
-        bool inCliente = s == State.ClientSearch;
+        bool inMenu = s == State.LobbyMenu;
+        bool inHost = s == State.HostConfig;
+        bool inSala = s == State.Sala;
 
-        // Painel externo: visível sempre que não estiver na sala
-        if (painelCriar     != null) painelCriar.SetActive(!inSala);
-        if (painelSala      != null) painelSala.SetActive(inSala);
-        if (painelJogadores != null) painelJogadores.SetActive(inSala);
+        // Cada estado mostra exatamente UM painel
+        if (painelLobby      != null) painelLobby.SetActive(inMenu);
+        if (painelCriarLobby != null) painelCriarLobby.SetActive(inHost);
+        if (painelJogadores  != null) painelJogadores.SetActive(inSala);
 
-        // Sub-painéis dentro de painelCriar
-        if (painelSelecao    != null) painelSelecao.SetActive(inMenu);
-        if (painelSubHost    != null) painelSubHost.SetActive(inHost);
-        if (painelSubCliente != null) painelSubCliente.SetActive(inCliente);
-
-        // Nick e login visíveis fora da sala (permite re-login manual se auto-login falhar)
-        if (nickField != null) nickField.gameObject.SetActive(!inSala);
-        if (btnLogin  != null) btnLogin.gameObject.SetActive(!inSala);
+        // Nick e login visíveis apenas no menu inicial
+        if (nickField != null) nickField.gameObject.SetActive(inMenu);
+        if (btnLogin  != null) btnLogin.gameObject.SetActive(inMenu);
 
         if (inSala) AtualizarSlots();
     }
@@ -447,7 +419,6 @@ public class LobbySceneUI : MonoBehaviour
     {
         if (lobbyNameText   != null) lobbyNameText.text   = _lobbyNome;
         if (lobbyCopyIdText != null) lobbyCopyIdText.text = _lobbyId;
-        if (readyToggle     != null) readyToggle.SetIsOnWithoutNotify(false);
         AtualizarBotaoIniciar();
     }
 
@@ -592,6 +563,7 @@ public class LobbySceneUI : MonoBehaviour
         btn.onClick.RemoveAllListeners();
         btn.onClick.AddListener(() =>
         {
+            AtualizarNickLocal();
             SetStatus($"Entrando em '{info.lobbyName}'...");
             _lobby?.JoinLobby(lobbyId);
         });
