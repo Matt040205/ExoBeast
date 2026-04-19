@@ -280,6 +280,9 @@ public class LobbySceneUI : MonoBehaviour
         if (maxPlayersText != null) maxPlayersText.text = _maxPlayers.ToString();
     }
 
+    public void AumentarMaxPlayers() => AlterarMaxPlayers(1);
+    public void DiminuirMaxPlayers() => AlterarMaxPlayers(-1);
+
     public void BuscarSalas()
     {
         if (_lobby == null) return;

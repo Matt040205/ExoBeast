@@ -137,12 +137,19 @@ namespace ExoBeasts.Multiplayer.Auth
 
         private void CreateDeviceIdAndLogin(ConnectInterface connectInterface)
         {
-            string baseModel = $"{SystemInfo.deviceModel}_{SystemInfo.deviceName}";
+#if UNITY_EDITOR
+            string baseModel = "ExoBeasts_Editor";
+#else
+            string baseModel = $"ExoBeasts_Build_{System.Diagnostics.Process.GetCurrentProcess().Id}";
+#endif
 
             // Clones MPPM partilham o mesmo SystemInfo — o CloneId diferencia o DeviceModel.
             string deviceModel = Core.MppmHelper.IsClone
                 ? $"{baseModel}_clone{Core.MppmHelper.CloneId}"
                 : baseModel;
+
+            // EOS exige maximo de 64 caracteres
+            if (deviceModel.Length > 64) deviceModel = deviceModel.Substring(0, 64);
 
             var createDeviceIdOptions = new CreateDeviceIdOptions
             {
