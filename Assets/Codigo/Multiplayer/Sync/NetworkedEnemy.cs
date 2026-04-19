@@ -116,6 +116,13 @@ namespace ExoBeasts.Multiplayer.Sync
                 anim.SetBool("isWalking", false);
                 anim.SetTrigger("isDead");
             }
+
+            // Desova do efeito visual de morte (se configurado) independente do script do inimigo
+            if (localHealth != null && localHealth.deathVfxPrefab != null)
+            {
+                var effect = Instantiate(localHealth.deathVfxPrefab, transform.position, transform.rotation);
+                Destroy(effect, 4f);
+            }
         }
 
         private void OnDeathStateChanged(bool oldVal, bool newVal)
@@ -131,6 +138,17 @@ namespace ExoBeasts.Multiplayer.Sync
         {
             IsDead.OnValueChanged -= OnDeathStateChanged;
             base.OnNetworkDespawn();
+        }
+
+        [ClientRpc]
+        public void PlayAttackVfxClientRpc(Vector3 position, Quaternion rotation)
+        {
+            var combatInfo = GetComponent<EnemyCombatSystem>();
+            if (combatInfo != null && combatInfo.attackVfxPrefab != null)
+            {
+                var flash = Instantiate(combatInfo.attackVfxPrefab, position, rotation);
+                Destroy(flash, 2f);
+            }
         }
     }
 }

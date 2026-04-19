@@ -8,9 +8,17 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: -8987182849631250749, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: GlobalObjectIdHash
+      value: 2056872636
+      objectReference: {fileID: 0}
+    - target: {fileID: -6925019414044004627, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: visualEffect
+      value: 
+      objectReference: {fileID: 0}
     - target: {fileID: 366370626998246806, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_Name
-      value: MONSTRO
+      value: MONSTRORanged
       objectReference: {fileID: 0}
     - target: {fileID: 1035349113437046572, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_LocalPosition.x
@@ -52,6 +60,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2009206100699956420, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: attackVfxPrefab
+      value: 
+      objectReference: {fileID: 7044212507199555230, guid: 699db3667441620439f755b88597d45f, type: 3}
+    - target: {fileID: 8001866522814007648, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: deathVfxPrefab
+      value: 
+      objectReference: {fileID: 1530198455052353034, guid: 1018e202175868c46ac9f72f3cf3b39e, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

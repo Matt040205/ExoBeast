@@ -78,6 +78,10 @@ public class CuttingBladeLogic : NetworkBehaviour
             playerMovement.isDashing = true;
         }
 
+        MeshTrail trail = quemUsou.GetComponent<MeshTrail>();
+        if (trail == null) trail = quemUsou.GetComponentInChildren<MeshTrail>();
+        if (trail != null) trail.TriggerTrail();
+
         if (!string.IsNullOrEmpty(eventoDash))
         {
             RuntimeManager.PlayOneShot(eventoDash, transform.position);

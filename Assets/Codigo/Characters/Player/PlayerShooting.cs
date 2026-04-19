@@ -19,6 +19,7 @@ public class PlayerShooting : NetworkBehaviour
     public Transform firePoint;
     public GameObject projectileVisualPrefab;
     public GameObject impactEffectPrefab;
+    public GameObject muzzleFlashPrefab;
 
     [Header("Configurações de IK (Rigging)")]
     public Transform aimTarget;
@@ -238,7 +239,15 @@ public class PlayerShooting : NetworkBehaviour
         PlayShootSound();
 
         if (firePoint != null)
+        {
             firePoint.rotation = Quaternion.LookRotation(direction);
+
+            if (muzzleFlashPrefab != null)
+            {
+                GameObject flash = Instantiate(muzzleFlashPrefab, firePoint.position, firePoint.rotation, firePoint);
+                Destroy(flash, 1.5f); // Limpeza de segurança
+            }
+        }
 
         if (projectilePool != null)
         {

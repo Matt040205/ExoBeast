@@ -23,6 +23,9 @@ public class EnemyCombatSystem : NetworkBehaviour
     public float towerAuraDamage = 14f;
     public float towerAuraInterval = 3f;
 
+    [Header("Efeitos Visuais")]
+    public GameObject attackVfxPrefab;
+
     [Header("Referências")]
     public Transform attackPoint;
     public LayerMask playerLayer;
@@ -111,6 +114,7 @@ public class EnemyCombatSystem : NetworkBehaviour
             float dist = Vector3.Distance(transform.position, enemyController.Target.position);
             if (dist > enemyController.attackDistance) break;
 
+            TriggerAttackVfx(enemyController.Target.position);
             ProcessAttack(enemyController.Target);
 
             float cooldown = (enemyData != null && enemyData.attackSpeed > 0) ? (1f / enemyData.attackSpeed) : 1f;
@@ -118,6 +122,26 @@ public class EnemyCombatSystem : NetworkBehaviour
         }
         
         attackCoroutine = null;
+    }
+
+    private void TriggerAttackVfx(Vector3 targetPos)
+    {
+        if (attackVfxPrefab == null) return;
+        
+        Vector3 origin = attackPoint != null ? attackPoint.position : transform.position;
+        Vector3 dir = (targetPos - origin).normalized;
+        if (dir == Vector3.zero) dir = transform.forward;
+        
+        // Em rede, invoca o ClientRpc para exibir o VFX em todos
+        var nwEnemy = GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedEnemy>();
+        if (nwEnemy != null && nwEnemy.IsSpawned)
+            nwEnemy.PlayAttackVfxClientRpc(origin, Quaternion.LookRotation(dir));
+        else
+        {
+            // Offline ou teste local
+            GameObject flash = Instantiate(attackVfxPrefab, origin, Quaternion.LookRotation(dir));
+            Destroy(flash, 2f);
+        }
     }
 
     private void ProcessAttack(Transform targetTransform)

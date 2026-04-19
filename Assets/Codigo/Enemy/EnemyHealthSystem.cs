@@ -14,6 +14,7 @@ public class EnemyHealthSystem : MonoBehaviour
     private Material[] originalMaterials;
 
     [Header("Feedback Visual")]
+    public GameObject deathVfxPrefab;
     public Transform popupSpawnPoint;
     public Color flashColor = new Color(0.8f, 0.8f, 0.8f, 1f);
     public float flashDuration = 0.05f;
@@ -281,5 +282,12 @@ public class EnemyHealthSystem : MonoBehaviour
         }
 
         if (enemyController != null) enemyController.HandleDeath();
+
+        // Tenta acionar o efeito visual em singleplayer (em multiplayer é feito via RPC)
+        if (networkedEnemy == null && deathVfxPrefab != null)
+        {
+            var effect = Instantiate(deathVfxPrefab, transform.position, transform.rotation);
+            Destroy(effect, 4f);
+        }
     }
 }

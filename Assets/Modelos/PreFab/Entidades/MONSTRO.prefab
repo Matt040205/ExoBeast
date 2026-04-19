@@ -1854,6 +1854,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   enemyData: {fileID: 11400000, guid: 6c387383024c2f64eae487681be4e202, type: 2}
   markedMaterial: {fileID: 2100000, guid: ea497927e75b3b24989c24378ede5b7c, type: 2}
+  deathVfxPrefab: {fileID: 1530198455052353034, guid: 1018e202175868c46ac9f72f3cf3b39e, type: 3}
   popupSpawnPoint: {fileID: 2388387850070160008}
   flashColor: {r: 0.8, g: 0.8, b: 0.8, a: 1}
   flashDuration: 0.05
@@ -1873,7 +1874,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 2925722161
+  GlobalObjectIdHash: 4044046207
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -1899,6 +1900,7 @@ MonoBehaviour:
   towerAuraRadius: 10
   towerAuraDamage: 14
   towerAuraInterval: 3
+  attackVfxPrefab: {fileID: 7044212507199555230, guid: 699db3667441620439f755b88597d45f, type: 3}
   attackPoint: {fileID: 3133169317417433774}
   playerLayer:
     serializedVersion: 2
