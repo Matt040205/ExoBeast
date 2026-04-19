@@ -128,18 +128,19 @@ namespace ExoBeasts.Multiplayer.Testing
         {
             bool hasName = !string.IsNullOrWhiteSpace(_displayName) && _displayName != "Jogador";
 
-            if (hasName)
+            if (!hasName)
             {
-                _authState = AuthState.Connecting;
-                AddLog($"Conectando como '{_displayName}'...");
-                _authCache.SetDeviceIdName(_displayName);
-                _authCache.LoginWithDeviceId();
+                // Gera nick automatico na primeira execucao — sem tela de login
+                _displayName = "Jogador_" + UnityEngine.Random.Range(1000, 9999);
+                PlayerPrefs.SetString("PlayerDisplayName", _displayName);
+                PlayerPrefs.Save();
+                AddLog($"Nick gerado automaticamente: '{_displayName}'");
             }
-            else
-            {
-                _authState = AuthState.WaitingForName;
-                AddLog("Bem-vindo! Digite seu nome para continuar.");
-            }
+
+            _authState = AuthState.Connecting;
+            AddLog($"Conectando como '{_displayName}'...");
+            _authCache.SetDeviceIdName(_displayName);
+            _authCache.LoginWithDeviceId();
         }
 
         private void OnDestroy()

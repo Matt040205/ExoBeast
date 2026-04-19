@@ -1,6 +1,8 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using ExoBeasts.Multiplayer.Auth;
+using ExoBeasts.Multiplayer.Core;
 using ExoBeasts.Multiplayer.Lobby;
 
 namespace ExoBeasts.Multiplayer.Testing
@@ -27,6 +29,7 @@ namespace ExoBeasts.Multiplayer.Testing
         private string _newLobbyName  = "Minha Sala";
         private string _joinByIdInput = "";
         private bool   _showCreate    = false;
+        private int    _newMaxPlayers = 4;
 
         // --- InLobby ---
         private string _currentLobbyId   = "";
@@ -57,6 +60,32 @@ namespace ExoBeasts.Multiplayer.Testing
             _auth  = EOSAuthenticator.Instance;
             _lobby = LobbyManager.Instance;
             SubscribeToEvents();
+            StartCoroutine(AutoLoginWhenReady());
+        }
+
+        private System.Collections.IEnumerator AutoLoginWhenReady()
+        {
+            // Aguarda EOSManagerWrapper inicializar (pode ser assíncrono na primeira vez)
+            float elapsed = 0f;
+            while (!EOSManagerWrapper.Instance.IsInitialized && elapsed < 15f)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            if (_auth == null) _auth = EOSAuthenticator.Instance;
+            if (_auth == null || _auth.IsLoggedIn) yield break;
+
+            string nick = PlayerPrefs.GetString("PlayerDisplayName", "");
+            if (string.IsNullOrWhiteSpace(nick))
+            {
+                nick = "Jogador_" + UnityEngine.Random.Range(1000, 9999);
+                PlayerPrefs.SetString("PlayerDisplayName", nick);
+                PlayerPrefs.Save();
+            }
+
+            _auth.SetDeviceIdName(nick);
+            _auth.LoginWithDeviceId();
         }
 
         private void OnDestroy()
@@ -242,8 +271,8 @@ namespace ExoBeasts.Multiplayer.Testing
             {
                 var warnStyle = new GUIStyle(GUI.skin.label);
                 warnStyle.normal.textColor = Color.yellow;
-                GUILayout.Label("[!] Voce nao esta autenticado no EOS.", warnStyle);
-                GUILayout.Label("    Faca login pela cena LobbyScene antes de continuar.", warnStyle);
+                GUILayout.Label("[!] Conectando ao EOS automaticamente...", warnStyle);
+                GUILayout.Label("    Aguarde ou verifique a configuracao do EOSManager.", warnStyle);
                 GUILayout.Space(6);
             }
 
@@ -261,7 +290,15 @@ namespace ExoBeasts.Multiplayer.Testing
                 GUILayout.Space(4);
                 GUILayout.Label("Nome da sala:");
                 _newLobbyName = GUILayout.TextField(_newLobbyName, GUILayout.Width(280));
-                GUILayout.Space(6);
+                GUILayout.Space(4);
+
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Limite de jogadores:", GUILayout.Width(145));
+                if (GUILayout.Button("-", GUILayout.Width(28))) _newMaxPlayers = Mathf.Max(2, _newMaxPlayers - 1);
+                GUILayout.Label(_newMaxPlayers.ToString(), GUILayout.Width(24));
+                if (GUILayout.Button("+", GUILayout.Width(28))) _newMaxPlayers = Mathf.Min(4, _newMaxPlayers + 1);
+                GUILayout.EndHorizontal();
+                GUILayout.Space(4);
 
                 GUILayout.BeginHorizontal();
                 GUI.enabled = loggedIn;
@@ -271,7 +308,7 @@ namespace ExoBeasts.Multiplayer.Testing
                     _lobby.CreateLobby(new LobbySettings
                     {
                         lobbyName  = string.IsNullOrWhiteSpace(_newLobbyName) ? "Minha Sala" : _newLobbyName,
-                        maxPlayers = 4,
+                        maxPlayers = _newMaxPlayers,
                         isPublic   = true,
                         mapName    = "CenaMapaTeste",
                     });

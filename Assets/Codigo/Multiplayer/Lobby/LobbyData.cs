@@ -120,6 +120,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         public const string LOBBY_STATE = "LOBBY_STATE";
         public const string SERVER_ADDRESS = "SERVER_ADDRESS";
         public const string SERVER_PORT = "SERVER_PORT";
+        public const string RELAY_CODE = "RELAY_CODE";
     }
 
     public static class MemberAttributes

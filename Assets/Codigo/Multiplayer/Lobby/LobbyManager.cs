@@ -5,6 +5,8 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using Unity.Services.Relay;
+using Unity.Services.Relay.Models;
 using UnityEngine.SceneManagement;
 
 #if !EOS_DISABLE
@@ -737,17 +739,9 @@ namespace ExoBeasts.Multiplayer.Lobby
             nm.NetworkConfig.ConnectionApproval = true;
             nm.ConnectionApprovalCallback = OnNgoConnectionApproval;
 
-            // IMPORTANTE: configurar o transport ANTES do StartHost.
-            // Host escuta em 0.0.0.0 (todas as interfaces) para aceitar conexoes de clientes LAN.
-            // Em Unity Editor (MPPM), ambos os processos estao na mesma maquina — 127.0.0.1 e mais
-            // confiavel que o LAN IP, que pode ser bloqueado pelo firewall do Windows.
-#if UNITY_EDITOR
-            string localIp = "127.0.0.1";
-#else
-            string localIp = GetLocalIpAddress();
-#endif
-            Debug.Log($"[LobbyManager][DBG] IP publicado para clientes: {localIp}");
             ushort port = DEFAULT_PORT;
+            string localIp = null;
+            string relayJoinCode = null;
             var transport = nm.GetComponent<UnityTransport>();
             if (transport == null)
             {
@@ -763,10 +757,66 @@ namespace ExoBeasts.Multiplayer.Lobby
                 nm.NetworkConfig.NetworkTransport = transport;
             }
 
+#if UNITY_EDITOR
+            // MPPM: ambos os processos na mesma maquina — IP direto confiavel e sem overhead de Relay
+            localIp = "127.0.0.1";
             transport.SetConnectionData("0.0.0.0", port);
             port = transport.ConnectionData.Port;
+            Debug.Log($"[LobbyManager][DBG] MPPM — listen 0.0.0.0:{port}, publicando IP: {localIp}");
+#else
+            // Build: Unity Relay para NAT traversal — funciona em redes diferentes sem port forwarding
+            float ugsWait = 0f;
+            while ((UGSBootstrap.Instance == null || !UGSBootstrap.Instance.IsReady) && ugsWait < 10f)
+            {
+                ugsWait += Time.deltaTime;
+                yield return null;
+            }
 
-            Debug.Log($"[LobbyManager] Tentando StartHost: transport={transport.Protocol}, listen=0.0.0.0:{port}, approval={nm.NetworkConfig.ConnectionApproval}");
+            if (UGSBootstrap.Instance != null && UGSBootstrap.Instance.IsReady)
+            {
+                var allocTask = RelayService.Instance.CreateAllocationAsync(_currentLobby.maxPlayers - 1);
+                yield return new WaitUntil(() => allocTask.IsCompleted);
+                if (!allocTask.IsFaulted && allocTask.Result != null)
+                {
+                    Allocation relayAlloc = allocTask.Result;
+                    var codeTask = RelayService.Instance.GetJoinCodeAsync(relayAlloc.AllocationId);
+                    yield return new WaitUntil(() => codeTask.IsCompleted);
+                    if (!codeTask.IsFaulted)
+                    {
+                        relayJoinCode = codeTask.Result;
+                        transport.SetHostRelayData(
+                            relayAlloc.RelayServer.IpV4,
+                            (ushort)relayAlloc.RelayServer.Port,
+                            relayAlloc.AllocationIdBytes,
+                            relayAlloc.Key,
+                            relayAlloc.ConnectionData);
+                        Debug.Log($"[LobbyManager] Relay alocado. JoinCode={relayJoinCode}");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[LobbyManager] GetJoinCodeAsync falhou: {codeTask.Exception?.Message}. Fallback IP direto.");
+                    }
+                }
+                else
+                {
+                    Debug.LogWarning($"[LobbyManager] CreateAllocationAsync falhou: {allocTask.Exception?.Message}. Fallback IP direto.");
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[LobbyManager] UGSBootstrap nao pronto no timeout. Fallback para IP direto.");
+            }
+
+            if (string.IsNullOrEmpty(relayJoinCode))
+            {
+                localIp = GetLocalIpAddress();
+                transport.SetConnectionData("0.0.0.0", port);
+                port = transport.ConnectionData.Port;
+                Debug.Log($"[LobbyManager][DBG] Fallback IP direto: listen 0.0.0.0:{port}, publicando: {localIp}");
+            }
+#endif
+
+            Debug.Log($"[LobbyManager] Tentando StartHost: transport={transport.Protocol}, approval={nm.NetworkConfig.ConnectionApproval}");
 
             if (!nm.StartHost())
             {
@@ -797,8 +847,18 @@ namespace ExoBeasts.Multiplayer.Lobby
             bool scheduled = false;
             try
             {
+#if UNITY_EDITOR
                 AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, localIp, LobbyAttributeVisibility.Public);
                 AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, port, LobbyAttributeVisibility.Public);
+#else
+                if (!string.IsNullOrEmpty(relayJoinCode))
+                    AddStringAttr(mod, LobbyAttributes.RELAY_CODE, relayJoinCode, LobbyAttributeVisibility.Public);
+                else
+                {
+                    AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, localIp ?? GetLocalIpAddress(), LobbyAttributeVisibility.Public);
+                    AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, port, LobbyAttributeVisibility.Public);
+                }
+#endif
                 AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.InGame.ToString(), LobbyAttributeVisibility.Public);
 
                 string capturedMapOverride = mapOverride;
@@ -936,6 +996,7 @@ namespace ExoBeasts.Multiplayer.Lobby
                 return;
 
             bool oldReady = member.isReady;
+            string oldDisplayName = member.displayName;
 
             // A1 audit: try/finally garante release mesmo se CopyMemberAttributeByKey
             // lancar exceptionalmente. Antes, o Release() podia ficar inalcancavel.
@@ -961,22 +1022,30 @@ namespace ExoBeasts.Multiplayer.Lobby
                     if (!string.IsNullOrEmpty(newName))
                         member.displayName = newName;
                 }
+
+                var charOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
+                {
+                    TargetUserId = info.TargetUserId,
+                    AttrKey = MemberAttributes.CHARACTER_INDEX,
+                };
+                if (details.CopyMemberAttributeByKey(ref charOpts, out var charAttr) == Result.Success && charAttr.HasValue)
+                {
+                    string charVal = charAttr.Value.Data?.Value.AsUtf8 ?? "";
+                    if (int.TryParse(charVal, out int charIdx))
+                        member.selectedCharacterIndex = charIdx;
+                }
             }
             finally
             {
                 details.Release();
             }
 
-            // Notificar UI apenas quando IS_READY muda de valor
-            // (evita notificacao falsa quando DISPLAY_NAME e atualizado no join)
-            if (member.isReady != oldReady)
+            // Notifica UI quando isReady ou displayName muda.
+            // displayName chega assíncrono (SetMemberAttribute após join) — deve re-renderizar.
+            if (member.isReady != oldReady || member.displayName != oldDisplayName)
             {
                 Debug.Log($"[LobbyManager] Membro atualizado: {userId} | isReady={member.isReady} | nome={member.displayName}");
                 OnMemberUpdated?.Invoke(member);
-            }
-            else
-            {
-                Debug.Log($"[LobbyManager] Atributo de membro atualizado (sem mudanca de ready): {userId} | nome={member.displayName}");
             }
         }
 
@@ -1022,6 +1091,26 @@ namespace ExoBeasts.Multiplayer.Lobby
             // SetConnectionData lancar.
             try
             {
+#if !UNITY_EDITOR
+                // Build: verificar RELAY_CODE primeiro (Unity Relay para cross-network)
+                var relayAttrOpts = new LobbyDetailsCopyAttributeByKeyOptions { AttrKey = LobbyAttributes.RELAY_CODE };
+                var relayAttrResult = details.CopyAttributeByKey(ref relayAttrOpts, out var relayAttr);
+                if (relayAttrResult == Result.Success && relayAttr.HasValue)
+                {
+                    string relayCode = relayAttr.Value.Data?.Value.AsUtf8 ?? "";
+                    if (!string.IsNullOrEmpty(relayCode))
+                    {
+                        Debug.Log($"[LobbyManager] RELAY_CODE recebido: {relayCode} — conectando via Relay");
+                        var nmClientRelay = NetworkManager.Singleton;
+                        var transportRelay = nmClientRelay?.GetComponent<UnityTransport>();
+                        if (nmClientRelay != null && transportRelay != null)
+                            StartCoroutine(ConnectClientViaRelayCoroutine(nmClientRelay, transportRelay, relayCode));
+                        else
+                            Debug.LogError("[LobbyManager] nmClient ou transport null para conexao Relay");
+                        return;
+                    }
+                }
+#endif
                 var attrOpts = new LobbyDetailsCopyAttributeByKeyOptions { AttrKey = LobbyAttributes.SERVER_ADDRESS };
                 var addrResult = details.CopyAttributeByKey(ref attrOpts, out var addrAttr);
                 Debug.Log($"[LobbyManager][DBG] CopyAttributeByKey(SERVER_ADDRESS): result={addrResult}, hasValue={addrAttr.HasValue}");
@@ -1129,6 +1218,79 @@ namespace ExoBeasts.Multiplayer.Lobby
                 OnError?.Invoke("Falha ao iniciar Client NGO");
             }
         }
+
+#if !UNITY_EDITOR
+        private System.Collections.IEnumerator ConnectClientViaRelayCoroutine(
+            NetworkManager nmClient, UnityTransport transport, string joinCode)
+        {
+            Debug.Log($"[LobbyManager] ConnectClientViaRelayCoroutine iniciada — joinCode={joinCode}");
+
+            if (nmClient.IsListening || nmClient.IsClient || nmClient.IsHost)
+            {
+                Debug.LogWarning("[LobbyManager] Cliente: NGO ja em execucao. Shutdown antes de conectar via Relay...");
+                nmClient.Shutdown();
+                float elapsed = 0f;
+                while (nmClient.IsListening && elapsed < 3f)
+                {
+                    elapsed += Time.deltaTime;
+                    yield return null;
+                }
+                if (nmClient.IsListening)
+                {
+                    Debug.LogError("[LobbyManager] Cliente: Shutdown nao completou em 3s. Abortando conexao Relay.");
+                    OnError?.Invoke("NetworkManager do cliente nao encerrou a tempo");
+                    yield break;
+                }
+            }
+
+            if (nmClient.NetworkConfig.NetworkTransport == null && transport != null)
+                nmClient.NetworkConfig.NetworkTransport = transport;
+
+            float ugsWait = 0f;
+            while ((UGSBootstrap.Instance == null || !UGSBootstrap.Instance.IsReady) && ugsWait < 10f)
+            {
+                ugsWait += Time.deltaTime;
+                yield return null;
+            }
+
+            if (UGSBootstrap.Instance == null || !UGSBootstrap.Instance.IsReady)
+            {
+                Debug.LogError("[LobbyManager] UGS nao pronto — verifique Project ID no Unity Dashboard");
+                OnError?.Invoke("UGS nao inicializado");
+                yield break;
+            }
+
+            var joinTask = RelayService.Instance.JoinAllocationAsync(joinCode);
+            yield return new WaitUntil(() => joinTask.IsCompleted);
+
+            if (joinTask.IsFaulted)
+            {
+                Debug.LogError($"[LobbyManager] JoinAllocationAsync falhou: {joinTask.Exception?.GetBaseException().Message}");
+                OnError?.Invoke("Falha ao entrar na alocacao Relay");
+                yield break;
+            }
+
+            JoinAllocation join = joinTask.Result;
+            transport.SetClientRelayData(
+                join.RelayServer.IpV4,
+                (ushort)join.RelayServer.Port,
+                join.AllocationIdBytes,
+                join.Key,
+                join.ConnectionData,
+                join.HostConnectionData);
+
+            nmClient.NetworkConfig.ConnectionApproval = true;
+            int myChar = GetMyCharacterIndex();
+            nmClient.NetworkConfig.ConnectionData = System.BitConverter.GetBytes(myChar);
+            Debug.Log($"[LobbyManager] Relay configurado. Enviando charIndex={myChar}. Iniciando StartClient...");
+
+            bool clientStarted = nmClient.StartClient();
+            Debug.Log($"[LobbyManager] StartClient (Relay) retornou: {clientStarted}");
+            if (!clientStarted)
+                OnError?.Invoke("Falha ao iniciar Client NGO via Relay");
+        }
+#endif
+
 #endif
 
 #if !EOS_DISABLE

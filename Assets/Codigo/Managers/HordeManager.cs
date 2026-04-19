@@ -214,6 +214,7 @@ public class HordeManager : NetworkBehaviour
         float timer = 0f;
         while ((PlayerRegistry.Instance == null || PlayerRegistry.Instance.GetPlayerCount() == 0) && timer < timeout)
         {
+            if (!IsServer) yield break;
             timer += 1f;
             yield return new WaitForSeconds(1f);
         }

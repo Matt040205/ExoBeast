@@ -54,8 +54,7 @@ namespace ExoBeasts.Multiplayer.Sync
             const float timeoutSeconds = 2f;
             float elapsed = 0f;
 
-            while (PlayerIdentityBridge.Instance == null ||
-                   (PlayerIdentityBridge.Instance.NetworkObject != null && !PlayerIdentityBridge.Instance.NetworkObject.IsSpawned))
+            while (PlayerIdentityBridge.Instance?.NetworkObject?.IsSpawned != true)
             {
                 elapsed += Time.deltaTime;
                 if (elapsed >= timeoutSeconds)

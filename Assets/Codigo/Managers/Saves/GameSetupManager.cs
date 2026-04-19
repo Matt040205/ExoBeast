@@ -85,6 +85,7 @@ public class GameSetupManager : NetworkBehaviour
 
         if (GameDataManager.Instance == null)
         {
+            _spawnedClientIds.Remove(clientId);
             Debug.LogError("[GameSetupManager] GameDataManager.Instance nulo — scene setup incompleto. Abortando spawn.");
             return;
         }
@@ -110,6 +111,7 @@ public class GameSetupManager : NetworkBehaviour
 
         if (prefabToSpawn == null)
         {
+            _spawnedClientIds.Remove(clientId);
             Debug.LogError($"[GameSetupManager] Falha crítica: nenhum 'commanderPrefab' encontrado para clientId={clientId} (charIndex={charIndex}). Configure GameDataManager.bibliotecaOriginalPersonagens ou equipeSelecionada[0] no Inspector.");
             return;
         }

@@ -914,7 +914,13 @@ PlayerSettings:
   XboxOneOverrideIdentityName: 
   XboxOneOverrideIdentityPublisher: 
   vrEditorSettings: {}
-  cloudServicesEnabled: {}
+  cloudServicesEnabled:
+    Build: 0
+    Game Performance: 0
+    Legacy Analytics: 0
+    Purchasing: 0
+    UDP: 0
+    Unity Ads: 0
   luminIcon:
     m_Name: 
     m_ModelFolderPath: 
@@ -936,11 +942,11 @@ PlayerSettings:
   captureStartupLogs: {}
   activeInputHandler: 2
   windowsGamepadBackendHint: 0
-  cloudProjectId: 8e99899f-9f7f-4362-b173-9d9297aa6dd1
+  cloudProjectId: 7c653fd9-9ad3-468f-8eea-448d3e384798
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: map bridge
-  organizationId: amigolindu
+  projectName: PI3D
+  organizationId: sitr3n
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}

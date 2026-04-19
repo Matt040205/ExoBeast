@@ -202,6 +202,13 @@ public class LobbySceneUI : MonoBehaviour
         // Inspector refs diretos
         if (btnLogin != null) { btnLogin.onClick.RemoveAllListeners(); if (btnLogin.onClick.GetPersistentEventCount() == 0) btnLogin.onClick.AddListener(Login); }
         if (iniciarPartidaButton != null) { iniciarPartidaButton.onClick.RemoveAllListeners(); if (iniciarPartidaButton.onClick.GetPersistentEventCount() == 0) iniciarPartidaButton.onClick.AddListener(IniciarPartida); }
+
+        // Auto-salva nick ao perder foco ou pressionar Enter (sem precisar de botão)
+        if (nickField != null)
+        {
+            nickField.onEndEdit.RemoveAllListeners();
+            nickField.onEndEdit.AddListener(_ => AtualizarNickLocal());
+        }
     }
 
     private void WireBtn(string goName, Action handler)
@@ -247,13 +254,12 @@ public class LobbySceneUI : MonoBehaviour
 
     private void AtualizarNickLocal()
     {
-        if (nickField != null && !string.IsNullOrWhiteSpace(nickField.text))
-        {
-            string nick = nickField.text.Trim();
-            SessionManager.Instance?.SetDisplayName(nick);
-            PlayerPrefs.SetString("PlayerDisplayName", nick);
-            PlayerPrefs.Save();
-        }
+        if (nickField == null || string.IsNullOrWhiteSpace(nickField.text)) return;
+        string nick = nickField.text.Trim();
+        SessionManager.Instance?.SetDisplayName(nick);
+        _auth?.SetDeviceIdName(nick);
+        PlayerPrefs.SetString("PlayerDisplayName", nick);
+        PlayerPrefs.Save();
     }
 
     public void CriarSala()
@@ -389,6 +395,7 @@ public class LobbySceneUI : MonoBehaviour
     {
         string nick = PlayerPrefs.GetString("PlayerDisplayName", "");
         if (!string.IsNullOrEmpty(nick) && nickField != null) nickField.text = nick;
+        AtualizarNickLocal();
         SetStatus("Pronto! Crie ou entre em uma sala.");
     }
 
@@ -449,10 +456,12 @@ public class LobbySceneUI : MonoBehaviour
         string localUid = SessionManager.Instance?.GetUserId() ?? "";
         int max = lobby?.maxPlayers ?? 4;
 
-        // Ajusta contagem de slots
+        // Ajusta contagem de slots.
+        // NOTA: Destroy() é diferido — childCount não diminui no mesmo frame.
+        // Usar while+Destroy causaria loop infinito. O for com bounds fixas é seguro.
         while (playerSlotsContent.childCount < max) CriarSlotVazio();
-        while (playerSlotsContent.childCount > max)
-            Destroy(playerSlotsContent.GetChild(playerSlotsContent.childCount - 1).gameObject);
+        for (int i = playerSlotsContent.childCount - 1; i >= max; i--)
+            Destroy(playerSlotsContent.GetChild(i).gameObject);
 
         for (int i = 0; i < max; i++)
         {
@@ -673,10 +682,10 @@ public class LobbySceneUI : MonoBehaviour
             yield break;
         }
 
-        // Auto-login: usa nick salvo ou gera nome temporário de teste
+        // Auto-login: usa nick salvo ou gera nome automatico na primeira execucao
         string autoNick = PlayerPrefs.GetString("PlayerDisplayName", "");
         if (string.IsNullOrEmpty(autoNick))
-            autoNick = "Tester_" + UnityEngine.Random.Range(1000, 9999);
+            autoNick = "Jogador_" + UnityEngine.Random.Range(1000, 9999);
 
         if (nickField != null) nickField.text = autoNick;
         SessionManager.Instance?.SetDisplayName(autoNick);
