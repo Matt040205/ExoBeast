@@ -78,35 +78,45 @@ public class GameSetupManager : NetworkBehaviour
         GameObject prefabToSpawn = null;
         CharacterBase characterEscolhido = null; // <--- Guarda o cartão de dados selecionado
 
-        // 1. Pega os dados exatos do Singleton
+        // 1. Verifica se estamos spawnando o avatar DO PRÓPRIO JOGADOR (Local)
+        bool isLocalPlayer = (NetworkManager.Singleton != null && clientId == NetworkManager.Singleton.LocalClientId);
+
         // Fonte primaria: CharacterChoiceCache (populado pelo LobbyManager via ConnectionApproval).
-        // PlayerRegistry e mantido como espelho para codigo legado que le de la.
         int charIndex = CharacterChoiceCache.Get(clientId, fallback: 0);
 
-        if (GameDataManager.Instance == null)
-        {
-            _spawnedClientIds.Remove(clientId);
-            Debug.LogError("[GameSetupManager] GameDataManager.Instance nulo — scene setup incompleto. Abortando spawn.");
-            return;
-        }
-
-        var biblioteca = GameDataManager.Instance.bibliotecaOriginalPersonagens;
-        if (biblioteca != null && charIndex >= 0 && charIndex < biblioteca.Count)
-        {
-            characterEscolhido = biblioteca[charIndex];
-            prefabToSpawn = characterEscolhido?.commanderPrefab;
-        }
-        else
-        {
-            Debug.LogWarning($"[GameSetupManager] charIndex={charIndex} fora de range (biblioteca.Count={biblioteca?.Count ?? 0}). Tentando fallback equipeSelecionada[0].");
-        }
-
-        // 2. Fallback de Segurança — com bounds check (C6 audit).
+        // Prioridade MÁXIMA para o próprio jogador: usar a sua própria equipeSelecionada[0] (O Comandante)
         var equipe = GameDataManager.Instance.equipeSelecionada;
-        if (prefabToSpawn == null && equipe != null && equipe.Length > 0 && equipe[0] != null)
+        if (isLocalPlayer && equipe != null && equipe.Length > 0 && equipe[0] != null)
         {
             characterEscolhido = equipe[0];
             prefabToSpawn = characterEscolhido.commanderPrefab;
+            
+            // Para manter a consistencia com o PlayerRegistry, se o local tiver a biblioteca carregada, a gente resgata o Index correto
+            var bib = GameDataManager.Instance.bibliotecaOriginalPersonagens;
+            if (bib != null) {
+                int foundIndex = bib.IndexOf(characterEscolhido);
+                if (foundIndex >= 0) charIndex = foundIndex;
+            }
+            Debug.Log($"[GameSetupManager] Usando equipeSelecionada[0] ({characterEscolhido.name}) para o LocalPlayer!");
+        }
+        else
+        {
+            // 2. Se for um jogador REMOTO conectando, ou fallback se a equipe nula:
+            // Lemos o Payload da rede já extraído no charIndex
+            var biblioteca = GameDataManager.Instance.bibliotecaOriginalPersonagens;
+
+            if (biblioteca != null && charIndex >= 0 && charIndex < biblioteca.Count)
+            {
+                characterEscolhido = biblioteca[charIndex];
+                prefabToSpawn = characterEscolhido?.commanderPrefab;
+                Debug.Log($"[GameSetupManager] Usando biblioteca[{charIndex}] ({characterEscolhido?.name}) para jogador Remoto {clientId}");
+            }
+            else if (equipe != null && equipe.Length > 0 && equipe[0] != null)
+            {
+                // Fallback de Segurança Extremo
+                characterEscolhido = equipe[0];
+                prefabToSpawn = characterEscolhido.commanderPrefab;
+            }
         }
 
         if (prefabToSpawn == null)

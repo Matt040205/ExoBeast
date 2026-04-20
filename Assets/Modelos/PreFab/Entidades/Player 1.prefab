@@ -585,6 +585,7 @@ MonoBehaviour:
   firePoint: {fileID: 4757579757688161299}
   projectileVisualPrefab: {fileID: 2027974582639016208, guid: e3fa2040e19007744b3937f9244f4c9f, type: 3}
   impactEffectPrefab: {fileID: 0}
+  muzzleFlashPrefab: {fileID: 0}
   aimTarget: {fileID: 0}
   aimTargetDistance: 20
   tipoDeSom: Arma
@@ -1043,13 +1044,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4674399538622136838}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.68224865, y: 1.1474209, z: 0.5677355}
-  m_LocalScale: {x: 0.7339988, y: 0.6116656, z: 0.7339988}
+  m_LocalRotation: {x: 0.00000005308539, y: -0.00000014295803, z: 0.7071066, w: 0.707107}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 0.01948301, y: 0.016235838, z: 0.019483017}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 7609352719927234622}
-  m_Father: {fileID: 8989196058910049133}
+  m_Father: {fileID: 8701486573267194323}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2734900487233724365
 MonoBehaviour:
@@ -1177,6 +1178,13 @@ MonoBehaviour:
   aimTransitionSpeed: 10
   mouseSensitivity: 2
   verticalAngleLimit: 80
+  normalMaxDistance: 3
+  aimMaxDistance: 1.5
+  minCameraDistance: 0.5
+  collisionRadius: 0.2
+  obstacleMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1001 &2862216175139487725
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1527,8 +1535,8 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6591203056182639744, guid: 613add97b4fba6a428860000a6652312, type: 3}
       insertIndex: 0
       addedObject: {fileID: 6422150060374132678}
-    - targetCorrespondingSourceObject: {fileID: 6591203056182639744, guid: 613add97b4fba6a428860000a6652312, type: 3}
-      insertIndex: 2
+    - targetCorrespondingSourceObject: {fileID: 6879602051789942334, guid: 613add97b4fba6a428860000a6652312, type: 3}
+      insertIndex: -1
       addedObject: {fileID: 6478298243723770104}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 5779095713070474810, guid: 613add97b4fba6a428860000a6652312, type: 3}
@@ -1585,6 +1593,11 @@ MonoBehaviour:
     TriggerNameHash: -1316629574
     TransitionIndex: 0
   m_Animator: {fileID: 3035468913146140951}
+--- !u!4 &8701486573267194323 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6879602051789942334, guid: 613add97b4fba6a428860000a6652312, type: 3}
+  m_PrefabInstance: {fileID: 2862216175139487725}
+  m_PrefabAsset: {fileID: 0}
 --- !u!4 &8989196058910049133 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 6591203056182639744, guid: 613add97b4fba6a428860000a6652312, type: 3}

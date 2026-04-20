@@ -645,6 +645,18 @@ namespace ExoBeasts.Multiplayer.Lobby
         /// </summary>
         private int GetMyCharacterIndex()
         {
+            // Prioriza a escolha real armazenada em cache pela tela de Selecao
+            if (GameDataManager.Instance != null && GameDataManager.Instance.equipeSelecionada != null && GameDataManager.Instance.equipeSelecionada.Length > 0)
+            {
+                var charBase = GameDataManager.Instance.equipeSelecionada[0];
+                if (charBase != null && GameDataManager.Instance.bibliotecaOriginalPersonagens != null)
+                {
+                    int index = GameDataManager.Instance.bibliotecaOriginalPersonagens.IndexOf(charBase);
+                    if (index >= 0) return index;
+                }
+            }
+
+            // Fallback
             string myUid = SessionManager.Instance?.GetUserId();
             if (string.IsNullOrEmpty(myUid)) return 0;
             var me = _members.Find(m => m.productUserId == myUid);
