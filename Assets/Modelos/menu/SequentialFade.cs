@@ -9,24 +9,25 @@ public class SequentialFade : MonoBehaviour
     public List<GameObject> elements;
     public float delayBetweenElements = 0.5f;
     public float fadeDuration = 1.0f;
-    public bool hideOnStart = true; // Nova variável
+    public bool hideOnStart = true; // Nova variï¿½vel
 
-    void Start()
+void Start()
     {
         if (hideOnStart)
         {
             // Inicializa todos os elementos com alpha 0
             foreach (GameObject element in elements)
             {
-                SetAlpha(element, 0f);
+                if (element != null) SetAlpha(element, 0f);
             }
         }
 
         StartCoroutine(FadeInSequence());
     }
 
-    void SetAlpha(GameObject obj, float alpha)
+void SetAlpha(GameObject obj, float alpha)
     {
+        if (obj == null) return;
         // Para imagens
         Image img = obj.GetComponent<Image>();
         if (img != null)
@@ -36,22 +37,22 @@ public class SequentialFade : MonoBehaviour
             img.color = c;
         }
 
-        // Para textos tradicionais
-        Text text = obj.GetComponentInChildren<Text>();
-        if (text != null)
+        // Para textos padrÃ£o
+        Text txt = obj.GetComponent<Text>();
+        if (txt != null)
         {
-            Color c = text.color;
+            Color c = txt.color;
             c.a = alpha;
-            text.color = c;
+            txt.color = c;
         }
 
         // Para TextMeshPro
-        TMP_Text tmpText = obj.GetComponentInChildren<TMP_Text>();
-        if (tmpText != null)
+        TMP_Text tmp = obj.GetComponent<TMP_Text>();
+        if (tmp != null)
         {
-            Color c = tmpText.color;
+            Color c = tmp.color;
             c.a = alpha;
-            tmpText.color = c;
+            tmp.color = c;
         }
     }
 
@@ -69,7 +70,7 @@ public class SequentialFade : MonoBehaviour
         float elapsed = 0f;
         List<Graphic> graphics = new List<Graphic>();
 
-        // Coleta todos os componentes gráficos
+        // Coleta todos os componentes grï¿½ficos
         graphics.AddRange(element.GetComponentsInChildren<Image>());
         graphics.AddRange(element.GetComponentsInChildren<Text>());
         graphics.AddRange(element.GetComponentsInChildren<TMP_Text>());

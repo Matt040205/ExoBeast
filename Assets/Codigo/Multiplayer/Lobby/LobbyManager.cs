@@ -78,6 +78,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         {
             if (_instance != null && _instance != this) { Destroy(gameObject); return; }
             _instance = this;
+            transform.SetParent(null); // DDOL requer root GameObject
             DontDestroyOnLoad(gameObject);
         }
 
@@ -117,17 +118,17 @@ namespace ExoBeasts.Multiplayer.Lobby
         }
 #endif
 
-        public void CreateLobby(LobbySettings settings)
+        public bool CreateLobby(LobbySettings settings)
         {
 #if !EOS_DISABLE
             var lobbyInterface = GetLobbyInterface();
-            if (lobbyInterface == null) { OnError?.Invoke("EOS nao inicializado"); return; }
+            if (lobbyInterface == null) { OnError?.Invoke("EOS nao inicializado"); return false; }
 
             var localUserId = GetLocalUserId();
             if (localUserId == null || !localUserId.IsValid())
             {
                 OnError?.Invoke("Usuario nao autenticado. Faca login antes de criar um lobby.");
-                return;
+                return false;
             }
 
             var options = new CreateLobbyOptions
@@ -190,8 +191,10 @@ namespace ExoBeasts.Multiplayer.Lobby
                                        SessionManager.Instance.GetDisplayName());
                 });
             });
+            return true;
 #else
             Debug.LogWarning("[LobbyManager] EOS desabilitado (EOS_DISABLE)");
+            return false;
 #endif
         }
 
@@ -530,6 +533,36 @@ namespace ExoBeasts.Multiplayer.Lobby
             ClearLobbyState();
             OnLobbyLeft?.Invoke();
 #endif
+        }
+
+        /// <summary>
+        /// Limpa o estado de lobby local de forma síncrona e dispara OnLobbyLeft imediatamente.
+        /// Envia o pedido de saída ao EOS em background (fire-and-forget — sem callback de estado).
+        /// Use este método antes de transições de cena para garantir estado limpo na cena destino.
+        /// </summary>
+        public void ForceLeaveImmediate()
+        {
+            if (!_isInLobby) return;
+
+#if !EOS_DISABLE
+            var lobbyInterface = GetLobbyInterface();
+            var localUserId    = GetLocalUserId();
+            string lobbyId     = _currentLobby?.lobbyId ?? "";
+
+            if (lobbyInterface != null && localUserId != null && localUserId.IsValid()
+                && !string.IsNullOrEmpty(lobbyId))
+            {
+                var options = new LeaveLobbyOptions { LocalUserId = localUserId, LobbyId = lobbyId };
+                lobbyInterface.LeaveLobby(ref options, null, (ref LeaveLobbyCallbackInfo info) =>
+                {
+                    if (info.ResultCode != Result.Success)
+                        Debug.LogWarning($"[LobbyManager] ForceLeaveImmediate EOS callback: {info.ResultCode}");
+                });
+            }
+#endif
+
+            ClearLobbyState();
+            OnLobbyLeft?.Invoke();
         }
 
         /// <summary>

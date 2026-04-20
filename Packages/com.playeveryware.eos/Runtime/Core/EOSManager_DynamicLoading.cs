@@ -21,7 +21,7 @@
 */
 
 #if UNITY_STANDALONE_WIN && !UNITY_EDITOR && !UNITY_IOS && !UNITY_STANDALONE_OSX
-#define USE_EOS_GFX_PLUGIN_NATIVE_RENDER
+// #define USE_EOS_GFX_PLUGIN_NATIVE_RENDER // DISABLED since GfxPluginNativeRender-x64.dll is not bundled
 #endif
 
 #if UNITY_EDITOR

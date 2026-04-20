@@ -1513,7 +1513,7 @@ GameObject:
   - component: {fileID: 493856251}
   - component: {fileID: 493856250}
   m_Layer: 5
-  m_Name: LobbyPulbico
+  m_Name: LobbyPublico
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2413,7 +2413,7 @@ GameObject:
   - component: {fileID: 725923750}
   - component: {fileID: 725923749}
   m_Layer: 5
-  m_Name: ' BackMenu'
+  m_Name: BackMenu
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2483,10 +2483,10 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls:
-      - m_Target: {fileID: 91982766}
-        m_TargetAssemblyTypeName: MenuManager, Assembly-CSharp
-        m_MethodName: 
-        m_Mode: 5
+      - m_Target: {fileID: 1526759489}
+        m_TargetAssemblyTypeName: LobbySceneUI, Assembly-CSharp
+        m_MethodName: IrParaMenuPrincipal
+        m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
           m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
@@ -4881,7 +4881,7 @@ GameObject:
   - component: {fileID: 1243253776}
   - component: {fileID: 1243253775}
   m_Layer: 5
-  m_Name: CreateLobby
+  m_Name: BtnCriarHost
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

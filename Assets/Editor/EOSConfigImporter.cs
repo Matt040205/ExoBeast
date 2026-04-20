@@ -109,7 +109,7 @@ namespace ExoBeasts.Multiplayer.Editor
                         new SandboxData
                         {
                             Name = "Development",
-                            Value = creds.SandboxId
+                            Value = new SandboxIdData { Value = creds.SandboxId }
                         }
                     }
                 },
@@ -243,7 +243,7 @@ namespace ExoBeasts.Multiplayer.Editor
         private class SandboxData
         {
             public string Name;
-            public string Value;
+            public SandboxIdData Value;
         }
 
         [System.Serializable]

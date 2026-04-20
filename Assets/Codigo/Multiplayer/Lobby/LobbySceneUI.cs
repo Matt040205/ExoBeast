@@ -70,6 +70,7 @@ public class LobbySceneUI : MonoBehaviour
     private int    _maxPlayers   = 4;
     private bool   _eosRunning      = false;
     private bool   _isCreatingLobby = false;
+    private Coroutine _createTimeoutCoroutine;
 
     private static readonly string[] _charNames = { "Coruja", "Samurai" };
 
@@ -99,7 +100,11 @@ public class LobbySceneUI : MonoBehaviour
         StartCoroutine(InitEOSFlow());
     }
 
-    private void OnDestroy() => UnsubscribeEvents();
+    private void OnDestroy()
+    {
+        CancelCreateTimeout();
+        UnsubscribeEvents();
+    }
 
     // ──────────────────────────────────────────────────────────────────────
     // Auto-detecção por nome (fallback se Inspector não preenchido)
@@ -176,8 +181,30 @@ public class LobbySceneUI : MonoBehaviour
         WireBtn("BtnCriarHost",     AbrirModoHost);
         WireBtn("BtnVoltarHost",    VoltarParaMenu);
 
-        // Criar Lobby
-        WireBtn("CreateLobby", CriarSala);
+        // Criar Lobby (busca resiliente dentro do painel diretamente, ignorando espaços no nome do painel)
+        if (painelCriarLobby != null)
+        {
+            foreach (var b in painelCriarLobby.GetComponentsInChildren<Button>(true))
+            {
+                if (b.gameObject.name == "CreateLobby" && b.transform.parent != null && b.transform.parent.name != "MaxJogadores")
+                {
+                    b.onClick = new Button.ButtonClickedEvent();
+                    b.onClick.AddListener(CriarSala);
+                }
+                else if (b.gameObject.name == "CreateLobby" && b.transform.parent != null && b.transform.parent.name == "MaxJogadores")
+                {
+                    b.onClick = new Button.ButtonClickedEvent();
+                    b.onClick.AddListener(() => AlterarMaxPlayers(-1));
+                }
+                else if (b.gameObject.name == "CreateLobby (1)")
+                {
+                    b.onClick = new Button.ButtonClickedEvent();
+                    b.onClick.AddListener(() => AlterarMaxPlayers(+1));
+                }
+            }
+        }
+        
+        // Mantem suporte a nomes corretos se arrumados
         WireBtn("-",              () => AlterarMaxPlayers(-1));
         WireBtn("+",              () => AlterarMaxPlayers(+1));
         WireBtn("'-'",            () => AlterarMaxPlayers(-1));
@@ -192,21 +219,24 @@ public class LobbySceneUI : MonoBehaviour
         WireBtn("BtnBuscarSalas", BuscarSalas);
         WireBtn("BuscarSalas",    BuscarSalas);
         WireBtn("LobbyPublico",   BuscarSalas);
+        WireBtn("LobbyPulbico",   BuscarSalas);  // nome real na cena (typo)
 
         // Sala
         WireBtn("Copiar",         CopiarId);
         WireBtn("SairLobby",      SairDaSala);
         WireBtn("BtnSairLobby",   SairDaSala);
         WireBtn("BtnIniciarPartida", IniciarPartida);
+        WireBtn("IniciarPartida",    IniciarPartida);
 
         // Voltar ao menu principal (sai da LobbyScene completamente)
         WireBtn("BtnVoltarMenuPrincipal", IrParaMenuPrincipal);
         WireBtn("VoltarMenuPrincipal",    IrParaMenuPrincipal);
         WireBtn("BtnMenu",                IrParaMenuPrincipal);
+        WireBtn("BackMenu",               IrParaMenuPrincipal);  // nome real na cena
 
         // Inspector refs diretos
-        if (btnLogin != null) { btnLogin.onClick.RemoveAllListeners(); if (btnLogin.onClick.GetPersistentEventCount() == 0) btnLogin.onClick.AddListener(Login); }
-        if (iniciarPartidaButton != null) { iniciarPartidaButton.onClick.RemoveAllListeners(); if (iniciarPartidaButton.onClick.GetPersistentEventCount() == 0) iniciarPartidaButton.onClick.AddListener(IniciarPartida); }
+        if (btnLogin != null) { btnLogin.onClick = new Button.ButtonClickedEvent(); btnLogin.onClick.AddListener(Login); }
+        if (iniciarPartidaButton != null) { iniciarPartidaButton.onClick = new Button.ButtonClickedEvent(); iniciarPartidaButton.onClick.AddListener(IniciarPartida); }
 
         // Auto-salva nick ao perder foco ou pressionar Enter (sem precisar de botão)
         if (nickField != null)
@@ -221,9 +251,29 @@ public class LobbySceneUI : MonoBehaviour
         foreach (var b in GetComponentsInChildren<Button>(true))
         {
             if (b.gameObject.name.Trim() != goName.Trim()) continue;
-            b.onClick.RemoveAllListeners();
-            if (b.onClick.GetPersistentEventCount() == 0)
+            // Cria um novo evento limpando tudo o que possa estar erradamente "injetado" no Inspecionar! (o GetPersistent não impede mais o código)
+            b.onClick = new Button.ButtonClickedEvent();
+            b.onClick.AddListener(() => handler());
+        }
+    }
+
+    private void WireBtnByPath(string path, Action handler)
+    {
+        var tr = transform.Find(path);
+        if (tr != null)
+        {
+            Debug.Log($"[LobbySceneUI] SUCESSO ao encontrar e mapear o botao via path: {path}");
+            var b = tr.GetComponent<Button>();
+            if (b != null)
+            {
+                // Substitui o UnityEvent por completo (ignora Inspecionar zoado)
+                b.onClick = new Button.ButtonClickedEvent();
                 b.onClick.AddListener(() => handler());
+            }
+        }
+        else
+        {
+            Debug.LogError($"[LobbySceneUI] FALHA FATAL: Nao achou o botao no path '{path}'");
         }
     }
 
@@ -234,7 +284,7 @@ public class LobbySceneUI : MonoBehaviour
         foreach (var b in parent.GetComponentsInChildren<Button>(true))
         {
             if (b.gameObject.name.Trim() != btnName.Trim()) continue;
-            b.onClick.RemoveAllListeners();
+            b.onClick = new Button.ButtonClickedEvent();
             b.onClick.AddListener(() => handler());
         }
     }
@@ -269,20 +319,52 @@ public class LobbySceneUI : MonoBehaviour
 
     public void CriarSala()
     {
+        Debug.Log("[LobbySceneUI] CriarSala() foi ACIONADO pelo cloque do botao!");
         AtualizarNickLocal();
-        if (_lobby == null || _isCreatingLobby) return;
+
+        if (_lobby == null) 
+        { 
+            Debug.LogError("[LobbySceneUI] CriarSala abortado: _lobby esta NULO!"); 
+            return; 
+        }
+        if (_isCreatingLobby) 
+        { 
+            Debug.LogError("[LobbySceneUI] CriarSala ignorado: Ja esta em processo de criar lobby (_isCreatingLobby = true)."); 
+            return; 
+        }
+
         _isCreatingLobby = true;
         string nome = lobbyNameField != null && !string.IsNullOrWhiteSpace(lobbyNameField.text)
             ? lobbyNameField.text.Trim() : "Minha Sala";
 
-        _lobby.CreateLobby(new LobbySettings
+        bool sucesso = _lobby.CreateLobby(new LobbySettings
         {
             lobbyName  = nome,
             maxPlayers = _maxPlayers,
             isPublic   = publicoToggle != null ? publicoToggle.isOn : true,
             mapName    = "EscolherPersonagem",
         });
+
+        if (!sucesso) return;
+        
         SetStatus("Criando sala...");
+
+        // Timeout de segurança: se o callback EOS nunca disparar (ex: singleton
+        // destruido na troca de cena), libera a UI apos 15 segundos.
+        if (_createTimeoutCoroutine != null) StopCoroutine(_createTimeoutCoroutine);
+        _createTimeoutCoroutine = StartCoroutine(CreateLobbyTimeoutCoroutine(15f));
+    }
+
+    private IEnumerator CreateLobbyTimeoutCoroutine(float timeout)
+    {
+        yield return new WaitForSeconds(timeout);
+        if (_isCreatingLobby)
+        {
+            Debug.LogError($"[LobbySceneUI] Timeout de {timeout}s ao criar lobby — callback EOS nao retornou.");
+            _isCreatingLobby = false;
+            SetStatus("[ERRO] Tempo esgotado ao criar sala. Tente novamente.");
+        }
+        _createTimeoutCoroutine = null;
     }
 
     public void AlterarMaxPlayers(int delta)
@@ -343,11 +425,37 @@ public class LobbySceneUI : MonoBehaviour
 
     public void IrParaMenuPrincipal()
     {
-        if (_lobby != null && _lobby.IsInLobby())
-            _lobby.LeaveLobby();
+        Debug.Log("[LobbySceneUI] Voltando para Menu Principal...");
 
-        GameModeManager.ReturnToSingleplayer();
-        UnityEngine.SceneManagement.SceneManager.LoadScene("MenuScene");
+        try
+        {
+            CancelCreateTimeout();
+            UnsubscribeEvents();
+
+            if (_lobby != null && _lobby.IsInLobby())
+            {
+                try { _lobby.ForceLeaveImmediate(); }
+                catch (System.Exception e) { Debug.LogWarning($"[LobbySceneUI] Erro ao sair do lobby: {e.Message}"); }
+            }
+
+            if (Unity.Netcode.NetworkManager.Singleton != null &&
+                Unity.Netcode.NetworkManager.Singleton.IsListening)
+            {
+                try { Unity.Netcode.NetworkManager.Singleton.Shutdown(); }
+                catch (System.Exception e) { Debug.LogWarning($"[LobbySceneUI] Erro ao desligar rede: {e.Message}"); }
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[LobbySceneUI] Erro ao limpar estado: {e.Message}");
+        }
+        finally
+        {
+            // SEMPRE volta para singleplayer e carrega MenuScene,
+            // mesmo que a limpeza acima falhe.
+            GameModeManager.ReturnToSingleplayer();
+            UnityEngine.SceneManagement.SceneManager.LoadScene("MenuScene");
+        }
     }
 
     // Navegação Pública para vincular no Inspecionar do Unity
@@ -361,6 +469,7 @@ public class LobbySceneUI : MonoBehaviour
     private void OnLobbyCreated(LobbyInfo lobby)
     {
         _isCreatingLobby = false;
+        CancelCreateTimeout();
         _lobbyId = lobby.lobbyId; _lobbyNome = lobby.lobbyName;
         SetState(State.Sala);
         AtualizarInfoSala();
@@ -397,7 +506,17 @@ public class LobbySceneUI : MonoBehaviour
     private void OnErro(string err)
     {
         _isCreatingLobby = false;
+        CancelCreateTimeout();
         SetStatus($"[ERRO] {err}");
+    }
+
+    private void CancelCreateTimeout()
+    {
+        if (_createTimeoutCoroutine != null)
+        {
+            StopCoroutine(_createTimeoutCoroutine);
+            _createTimeoutCoroutine = null;
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────

@@ -36,6 +36,7 @@ namespace ExoBeasts.Multiplayer.Core
 
         private void Awake()
         {
+            transform.SetParent(null); // DDOL requer root GameObject
             DontDestroyOnLoad(gameObject);
             Debug.Log($"[NetworkBootstrap] Inicializando sistema de rede... (P2P: {useP2PMode})");
         }

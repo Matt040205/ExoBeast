@@ -52,10 +52,30 @@ namespace ExoBeasts.Multiplayer.Core
             string filePath = System.IO.Path.GetFullPath(
                 System.IO.Path.Combine(dataParent, credentialsFilePath));
 
+            // Fallback 1: StreamingAssets (funciona em builds se o arquivo foi copiado)
             if (!System.IO.File.Exists(filePath))
             {
+                string streamingPath = System.IO.Path.Combine(
+                    Application.streamingAssetsPath, credentialsFilePath);
+                if (System.IO.File.Exists(streamingPath))
+                {
+                    filePath = streamingPath;
+                    Debug.Log($"[EOSConfig] Usando credenciais de StreamingAssets: {filePath}");
+                }
+            }
+
+            if (!System.IO.File.Exists(filePath))
+            {
+                // Fallback 2: usar credenciais já serializadas no ScriptableObject (baked no Inspector)
+                if (ValidateCredentials())
+                {
+                    Debug.Log("[EOSConfig] Arquivo externo nao encontrado, usando credenciais baked no ScriptableObject.");
+                    return;
+                }
+
                 Debug.LogError($"[EOSConfig] Arquivo de credenciais nao encontrado: {filePath}");
-                Debug.LogError("[EOSConfig] Crie o arquivo EOSCredentials.json na raiz do projeto!");
+                Debug.LogError("[EOSConfig] Crie o arquivo EOSCredentials.json na raiz do projeto, " +
+                               "ou preencha os campos diretamente no Inspector do EOSConfig asset!");
                 return;
             }
 
@@ -76,6 +96,9 @@ namespace ExoBeasts.Multiplayer.Core
             catch (System.Exception e)
             {
                 Debug.LogError($"[EOSConfig] Erro ao carregar credenciais: {e.Message}");
+                // Fallback: se o parse falhou mas temos credenciais baked, usa elas
+                if (ValidateCredentials())
+                    Debug.LogWarning("[EOSConfig] Usando credenciais baked como fallback apos erro de parse.");
             }
         }
 

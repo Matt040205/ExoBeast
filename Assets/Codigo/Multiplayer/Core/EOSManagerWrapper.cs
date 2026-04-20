@@ -96,6 +96,7 @@ namespace ExoBeasts.Multiplayer.Core
                 return;
             }
             _instance = this;
+            transform.SetParent(null); // DDOL requer root GameObject
             DontDestroyOnLoad(gameObject);
         }
 
