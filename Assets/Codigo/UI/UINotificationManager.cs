@@ -1,12 +1,14 @@
 using UnityEngine;
 using TMPro;
 using System.Collections;
+using System.Collections.Generic;
 using Unity.Netcode;
 
 /// <summary>
 /// ── UINotificationManager ──────────────────────────────────
 /// Gerencia os textos de alerta de horda globalmente.
 /// Escuta os EnemyEvents locais no Servidor e repassa aos Clientes.
+/// Conta com um sistema de Debounce para evitar Spam de Eventos.
 /// ───────────────────────────────────────────────────────────
 /// </summary>
 public class UINotificationManager : NetworkBehaviour
@@ -17,11 +19,18 @@ public class UINotificationManager : NetworkBehaviour
     [Tooltip("Arraste o TextMeshProUGUI da sua HUD de Ingame aqui.")]
     public TextMeshProUGUI notificationText;
     
-    [Header("Tempos")]
+    [Header("Tempos de Exibição")]
     public float fadeDuration = 0.5f;
     public float displayDuration = 3f;
 
+    [Header("Controle de Spam (Debounce)")]
+    [Tooltip("Tempo mínimo em segundos antes que a mesma mensagem possa ser repetida.")]
+    public float messageCooldown = 3f;
+
     private Coroutine activeFadeRoutine;
+    
+    // Dicionário para registrar o Time.time em que cada mensagem foi exibida pela última vez
+    private Dictionary<string, float> lastMessageTimes = new Dictionary<string, float>();
 
     private void Awake()
     {
@@ -58,23 +67,48 @@ public class UINotificationManager : NetworkBehaviour
 
     private void TriggerSpawnNotification(int pathIndex)
     {
-        if (IsServer) NotifyUIClientRpc($"Inimigos nascendo [Caminho {pathIndex}]", Color.yellow);
-        else if (IsLocalFallback()) ShowNotificationLocal($"Inimigos nascendo [Caminho {pathIndex}]", Color.yellow);
+        string msg = $"Inimigos nascendo [Caminho {pathIndex}]";
+        if (!CanSendMessage(msg)) return;
+
+        if (IsServer) NotifyUIClientRpc(msg, Color.yellow);
+        else if (IsLocalFallback()) ShowNotificationLocal(msg, Color.yellow);
     }
 
     private void TriggerHalfwayNotification(int pathIndex)
     {
+        string msg = $"Inimigos na metade do caminho [Caminho {pathIndex}]";
+        if (!CanSendMessage(msg)) return;
+
         // Laranja vibrante
         Color orangeColor = new Color(1f, 0.647f, 0f); 
         
-        if (IsServer) NotifyUIClientRpc($"Inimigos na metade do caminho [Caminho {pathIndex}]", orangeColor);
-        else if (IsLocalFallback()) ShowNotificationLocal($"Inimigos na metade do caminho [Caminho {pathIndex}]", orangeColor);
+        if (IsServer) NotifyUIClientRpc(msg, orangeColor);
+        else if (IsLocalFallback()) ShowNotificationLocal(msg, orangeColor);
     }
 
     private void TriggerBaseNotification()
     {
-        if (IsServer) NotifyUIClientRpc("Inimigos atingiram a base", Color.red);
-        else if (IsLocalFallback()) ShowNotificationLocal("Inimigos atingiram a base", Color.red);
+        string msg = "Inimigos atingiram a base";
+        if (!CanSendMessage(msg)) return;
+
+        if (IsServer) NotifyUIClientRpc(msg, Color.red);
+        else if (IsLocalFallback()) ShowNotificationLocal(msg, Color.red);
+    }
+
+    // Função central de Debounce (Cooldown)
+    private bool CanSendMessage(string message)
+    {
+        if (lastMessageTimes.TryGetValue(message, out float lastTime))
+        {
+            if (Time.time < lastTime + messageCooldown)
+            {
+                return false; // Spam detectado: bloqueia o envio
+            }
+        }
+        
+        // Atualiza ou insere o novo tempo no Dicionário
+        lastMessageTimes[message] = Time.time;
+        return true;
     }
 
     private bool IsLocalFallback()

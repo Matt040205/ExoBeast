@@ -24,6 +24,10 @@ public class CuttingBladeLogic : NetworkBehaviour
     private CommanderAbilityController abilityController;
     private Ability sourceAbility;
     private bool resetCooldownOnKill;
+
+    [Header("Juice Configs")]
+    [SerializeField] private CameraShakeConfig dashShake = new CameraShakeConfig(1.5f, 10f, 0.15f);
+
     private PlayerMovement playerMovement;
 
     public void StartDash(GameObject quemUsou, CharacterController cont, Transform pivot, float dist, float dmg, string som, CommanderAbilityController abCont, Ability ability, bool resetOnKill)
@@ -89,6 +93,12 @@ public class CuttingBladeLogic : NetworkBehaviour
 
         Vector3 startPosition = transform.position;
         Vector3 dashDirection = modelPivot.forward;
+
+        if (IsOwner)
+        {
+            JuiceEvents.OnCameraShake?.Invoke(dashDirection, dashShake.amplitude, dashShake.frequency, dashShake.duration);
+        }
+
         Vector3 targetPosition = startPosition + (dashDirection * dashDistance);
         int obstacleMask = LayerMask.GetMask("Default", "Ground", "Terrain");
 

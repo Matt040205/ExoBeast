@@ -53,6 +53,9 @@ public class MeleeCombatSystem : NetworkBehaviour
     public float? overrideAttackSpeed = null;
     public float? overrideAttackAngle = null;
 
+    [Header("Juice Configs")]
+    [SerializeField] private CameraShakeConfig ultimateHitShake = new CameraShakeConfig(0.8f, 15f, 0.1f);
+
     private Animator anim;
     private NetworkAnimator networkAnimator; // <--- CACHE SEGURO ADICIONADO AQUI
     private WeaponConfig currentStats;
@@ -138,6 +141,13 @@ public class MeleeCombatSystem : NetworkBehaviour
             RuntimeManager.PlayOneShot(fmodEvent, transform.position);
 
         if (!IsOwner) return;
+
+        // Gatilho EXCLUSIVO para Ultimate Dança das Nove Caudas (Identificada pelos Overrides)
+        if (overrideAttackSpeed.HasValue)
+        {
+            Vector3 randomDir = new Vector3(Random.Range(-1f, 1f), 0f, Random.Range(-1f, 1f)).normalized;
+            JuiceEvents.OnCameraShake?.Invoke(randomDir, ultimateHitShake.amplitude, ultimateHitShake.frequency, ultimateHitShake.duration);
+        }
 
         float currentAngle = overrideAttackAngle ?? currentStats.attackAngle;
         float currentRange = currentStats.attackRange;

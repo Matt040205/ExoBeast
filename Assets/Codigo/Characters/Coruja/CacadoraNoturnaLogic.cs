@@ -20,6 +20,9 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
     public GameObject beamVisualPrefab;
     public float visualDuration = 0.5f;
 
+    [Header("Juice Configs")]
+    [SerializeField] private CameraShakeConfig ultimateShake = new CameraShakeConfig(5f, 5f, 0.6f);
+
     private NetworkVariable<float> netDamage = new NetworkVariable<float>();
     private NetworkVariable<float> netRange = new NetworkVariable<float>();
     private NetworkVariable<float> netWidth = new NetworkVariable<float>();
@@ -113,6 +116,11 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
 
         if (IsClient && beamVisualPrefab != null)
         {
+            if (netCaster.Value.TryGet(out NetworkObject casterNO) && casterNO.IsOwner)
+            {
+                JuiceEvents.OnCameraShake?.Invoke(transform.forward, ultimateShake.amplitude, ultimateShake.frequency, ultimateShake.duration);
+            }
+            
             StartCoroutine(ShowBeamVisual());
         }
     }

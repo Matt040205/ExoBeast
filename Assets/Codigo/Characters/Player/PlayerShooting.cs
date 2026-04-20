@@ -21,6 +21,9 @@ public class PlayerShooting : NetworkBehaviour
     public GameObject impactEffectPrefab;
     public GameObject muzzleFlashPrefab;
 
+    [Header("Juice Configs")]
+    [SerializeField] private CameraShakeConfig empoweredShotShake = new CameraShakeConfig(3f, 0.5f, 0.3f);
+
     [Header("Configurações de IK (Rigging)")]
     public Transform aimTarget;
     public float aimTargetDistance = 20f;
@@ -268,6 +271,11 @@ public class PlayerShooting : NetworkBehaviour
                         damage = CalculateDamage(out isCrit);
 
                     visualScript.Initialize(damage, isCrit, armPen, playerHealth, direction, isEmpoweredBySkill);
+
+                    if (isOwnerShot && tipoDeSom == "Arco" && isEmpoweredBySkill)
+                    {
+                        JuiceEvents.OnCameraShake?.Invoke(-direction, empoweredShotShake.amplitude, empoweredShotShake.frequency, empoweredShotShake.duration);
+                    }
                 }
             }
         }
