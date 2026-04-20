@@ -69,21 +69,21 @@ public class GameDataManager : MonoBehaviour
             Instance = this;
             DontDestroyOnLoad(gameObject);
             
-            // Instancia os SOs Originais para runtime isolada local
             personagensDoJogador.Clear();
+            var seen = new HashSet<string>();
             foreach (var original in bibliotecaOriginalPersonagens)
             {
-                if (original != null)
+                if (original == null) continue;
+                if (!seen.Add(original.name))
                 {
-                    CharacterBase clone = Instantiate(original);
-                    
-                    // Força a limpeza de 'sujeiras' e DESACOPLA o ponteiro da pasta da Engine!
-                    clone.habilidadesDesbloqueadas = new List<string>();
-                    clone.pontosPorCaminho = new List<CaminhoRastrosData>();
-                    clone.pontosRastrosGastos = 0;
-
-                    personagensDoJogador.Add(clone);
+                    Debug.LogWarning($"[GameDataManager] Personagem duplicado ignorado: {original.name}. Remova a entrada extra de 'bibliotecaOriginalPersonagens' no Inspector.");
+                    continue;
                 }
+                CharacterBase clone = Instantiate(original);
+                clone.habilidadesDesbloqueadas = new List<string>();
+                clone.pontosPorCaminho = new List<CaminhoRastrosData>();
+                clone.pontosRastrosGastos = 0;
+                personagensDoJogador.Add(clone);
             }
 
             saveFilePath = Path.Combine(Application.persistentDataPath, "savegame.json");

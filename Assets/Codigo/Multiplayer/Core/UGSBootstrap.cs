@@ -40,12 +40,33 @@ namespace ExoBeasts.Multiplayer.Core
 
             if (!AuthenticationService.Instance.IsSignedIn)
             {
-                var authTask = AuthenticationService.Instance.SignInAnonymouslyAsync();
-                yield return new WaitUntil(() => authTask.IsCompleted);
+                float[] backoff = { 1f, 2f, 4f };
+                bool signed = false;
 
-                if (authTask.IsFaulted)
+                for (int attempt = 0; attempt < backoff.Length; attempt++)
                 {
-                    Debug.LogWarning("[UGSBootstrap] Falha na auth UGS: " + authTask.Exception?.GetBaseException().Message);
+                    if (attempt > 0)
+                    {
+                        Debug.LogWarning($"[UGSBootstrap] Retry auth UGS ({attempt}/{backoff.Length - 1}) em {backoff[attempt - 1]}s...");
+                        yield return new WaitForSeconds(backoff[attempt - 1]);
+                    }
+
+                    var authTask = AuthenticationService.Instance.SignInAnonymouslyAsync();
+                    yield return new WaitUntil(() => authTask.IsCompleted);
+
+                    if (!authTask.IsFaulted)
+                    {
+                        signed = true;
+                        break;
+                    }
+
+                    Debug.LogWarning("[UGSBootstrap] Falha na auth UGS (tentativa " + (attempt + 1) + "): " +
+                                     authTask.Exception?.GetBaseException().Message);
+                }
+
+                if (!signed)
+                {
+                    Debug.LogError("[UGSBootstrap] Auth UGS falhou apos todas as tentativas. Relay indisponivel.");
                     yield break;
                 }
             }
