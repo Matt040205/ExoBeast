@@ -1272,17 +1272,34 @@ namespace ExoBeasts.Multiplayer.Lobby
                 yield break;
             }
 
-            var joinTask = RelayService.Instance.JoinAllocationAsync(joinCode);
-            yield return new WaitUntil(() => joinTask.IsCompleted);
+            JoinAllocation join = null;
+            float[] relayBackoff = { 1f, 2f };
 
-            if (joinTask.IsFaulted)
+            for (int attempt = 0; attempt <= relayBackoff.Length; attempt++)
             {
-                Debug.LogError($"[LobbyManager] JoinAllocationAsync falhou: {joinTask.Exception?.GetBaseException().Message}");
-                OnError?.Invoke("Falha ao entrar na alocacao Relay");
-                yield break;
-            }
+                if (attempt > 0)
+                {
+                    Debug.LogWarning($"[LobbyManager] Relay retry ({attempt}/{relayBackoff.Length}) em {relayBackoff[attempt - 1]}s...");
+                    yield return new WaitForSeconds(relayBackoff[attempt - 1]);
+                }
 
-            JoinAllocation join = joinTask.Result;
+                var joinTask = RelayService.Instance.JoinAllocationAsync(joinCode);
+                yield return new WaitUntil(() => joinTask.IsCompleted);
+
+                if (!joinTask.IsFaulted)
+                {
+                    join = joinTask.Result;
+                    break;
+                }
+
+                Debug.LogError($"[LobbyManager] JoinAllocationAsync falhou (tentativa {attempt + 1}): {joinTask.Exception?.GetBaseException().Message}");
+
+                if (attempt == relayBackoff.Length)
+                {
+                    OnError?.Invoke("Falha ao entrar na alocacao Relay apos todas as tentativas");
+                    yield break;
+                }
+            }
             transport.SetClientRelayData(
                 join.RelayServer.IpV4,
                 (ushort)join.RelayServer.Port,

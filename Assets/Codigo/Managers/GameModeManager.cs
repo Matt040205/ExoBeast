@@ -57,6 +57,11 @@ namespace ExoBeasts.Managers
             SceneManager.LoadScene(lobbyScene);
         }
 
+        public static void ReturnToSingleplayer()
+        {
+            CurrentMode = GameMode.Singleplayer;
+        }
+
         /// <summary>
         /// Auxiliar: verifica se estamos em modo multiplayer com clientes remotos.
         /// Util para decidir se usa NetworkManager.SceneManager ou SceneManager padrao.

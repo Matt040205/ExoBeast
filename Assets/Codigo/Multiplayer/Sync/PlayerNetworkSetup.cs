@@ -47,11 +47,11 @@ namespace ExoBeasts.Multiplayer.Sync
         ///
         /// Retry: NGO nao garante ordem de OnNetworkSpawn entre objetos da cena, entao o
         /// PlayerIdentityBridge pode ainda nao ter sido spawnado quando este jogador inicia.
-        /// Aguarda ate 2s (60 frames a 30 TPS) pelo bridge aparecer. Se falhar, loga erro.
+        /// Aguarda ate 5s pelo bridge aparecer. Se falhar, loga erro.
         /// </summary>
         private IEnumerator RegisterIdentityWithBridgeWhenReady()
         {
-            const float timeoutSeconds = 2f;
+            const float timeoutSeconds = 5f;
             float elapsed = 0f;
 
             while (PlayerIdentityBridge.Instance?.NetworkObject?.IsSpawned != true)
@@ -68,14 +68,14 @@ namespace ExoBeasts.Multiplayer.Sync
                 yield return null;
             }
 
-            string userId = "";
-            string token = "";
+            string userId = EOSAuthenticator.Instance?.CurrentProductUserId ?? "";
+            string token  = SessionManager.Instance?.sessionToken ?? "";
 
-            if (EOSAuthenticator.Instance != null)
-                userId = EOSAuthenticator.Instance.CurrentProductUserId ?? "";
-
-            if (SessionManager.Instance != null)
-                token = SessionManager.Instance.sessionToken ?? "";
+            if (string.IsNullOrEmpty(userId))
+            {
+                Debug.LogWarning("[PlayerNetworkSetup] userId EOS vazio — EOS pode ainda nao ter concluido auth. Identity nao registrada.");
+                yield break;
+            }
 
             PlayerIdentityBridge.Instance.RegisterPlayerServerRpc(userId, token);
         }

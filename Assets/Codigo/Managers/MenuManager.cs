@@ -177,18 +177,16 @@ public class MenuManager : MonoBehaviour
         PauseControl.isPaused = false;
 
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
-        {
             NetworkManager.Singleton.Shutdown();
-        }
 
-        // Se voltar pro Menu, reseta automaticamente qualquer time da partida anterior
         if (nomeDaCena.ToLower().Contains("menu") && GameDataManager.Instance != null)
         {
             GameDataManager.Instance.LimparSelecao();
-            // Salva isso no perfil para não ter conflito se alguém fechar o jogo
-            GameDataManager.Instance.SaveGame(); 
+            GameDataManager.Instance.SaveGame();
+            GameModeManager.ReturnToSingleplayer();
         }
 
-        GameModeManager.LoadSceneSafe(nomeDaCena);
+        // Direto — não usa LoadSceneSafe para evitar race condition com IsListening pós-Shutdown
+        SceneManager.LoadScene(nomeDaCena);
     }
 }

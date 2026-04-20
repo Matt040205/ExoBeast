@@ -199,6 +199,11 @@ public class LobbySceneUI : MonoBehaviour
         WireBtn("BtnSairLobby",   SairDaSala);
         WireBtn("BtnIniciarPartida", IniciarPartida);
 
+        // Voltar ao menu principal (sai da LobbyScene completamente)
+        WireBtn("BtnVoltarMenuPrincipal", IrParaMenuPrincipal);
+        WireBtn("VoltarMenuPrincipal",    IrParaMenuPrincipal);
+        WireBtn("BtnMenu",                IrParaMenuPrincipal);
+
         // Inspector refs diretos
         if (btnLogin != null) { btnLogin.onClick.RemoveAllListeners(); if (btnLogin.onClick.GetPersistentEventCount() == 0) btnLogin.onClick.AddListener(Login); }
         if (iniciarPartidaButton != null) { iniciarPartidaButton.onClick.RemoveAllListeners(); if (iniciarPartidaButton.onClick.GetPersistentEventCount() == 0) iniciarPartidaButton.onClick.AddListener(IniciarPartida); }
@@ -336,9 +341,17 @@ public class LobbySceneUI : MonoBehaviour
     public void AbrirModoHost()    => SetState(State.HostConfig);
     public void VoltarParaMenu()   => SetState(State.LobbyMenu);
 
+    public void IrParaMenuPrincipal()
+    {
+        if (_lobby != null && _lobby.IsInLobby())
+            _lobby.LeaveLobby();
+
+        GameModeManager.ReturnToSingleplayer();
+        UnityEngine.SceneManagement.SceneManager.LoadScene("MenuScene");
+    }
+
     // Navegação Pública para vincular no Inspecionar do Unity
-    public void IrParaCriarLobby() => SetState(State.HostConfig);
-    public void IrParaMenuPrincipal() => SetState(State.LobbyMenu);
+    public void IrParaCriarLobby()     => SetState(State.HostConfig);
     public void IrParaPainelJogadores() => SetState(State.Sala);
 
     // ──────────────────────────────────────────────────────────────────────
