@@ -15767,7 +15767,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -1231, y: -108}
+  m_AnchoredPosition: {x: -1280, y: -108}
   m_SizeDelta: {x: -1419, y: -934.21533}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &284698832
@@ -15790,7 +15790,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Master
+  m_text: Som
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
@@ -16234,9 +16234,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Yes
-
-'
+  m_text: Sim
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
@@ -22681,7 +22679,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Sound
+  m_text: Efeitos
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
@@ -23802,7 +23800,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Do you want to leave?
+  m_text: Quer mesmo sair?
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
@@ -24321,9 +24319,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Quit
-
-'
+  m_text: Sair
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
@@ -30041,7 +30037,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: No
+  m_text: "n\xE3o"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
@@ -35415,7 +35411,7 @@ MonoBehaviour:
   m_HandleRect: {fileID: 1758228610}
   m_Direction: 2
   m_Value: 0
-  m_Size: 1
+  m_Size: 0.8133336
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -36053,7 +36049,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0.000015258789}
+  m_AnchoredPosition: {x: 0, y: 0.000019073486}
   m_SizeDelta: {x: 0, y: 28}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!1 &1618690217
@@ -41260,7 +41256,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Back
+  m_text: Voltar
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
@@ -41396,9 +41392,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Options
-
-'
+  m_text: "Op\xE7\xF5es"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
@@ -41534,9 +41528,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Credits
-
-'
+  m_text: Creditos
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
@@ -46750,7 +46742,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -1231, y: -343}
+  m_AnchoredPosition: {x: -1219, y: -343}
   m_SizeDelta: {x: -1419, y: -934.21533}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1948281576
@@ -46773,9 +46765,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'Music
-
-'
+  m_text: "M\xFAsica"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
@@ -51744,7 +51734,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Back
+  m_text: Voltar
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
@@ -57066,7 +57056,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Multiplayer
+  m_text: Multijogador
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
   m_sharedMaterial: {fileID: -1928636499160523542, guid: 23b10bdce12e5b140b64171995a59c91, type: 2}
