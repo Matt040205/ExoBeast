@@ -57,6 +57,9 @@ public class EnemyController : MonoBehaviour
     private int nivel;
     public EnemyDataSO enemyData { get; private set; }
 
+    private int pathIndex;
+    private bool hasTriggeredHalfway = false;
+
     private bool isRooted = false;
     private bool isSlipping = false;
     private bool isKnockedBack = false;
@@ -76,17 +79,22 @@ public class EnemyController : MonoBehaviour
         currentMoveSpeed = originalMoveSpeed;
     }
 
-    public void InitializeEnemy(Transform initialTarget, List<Transform> points, EnemyDataSO data, int level)
+    public void InitializeEnemy(Transform initialTarget, List<Transform> points, EnemyDataSO data, int level, int assignedPathIndex = 0)
     {
         playerTransform = initialTarget;
         patrolPoints = points;
         enemyData = data;
         nivel = level;
+        pathIndex = assignedPathIndex;
+        hasTriggeredHalfway = false;
         currentPointIndex = 0;
         IsDead = false;
         target = null;
         currentChaseTimer = 0f;
         speedModifier = 1f;
+        
+        // Dispara notificação puramente no Server (notifica o UINotificationManager)
+        EnemyEvents.OnEnemySpawned?.Invoke(pathIndex + 1);
         isRooted = false;
         isSlipping = false;
         isKnockedBack = false;
@@ -245,6 +253,13 @@ public class EnemyController : MonoBehaviour
         Transform waypoint = patrolPoints[currentPointIndex];
         if (waypoint == null) { currentPointIndex++; return; }
 
+        // Notificação de 50% do caminho percorrido (só dispara 1 vez por inimigo)
+        if (!hasTriggeredHalfway && patrolPoints.Count > 0 && currentPointIndex >= patrolPoints.Count / 2)
+        {
+            hasTriggeredHalfway = true;
+            EnemyEvents.OnEnemyHalfway?.Invoke(pathIndex + 1);
+        }
+
         // Usa distância HORIZONTAL (ignora Y) para detectar chegada — evita problemas com altura
         Vector3 flatPos = new Vector3(transform.position.x, 0, transform.position.z);
         Vector3 flatWaypoint = new Vector3(waypoint.position.x, 0, waypoint.position.z);
@@ -305,11 +320,14 @@ public class EnemyController : MonoBehaviour
 
     private void AttackObjectiveAndDie()
     {
-            var objective = ObjectiveHealthSystem.Instance;
+        var objective = ObjectiveHealthSystem.Instance;
         if (objective != null && enemyData != null)
         {
             objective.TakeDamage(enemyData.GetDamage(nivel));
         }
+
+        EnemyEvents.OnEnemyReachedBase?.Invoke();
+
         HandleDeath();
     }
 

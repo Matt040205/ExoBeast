@@ -244,8 +244,8 @@ public class PlayerShooting : NetworkBehaviour
 
             if (muzzleFlashPrefab != null)
             {
-                GameObject flash = Instantiate(muzzleFlashPrefab, firePoint.position, firePoint.rotation, firePoint);
-                Destroy(flash, 1.5f); // Limpeza de segurança
+                GameObject flash = GlobalVFXPool.GetVFX(muzzleFlashPrefab, firePoint.position, firePoint.rotation, 1.5f);
+                flash.transform.SetParent(firePoint);
             }
         }
 
@@ -261,11 +261,13 @@ public class PlayerShooting : NetworkBehaviour
                     bool isCrit = false;
 
                     float armPen = (characterData != null) ? characterData.armorPenetration : 0f;
+                    
+                    bool isEmpoweredBySkill = hasNextShotBonus;
 
                     if (isOwnerShot)
                         damage = CalculateDamage(out isCrit);
 
-                    visualScript.Initialize(damage, isCrit, armPen, playerHealth, direction);
+                    visualScript.Initialize(damage, isCrit, armPen, playerHealth, direction, isEmpoweredBySkill);
                 }
             }
         }

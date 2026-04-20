@@ -286,8 +286,7 @@ public class EnemyHealthSystem : MonoBehaviour
         // Tenta acionar o efeito visual em singleplayer (em multiplayer é feito via RPC)
         if (networkedEnemy == null && deathVfxPrefab != null)
         {
-            var effect = Instantiate(deathVfxPrefab, transform.position, transform.rotation);
-            Destroy(effect, 4f);
+            GlobalVFXPool.GetVFX(deathVfxPrefab, transform.position, transform.rotation, 4f);
         }
     }
 }

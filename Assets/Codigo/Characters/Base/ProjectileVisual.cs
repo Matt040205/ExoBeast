@@ -29,6 +29,8 @@ public class ProjectileVisual : MonoBehaviour
     private Rigidbody rb;
     private bool hasHit;
 
+    private bool isEmpoweredSkill = false;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
@@ -37,13 +39,14 @@ public class ProjectileVisual : MonoBehaviour
         GetComponent<Collider>().isTrigger = true;
     }
 
-    public void Initialize(float damage, bool isCritical, float armorPenetration, PlayerHealthSystem playerHealth, Vector3 direction)
+    public void Initialize(float damage, bool isCritical, float armorPenetration, PlayerHealthSystem playerHealth, Vector3 direction, bool isEmpoweredSkill = false)
     {
         this.damage = damage;
         this.isCritical = isCritical;
         this.armorPenetration = armorPenetration;
         this.playerHealth = playerHealth;
         this.hasHit = false;
+        this.isEmpoweredSkill = isEmpoweredSkill;
 
         rb.linearVelocity = direction * speed;
         CancelInvoke(nameof(ReturnToPool));
@@ -72,6 +75,11 @@ public class ProjectileVisual : MonoBehaviour
         // Dano apenas para o owner (damage > 0 = projetil do jogador local)
         if (damage > 0)
         {
+            if (isEmpoweredSkill && JuiceManager.Instance != null)
+            {
+                JuiceManager.Instance.HitStop(0.08f);
+            }
+
             if (other.TryGetComponent<NetworkObject>(out var enemyNetObj))
             {
                 if (playerHealth != null && playerHealth.IsOwner)

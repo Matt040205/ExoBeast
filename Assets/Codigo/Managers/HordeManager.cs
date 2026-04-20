@@ -369,7 +369,7 @@ public class HordeManager : NetworkBehaviour
             if (enemyController != null)
             {
                 Transform target = GetRandomPlayerTarget();
-                enemyController.InitializeEnemy(target, selectedPath.patrolPoints, enemyData, CurrentHorde);
+                enemyController.InitializeEnemy(target, selectedPath.patrolPoints, enemyData, CurrentHorde, pathIndex);
             }
         }
     }

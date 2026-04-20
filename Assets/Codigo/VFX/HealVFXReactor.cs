@@ -151,22 +151,20 @@ public class HealVFXReactor : NetworkBehaviour
             return;
         }
 
-        // Fallback: instanciação direta
-        // Substituir por: GameObject instance = MyPoolManager.Instance.Get(healAuraPrefab);
-        GameObject auraInstance = Instantiate(healAuraPrefab);
+        // Usa a nova infraestrutura global para não gerar Garbage
+        GameObject auraInstance = GlobalVFXPool.GetVFX(healAuraPrefab, vfxAttachPoint.position, vfxAttachPoint.rotation);
 
         PooledHealAuraVisuals auraVisuals = auraInstance.GetComponent<PooledHealAuraVisuals>();
 
         if (auraVisuals == null)
         {
             Debug.LogError("[HealVFXReactor] O Prefab HealAura não possui PooledHealAuraVisuals!");
-            Destroy(auraInstance);
+            GlobalVFXPool.ReleaseVFX(healAuraPrefab, auraInstance);
             return;
         }
 
         // Callback invocado quando a duração do efeito termina
-        // Substituir Destroy por: MyPoolManager.Instance.Return(go);
-        auraVisuals.OnReturnToPool = (go) => Destroy(go);
+        auraVisuals.OnReturnToPool = (go) => GlobalVFXPool.ReleaseVFX(healAuraPrefab, go);
 
         // Ativa parenteando ao attach point deste jogador
         auraVisuals.OnSpawnFromPool(vfxAttachPoint, healAuraDuration);

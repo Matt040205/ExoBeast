@@ -165,6 +165,7 @@ public class MeleeCombatSystem : NetworkBehaviour
                         // Chamamos o RPC descentralizado direto do inimigo.
                         // O NGO irá encapsular nosso ID (1, 2, etc.) automaticamente na chegada ao servidor.
                         networkedEnemy.TakeDamageServerRpc(finalDamage, armorPen, isCrit);
+                        if (JuiceManager.Instance != null) JuiceManager.Instance.HitStop(0.05f);
                     }
                 }
             }
