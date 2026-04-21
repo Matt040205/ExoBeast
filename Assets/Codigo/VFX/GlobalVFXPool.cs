@@ -54,8 +54,19 @@ public class GlobalVFXPool : MonoBehaviour
                     go.transform.rotation = rotation;
                     go.SetActive(true);
                     
-                    var ps = go.GetComponent<ParticleSystem>();
-                    if (ps != null) ps.Play(true);
+                    // Varredura à prova de balas para Particle Systems (Pai e Filhos)
+                    var particleSystems = go.GetComponentsInChildren<ParticleSystem>(true);
+                    foreach (var ps in particleSystems)
+                    {
+                        ps.Play(true);
+                    }
+                    
+                    // Varredura para Visual Effect Graph (Pai e Filhos)
+                    var vfxGraphs = go.GetComponentsInChildren<UnityEngine.VFX.VisualEffect>(true);
+                    foreach (var vfx in vfxGraphs)
+                    {
+                        vfx.Play();
+                    }
                 },
                 actionOnRelease: (go) => {
                     go.SetActive(false);

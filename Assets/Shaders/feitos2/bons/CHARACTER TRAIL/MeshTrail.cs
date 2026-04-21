@@ -1,103 +1,116 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class MeshTrail : MonoBehaviour
 {
-    [Header("Tempo de AtivaÁ„o do Dash")]
-    public float activeTime = 0.3f;
-
-    [Header("ConfiguraÁıes do Mesh")]
-    public float meshRefreshRate = 0.05f;
+    [Header("Configura√ß√µes do Mesh")]
     public float meshDestroyDelay = 2f;
-    public Transform positionToSpawn;
 
-    [Header("ConfiguraÁıes do Shader")]
+    [Header("Configura√ß√µes do Shader (Shader Graph)")]
     public Material mat;
     public string shaderVarRef = "_Alpha";
     public float shaderVarRate = 0.1f;
     public float shaderVarRefreshRate = 0.05f;
 
-    private bool isTrailActive;
     private SkinnedMeshRenderer[] skinnedMeshRenderers;
+    private Queue<GameObject> ghostPool = new Queue<GameObject>();
 
     void Start()
     {
-        if (positionToSpawn == null)
+        skinnedMeshRenderers = GetComponentsInChildren<SkinnedMeshRenderer>();
+        if (skinnedMeshRenderers.Length == 0)
         {
-            positionToSpawn = this.transform;
+            Debug.LogWarning("ALERTA: O MeshTrail n√£o encontrou nenhum 'SkinnedMeshRenderer' nos filhos!");
         }
     }
 
-    // FunÁ„o que È ativada pelo script de Movimento (TPSMovementAndCamera)
-    public void TriggerTrail()
+    /// <summary>
+    /// Faz o Bake da malha na posi√ß√£o e rota√ß√£o solicitadas e aplica o efeito de ghosting.
+    /// </summary>
+    public void SpawnGhostAt(Vector3 position, Quaternion rotation, Transform modelPivot)
     {
-        if (!isTrailActive)
+        if (skinnedMeshRenderers == null || skinnedMeshRenderers.Length == 0) return;
+
+        for (int i = 0; i < skinnedMeshRenderers.Length; i++)
         {
-            isTrailActive = true;
-            StartCoroutine(ActivateTrail(activeTime));
+            GameObject gObj = GetFromPool();
+            
+            // A malha gerada em BakeMesh √© baseada no espa√ßo local do SkinnedMeshRenderer atual.
+            // Posicionamos o clone no novo ponto calculado.
+            gObj.transform.SetPositionAndRotation(position, rotation);
+
+            MeshRenderer mr = gObj.GetComponent<MeshRenderer>();
+            MeshFilter mf = gObj.GetComponent<MeshFilter>();
+
+            Mesh mesh = new Mesh();
+            skinnedMeshRenderers[i].BakeMesh(mesh);
+            mf.mesh = mesh;
+
+            if (mat != null)
+            {
+                // Instancia o material (clone) para que a anima√ß√£o de um ghost n√£o afete os outros
+                mr.material = new Material(mat);
+                StartCoroutine(AnimateMaterialFloat(mr.material, 0f, shaderVarRate, shaderVarRefreshRate, gObj));
+            }
+            else
+            {
+                Debug.LogWarning("ALERTA: Nenhum material associado no script MeshTrail!");
+                ReturnToPool(gObj, meshDestroyDelay);
+            }
         }
     }
 
-    IEnumerator ActivateTrail(float timeActive)
+    private GameObject GetFromPool()
     {
-        while (timeActive > 0)
+        if (ghostPool.Count > 0)
         {
-            timeActive -= meshRefreshRate;
-
-            if (skinnedMeshRenderers == null || skinnedMeshRenderers.Length == 0)
-            {
-                skinnedMeshRenderers = GetComponentsInChildren<SkinnedMeshRenderer>();
-
-                // SISTEMA DE AVISO: Se n„o encontrar o modelo 3D, avisa no Console
-                if (skinnedMeshRenderers.Length == 0)
-                {
-                    Debug.LogWarning("ALERTA: O MeshTrail n„o encontrou nenhum 'SkinnedMeshRenderer' nos filhos! VocÍ est· testando com uma C·psula do Unity? O efeito precisa da malha 3D real da sua personagem para funcionar.");
-                }
-            }
-
-            for (int i = 0; i < skinnedMeshRenderers.Length; i++)
-            {
-                // Cria o Clone
-                GameObject gObj = new GameObject("TrailMesh");
-                gObj.transform.SetPositionAndRotation(positionToSpawn.position, positionToSpawn.rotation);
-
-                MeshRenderer mr = gObj.AddComponent<MeshRenderer>();
-                MeshFilter mf = gObj.AddComponent<MeshFilter>();
-
-                Mesh mesh = new Mesh();
-                skinnedMeshRenderers[i].BakeMesh(mesh);
-                mf.mesh = mesh;
-
-                // Aplica o material do Shader Graph
-                if (mat != null)
-                {
-                    mr.material = mat;
-                    StartCoroutine(AnimateMaterialFloat(mr.material, 0f, shaderVarRate, shaderVarRefreshRate));
-                }
-                else
-                {
-                    Debug.LogWarning("ALERTA: Nenhum material associado no script MeshTrail!");
-                }
-
-                Destroy(gObj, meshDestroyDelay);
-            }
-
-            yield return new WaitForSeconds(meshRefreshRate);
+            GameObject obj = ghostPool.Dequeue();
+            obj.SetActive(true);
+            return obj;
         }
 
-        isTrailActive = false;
+        GameObject gObj = new GameObject("TrailMeshGhost");
+        gObj.AddComponent<MeshRenderer>();
+        gObj.AddComponent<MeshFilter>();
+        return gObj;
     }
 
-    IEnumerator AnimateMaterialFloat(Material material, float goal, float rate, float refreshRate)
+    private void ReturnToPool(GameObject gObj, float delay)
+    {
+        StartCoroutine(ReturnToPoolCoroutine(gObj, delay));
+    }
+
+    private IEnumerator ReturnToPoolCoroutine(GameObject gObj, float delay)
+    {
+        if (delay > 0) yield return new WaitForSeconds(delay);
+        
+        gObj.SetActive(false);
+        
+        MeshFilter mf = gObj.GetComponent<MeshFilter>();
+        if (mf != null && mf.mesh != null)
+        {
+            // Limpa a malha da mem√≥ria para evitar Memory Leak massivo (GC)
+            Destroy(mf.mesh); 
+            mf.mesh = null;
+        }
+
+        MeshRenderer mr = gObj.GetComponent<MeshRenderer>();
+        if (mr != null && mr.material != null)
+        {
+            // Destroi a inst√¢ncia do material tamb√©m
+            Destroy(mr.material);
+        }
+        
+        ghostPool.Enqueue(gObj);
+    }
+
+    IEnumerator AnimateMaterialFloat(Material material, float goal, float rate, float refreshRate, GameObject gObj)
     {
         float valueToAnimate = 1f;
         if (material.HasProperty(shaderVarRef))
         {
             valueToAnimate = material.GetFloat(shaderVarRef);
-        }
-        else
-        {
-            Debug.LogWarning("ALERTA: O material n„o tem a propriedade " + shaderVarRef + ". Veja se escreveu certo no Shader Graph!");
         }
 
         while (valueToAnimate > goal)
@@ -106,5 +119,13 @@ public class MeshTrail : MonoBehaviour
             material.SetFloat(shaderVarRef, valueToAnimate);
             yield return new WaitForSeconds(refreshRate);
         }
+        
+        ReturnToPool(gObj, 0f);
+    }
+
+    [System.Obsolete("TriggerTrail is deprecated. Use SpawnGhostAt for precise distance-based clones.")]
+    public void TriggerTrail()
+    {
+        Debug.LogWarning("MeshTrail.TriggerTrail() foi chamado por um script antigo, mas este m√©todo est√° obsoleto e foi desativado em favor do SpawnGhostAt.");
     }
 }

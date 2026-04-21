@@ -22,6 +22,9 @@ public class VooGraciosoLogic : NetworkBehaviour
     private NetworkVariable<float> netBonusDamage = new NetworkVariable<float>();
     private NetworkVariable<float> netBonusRadius = new NetworkVariable<float>();
 
+    [Header("VFX")]
+    [SerializeField] private GameObject hoverVfxPrefab;
+
     private PlayerMovement playerMovement;
     private PlayerShooting playerShooting;
 
@@ -45,13 +48,50 @@ public class VooGraciosoLogic : NetworkBehaviour
     public void StartEffect(GameObject quemUsou, float jumpHeightModifier, float staticAimDuration,
         float bonusDamage, float bonusRadius, CommanderAbilityController controller, Ability ability)
     {
-        if (!IsServer) return;
+        // Lógica Zero-Latency: O dono já toca o efeito imediatamente
+        if (IsOwner && hoverVfxPrefab != null)
+        {
+            GlobalVFXPool.GetVFX(hoverVfxPrefab, transform.position, transform.rotation, 2f);
+        }
 
+        // Se for servidor, aplica estado e faz o broadcast do VFX
+        if (IsServer)
+        {
+            ApplyEffectServer(jumpHeightModifier, staticAimDuration, bonusDamage, bonusRadius);
+            PlayHoverVfxClientRpc();
+        }
+        else
+        {
+            // Se for cliente, solicita ao servidor
+            RequestStartEffectServerRpc(jumpHeightModifier, staticAimDuration, bonusDamage, bonusRadius);
+        }
+    }
+
+    [ServerRpc]
+    private void RequestStartEffectServerRpc(float jumpHeightModifier, float staticAimDuration, float bonusDamage, float bonusRadius)
+    {
+        ApplyEffectServer(jumpHeightModifier, staticAimDuration, bonusDamage, bonusRadius);
+        PlayHoverVfxClientRpc();
+    }
+
+    private void ApplyEffectServer(float jumpHeightModifier, float staticAimDuration, float bonusDamage, float bonusRadius)
+    {
         netJumpHeightModifier.Value = jumpHeightModifier;
         netStaticAimDuration.Value = staticAimDuration;
         netBonusDamage.Value = bonusDamage;
         netBonusRadius.Value = bonusRadius;
         netIsActive.Value = true;
+    }
+
+    [ClientRpc]
+    private void PlayHoverVfxClientRpc()
+    {
+        if (IsOwner) return; // O dono já instanciou localmente com zero latency
+
+        if (hoverVfxPrefab != null)
+        {
+            GlobalVFXPool.GetVFX(hoverVfxPrefab, transform.position, transform.rotation, 2f);
+        }
     }
 
     private void OnActiveChanged(bool oldVal, bool newVal)

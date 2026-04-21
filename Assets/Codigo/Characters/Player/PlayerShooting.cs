@@ -21,6 +21,10 @@ public class PlayerShooting : NetworkBehaviour
     public GameObject impactEffectPrefab;
     public GameObject muzzleFlashPrefab;
 
+    [Header("Explosão em Área (Coruja)")]
+    public GameObject explosionVfxPrefab;
+    public string explosionVfxRadiusParam = "Radius";
+
     [Header("Juice Configs")]
     [SerializeField] private CameraShakeConfig empoweredShotShake = new CameraShakeConfig(3f, 0.5f, 0.3f);
 
@@ -266,11 +270,12 @@ public class PlayerShooting : NetworkBehaviour
                     float armPen = (characterData != null) ? characterData.armorPenetration : 0f;
                     
                     bool isEmpoweredBySkill = hasNextShotBonus;
+                    float explosionRadius = 0f;
 
                     if (isOwnerShot)
-                        damage = CalculateDamage(out isCrit);
+                        damage = CalculateDamage(out isCrit, out explosionRadius);
 
-                    visualScript.Initialize(damage, isCrit, armPen, playerHealth, direction, isEmpoweredBySkill);
+                    visualScript.Initialize(damage, isCrit, armPen, playerHealth, direction, isEmpoweredBySkill, explosionRadius);
 
                     if (isOwnerShot && tipoDeSom == "Arco" && isEmpoweredBySkill)
                     {
@@ -295,10 +300,11 @@ public class PlayerShooting : NetworkBehaviour
             RuntimeManager.PlayOneShot(eventToPlay, transform.position);
     }
 
-    float CalculateDamage(out bool isCritical)
+    float CalculateDamage(out bool isCritical, out float areaRadius)
     {
         float finalDamage = (characterData != null) ? characterData.damage : 10f;
         isCritical = false;
+        areaRadius = 0f;
 
         if (characterData != null && Random.value <= characterData.critChance)
         {
@@ -311,6 +317,7 @@ public class PlayerShooting : NetworkBehaviour
         if (hasNextShotBonus)
         {
             finalDamage *= nextShotDamageBonus;
+            areaRadius = nextShotAreaBonus;
             hasNextShotBonus = false;
             nextShotDamageBonus = 1f;
             nextShotAreaBonus = 1f;
@@ -393,5 +400,44 @@ public class PlayerShooting : NetworkBehaviour
         if (!isReloading) return 0;
         float relSpeed = (characterData != null) ? characterData.reloadSpeed : 2f;
         return relSpeed - (Time.time - reloadStartTime);
+    }
+
+    public void RequestExplosionVfx(Vector3 position, float radius)
+    {
+        if (IsOwner)
+        {
+            PlayExplosionLocal(position, radius);
+            RequestExplosionVfxServerRpc(position, radius);
+        }
+    }
+
+    [ServerRpc]
+    private void RequestExplosionVfxServerRpc(Vector3 position, float radius)
+    {
+        PlayExplosionVfxClientRpc(position, radius);
+    }
+
+    [ClientRpc]
+    private void PlayExplosionVfxClientRpc(Vector3 position, float radius)
+    {
+        if (IsOwner) return;
+        PlayExplosionLocal(position, radius);
+    }
+
+    private void PlayExplosionLocal(Vector3 position, float radius)
+    {
+        if (explosionVfxPrefab != null)
+        {
+            GameObject vfx = GlobalVFXPool.GetVFX(explosionVfxPrefab, position, Quaternion.identity, 3f);
+            var vfxGraph = vfx.GetComponent<UnityEngine.VFX.VisualEffect>();
+            if (vfxGraph != null && vfxGraph.HasFloat(explosionVfxRadiusParam))
+            {
+                vfxGraph.SetFloat(explosionVfxRadiusParam, radius);
+            }
+            else
+            {
+                vfx.transform.localScale = Vector3.one * radius;
+            }
+        }
     }
 }

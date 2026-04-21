@@ -1774,6 +1774,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4637083416764844696773a3cdc57357, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  dashShake:
+    amplitude: 1.5
+    frequency: 10
+    duration: 0.15
+  trailVfxPrefab: {fileID: 0}
+  trailSpacing: 1.5
+  trailDuration: 2
 --- !u!114 &1494149449045411526
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1838,7 +1845,7 @@ MonoBehaviour:
   activeTime: 0.3
   meshRefreshRate: 0.05
   meshDestroyDelay: 2
-  positionToSpawn: {fileID: 1196633011986905671}
+  positionToSpawn: {fileID: 6906416966143403624}
   mat: {fileID: 2100000, guid: 6c8f99907bbca27468fdaabf2ee7bfdf, type: 2}
   shaderVarRef: _Alpha
   shaderVarRate: 0.1

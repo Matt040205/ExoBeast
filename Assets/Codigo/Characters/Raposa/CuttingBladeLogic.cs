@@ -28,6 +28,12 @@ public class CuttingBladeLogic : NetworkBehaviour
     [Header("Juice Configs")]
     [SerializeField] private CameraShakeConfig dashShake = new CameraShakeConfig(1.5f, 10f, 0.15f);
 
+    [Header("Rastro do Dash (Mesh Baking)")]
+    [SerializeField] private float trailSpacing = 1.5f;
+
+    [Header("Hit VFX (Star Guardians)")]
+    [SerializeField] private GameObject personalHitVfxPrefab;
+
     private PlayerMovement playerMovement;
 
     public void StartDash(GameObject quemUsou, CharacterController cont, Transform pivot, float dist, float dmg, string som, CommanderAbilityController abCont, Ability ability, bool resetOnKill)
@@ -84,7 +90,8 @@ public class CuttingBladeLogic : NetworkBehaviour
 
         MeshTrail trail = quemUsou.GetComponent<MeshTrail>();
         if (trail == null) trail = quemUsou.GetComponentInChildren<MeshTrail>();
-        if (trail != null) trail.TriggerTrail();
+        // O trigger antigo (via tempo) foi removido do MeshTrail, 
+        // agora o trail será criado via interpolação de pontos mais abaixo.
 
         if (!string.IsNullOrEmpty(eventoDash))
         {
@@ -117,6 +124,35 @@ public class CuttingBladeLogic : NetworkBehaviour
         if (Physics.Raycast(targetPosition + Vector3.up * 0.5f, Vector3.down, out groundHit, 5f, groundMask))
         {
             finalPosition = groundHit.point + (Vector3.up * (controller.height / 2f));
+        }
+
+        // Owner já cria os rastros localmente instantaneamente
+        SpawnTrailAlongPath(startPosition, finalPosition);
+
+        // HIT VFX PERSONALIZADO (ZERO LATENCY LOCAL PARA O DONO)
+        if (IsOwner && personalHitVfxPrefab != null)
+        {
+            float actualDist = Vector3.Distance(startPosition, finalPosition);
+            Vector3 dashDir = (finalPosition - startPosition).normalized;
+            if (actualDist < 0.1f) dashDir = transform.forward;
+            
+            RaycastHit[] localHits = Physics.SphereCastAll(startPosition, 2f, dashDir, actualDist);
+            List<EnemyHealthSystem> enemiesHitLocal = new List<EnemyHealthSystem>();
+            
+            foreach (var hit in localHits)
+            {
+                EnemyHealthSystem vidaInimigo = hit.collider.GetComponent<EnemyHealthSystem>();
+                if (vidaInimigo != null && !enemiesHitLocal.Contains(vidaInimigo))
+                {
+                    enemiesHitLocal.Add(vidaInimigo);
+                    Vector3 contactPoint = hit.point != Vector3.zero ? hit.point : hit.collider.ClosestPoint(transform.position);
+                    Vector3 normal = hit.normal != Vector3.zero ? hit.normal : (transform.position - contactPoint).normalized;
+                    Quaternion hitRot = normal != Vector3.zero ? Quaternion.LookRotation(normal) : Quaternion.identity;
+                    
+                    GlobalVFXPool.GetVFX(personalHitVfxPrefab, contactPoint, hitRot, 2f);
+                    RequestMeleeHitVfxServerRpc(contactPoint, hitRot);
+                }
+            }
         }
 
         transform.position = finalPosition;
@@ -171,6 +207,8 @@ public class CuttingBladeLogic : NetworkBehaviour
         {
             NotifyResetCooldownClientRpc();
         }
+
+        BroadcastTrailExplosionClientRpc(start, end);
     }
 
     [ClientRpc]
@@ -179,6 +217,52 @@ public class CuttingBladeLogic : NetworkBehaviour
         if (IsOwner && abilityController != null)
         {
             abilityController.ResetCooldown(sourceAbility);
+        }
+    }
+
+    [ClientRpc]
+    private void BroadcastTrailExplosionClientRpc(Vector3 start, Vector3 end)
+    {
+        if (IsOwner) return; // O dono já processou localmente
+        SpawnTrailAlongPath(start, end);
+    }
+
+    private void SpawnTrailAlongPath(Vector3 startPos, Vector3 endPos)
+    {
+        MeshTrail trailManager = GetComponent<MeshTrail>();
+        if (trailManager == null) trailManager = GetComponentInChildren<MeshTrail>();
+        if (trailManager == null) return;
+
+        float distance = Vector3.Distance(startPos, endPos);
+        if (distance < 0.1f) return;
+
+        int cloneCount = Mathf.Max(1, Mathf.FloorToInt(distance / trailSpacing));
+        Vector3 direction = (endPos - startPos).normalized;
+        Quaternion rotation = direction != Vector3.zero ? Quaternion.LookRotation(direction) : transform.rotation;
+
+        for (int i = 1; i <= cloneCount; i++)
+        {
+            float t = (float)i / cloneCount;
+            Vector3 spawnPos = Vector3.Lerp(startPos, endPos, t);
+            
+            // Faz o Bake Mesh em cada ponto espalhado, usando o modelPivot do owner como referência de malha
+            trailManager.SpawnGhostAt(spawnPos, rotation, modelPivot);
+        }
+    }
+
+    [ServerRpc]
+    private void RequestMeleeHitVfxServerRpc(Vector3 position, Quaternion rotation)
+    {
+        PlayMeleeHitVfxClientRpc(position, rotation);
+    }
+
+    [ClientRpc]
+    private void PlayMeleeHitVfxClientRpc(Vector3 position, Quaternion rotation)
+    {
+        if (IsOwner) return; // O dono já tocou instantaneamente
+        if (personalHitVfxPrefab != null)
+        {
+            GlobalVFXPool.GetVFX(personalHitVfxPrefab, position, rotation, 2f);
         }
     }
 }
