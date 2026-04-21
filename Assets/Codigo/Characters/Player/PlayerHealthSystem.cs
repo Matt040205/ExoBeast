@@ -36,6 +36,13 @@ public class PlayerHealthSystem : NetworkBehaviour
     [Header("Configuração de Respawn")]
     public string respawnPointNameOrTag = "RespawnPoint";
 
+    [Header("Materialização (Spawn)")]
+    [SerializeField] private float tempoDeSpawn = 2f;
+    [SerializeField] private Material materialHolograma;
+    [SerializeField] private Material materialToon;
+    [SerializeField] private Material materialOutline;
+
+
     public event Action OnHealthChanged;
     public event Action<float> OnDamageDealt;
 
@@ -63,6 +70,9 @@ public class PlayerHealthSystem : NetworkBehaviour
         {
             StartCoroutine(WaitAndRegisterHUD());
         }
+
+        // Inicia o fluxo de materialização ao spawnar pela primeira vez
+        StartCoroutine(SpawnMaterializationFlow());
     }
 
     private IEnumerator WaitAndRegisterHUD()
@@ -237,31 +247,91 @@ public class PlayerHealthSystem : NetworkBehaviour
     {
         if (IsOwner)
         {
-            CharacterController controller = GetComponent<CharacterController>();
-            MonoBehaviour movementScript = GetComponent("PlayerMovement") as MonoBehaviour;
+            transform.position = spawnPosition;
+            Physics.SyncTransforms(); // Sincroniza a física imediatamente para o teleporte
+        }
+
+        StartCoroutine(SpawnMaterializationFlow());
+    }
+
+    private IEnumerator SpawnMaterializationFlow()
+    {
+        // Passo A: Bloqueio
+        CharacterController controller = null;
+        MonoBehaviour movementScript = null;
+        MonoBehaviour shootingScript = null;
+        MonoBehaviour combatScript = null;
+
+        if (IsOwner)
+        {
+            controller = GetComponent<CharacterController>();
+            movementScript = GetComponent("PlayerMovement") as MonoBehaviour;
+            shootingScript = GetComponent("PlayerShooting") as MonoBehaviour;
+            combatScript = GetComponent("PlayerCombatManager") as MonoBehaviour;
 
             if (controller != null) controller.enabled = false;
             if (movementScript != null) movementScript.enabled = false;
-
-            transform.position = spawnPosition;
-
-            StartCoroutine(ReactivatePlayer(controller, movementScript));
+            if (shootingScript != null) shootingScript.enabled = false;
+            if (combatScript != null) combatScript.enabled = false;
         }
 
-        // Efeito visual de respawn para todos
-        PlayRespawnEffect();
-    }
+        Renderer[] allRenderers = GetComponentsInChildren<Renderer>();
+        System.Collections.Generic.List<Renderer> targetRenderers = new System.Collections.Generic.List<Renderer>();
+        foreach (Renderer r in allRenderers)
+        {
+            if (r is MeshRenderer || r is SkinnedMeshRenderer)
+            {
+                targetRenderers.Add(r);
+            }
+        }
 
-    private IEnumerator ReactivatePlayer(CharacterController controller, MonoBehaviour movementScript)
-    {
-        yield return null; // Esperar um frame para o teleporte ser processado pela engine de física
-        if (controller != null) controller.enabled = true;
-        if (movementScript != null) movementScript.enabled = true;
-    }
+        // Passo B: Textura Inicial (Holograma)
+        if (materialHolograma != null)
+        {
+            foreach (Renderer r in targetRenderers)
+            {
+                r.material = materialHolograma;
+            }
+        }
 
-    private void PlayRespawnEffect()
-    {
-        // TODO: Implementar ou chamar efeito visual/sonoro de respawn
+        // Passo C e D: Animação do Shader pelo tempoDeSpawn
+        float elapsedTime = 0f;
+        while (elapsedTime < tempoDeSpawn)
+        {
+            elapsedTime += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsedTime / tempoDeSpawn);
+            
+            if (materialHolograma != null)
+            {
+                foreach (Renderer r in targetRenderers)
+                {
+                    if (r.material.HasProperty("Proguesso_Holograma"))
+                    {
+                        r.material.SetFloat("Proguesso_Holograma", progress);
+                    }
+                }
+            }
+            yield return null;
+        }
+
+        // Passo E: Materiais Finais
+        if (materialToon != null && materialOutline != null)
+        {
+            Material[] finalMaterials = new Material[] { materialToon, materialOutline };
+            foreach (Renderer r in targetRenderers)
+            {
+                r.materials = finalMaterials;
+            }
+        }
+
+        // Passo F: Liberação
+        if (IsOwner)
+        {
+            if (controller != null) controller.enabled = true;
+            if (movementScript != null) movementScript.enabled = true;
+            if (shootingScript != null) shootingScript.enabled = true;
+            if (combatScript != null) combatScript.enabled = true;
+        }
     }
 
     void NotifyHealthChanged()
