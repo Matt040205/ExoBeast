@@ -10,6 +10,13 @@ public class TowerController : MonoBehaviour
     public Transform partToRotate;
     public Transform firePoint;
 
+    [Header("Materialização (Spawn)")]
+    [SerializeField] private float tempoDeSpawn = 2f;
+    [SerializeField] private Material materialHolograma;
+    [SerializeField] private Material materialToon;
+    [SerializeField] private Material materialOutline;
+    private bool isMaterializing = false;
+
     [Header("Visual e Animação")]
     public Animator animator;
     public string shootTrigger = "Attack";
@@ -65,6 +72,8 @@ public class TowerController : MonoBehaviour
 
         CloneBaseStats();
         SetupTowerMode();
+
+        StartCoroutine(SpawnMaterializationFlow());
 
         // Removemos UpdateAbilities do Start pois os níveis começam zerados ou definidos pelo AbilitySystem
         InvokeRepeating("UpdateTarget", 0f, 0.5f);
@@ -172,6 +181,7 @@ public class TowerController : MonoBehaviour
     void Update()
     {
         if (IsDestroyed) return;
+        if (isMaterializing) return;
         if (targetEnemy == null) return;
 
         if (partToRotate != null) RotateTowardsTarget();
@@ -186,6 +196,7 @@ public class TowerController : MonoBehaviour
 
     public void Shoot()
     {
+        if (isMaterializing) return;
         if (targetEnemy == null) return;
         if (animator != null) animator.SetTrigger(shootTrigger);
 
@@ -401,6 +412,66 @@ public class TowerController : MonoBehaviour
         {
             r.enabled = true;
         }
+
+        StartCoroutine(SpawnMaterializationFlow());
+    }
+
+    private System.Collections.IEnumerator SpawnMaterializationFlow()
+    {
+        // Passo A: Bloqueio
+        isMaterializing = true;
+        
+        Renderer[] allRenderers = GetComponentsInChildren<Renderer>();
+        System.Collections.Generic.List<Renderer> targetRenderers = new System.Collections.Generic.List<Renderer>();
+        foreach (Renderer r in allRenderers)
+        {
+            if (r is MeshRenderer || r is SkinnedMeshRenderer)
+            {
+                targetRenderers.Add(r);
+            }
+        }
+
+        // Passo B: Textura Inicial (Holograma)
+        if (materialHolograma != null)
+        {
+            foreach (Renderer r in targetRenderers)
+            {
+                r.material = materialHolograma;
+            }
+        }
+
+        // Passo C e D: Animação do Shader
+        float elapsedTime = 0f;
+        while (elapsedTime < tempoDeSpawn)
+        {
+            elapsedTime += Time.deltaTime;
+            float progress = Mathf.Clamp01(elapsedTime / tempoDeSpawn);
+            
+            if (materialHolograma != null)
+            {
+                foreach (Renderer r in targetRenderers)
+                {
+                    if (r.material.HasProperty("Proguesso_Holograma"))
+                    {
+                        r.material.SetFloat("Proguesso_Holograma", progress);
+                    }
+                }
+            }
+            yield return null;
+        }
+
+        // Passo E: Materiais Finais
+        if (materialToon != null && materialOutline != null)
+        {
+            Material[] finalMaterials = new Material[] { materialToon, materialOutline };
+            foreach (Renderer r in targetRenderers)
+            {
+                r.materials = finalMaterials;
+            }
+        }
+
+        // Passo F: Liberação
+        isMaterializing = false;
     }
 
     public void Heal(float amount) { currentHealth = Mathf.Min(currentHealth + amount, MaxHealth); }

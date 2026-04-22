@@ -76,6 +76,10 @@ PrefabInstance:
       propertyPath: gravity
       value: -19
       objectReference: {fileID: 0}
+    - target: {fileID: 573096255506189436, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: doubleJumpVfxPrefab
+      value: 
+      objectReference: {fileID: 2008336969228493346, guid: 899d7c91f4a77144fbdf40126bdf07e9, type: 3}
     - target: {fileID: 702061340975147476, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_LocalPosition.x
       value: -17.792665
@@ -157,9 +161,21 @@ PrefabInstance:
       value: 0.333333
       objectReference: {fileID: 0}
     - target: {fileID: 6330410534027532317, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: materialToon
+      value: 
+      objectReference: {fileID: -876546973899608171, guid: 6dcd50ea42bec0c4e9ab7821d6da8a88, type: 3}
+    - target: {fileID: 6330410534027532317, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: characterData
       value: 
       objectReference: {fileID: 11400000, guid: 8eb457e248c385043bf118efaf313b53, type: 2}
+    - target: {fileID: 6330410534027532317, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: materialOutline
+      value: 
+      objectReference: {fileID: 2100000, guid: d3b79392956344f47ba80efa321e08f1, type: 2}
+    - target: {fileID: 6330410534027532317, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: materialHolograma
+      value: 
+      objectReference: {fileID: 2100000, guid: 1887a21d31dc40a45b3ccb1841ba2a58, type: 2}
     - target: {fileID: 6472170318049487491, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: characterData
       value: 
@@ -192,6 +208,10 @@ PrefabInstance:
       propertyPath: m_Enabled
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 8436099783770465690, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: hoverVfxPrefab
+      value: 
+      objectReference: {fileID: 2008336969228493346, guid: 899d7c91f4a77144fbdf40126bdf07e9, type: 3}
     - target: {fileID: 9215532886368702831, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: maxAmmo
       value: 1
@@ -204,6 +224,18 @@ PrefabInstance:
       propertyPath: characterData
       value: 
       objectReference: {fileID: 11400000, guid: 8eb457e248c385043bf118efaf313b53, type: 2}
+    - target: {fileID: 9215532886368702831, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: muzzleFlashPrefab
+      value: 
+      objectReference: {fileID: 6167272043592031732, guid: 728133d728c20344fbdfdb8ae4d92a01, type: 3}
+    - target: {fileID: 9215532886368702831, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: explosionVfxPrefab
+      value: 
+      objectReference: {fileID: 638015858379974017, guid: 8bfaa9f858fd232499d671cd9434d61f, type: 3}
+    - target: {fileID: 9215532886368702831, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: impactEffectPrefab
+      value: 
+      objectReference: {fileID: 6306164957944565938, guid: b7dda20ef3905f244a40caa9995854f5, type: 3}
     - target: {fileID: 9215532886368702831, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: projectileVisualPrefab
       value: 
@@ -239,7 +271,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 373271110
+  GlobalObjectIdHash: 2978116185
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1

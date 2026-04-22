@@ -29,6 +29,9 @@ public class ProjectileVisual : MonoBehaviour
     private Rigidbody rb;
     private bool hasHit;
 
+    private bool isEmpoweredSkill = false;
+    private float explosionRadius = 0f;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
@@ -37,13 +40,15 @@ public class ProjectileVisual : MonoBehaviour
         GetComponent<Collider>().isTrigger = true;
     }
 
-    public void Initialize(float damage, bool isCritical, float armorPenetration, PlayerHealthSystem playerHealth, Vector3 direction)
+    public void Initialize(float damage, bool isCritical, float armorPenetration, PlayerHealthSystem playerHealth, Vector3 direction, bool isEmpoweredSkill = false, float explosionRadius = 0f)
     {
         this.damage = damage;
         this.isCritical = isCritical;
         this.armorPenetration = armorPenetration;
         this.playerHealth = playerHealth;
         this.hasHit = false;
+        this.isEmpoweredSkill = isEmpoweredSkill;
+        this.explosionRadius = explosionRadius;
 
         rb.linearVelocity = direction * speed;
         CancelInvoke(nameof(ReturnToPool));
@@ -72,28 +77,54 @@ public class ProjectileVisual : MonoBehaviour
         // Dano apenas para o owner (damage > 0 = projetil do jogador local)
         if (damage > 0)
         {
-            if (other.TryGetComponent<NetworkObject>(out var enemyNetObj))
+            if (isEmpoweredSkill && JuiceManager.Instance != null)
             {
-                if (playerHealth != null && playerHealth.IsOwner)
+                JuiceManager.Instance.HitStop(0.08f);
+            }
+
+            PlayerShooting shooting = null;
+            if (playerHealth != null && playerHealth.IsOwner)
+            {
+                shooting = playerHealth.GetComponent<PlayerShooting>();
+            }
+            else
+            {
+                var localPlayer = NetworkManager.Singleton.SpawnManager.GetLocalPlayerObject();
+                if (localPlayer != null) shooting = localPlayer.GetComponent<PlayerShooting>();
+            }
+
+            if (shooting != null)
+            {
+                if (isEmpoweredSkill && explosionRadius > 0f)
                 {
-                    PlayerShooting shooting = playerHealth.GetComponent<PlayerShooting>();
-                    if (shooting != null)
+                    // Dano em Área da Explosão
+                    Collider[] hits = Physics.OverlapSphere(transform.position, explosionRadius);
+                    foreach (var hitCol in hits)
                     {
-                        shooting.RequestDamageOnEnemy(enemyNetObj.NetworkObjectId, damage, armorPenetration, isCritical);
-                        playerHealth.TriggerDamageDealt(damage);
+                        if (hitCol.TryGetComponent<NetworkObject>(out var netObj))
+                        {
+                            var networkedEnemy = netObj.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedEnemy>();
+                            if (networkedEnemy != null)
+                            {
+                                shooting.RequestDamageOnEnemy(netObj.NetworkObjectId, damage, armorPenetration, isCritical);
+                            }
+                        }
                     }
+                    shooting.RequestExplosionVfx(transform.position, explosionRadius);
                 }
                 else
                 {
-                    var localPlayer = NetworkManager.Singleton.SpawnManager.GetLocalPlayerObject();
-                    if (localPlayer != null)
+                    // Dano Único Normal
+                    if (other.TryGetComponent<NetworkObject>(out var enemyNetObj))
                     {
-                        PlayerShooting shooting = localPlayer.GetComponent<PlayerShooting>();
-                        if (shooting != null)
-                        {
-                            shooting.RequestDamageOnEnemy(enemyNetObj.NetworkObjectId, damage, armorPenetration, isCritical);
-                        }
+                        shooting.RequestDamageOnEnemy(enemyNetObj.NetworkObjectId, damage, armorPenetration, isCritical);
                     }
+                }
+
+                // Só processa lifesteal e eventos se for do owner real (para não duplicar em localPlayers falsos)
+                if (playerHealth != null && playerHealth.IsOwner)
+                {
+                    playerHealth.TriggerDamageDealt(damage);
                 }
             }
         }

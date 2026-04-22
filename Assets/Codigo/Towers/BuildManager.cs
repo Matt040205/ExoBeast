@@ -22,6 +22,9 @@ public class BuildManager : NetworkBehaviour
     public Material validPlacementMaterial;
     public Material invalidPlacementMaterial;
 
+    [Header("VFX de Construção")]
+    [SerializeField] private GameObject spawnBeamVfxPrefab;
+
     [Header("Network Buildables")]
     public List<GameObject> buildablePrefabs = new List<GameObject>();
 
@@ -226,6 +229,12 @@ public class BuildManager : NetworkBehaviour
         finalPosition.x = Mathf.Round(finalPosition.x / gridSize) * gridSize;
         finalPosition.z = Mathf.Round(finalPosition.z / gridSize) * gridSize;
 
+        // Zero-latency VFX: O cliente que clicou vê o feixe instantaneamente
+        if (spawnBeamVfxPrefab != null)
+        {
+            GlobalVFXPool.GetVFX(spawnBeamVfxPrefab, finalPosition, Quaternion.identity, 3f);
+        }
+
         // Verificar se e armadilha ou torre (armadilhas nao estao em buildablePrefabs)
         if (selectedBuildableData is TrapDataSO trapDataSO)
         {
@@ -256,6 +265,16 @@ public class BuildManager : NetworkBehaviour
 
         CurrencyManager.Instance.SpendCurrency(cost, CurrencyType.Geodites);
 
+        // Dispara o ClientRpc para os outros jogadores verem o feixe antes da torre spawnar
+        PlaySpawnBeamClientRpc(pos, rpcParams.Receive.SenderClientId);
+
+        StartCoroutine(SpawnTrapWithDelay(trapData, pos));
+    }
+
+    private IEnumerator SpawnTrapWithDelay(TrapDataSO trapData, Vector3 pos)
+    {
+        yield return new WaitForSeconds(0.05f); // Micro-delay
+
         // 1. Spawna o prefab VISUAL
         GameObject newTrap = Instantiate(trapData.prefab, pos, Quaternion.identity);
         if (newTrap.TryGetComponent<NetworkObject>(out var netObj))
@@ -266,11 +285,9 @@ public class BuildManager : NetworkBehaviour
         {
             GameObject logicObj = Instantiate(trapData.logicPrefab, pos, Quaternion.identity);
 
-            // Injeta a referência ao SO para que a lógica possa se vender
             TrapLogicBase logicBase = logicObj.GetComponent<TrapLogicBase>();
             if (logicBase != null) logicBase.trapData = trapData;
 
-            // Se tiver NetworkObject, spawna na rede; senão, deixa local no servidor
             if (logicObj.TryGetComponent<NetworkObject>(out var logicNetObj))
                 logicNetObj.Spawn();
         }
@@ -288,6 +305,16 @@ public class BuildManager : NetworkBehaviour
 
         CurrencyManager.Instance.SpendCurrency(cost, CurrencyType.Geodites);
 
+        // Dispara o ClientRpc para os outros jogadores verem o feixe antes da torre spawnar
+        PlaySpawnBeamClientRpc(pos, rpcParams.Receive.SenderClientId);
+
+        StartCoroutine(SpawnBuildingWithDelay(prefabToSpawn, pos));
+    }
+
+    private IEnumerator SpawnBuildingWithDelay(GameObject prefabToSpawn, Vector3 pos)
+    {
+        yield return new WaitForSeconds(0.05f); // Micro-delay
+
         GameObject newBuildObject = Instantiate(prefabToSpawn, pos, Quaternion.identity);
 
         if (newBuildObject.TryGetComponent<NetworkObject>(out var netObj))
@@ -296,6 +323,18 @@ public class BuildManager : NetworkBehaviour
         }
 
         NotifyBuildingPlacedClientRpc(pos);
+    }
+
+    [ClientRpc]
+    private void PlaySpawnBeamClientRpc(Vector3 pos, ulong senderId)
+    {
+        // Se quem mandou foi o próprio cliente local, ignora (pois ele já tocou Zero-Latency no PlaceBuilding)
+        if (NetworkManager.Singleton.LocalClientId == senderId) return;
+
+        if (spawnBeamVfxPrefab != null)
+        {
+            GlobalVFXPool.GetVFX(spawnBeamVfxPrefab, pos, Quaternion.identity, 3f);
+        }
     }
 
     [ClientRpc]

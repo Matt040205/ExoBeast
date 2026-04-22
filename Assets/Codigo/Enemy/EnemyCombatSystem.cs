@@ -139,8 +139,7 @@ public class EnemyCombatSystem : NetworkBehaviour
         else
         {
             // Offline ou teste local
-            GameObject flash = Instantiate(attackVfxPrefab, origin, Quaternion.LookRotation(dir));
-            Destroy(flash, 2f);
+            GlobalVFXPool.GetVFX(attackVfxPrefab, origin, Quaternion.LookRotation(dir), 2f);
         }
     }
 

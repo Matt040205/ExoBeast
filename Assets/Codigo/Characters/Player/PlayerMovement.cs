@@ -32,6 +32,10 @@ public class PlayerMovement : NetworkBehaviour
     public Transform cameraController;
     public Transform modelPivot;
 
+    [Header("VFX Especiais")]
+    [Tooltip("Prefab do efeito de vento para pulos múltiplos (ex: Voo Gracioso da Coruja)")]
+    public GameObject doubleJumpVfxPrefab;
+
     [Header("Aiming Settings")]
     public Rig aimRig;
     public MultiAimConstraint aimConstraint;
@@ -212,6 +216,13 @@ public class PlayerMovement : NetworkBehaviour
 
             // CORREÇÃO DO PULO DUPLO TAMBÉM:
             if (networkAnimator != null) networkAnimator.SetTrigger("Jump");
+
+            // Instancia o VFX localmente (Zero Latency) e avisa a rede
+            if (doubleJumpVfxPrefab != null)
+            {
+                GlobalVFXPool.GetVFX(doubleJumpVfxPrefab, transform.position, transform.rotation, 2f);
+            }
+            RequestDoubleJumpVfxServerRpc();
 
             StopFootstepSound();
         }
@@ -453,6 +464,23 @@ public class PlayerMovement : NetworkBehaviour
     private void OnDestroy()
     {
         if (passosSoundInstance.isValid()) passosSoundInstance.release();
+    }
+
+    [ServerRpc]
+    private void RequestDoubleJumpVfxServerRpc()
+    {
+        PlayDoubleJumpVfxClientRpc();
+    }
+
+    [ClientRpc]
+    private void PlayDoubleJumpVfxClientRpc()
+    {
+        if (IsOwner) return; // O dono já instanciou localmente
+
+        if (doubleJumpVfxPrefab != null)
+        {
+            GlobalVFXPool.GetVFX(doubleJumpVfxPrefab, transform.position, transform.rotation, 2f);
+        }
     }
 
     public Transform GetModelPivot() => modelPivot;

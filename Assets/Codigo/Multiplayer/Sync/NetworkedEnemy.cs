@@ -120,8 +120,7 @@ namespace ExoBeasts.Multiplayer.Sync
             // Desova do efeito visual de morte (se configurado) independente do script do inimigo
             if (localHealth != null && localHealth.deathVfxPrefab != null)
             {
-                var effect = Instantiate(localHealth.deathVfxPrefab, transform.position, transform.rotation);
-                Destroy(effect, 4f);
+                GlobalVFXPool.GetVFX(localHealth.deathVfxPrefab, transform.position, transform.rotation, 4f);
             }
         }
 
@@ -146,8 +145,7 @@ namespace ExoBeasts.Multiplayer.Sync
             var combatInfo = GetComponent<EnemyCombatSystem>();
             if (combatInfo != null && combatInfo.attackVfxPrefab != null)
             {
-                var flash = Instantiate(combatInfo.attackVfxPrefab, position, rotation);
-                Destroy(flash, 2f);
+                GlobalVFXPool.GetVFX(combatInfo.attackVfxPrefab, position, rotation, 2f);
             }
         }
     }

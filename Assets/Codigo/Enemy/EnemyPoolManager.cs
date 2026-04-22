@@ -5,11 +5,11 @@ using Unity.Netcode;
 
 /// <summary>
 /// ── EnemyPoolManager ───────────────────────────────────
-/// Pool de inimigos integrado com NGO Spawn/Despawn.
+/// Pool de inimigos integrado com NGO Spawn/Despawn via Handler.
 ///
-///  ▸ Server: GetPooledEnemy() retorna inimigo do pool e faz NetworkObject.Spawn
-///  ▸ Server: ReturnToPool() faz Despawn(false) e devolve ao pool
-///  ▸ Pools organizados por nome do prefab em dicionario de filas
+///  ▸ Implementa INetworkPrefabInstanceHandler para que os clientes 
+///    puxem objetos DESTE pool em vez de rodarem Instantiate() quando 
+///    o Servidor fizer o Spawn.
 /// ─────────────────────────────────────────────────────
 /// </summary>
 public class EnemyPoolManager : MonoBehaviour
@@ -26,26 +26,41 @@ public class EnemyPoolManager : MonoBehaviour
     {
         if (Instance != null && Instance != this)
         {
-            Destroy(this); // Apenas destrói o script duplicado, protegendo o resto do objeto!
+            Destroy(this);
             return;
         }
         Instance = this;
     }
 
+    private void Start()
+    {
+        RegisterNetworkPrefabs();
+    }
 
     /// <summary>
-    /// Retorna um inimigo pronto para ser spawnado no servidor.
+    /// Percorre os prefabs do NetworkManager e cadastra o manipulador de instâncias
+    /// para cada um que seja um inimigo.
     /// </summary>
-    // Verifica se o NGO está rodando como servidor
+    private void RegisterNetworkPrefabs()
+    {
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.NetworkConfig.Prefabs != null)
+        {
+            foreach (var networkPrefab in NetworkManager.Singleton.NetworkConfig.Prefabs.Prefabs)
+            {
+                var prefab = networkPrefab.Prefab;
+                if (prefab != null && prefab.GetComponent<EnemyController>() != null)
+                {
+                    // Registra para interceptar a criação no cliente
+                    NetworkManager.Singleton.PrefabHandler.AddHandler(prefab, new EnemyPrefabHandler(prefab, this));
+                }
+            }
+        }
+    }
+
     private bool IsNGOServer => NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer;
-    private bool IsNGOActive => NetworkManager.Singleton != null && 
-                                (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient);
 
     public GameObject GetPooledEnemy(GameObject prefab, Vector3 position, Quaternion rotation)
     {
-        // Bloqueia apenas se NGO está ativo e NÃO somos o servidor (somos cliente puro)
-        if (IsNGOActive && !IsNGOServer) return null;
-
         string prefabName = prefab.name;
         if (!pools.ContainsKey(prefabName))
         {
@@ -68,7 +83,6 @@ public class EnemyPoolManager : MonoBehaviour
 
         if (enemy == null) return null;
 
-        // Desabilita o NavMeshAgent ANTES de mover para evitar conflitos
         var navAgent = enemy.GetComponent<NavMeshAgent>();
         if (navAgent != null) navAgent.enabled = false;
 
@@ -76,14 +90,14 @@ public class EnemyPoolManager : MonoBehaviour
         enemy.transform.rotation = rotation;
         enemy.SetActive(true);
 
-        // Reabilita o NavMeshAgent e faz Warp para a posição correta no NavMesh
         if (navAgent != null)
         {
             navAgent.enabled = true;
             navAgent.Warp(position);
         }
 
-        // Só faz NetworkObject.Spawn se o NGO estiver ativo como servidor
+        // IMPORTANTE: Só disparamos Spawn manual quando SOMOS O SERVIDOR.
+        // O cliente passará por aqui quando o NGO chamar Instantiate() nele.
         if (IsNGOServer && enemy.TryGetComponent<NetworkObject>(out var netObj))
         {
             if (!netObj.IsSpawned)
@@ -100,7 +114,6 @@ public class EnemyPoolManager : MonoBehaviour
         GameObject newObj = Instantiate(prefab, transform);
         newObj.name = prefabName;
 
-        // Desabilita NavMeshAgent antes de desativar para evitar erro de NavMesh
         var navAgent = newObj.GetComponent<NavMeshAgent>();
         if (navAgent != null) navAgent.enabled = false;
 
@@ -110,15 +123,13 @@ public class EnemyPoolManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Devolve um inimigo ao pool e o despawna da rede sem destruí-lo.
+    /// Devolve um inimigo ao pool e o despawna da rede (se for server) sem destruí-lo.
+    /// Clientes caem aqui pelo callback .Destroy() do PrefabHandler do NGO.
     /// </summary>
     public void ReturnToPool(GameObject enemy)
     {
         if (enemy == null) return;
-        // Bloqueia apenas se NGO está ativo e NÃO somos servidor
-        if (IsNGOActive && !IsNGOServer) return;
 
-        // Desabilita NavMeshAgent para evitar erros ao desativar
         var navAgent = enemy.GetComponent<NavMeshAgent>();
         if (navAgent != null) navAgent.enabled = false;
 
@@ -129,7 +140,6 @@ public class EnemyPoolManager : MonoBehaviour
             pools[prefabName] = new Queue<GameObject>();
         }
 
-        // Só faz Despawn se o NGO estiver ativo e o objeto estiver spawnado na rede
         if (IsNGOServer && enemy.TryGetComponent<NetworkObject>(out var netObj))
         {
             if (netObj.IsSpawned)
@@ -139,16 +149,10 @@ public class EnemyPoolManager : MonoBehaviour
         }
 
         enemy.SetActive(false);
+        enemy.transform.SetParent(transform);
 
-        // Só faz reparenting se o NetworkObject NÃO estiver spawned (evita SpawnStateException)
-        bool canReparent = true;
-        if (enemy.TryGetComponent<NetworkObject>(out var no) && no.IsSpawned)
-            canReparent = false;
-
-        if (canReparent)
-            enemy.transform.SetParent(transform);
-
-        pools[prefabName].Enqueue(enemy);
+        if (!pools[prefabName].Contains(enemy))
+            pools[prefabName].Enqueue(enemy);
     }
 
     public void ClearAllPools()
@@ -161,5 +165,34 @@ public class EnemyPoolManager : MonoBehaviour
             }
         }
         pools.Clear();
+    }
+}
+
+/// <summary>
+/// Classe injetada no NetworkManager para interceptar o Instantiate e Destroy automático do NGO
+/// e redirecionar para o EnemyPoolManager.
+/// </summary>
+public class EnemyPrefabHandler : INetworkPrefabInstanceHandler
+{
+    private GameObject _prefab;
+    private EnemyPoolManager _poolManager;
+
+    public EnemyPrefabHandler(GameObject prefab, EnemyPoolManager poolManager)
+    {
+        _prefab = prefab;
+        _poolManager = poolManager;
+    }
+
+    public NetworkObject Instantiate(ulong ownerClientId, Vector3 position, Quaternion rotation)
+    {
+        // O servidor enviou o Spawn. Em vez de Instantiate puro, pegamos do pool.
+        GameObject obj = _poolManager.GetPooledEnemy(_prefab, position, rotation);
+        return obj.GetComponent<NetworkObject>();
+    }
+
+    public void Destroy(NetworkObject networkObject)
+    {
+        // O servidor despawnou o objeto. Em vez de Destroy puro, devolvemos ao pool.
+        _poolManager.ReturnToPool(networkObject.gameObject);
     }
 }
