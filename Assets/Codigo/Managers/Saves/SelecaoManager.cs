@@ -150,6 +150,13 @@ public class SelecaoManager : NetworkBehaviour
             return;
         }
 
+        // Em singleplayer, LobbyManager/SessionManager não estão inicializados.
+        if (GameModeManager.CurrentMode == GameMode.Singleplayer)
+        {
+            slotsPermitidos = new List<int> { 0, 1, 2, 3, 4, 5, 6, 7 };
+            return;
+        }
+
         var membros = ExoBeasts.Multiplayer.Lobby.LobbyManager.Instance.GetMembers();
         string meuId = ExoBeasts.Multiplayer.Auth.SessionManager.Instance.GetUserId();
         int meuIndice = membros.FindIndex(m => m.productUserId == meuId);
@@ -394,32 +401,48 @@ public class SelecaoManager : NetworkBehaviour
         }
 
         botaoJogar.onClick.RemoveAllListeners();
-        botaoJogar.onClick.AddListener(() =>
-        {
-            if (GameModeManager.CurrentMode == GameMode.Multiplayer)
-            {
-                if (LobbyManager.Instance != null)
-                    LobbyManager.Instance.StartMatch(nomeDaCenaDoJogo);
-            }
-            else
-            {
-                // Singleplayer: inicia direto
-                if (NetworkManager.Singleton != null)
-                {
-                    NetworkManager.Singleton.StartHost();
-                    NetworkManager.Singleton.SceneManager.LoadScene(
-                        nomeDaCenaDoJogo, UnityEngine.SceneManagement.LoadSceneMode.Single);
-                }
-                else
-                {
-                    Debug.LogError("[SelecaoManager] NetworkManager não encontrado para StartHost!");
-                }
-            }
-        });
+        botaoJogar.onClick.AddListener(() => StartCoroutine(IniciarPartidaSingleplayer()));
         botaoVoltarDaEscolha.onClick.AddListener(VoltarParaPainelEquipe);
         botaoVoltarDosDetalhes.onClick.AddListener(VoltarParaPainelEscolha);
         if (botaoRemover != null)
             botaoRemover.onClick.AddListener(ToggleRemoveMode);
+    }
+
+    private IEnumerator IniciarPartidaSingleplayer()
+    {
+        var nm = NetworkManager.Singleton;
+        if (nm == null)
+        {
+            Debug.LogError("[SelecaoManager] NetworkManager não encontrado para StartHost!");
+            yield break;
+        }
+
+        // Aguarda shutdown completo de sessão anterior (mesmo padrão do LobbyManager)
+        if (nm.IsListening || nm.IsHost || nm.IsServer || nm.IsClient)
+        {
+            Debug.Log("[SelecaoManager] NGO ainda em execução. Aguardando Shutdown antes de StartHost...");
+            nm.Shutdown();
+            float elapsed = 0f;
+            while (nm.IsListening && elapsed < 3f)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+            if (nm.IsListening)
+            {
+                Debug.LogError("[SelecaoManager] Shutdown não completou em 3s. Abortando StartHost.");
+                yield break;
+            }
+        }
+
+        bool started = nm.StartHost();
+        if (!started)
+        {
+            Debug.LogError("[SelecaoManager] StartHost() falhou. Verifique o estado do NetworkManager.");
+            yield break;
+        }
+
+        nm.SceneManager.LoadScene(nomeDaCenaDoJogo, UnityEngine.SceneManagement.LoadSceneMode.Single);
     }
 
     // Chamado quando um membro do lobby atualiza (inclusive ready)

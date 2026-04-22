@@ -342,7 +342,7 @@ public class LobbySceneUI : MonoBehaviour
             lobbyName  = nome,
             maxPlayers = _maxPlayers,
             isPublic   = publicoToggle != null ? publicoToggle.isOn : true,
-            mapName    = "EscolherPersonagem",
+            mapName    = "CenaMapaTeste",
         });
 
         if (!sucesso) return;
@@ -404,7 +404,7 @@ public class LobbySceneUI : MonoBehaviour
 
     public void IniciarPartida()
     {
-        SetStatus("Iniciando partida...");
+        SetStatus("Iniciando partida... aguardando rede");
         _lobby?.StartMatch();
     }
 

@@ -179,12 +179,17 @@ public class MenuManager : MonoBehaviour
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
             NetworkManager.Singleton.Shutdown();
 
-        if (nomeDaCena.ToLower().Contains("menu") && GameDataManager.Instance != null)
+        bool isMenuDestination = nomeDaCena.ToLower().Contains("menu");
+        bool isSelectionDestination = nomeDaCena.ToLower().Contains("escolherpersonagem");
+
+        if (isMenuDestination && GameDataManager.Instance != null)
         {
             GameDataManager.Instance.LimparSelecao();
             GameDataManager.Instance.SaveGame();
-            GameModeManager.ReturnToSingleplayer();
         }
+
+        if (isMenuDestination || isSelectionDestination)
+            GameModeManager.ReturnToSingleplayer();
 
         // Direto — não usa LoadSceneSafe para evitar race condition com IsListening pós-Shutdown
         SceneManager.LoadScene(nomeDaCena);
