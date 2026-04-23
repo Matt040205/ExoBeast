@@ -71,6 +71,9 @@ namespace ExoBeasts.Multiplayer.Lobby
         // Cache do EOSManagerWrapper para evitar lazy-create em OnDestroy
         private Core.EOSManagerWrapper _eosCache;
 
+        // Coroutine de conexao cliente em andamento — cancelada se StartMatch for chamado no host
+        private Coroutine _pendingClientConnect;
+
         private const ushort DEFAULT_PORT = 7777;
         private const string BUCKET_ID = "ExoBeasts";
 
@@ -227,9 +230,10 @@ namespace ExoBeasts.Multiplayer.Lobby
                 AddStringAttr(mod, LobbyAttributes.MAP_NAME, settings.mapName, LobbyAttributeVisibility.Public);
                 AddInt64Attr(mod, LobbyAttributes.MAX_PLAYERS, settings.maxPlayers, LobbyAttributeVisibility.Public);
                 AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.WaitingForPlayers.ToString(), LobbyAttributeVisibility.Public);
-                // Campos reservados para StartMatch — clientes observam SERVER_ADDRESS
+                // Campos reservados para StartMatch — clientes observam RELAY_CODE e SERVER_ADDRESS
                 AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, "", LobbyAttributeVisibility.Public);
                 AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, DEFAULT_PORT, LobbyAttributeVisibility.Public);
+                AddStringAttr(mod, LobbyAttributes.RELAY_CODE, "", LobbyAttributeVisibility.Public);
 
                 var updateOpts = new UpdateLobbyOptions { LobbyModificationHandle = mod };
                 lobbyInterface.UpdateLobby(ref updateOpts, null, (ref UpdateLobbyCallbackInfo info) =>
@@ -426,6 +430,8 @@ namespace ExoBeasts.Multiplayer.Lobby
                     if (GetLobbyInterface()?.CopyLobbyDetailsHandle(ref freshOpts, out var freshDetails) == Result.Success)
                     {
                         PopulateMembersFromDetails(freshDetails, lobbyInfo.hostProductUserId);
+                        // [SYNC-FIX] Verificar atributos imediatamente após o join (proativo)
+                        ProcessLobbyAttributes(freshDetails);
                         freshDetails.Release();
                     }
                     else
@@ -735,6 +741,15 @@ namespace ExoBeasts.Multiplayer.Lobby
 
             Debug.Log("[LobbyManager] Iniciando partida como HOST...");
 
+            // Segurança: apenas o host do lobby EOS pode disparar StartMatch.
+            string myUid = SessionManager.Instance?.GetUserId() ?? "";
+            if (!string.IsNullOrEmpty(myUid) && _currentLobby != null && _currentLobby.hostProductUserId != myUid)
+            {
+                Debug.LogError($"[LobbyManager] Abortado: Player local ({myUid}) nao e o host da sala ({_currentLobby.hostProductUserId})");
+                return;
+            }
+
+
             var nm = NetworkManager.Singleton;
             if (nm == null)
             {
@@ -861,6 +876,26 @@ namespace ExoBeasts.Multiplayer.Lobby
             }
 #endif
 
+            // Cancela qualquer coroutine de conexao como cliente que possa ter disparado durante
+            // o await do Relay (corrida com sessao anterior ou notificacao EOS tardia)
+            if (_pendingClientConnect != null) { StopCoroutine(_pendingClientConnect); _pendingClientConnect = null; }
+
+            // Re-verifica estado NGO apos operacoes async — necessario em build onde o Relay
+            // pode demorar e uma coroutine de reconexao pode ter chamado StartClient() no intervalo
+            if (nm.IsListening || nm.IsClient || nm.IsHost || nm.IsServer)
+            {
+                Debug.LogWarning($"[LobbyManager] Estado inesperado pre-StartHost (IsListening={nm.IsListening}, IsClient={nm.IsClient}). Shutdown emergencial...");
+                nm.Shutdown();
+                float elapsed2 = 0f;
+                while (nm.IsListening && elapsed2 < 2f) { elapsed2 += Time.deltaTime; yield return null; }
+                if (nm.IsListening)
+                {
+                    Debug.LogError("[LobbyManager] Shutdown pre-StartHost nao completou em 2s. Abortando.");
+                    OnError?.Invoke("NGO nao encerrou antes de StartHost");
+                    yield break;
+                }
+            }
+
             Debug.Log($"[LobbyManager] Tentando StartHost: transport={transport.Protocol}, approval={nm.NetworkConfig.ConnectionApproval}");
 
             if (!nm.StartHost())
@@ -892,19 +927,17 @@ namespace ExoBeasts.Multiplayer.Lobby
             bool scheduled = false;
             try
             {
-#if UNITY_EDITOR
-                AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, localIp, LobbyAttributeVisibility.Public);
-                AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, port, LobbyAttributeVisibility.Public);
-#else
+                // Publica AMBOS atributos em todas as plataformas para que editor<->build funcione.
+                // RELAY_CODE e preferido por clientes; SERVER_ADDRESS e fallback para LAN.
                 if (!string.IsNullOrEmpty(relayJoinCode))
                     AddStringAttr(mod, LobbyAttributes.RELAY_CODE, relayJoinCode, LobbyAttributeVisibility.Public);
-                else
-                {
-                    AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, localIp ?? GetLocalIpAddress(), LobbyAttributeVisibility.Public);
-                    AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, port, LobbyAttributeVisibility.Public);
-                }
-#endif
+
+                string publishIp = localIp ?? GetLocalIpAddress();
+                AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, publishIp, LobbyAttributeVisibility.Public);
+                AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, port, LobbyAttributeVisibility.Public);
                 AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.InGame.ToString(), LobbyAttributeVisibility.Public);
+
+                Debug.Log($"[LobbyManager] Publicando atributos: RELAY_CODE='{relayJoinCode ?? ""}' | SERVER_ADDRESS='{publishIp}' | PORT={port}");
 
                 string capturedMapOverride = mapOverride;
                 var updateOpts = new UpdateLobbyOptions { LobbyModificationHandle = mod };
@@ -914,9 +947,9 @@ namespace ExoBeasts.Multiplayer.Lobby
                     if (info.ResultCode == Result.Success)
                     {
                         string sceneName = !string.IsNullOrEmpty(capturedMapOverride) ? capturedMapOverride : _currentLobby.mapName;
-                        Debug.Log($"[LobbyManager] Endereco publicado. Carregando cena '{sceneName}'...");
-                        NetworkManager.Singleton.SceneManager.LoadScene(
-                            sceneName, LoadSceneMode.Single);
+                        int expectedPlayers = _currentLobby?.currentPlayers ?? 1;
+                        Debug.Log($"[LobbyManager] Atributos publicados. Aguardando {expectedPlayers} jogador(es) conectarem ao NGO antes de carregar '{sceneName}'...");
+                        StartCoroutine(WaitForAllClientsAndLoadScene(sceneName, expectedPlayers));
                     }
                     else
                     {
@@ -933,6 +966,111 @@ namespace ExoBeasts.Multiplayer.Lobby
                 if (!scheduled) mod.Release();
             }
 #endif
+        }
+
+        // DEPRECATED: substituido por WaitForAllClientsAndLoadScene — delay fixo era insuficiente
+        // para a pipeline Relay dos clientes (EOS propagation + UGS + JoinAllocationAsync).
+        private System.Collections.IEnumerator DelayedSceneLoad(string sceneName, float delaySec)
+        {
+            Debug.Log($"[LobbyManager] Aguardando {delaySec}s para propagacao EOS antes de carregar '{sceneName}'...");
+            yield return new WaitForSeconds(delaySec);
+
+            if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsHost)
+            {
+                Debug.Log($"[LobbyManager] Carregando cena '{sceneName}' via NetworkSceneManager");
+                NetworkManager.Singleton.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+            }
+            else
+            {
+                Debug.LogWarning($"[LobbyManager] DelayedSceneLoad abortado: NetworkManager nao e mais Host (Singleton={NetworkManager.Singleton != null}, IsHost={NetworkManager.Singleton?.IsHost})");
+            }
+        }
+
+        /// <summary>
+        /// Aguarda todos os clients esperados conectarem ao NGO antes de carregar a cena.
+        /// Elimina a race condition do delay fixo: cada client passa por EOS propagation +
+        /// UGS + JoinAllocationAsync + handshake NGO, o que leva 5-15s em builds com Relay.
+        /// Timeout de 25s como fallback para nao travar o host se um client desconectar.
+        /// </summary>
+        private System.Collections.IEnumerator WaitForAllClientsAndLoadScene(
+            string sceneName, int expectedPlayerCount)
+        {
+            var nm = NetworkManager.Singleton;
+            if (nm == null || !nm.IsHost)
+            {
+                Debug.LogWarning("[LobbyManager] WaitForAllClientsAndLoadScene abortado na entrada: nao e Host.");
+                yield break;
+            }
+
+            Debug.Log($"[LobbyManager] Aguardando {expectedPlayerCount} jogador(es) antes de carregar '{sceneName}'...");
+
+            const float timeoutSeconds = 25f;
+            float elapsed = 0f;
+            float nextLogAt = 1f;
+
+            // ConnectedClientsIds inclui o proprio host (ServerClientId=0), entao a
+            // contagem alvo ja cobre todos os membros do lobby sem ajuste adicional.
+            System.Action<ulong> onClientConnected = (clientId) =>
+            {
+                Debug.Log($"[LobbyManager] Client conectou: clientId={clientId} | " +
+                          $"Total={nm.ConnectedClientsIds.Count}/{expectedPlayerCount}");
+            };
+
+            nm.OnClientConnectedCallback += onClientConnected;
+
+            try
+            {
+                while (true)
+                {
+                    if (nm == null || !nm.IsHost)
+                    {
+                        Debug.LogWarning("[LobbyManager] WaitForAllClientsAndLoadScene cancelado: nao e mais Host.");
+                        yield break;
+                    }
+
+                    int connected = nm.ConnectedClientsIds.Count;
+
+                    if (elapsed >= nextLogAt)
+                    {
+                        Debug.Log($"[LobbyManager] Aguardando clients... {connected}/{expectedPlayerCount} ({elapsed:F1}s / {timeoutSeconds}s)");
+                        nextLogAt += 1f;
+                    }
+
+                    if (connected >= expectedPlayerCount)
+                    {
+                        Debug.Log($"[LobbyManager] Todos os {connected} jogadores conectados. Carregando '{sceneName}'.");
+                        break;
+                    }
+
+                    if (elapsed >= timeoutSeconds)
+                    {
+                        Debug.LogWarning($"[LobbyManager] Timeout {timeoutSeconds}s atingido. Carregando '{sceneName}' com {connected}/{expectedPlayerCount} jogadores.");
+                        break;
+                    }
+
+                    elapsed += Time.deltaTime;
+                    yield return null;
+                }
+            }
+            finally
+            {
+                if (nm != null)
+                    nm.OnClientConnectedCallback -= onClientConnected;
+            }
+
+            if (nm == null || !nm.IsHost)
+            {
+                Debug.LogWarning("[LobbyManager] WaitForAllClientsAndLoadScene abortado antes do LoadScene: host inativo.");
+                yield break;
+            }
+
+            var status = nm.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
+            if (status != SceneEventProgressStatus.Started)
+            {
+                Debug.LogError($"[LobbyManager] LoadScene('{sceneName}') falhou com status: {status}. " +
+                               "Verifique Build Settings e EnableSceneManagement=true no NetworkManager.");
+                OnError?.Invoke($"Falha ao carregar cena '{sceneName}': {status}");
+            }
         }
 
         private void RegisterNotifications()
@@ -1079,6 +1217,9 @@ namespace ExoBeasts.Multiplayer.Lobby
                     if (int.TryParse(charVal, out int charIdx))
                         member.selectedCharacterIndex = charIdx;
                 }
+
+                // [SYNC-FIX] Verificar se a partida já começou (proativo)
+                ProcessLobbyAttributes(details);
             }
             finally
             {
@@ -1110,13 +1251,7 @@ namespace ExoBeasts.Multiplayer.Lobby
                 return;
             }
 
-            // Apenas clientes que ainda nao estao conectados ao NGO
-            if (NetworkManager.Singleton != null &&
-                (NetworkManager.Singleton.IsHost || NetworkManager.Singleton.IsClient))
-            {
-                Debug.Log($"[LobbyManager][DBG] Ignorado: ja conectado ao NGO (IsHost={NetworkManager.Singleton.IsHost}, IsClient={NetworkManager.Singleton.IsClient})");
-                return;
-            }
+            Debug.Log($"[LobbyManager] Notificacao de atributo recebida para Lobby {info.LobbyId}. Verificando estado da rede...");
 
             var lobbyInterface = GetLobbyInterface();
             var detailsOpts = new CopyLobbyDetailsHandleOptions
@@ -1132,70 +1267,98 @@ namespace ExoBeasts.Multiplayer.Lobby
                 return;
             }
 
-            // A2 audit: try/finally para garantir Release mesmo se StartClient ou
-            // SetConnectionData lancar.
             try
             {
-#if !UNITY_EDITOR
-                // Build: verificar RELAY_CODE primeiro (Unity Relay para cross-network)
-                var relayAttrOpts = new LobbyDetailsCopyAttributeByKeyOptions { AttrKey = LobbyAttributes.RELAY_CODE };
-                var relayAttrResult = details.CopyAttributeByKey(ref relayAttrOpts, out var relayAttr);
-                if (relayAttrResult == Result.Success && relayAttr.HasValue)
-                {
-                    string relayCode = relayAttr.Value.Data?.Value.AsUtf8 ?? "";
-                    if (!string.IsNullOrEmpty(relayCode))
-                    {
-                        Debug.Log($"[LobbyManager] RELAY_CODE recebido: {relayCode} — conectando via Relay");
-                        var nmClientRelay = NetworkManager.Singleton;
-                        var transportRelay = nmClientRelay?.GetComponent<UnityTransport>();
-                        if (nmClientRelay != null && transportRelay != null)
-                            StartCoroutine(ConnectClientViaRelayCoroutine(nmClientRelay, transportRelay, relayCode));
-                        else
-                            Debug.LogError("[LobbyManager] nmClient ou transport null para conexao Relay");
-                        return;
-                    }
-                }
-#endif
-                var attrOpts = new LobbyDetailsCopyAttributeByKeyOptions { AttrKey = LobbyAttributes.SERVER_ADDRESS };
-                var addrResult = details.CopyAttributeByKey(ref attrOpts, out var addrAttr);
-                Debug.Log($"[LobbyManager][DBG] CopyAttributeByKey(SERVER_ADDRESS): result={addrResult}, hasValue={addrAttr.HasValue}");
-
-                if (addrResult == Result.Success && addrAttr.HasValue)
-                {
-                    string serverAddress = addrAttr.Value.Data?.Value.AsUtf8 ?? "";
-                    Debug.Log($"[LobbyManager][DBG] SERVER_ADDRESS lido: '{serverAddress}'");
-
-                    if (string.IsNullOrEmpty(serverAddress))
-                    {
-                        Debug.LogWarning("[LobbyManager][DBG] SERVER_ADDRESS vazio — aguardando proxima notificacao");
-                        return;
-                    }
-
-                    if (true) // bloco mantido para preservar estrutura de indentacao
-                    {
-                        ushort port = DEFAULT_PORT;
-                        attrOpts.AttrKey = LobbyAttributes.SERVER_PORT;
-                        if (details.CopyAttributeByKey(ref attrOpts, out var portAttr) == Result.Success && portAttr.HasValue)
-                            port = (ushort)(portAttr.Value.Data?.Value.AsInt64 ?? DEFAULT_PORT);
-
-                        Debug.Log($"[LobbyManager] Partida iniciada pelo host! Conectando: {serverAddress}:{port}");
-
-                        var nmClient = NetworkManager.Singleton;
-                        var transport = nmClient?.GetComponent<UnityTransport>();
-                        if (nmClient != null && transport != null)
-                            StartCoroutine(ConnectClientCoroutine(nmClient, transport, serverAddress, port));
-                        else
-                            Debug.LogError($"[LobbyManager][DBG] nmClient={nmClient != null}, transport={transport != null} — StartCoroutine nao foi iniciada!");
-                    }
-                }
-                else
-                {
-                    Debug.LogWarning($"[LobbyManager][DBG] SERVER_ADDRESS nao encontrado nos atributos (result={addrResult}, hasValue={addrAttr.HasValue})");
-                }
+                ProcessLobbyAttributes(details);
             }
             finally
             {
                 details.Release();
+            }
+        }
+
+        /// <summary>
+        /// [SYNC-FIX] Extrai atributos de rede do lobby e inicia conexão se STATE=InGame.
+        /// Centralizado para ser chamado por notificações e proativamente no Join.
+        /// </summary>
+        private void ProcessLobbyAttributes(LobbyDetails details)
+        {
+            if (details == null) return;
+
+            // O host do lobby EOS nunca conecta como cliente NGO.
+            string _myUid = SessionManager.Instance?.GetUserId() ?? "";
+            if (!string.IsNullOrEmpty(_myUid) && _currentLobby != null && _currentLobby.hostProductUserId == _myUid)
+            {
+                return;
+            }
+
+            // Ja conectado como cliente ativo num jogo real — nao reconectar.
+            // IsConnectedClient so vira true apos handshake completo com o servidor.
+            // IsHost=true sozinho NAO bloqueia: pode ser um StartHost() do MenuScene que
+            // precisa ser derrubado — ConnectClientCoroutine faz o Shutdown() antes de StartClient().
+            if (NetworkManager.Singleton != null &&
+                NetworkManager.Singleton.IsClient &&
+                !NetworkManager.Singleton.IsHost &&
+                NetworkManager.Singleton.IsConnectedClient)
+            {
+                return;
+            }
+
+            // Verificar LOBBY_STATE
+            var stateAttrOpts = new LobbyDetailsCopyAttributeByKeyOptions { AttrKey = LobbyAttributes.LOBBY_STATE };
+            if (details.CopyAttributeByKey(ref stateAttrOpts, out var stateAttr) == Result.Success && stateAttr.HasValue)
+            {
+                string stateStr = stateAttr.Value.Data?.Value.AsUtf8 ?? "";
+                if (stateStr != LobbyState.InGame.ToString() && stateStr != "Starting")
+                {
+                    // Se não está em InGame ou Starting, ignora (ainda esperando)
+                    return;
+                }
+                Debug.Log($"[LobbyManager][DBG] Lobby em estado '{stateStr}' — processando dados de conexão...");
+            }
+
+            // Verificar RELAY_CODE primeiro
+            var relayAttrOpts = new LobbyDetailsCopyAttributeByKeyOptions { AttrKey = LobbyAttributes.RELAY_CODE };
+            var relayAttrResult = details.CopyAttributeByKey(ref relayAttrOpts, out var relayAttr);
+            if (relayAttrResult == Result.Success && relayAttr.HasValue)
+            {
+                string relayCode = relayAttr.Value.Data?.Value.AsUtf8 ?? "";
+                if (!string.IsNullOrEmpty(relayCode))
+                {
+                    Debug.Log($"[LobbyManager] Conectando via Relay: {relayCode}");
+                    var nmClientRelay = NetworkManager.Singleton;
+                    var transportRelay = nmClientRelay?.GetComponent<UnityTransport>();
+                    if (nmClientRelay != null && transportRelay != null)
+                    {
+                        if (_pendingClientConnect != null) StopCoroutine(_pendingClientConnect);
+                        _pendingClientConnect = StartCoroutine(ConnectClientViaRelayCoroutine(nmClientRelay, transportRelay, relayCode));
+                    }
+                    return;
+                }
+            }
+
+            // Fallback: SERVER_ADDRESS
+            var addrAttrOpts = new LobbyDetailsCopyAttributeByKeyOptions { AttrKey = LobbyAttributes.SERVER_ADDRESS };
+            var addrResult = details.CopyAttributeByKey(ref addrAttrOpts, out var addrAttr);
+            if (addrResult == Result.Success && addrAttr.HasValue)
+            {
+                string serverAddress = addrAttr.Value.Data?.Value.AsUtf8 ?? "";
+                if (!string.IsNullOrEmpty(serverAddress))
+                {
+                    ushort port = DEFAULT_PORT;
+                    addrAttrOpts.AttrKey = LobbyAttributes.SERVER_PORT;
+                    if (details.CopyAttributeByKey(ref addrAttrOpts, out var portAttr) == Result.Success && portAttr.HasValue)
+                        port = (ushort)(portAttr.Value.Data?.Value.AsInt64 ?? DEFAULT_PORT);
+
+                    Debug.Log($"[LobbyManager] Conectando via IP: {serverAddress}:{port}");
+                    var nmClient = NetworkManager.Singleton;
+                    var transport = nmClient?.GetComponent<UnityTransport>();
+                    if (nmClient != null && transport != null)
+                    {
+                        if (_pendingClientConnect != null) StopCoroutine(_pendingClientConnect);
+                        _pendingClientConnect = StartCoroutine(ConnectClientCoroutine(nmClient, transport, serverAddress, port));
+                    }
+                }
             }
         }
 
@@ -1264,7 +1427,6 @@ namespace ExoBeasts.Multiplayer.Lobby
             }
         }
 
-#if !UNITY_EDITOR
         private System.Collections.IEnumerator ConnectClientViaRelayCoroutine(
             NetworkManager nmClient, UnityTransport transport, string joinCode)
         {
@@ -1351,7 +1513,6 @@ namespace ExoBeasts.Multiplayer.Lobby
             if (!clientStarted)
                 OnError?.Invoke("Falha ao iniciar Client NGO via Relay");
         }
-#endif
 
 #endif
 
@@ -1486,6 +1647,14 @@ namespace ExoBeasts.Multiplayer.Lobby
             attrOpts.AttrKey = LobbyAttributes.MAP_NAME;
             if (details.CopyAttributeByKey(ref attrOpts, out var mapAttr) == Result.Success && mapAttr.HasValue)
                 result.mapName = mapAttr.Value.Data?.Value.AsUtf8 ?? "";
+
+            attrOpts.AttrKey = LobbyAttributes.LOBBY_STATE;
+            if (details.CopyAttributeByKey(ref attrOpts, out var stateAttr) == Result.Success && stateAttr.HasValue)
+            {
+                string stateStr = stateAttr.Value.Data?.Value.AsUtf8 ?? "";
+                if (System.Enum.TryParse(stateStr, out LobbyState parsedState))
+                    result.state = parsedState;
+            }
 
             onResult?.Invoke(result);
         }

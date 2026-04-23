@@ -555,11 +555,13 @@ public class LobbyUIManager : MonoBehaviour
                       lobby.hostProductUserId == SessionManager.Instance?.GetUserId();
         if (amHost)
         {
+            GUI.enabled = AllMembersReady();
             if (GUILayout.Button("Iniciar Partida", GUILayout.Height(42)))
             {
                 AddLog("Iniciando partida...");
                 _lobby.StartMatch();
             }
+            GUI.enabled = true;
             GUILayout.Space(4);
         }
 
@@ -568,6 +570,13 @@ public class LobbyUIManager : MonoBehaviour
             AddLog("Saindo...");
             _lobby.LeaveLobby();
         }
+    }
+
+    private bool AllMembersReady()
+    {
+        var members = _lobby.GetMembers();
+        if (members == null || members.Count == 0) return false;
+        return members.TrueForAll(m => m.isReady);
     }
 
     // ──────────────────────────────────────────────────────────────────────

@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using FMODUnity;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.Lobby;  // LobbyManager — índice de membro do lobby
+using ExoBeasts.Multiplayer.Auth;   // SessionManager — productUserId local
 
 /// <summary>
 /// ── CommanderAbilityController ─────────────────────────
@@ -47,19 +49,67 @@ public class CommanderAbilityController : NetworkBehaviour
             playerHealth.OnDamageDealt += HandleDamageDealt;
         }
 
+        // ScriptableObjects não viajam pela rede — resolver localmente quando nulo.
+        // Segue o mesmo padrão de PlayerShooting.ResolveLocalCommanderCharacter().
+        if (characterData == null && GameDataManager.Instance != null)
+        {
+            characterData = ResolveLocalCommanderCharacter();
+            Debug.Log($"[CommanderAbilityController] characterData resolvido via lobby index: {characterData?.name}");
+        }
+
         if (characterData != null)
         {
             if (characterData.ability1 != null) { abilityCooldowns[characterData.ability1] = 0; characterData.ability1.Initialize(); }
             if (characterData.ability2 != null) { abilityCooldowns[characterData.ability2] = 0; characterData.ability2.Initialize(); }
             if (characterData.ultimate != null) { abilityCooldowns[characterData.ultimate] = 0; characterData.ultimate.Initialize(); }
-            
+
             // Ativa a passiva em todos os clientes (cada um aplica o que lhe cabe: Owner=Input, Server=Damage, All=Visual)
             if (characterData.passive != null)
             {
                 characterData.passive.OnEquip(gameObject);
             }
         }
+        else
+        {
+            Debug.LogWarning($"[CommanderAbilityController] characterData ainda nulo após resolução local. Habilidades desabilitadas para clientId={OwnerClientId}.");
+        }
+    }
 
+    /// <summary>
+    /// Resolve o CharacterBase do Comandante deste jogador consultando o índice de
+    /// membro no lobby. Duplica a lógica de PlayerShooting para evitar dependência
+    /// de componente entre scripts do prefab do jogador.
+    ///
+    /// Layout: 2p → P0=slot0, P1=slot4 | 3p → P0=0, P1=4, P2=6 | 4p → Px=x*2
+    /// </summary>
+    private CharacterBase ResolveLocalCommanderCharacter()
+    {
+        var equipe = GameDataManager.Instance?.equipeSelecionada;
+        if (equipe == null || equipe.Length == 0) return null;
+
+        int commanderSlot = 0;
+
+        var lobbyMgr = LobbyManager.Instance;
+        var sessionMgr = SessionManager.Instance;
+
+        if (lobbyMgr != null && sessionMgr != null)
+        {
+            var membros  = lobbyMgr.GetMembers();
+            string meuId = sessionMgr.GetUserId();
+            int meuIndice = membros.FindIndex(m => m.productUserId == meuId);
+            int total     = membros.Count;
+
+            if (meuIndice >= 0)
+            {
+                if      (total == 2) commanderSlot = meuIndice * 4;
+                else if (total == 3) commanderSlot = meuIndice == 0 ? 0 : meuIndice == 1 ? 4 : 6;
+                else if (total == 4) commanderSlot = meuIndice * 2;
+            }
+        }
+
+        return (commanderSlot < equipe.Length && equipe[commanderSlot] != null)
+            ? equipe[commanderSlot]
+            : (equipe.Length > 0 ? equipe[0] : null);
     }
 
     void OnDestroy()

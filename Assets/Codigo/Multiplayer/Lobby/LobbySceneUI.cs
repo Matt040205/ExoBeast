@@ -342,7 +342,7 @@ public class LobbySceneUI : MonoBehaviour
             lobbyName  = nome,
             maxPlayers = _maxPlayers,
             isPublic   = publicoToggle != null ? publicoToggle.isOn : true,
-            mapName    = "CenaMapaTeste",
+            mapName    = "EscolherPersonagem",
         });
 
         if (!sucesso) return;
@@ -572,7 +572,20 @@ public class LobbySceneUI : MonoBehaviour
         bool isHost = lobby != null
             && !string.IsNullOrEmpty(lobby.hostProductUserId)
             && lobby.hostProductUserId == localUid;
+
         iniciarPartidaButton.gameObject.SetActive(isHost);
+        if (isHost)
+        {
+            iniciarPartidaButton.interactable = AllMembersReady();
+        }
+    }
+
+    private bool AllMembersReady()
+    {
+        if (_lobby == null) return false;
+        var members = _lobby.GetMembers();
+        if (members == null || members.Count == 0) return false;
+        return members.TrueForAll(m => m.isReady);
     }
 
     // ──────────────────────────────────────────────────────────────────────

@@ -258,7 +258,12 @@ public class SelecaoManager : NetworkBehaviour
         int slotConfirmado = slotSendoEditado;
 
         if (IsNetworkActive)
+        {
             ConfirmarEscolhaServerRpc(id, slotConfirmado);
+            // Atualiza CharacterChoiceCache no servidor ao confirmar o Comandante (slot principal do jogador)
+            if (slotsPermitidos.Count > 0 && slotConfirmado == slotsPermitidos[0])
+                RegisterCommanderChoiceServerRpc(id);
+        }
         else
             AplicarEscolhaLocal(id, slotConfirmado);
 
@@ -301,6 +306,12 @@ public class SelecaoManager : NetworkBehaviour
 
     [ClientRpc]
     void ConfirmarEscolhaClientRpc(int id, int slot) => AplicarEscolhaLocal(id, slot);
+
+    [ServerRpc(RequireOwnership = false)]
+    void RegisterCommanderChoiceServerRpc(int charId, ServerRpcParams rpcParams = default)
+    {
+        ExoBeasts.Multiplayer.Core.CharacterChoiceCache.ByClientId[rpcParams.Receive.SenderClientId] = charId;
+    }
 
     [ServerRpc(RequireOwnership = false)]
     void SolicitarRemocaoServerRpc(int slot) => RemoverClientRpc(slot);
@@ -401,7 +412,16 @@ public class SelecaoManager : NetworkBehaviour
         }
 
         botaoJogar.onClick.RemoveAllListeners();
-        botaoJogar.onClick.AddListener(() => StartCoroutine(IniciarPartidaSingleplayer()));
+        botaoJogar.onClick.AddListener(() => {
+            if (GameModeManager.CurrentMode == GameMode.Multiplayer)
+            {
+                var nm = NetworkManager.Singleton;
+                if (nm != null && nm.IsServer)
+                    nm.SceneManager.LoadScene(nomeDaCenaDoJogo, UnityEngine.SceneManagement.LoadSceneMode.Single);
+            }
+            else
+                StartCoroutine(IniciarPartidaSingleplayer());
+        });
         botaoVoltarDaEscolha.onClick.AddListener(VoltarParaPainelEquipe);
         botaoVoltarDosDetalhes.onClick.AddListener(VoltarParaPainelEscolha);
         if (botaoRemover != null)

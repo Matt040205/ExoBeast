@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using ExoBeasts.Multiplayer.GameServer; // Necessário para achar o PlayerRegistry
+using ExoBeasts.Multiplayer.Lobby;     // LobbyManager — para índice de membro do lobby
+using ExoBeasts.Multiplayer.Auth;      // SessionManager — para productUserId local
 
 /// <summary>
 /// ── PlayerShooting ─────────────────────────────────────
@@ -96,19 +98,26 @@ public class PlayerShooting : NetworkBehaviour
         // =================================================================
         if (characterData == null)
         {
-            if (PlayerRegistry.Instance != null && GameDataManager.Instance != null)
+            // Caminho primário (funciona para o Host, que é também o servidor):
+            // PlayerRegistry.playerCharacterChoices só é populado no servidor,
+            // por isso esse path retorna 0 (default) para clientes não-host.
+            if (IsServer && PlayerRegistry.Instance != null && GameDataManager.Instance != null)
             {
                 int charIndex = PlayerRegistry.Instance.GetPlayerCharacterChoice(OwnerClientId);
                 if (charIndex >= 0 && charIndex < GameDataManager.Instance.bibliotecaOriginalPersonagens.Count)
                 {
                     characterData = GameDataManager.Instance.bibliotecaOriginalPersonagens[charIndex];
+                    Debug.Log($"[PlayerShooting] characterData resolvido via PlayerRegistry: {characterData?.name} (charIndex={charIndex})");
                 }
             }
 
-            // Fallback caso seja Singleplayer ou o Registry demore
-            if (characterData == null && GameDataManager.Instance != null && GameDataManager.Instance.equipeSelecionada[0] != null)
+            // Fallback multiplayer/singleplayer: resolve pelo índice de membro no lobby.
+            // Necessário para clientes não-host, pois o Registry não replica entre peers.
+            // Slot layout: 2p → P0=[0-3], P1=[4-7] | 3p → P0=[0-3], P1=[4-5], P2=[6-7] | 4p → Px=[x*2, x*2+1]
+            if (characterData == null && GameDataManager.Instance != null)
             {
-                characterData = GameDataManager.Instance.equipeSelecionada[0];
+                characterData = ResolveLocalCommanderCharacter();
+                Debug.Log($"[PlayerShooting] characterData resolvido via lobby index: {characterData?.name}");
             }
         }
 
@@ -134,11 +143,73 @@ public class PlayerShooting : NetworkBehaviour
             cameraController = mainCamera.GetComponent<CameraController>();
 
         projectilePool = ProjectilePool.Instance;
-        if (projectilePool != null && projectileVisualPrefab != null)
+        if (projectilePool == null)
+        {
+            Debug.LogWarning("[PlayerShooting] ProjectilePool.Instance é nulo! Adicione um ProjectilePool à cena. Projéteis visuais não serão spawnados.");
+        }
+        else if (projectileVisualPrefab == null)
+        {
+            Debug.LogWarning("[PlayerShooting] projectileVisualPrefab é nulo no Inspector. Projéteis visuais não serão spawnados.");
+        }
+        else
         {
             projectilePool.projectilePrefab = this.projectileVisualPrefab;
             projectilePool.InitializePool();
         }
+    }
+
+    /// <summary>
+    /// Resolve o CharacterBase do Comandante deste jogador local consultando o índice
+    /// de membro no lobby. Necessário para clientes não-host porque o PlayerRegistry
+    /// (server-only) não replica os dados entre peers via NGO.
+    ///
+    /// Layout de slots (equipeSelecionada):
+    ///  2 jogadores → P0=[0-3], P1=[4-7]          (commander = slot inicial)
+    ///  3 jogadores → P0=[0-3], P1=[4-5], P2=[6-7]
+    ///  4 jogadores → P0=[0-1], P1=[2-3], P2=[4-5], P3=[6-7]
+    ///
+    /// Fallback seguro: equipe[0] (Singleplayer).
+    /// </summary>
+    private CharacterBase ResolveLocalCommanderCharacter()
+    {
+        var gdm = GameDataManager.Instance;
+        if (gdm == null) return null;
+
+        var equipe = gdm.equipeSelecionada;
+        if (equipe == null || equipe.Length == 0) return null;
+
+        int commanderSlot = 0; // Padrão: slot 0 (Singleplayer / P0)
+
+        var lobbyMgr = LobbyManager.Instance;
+        var sessionMgr = SessionManager.Instance;
+
+        if (lobbyMgr != null && sessionMgr != null)
+        {
+            var membros = lobbyMgr.GetMembers();
+            string meuId = sessionMgr.GetUserId();
+            int meuIndice = membros.FindIndex(m => m.productUserId == meuId);
+            int total = membros.Count;
+
+            if (meuIndice >= 0)
+            {
+                if      (total == 2) commanderSlot = meuIndice * 4;
+                else if (total == 3) commanderSlot = meuIndice == 0 ? 0 : meuIndice == 1 ? 4 : 6;
+                else if (total == 4) commanderSlot = meuIndice * 2;
+                // total == 1 → commanderSlot permanece 0 (Singleplayer)
+            }
+
+            Debug.Log($"[PlayerShooting] Lobby index={meuIndice}/{total} → commanderSlot={commanderSlot}");
+        }
+        else
+        {
+            Debug.Log("[PlayerShooting] LobbyManager ou SessionManager nulo — usando slot 0 (Singleplayer).");
+        }
+
+        if (commanderSlot >= 0 && commanderSlot < equipe.Length && equipe[commanderSlot] != null)
+            return equipe[commanderSlot];
+
+        // Último recurso: slot 0
+        return equipe.Length > 0 ? equipe[0] : null;
     }
 
     public void OnFire(InputAction.CallbackContext ctx)

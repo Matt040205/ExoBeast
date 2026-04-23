@@ -60,6 +60,7 @@ void SetAlpha(GameObject obj, float alpha)
     {
         foreach (GameObject element in elements)
         {
+            if (element == null) continue;
             StartCoroutine(FadeElement(element));
             yield return new WaitForSeconds(delayBetweenElements);
         }
@@ -67,10 +68,12 @@ void SetAlpha(GameObject obj, float alpha)
 
     IEnumerator FadeElement(GameObject element)
     {
+        if (element == null) yield break;
+
         float elapsed = 0f;
         List<Graphic> graphics = new List<Graphic>();
 
-        // Coleta todos os componentes gr�ficos
+        // Coleta todos os componentes grficos
         graphics.AddRange(element.GetComponentsInChildren<Image>());
         graphics.AddRange(element.GetComponentsInChildren<Text>());
         graphics.AddRange(element.GetComponentsInChildren<TMP_Text>());

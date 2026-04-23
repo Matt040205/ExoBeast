@@ -39,6 +39,44 @@ namespace ExoBeasts.Multiplayer.Sync
         {
             Debug.Log($"[PlayerNetworkSetup] Jogador LOCAL inicializado | ClientId: {OwnerClientId}");
             StartCoroutine(RegisterIdentityWithBridgeWhenReady());
+            StartCoroutine(FinishLocalSetupNextFrame());
+        }
+
+        /// <summary>
+        /// Executa no frame seguinte ao OnNetworkSpawn para garantir que Start() de todos os
+        /// MonoBehaviours do prefab (ex: PlayerMovement) já tenha rodado antes de sobrescrever
+        /// o estado do cursor e das torres.
+        /// </summary>
+        private IEnumerator FinishLocalSetupNextFrame()
+        {
+            // Aguarda um frame — Start() é sempre chamado após OnNetworkSpawn em objetos
+            // spawnados dinamicamente pelo NGO.
+            yield return null;
+
+            // ── 1. Cursor ────────────────────────────────────────────────────────────
+            // PlayerMovement.Start() trava o cursor apenas se o tutorial "PLAYER_MOVEMENT"
+            // estiver concluído. Em multiplayer, clientes remotos podem não ter completado
+            // o tutorial na sua máquina — aplicamos o lock diretamente aqui.
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible   = false;
+            Debug.Log("[PlayerNetworkSetup] Cursor travado para jogador local (multiplayer bypass).");
+
+            // ── 2. Torres disponíveis ─────────────────────────────────────────────────
+            // GameSetupManager.SpawnPlayerServerSide chama SetAvailableTowers apenas no
+            // servidor (host). Clientes não-host nunca recebem essa chamada, então suas
+            // torres não aparecem no BuildUI. Chamamos aqui com os dados locais do cliente.
+            if (BuildManager.Instance != null && GameDataManager.Instance != null)
+            {
+                BuildManager.Instance.SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);
+                Debug.Log("[PlayerNetworkSetup] Torres disponíveis configuradas para jogador local.");
+            }
+            else
+            {
+                Debug.LogWarning(
+                    "[PlayerNetworkSetup] Não foi possível configurar torres: " +
+                    $"BuildManager={BuildManager.Instance != null} | " +
+                    $"GameDataManager={GameDataManager.Instance != null}");
+            }
         }
 
         /// <summary>
