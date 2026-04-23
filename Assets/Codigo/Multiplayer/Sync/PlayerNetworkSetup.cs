@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using Unity.Netcode;
 using ExoBeasts.Multiplayer.Core;
 using ExoBeasts.Multiplayer.Auth;
@@ -52,6 +53,17 @@ namespace ExoBeasts.Multiplayer.Sync
             // Aguarda um frame — Start() é sempre chamado após OnNetworkSpawn em objetos
             // spawnados dinamicamente pelo NGO.
             yield return null;
+
+            // ── 0. PlayerInput — garantir ActionMap "Player" ativa ───────────────────
+            // SwitchCurrentActionMap força o mapa correto antes que auto-switch para "UI"
+            // possa ocorrer (m_NeverAutoSwitchControlSchemes = 0 nos prefabs).
+            var playerInput = GetComponent<PlayerInput>();
+            if (playerInput != null)
+            {
+                playerInput.enabled = true;
+                playerInput.SwitchCurrentActionMap("Player");
+            }
+            Debug.Log("[PlayerNetworkSetup] PlayerInput configurado no ActionMap 'Player'.");
 
             // ── 1. Cursor ────────────────────────────────────────────────────────────
             // PlayerMovement.Start() trava o cursor apenas se o tutorial "PLAYER_MOVEMENT"
@@ -121,6 +133,10 @@ namespace ExoBeasts.Multiplayer.Sync
         private void SetupAsRemotePlayer()
         {
             Debug.Log($"[PlayerNetworkSetup] Jogador REMOTO inicializado | ClientId: {OwnerClientId}");
+
+            // Desabilita PlayerInput para evitar conflito de device-pairing entre instâncias no Unity 6 Input System
+            var playerInput = GetComponent<PlayerInput>();
+            if (playerInput != null) playerInput.enabled = false;
 
             if (movement != null) movement.enabled = false;
             if (cameraController != null) cameraController.enabled = false;
