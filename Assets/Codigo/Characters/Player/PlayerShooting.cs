@@ -1,40 +1,40 @@
-using UnityEngine;
-using UnityEngine.InputSystem;
 using FMODUnity;
-using System.Collections.Generic;
 using Unity.Netcode;
 using Unity.Netcode.Components;
-using ExoBeasts.Multiplayer.GameServer; // Necessário para achar o PlayerRegistry
-using ExoBeasts.Multiplayer.Lobby;     // LobbyManager — para índice de membro do lobby
-using ExoBeasts.Multiplayer.Auth;      // SessionManager — para productUserId local
+using UnityEngine;
+using UnityEngine.InputSystem;
+using ExoBeasts.Multiplayer.Auth;
+using ExoBeasts.Multiplayer.Core;
+using ExoBeasts.Multiplayer.GameServer;
+using ExoBeasts.Multiplayer.Lobby;
+using ExoBeasts.Multiplayer.Sync;
 
 /// <summary>
-/// ── PlayerShooting ─────────────────────────────────────
-/// Sistema de tiro a distancia com projeteis visuais locais.
-/// ─────────────────────────────────────────────────────
+/// Sistema de tiro do jogador.
+/// O owner cuida do input e da resposta visual imediata; o servidor valida o disparo e o dano.
 /// </summary>
 [RequireComponent(typeof(PlayerHealthSystem))]
 public class PlayerShooting : NetworkBehaviour
 {
-    [Header("Configurações")]
+    [Header("Configuracoes")]
     public CharacterBase characterData;
     public Transform firePoint;
     public GameObject projectileVisualPrefab;
     public GameObject impactEffectPrefab;
     public GameObject muzzleFlashPrefab;
 
-    [Header("Explosão em Área (Coruja)")]
+    [Header("Explosao em Area (Coruja)")]
     public GameObject explosionVfxPrefab;
     public string explosionVfxRadiusParam = "Radius";
 
     [Header("Juice Configs")]
     [SerializeField] private CameraShakeConfig empoweredShotShake = new CameraShakeConfig(3f, 0.5f, 0.3f);
 
-    [Header("Configurações de IK (Rigging)")]
+    [Header("Configuracoes de IK (Rigging)")]
     public Transform aimTarget;
     public float aimTargetDistance = 20f;
 
-    [Header("Configurações FMOD")]
+    [Header("Configuracoes FMOD")]
     [Tooltip("Escreva 'Arma' ou 'Arco'")]
     public string tipoDeSom = "Arma";
 
@@ -59,73 +59,47 @@ public class PlayerShooting : NetworkBehaviour
     private float nextShotTime;
     private CameraController cameraController;
     private Transform modelPivot;
-    private ProjectilePool projectilePool;
     private Camera mainCamera;
     private Animator animator;
     private NetworkAnimator networkAnimator;
-
     private PlayerHealthSystem playerHealth;
-    private bool hasNextShotBonus = false;
+    private PlayerCombatManager combatManager;
+    private LocalPlayerInputBridge inputBridge;
+
+    private bool hasNextShotBonus;
     private float nextShotDamageBonus = 1f;
     private float nextShotAreaBonus = 1f;
-
     private bool fireInputHeld;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
-        if (!IsOwner)
+        if (!IsOwner && !IsServer)
         {
-            this.enabled = false;
+            enabled = false;
             return;
         }
 
         InitializeShooting();
 
-        // Garante que a HUD seja avisada imediatamente assim que a arma liga!
-        if (PlayerHUD.Instance != null && playerHealth != null)
-        {
+        if (IsOwner && PlayerHUD.Instance != null && playerHealth != null)
             PlayerHUD.Instance.RegistrarJogador(playerHealth);
-        }
     }
 
     private void InitializeShooting()
     {
-        // =================================================================
-        // INJEÇÃO LOCAL: Como o ScriptableObject não viaja pela rede sozinho,
-        // o próprio Cliente busca os dados locais dele caso estejam nulos!
-        // =================================================================
         if (characterData == null)
-        {
-            // Caminho primário (funciona para o Host, que é também o servidor):
-            // PlayerRegistry.playerCharacterChoices só é populado no servidor,
-            // por isso esse path retorna 0 (default) para clientes não-host.
-            if (IsServer && PlayerRegistry.Instance != null && GameDataManager.Instance != null)
-            {
-                int charIndex = PlayerRegistry.Instance.GetPlayerCharacterChoice(OwnerClientId);
-                if (charIndex >= 0 && charIndex < GameDataManager.Instance.bibliotecaOriginalPersonagens.Count)
-                {
-                    characterData = GameDataManager.Instance.bibliotecaOriginalPersonagens[charIndex];
-                    Debug.Log($"[PlayerShooting] characterData resolvido via PlayerRegistry: {characterData?.name} (charIndex={charIndex})");
-                }
-            }
+            characterData = ResolveCharacterDataFromNetworkState();
 
-            // Fallback multiplayer/singleplayer: resolve pelo índice de membro no lobby.
-            // Necessário para clientes não-host, pois o Registry não replica entre peers.
-            // Slot layout: 2p → P0=[0-3], P1=[4-7] | 3p → P0=[0-3], P1=[4-5], P2=[6-7] | 4p → Px=[x*2, x*2+1]
-            if (characterData == null && GameDataManager.Instance != null)
-            {
-                characterData = ResolveLocalCommanderCharacter();
-                Debug.Log($"[PlayerShooting] characterData resolvido via lobby index: {characterData?.name}");
-            }
-        }
-
-        maxAmmo = (characterData != null) ? characterData.magazineSize : 10;
-        currentAmmo = maxAmmo;
+        maxAmmo = characterData != null ? characterData.magazineSize : 10;
+        if (currentAmmo <= 0 || currentAmmo > maxAmmo)
+            currentAmmo = maxAmmo;
 
         mainCamera = Camera.main;
         playerHealth = GetComponent<PlayerHealthSystem>();
+        combatManager = GetComponent<PlayerCombatManager>();
+        inputBridge = GetComponent<LocalPlayerInputBridge>();
 
         PlayerMovement playerMovement = GetComponent<PlayerMovement>();
         if (playerMovement != null)
@@ -136,85 +110,71 @@ public class PlayerShooting : NetworkBehaviour
         }
 
         networkAnimator = GetComponent<NetworkAnimator>();
-        if (networkAnimator == null) networkAnimator = GetComponentInChildren<NetworkAnimator>();
+        if (networkAnimator == null)
+            networkAnimator = GetComponentInChildren<NetworkAnimator>();
 
         cameraController = GetComponentInChildren<CameraController>();
         if (cameraController == null && mainCamera != null)
             cameraController = mainCamera.GetComponent<CameraController>();
 
-        projectilePool = ProjectilePool.Instance;
-        if (projectilePool == null)
-        {
-            Debug.LogWarning("[PlayerShooting] ProjectilePool.Instance é nulo! Adicione um ProjectilePool à cena. Projéteis visuais não serão spawnados.");
-        }
-        else if (projectileVisualPrefab == null)
-        {
-            Debug.LogWarning("[PlayerShooting] projectileVisualPrefab é nulo no Inspector. Projéteis visuais não serão spawnados.");
-        }
-        else
-        {
-            projectilePool.projectilePrefab = this.projectileVisualPrefab;
-            projectilePool.InitializePool();
-        }
+        if (firePoint == null)
+            firePoint = transform;
     }
 
-    /// <summary>
-    /// Resolve o CharacterBase do Comandante deste jogador local consultando o índice
-    /// de membro no lobby. Necessário para clientes não-host porque o PlayerRegistry
-    /// (server-only) não replica os dados entre peers via NGO.
-    ///
-    /// Layout de slots (equipeSelecionada):
-    ///  2 jogadores → P0=[0-3], P1=[4-7]          (commander = slot inicial)
-    ///  3 jogadores → P0=[0-3], P1=[4-5], P2=[6-7]
-    ///  4 jogadores → P0=[0-1], P1=[2-3], P2=[4-5], P3=[6-7]
-    ///
-    /// Fallback seguro: equipe[0] (Singleplayer).
-    /// </summary>
+    private CharacterBase ResolveCharacterDataFromNetworkState(int preferredIndex = -1)
+    {
+        if (GameDataManager.Instance?.bibliotecaOriginalPersonagens == null)
+            return null;
+
+        int resolvedIndex = preferredIndex;
+
+        if (resolvedIndex < 0 && IsServer && PlayerRegistry.Instance != null)
+            resolvedIndex = PlayerRegistry.Instance.GetPlayerCharacterChoice(OwnerClientId);
+
+        if (resolvedIndex < 0 && CharacterChoiceCache.TryGet(OwnerClientId, out int cachedChoice))
+            resolvedIndex = cachedChoice;
+
+        if (resolvedIndex >= 0 && resolvedIndex < GameDataManager.Instance.bibliotecaOriginalPersonagens.Count)
+            return GameDataManager.Instance.bibliotecaOriginalPersonagens[resolvedIndex];
+
+        if (IsOwner)
+            return ResolveLocalCommanderCharacter();
+
+        return null;
+    }
+
     private CharacterBase ResolveLocalCommanderCharacter()
     {
-        var gdm = GameDataManager.Instance;
-        if (gdm == null) return null;
+        GameDataManager gdm = GameDataManager.Instance;
+        if (gdm == null || gdm.equipeSelecionada == null || gdm.equipeSelecionada.Length == 0)
+            return null;
 
-        var equipe = gdm.equipeSelecionada;
-        if (equipe == null || equipe.Length == 0) return null;
-
-        int commanderSlot = 0; // Padrão: slot 0 (Singleplayer / P0)
-
-        var lobbyMgr = LobbyManager.Instance;
-        var sessionMgr = SessionManager.Instance;
+        int commanderSlot = 0;
+        LobbyManager lobbyMgr = LobbyManager.Instance;
+        SessionManager sessionMgr = SessionManager.Instance;
 
         if (lobbyMgr != null && sessionMgr != null)
         {
-            var membros = lobbyMgr.GetMembers();
-            string meuId = sessionMgr.GetUserId();
-            int meuIndice = membros.FindIndex(m => m.productUserId == meuId);
-            int total = membros.Count;
+            string myUserId = sessionMgr.GetUserId();
+            int myIndex = lobbyMgr.GetCanonicalMemberIndex(myUserId);
+            int totalPlayers = lobbyMgr.GetOrderedMembers().Count;
 
-            if (meuIndice >= 0)
-            {
-                if      (total == 2) commanderSlot = meuIndice * 4;
-                else if (total == 3) commanderSlot = meuIndice == 0 ? 0 : meuIndice == 1 ? 4 : 6;
-                else if (total == 4) commanderSlot = meuIndice * 2;
-                // total == 1 → commanderSlot permanece 0 (Singleplayer)
-            }
-
-            Debug.Log($"[PlayerShooting] Lobby index={meuIndice}/{total} → commanderSlot={commanderSlot}");
-        }
-        else
-        {
-            Debug.Log("[PlayerShooting] LobbyManager ou SessionManager nulo — usando slot 0 (Singleplayer).");
+            if (myIndex >= 0)
+                commanderSlot = PartySlotLayout.GetCommanderSlot(totalPlayers, myIndex);
         }
 
-        if (commanderSlot >= 0 && commanderSlot < equipe.Length && equipe[commanderSlot] != null)
-            return equipe[commanderSlot];
+        if (commanderSlot >= 0 &&
+            commanderSlot < gdm.equipeSelecionada.Length &&
+            gdm.equipeSelecionada[commanderSlot] != null)
+            return gdm.equipeSelecionada[commanderSlot];
 
-        // Último recurso: slot 0
-        return equipe.Length > 0 ? equipe[0] : null;
+        return gdm.equipeSelecionada[0];
     }
 
     public void OnFire(InputAction.CallbackContext ctx)
     {
-        if (!IsOwner || !this.enabled) return;
+        if (!IsOwner || !enabled || UsesPolledInput())
+            return;
 
         if (ctx.started || ctx.performed) fireInputHeld = true;
         else if (ctx.canceled) fireInputHeld = false;
@@ -222,54 +182,80 @@ public class PlayerShooting : NetworkBehaviour
 
     public void OnReload(InputAction.CallbackContext ctx)
     {
-        if (!IsOwner || !this.enabled) return;
+        if (!IsOwner || !enabled || UsesPolledInput())
+            return;
 
         if (ctx.performed && !isReloading && currentAmmo < maxAmmo)
             RequestReloadServerRpc();
     }
 
-    void Update()
+    private void Update()
     {
-        if (!IsOwner) return;
-        if (PauseControl.isPaused) return;
+        if (!IsOwner)
+            return;
 
-        if (PauseControl.isPaused || BuildManager.isBuildingMode) return;
+        SyncOwnerInputFromBridge();
+
+        if (PauseControl.isPaused || BuildManager.isBuildingMode)
+            return;
 
         UpdateAimTargetPosition();
 
-        if (isReloading) return;
+        if (isReloading)
+            return;
 
         HandleShootingLogic();
 
-        if (Input.GetKeyDown(KeyCode.R) && currentAmmo < maxAmmo)
+        if (!UsesPolledInput() && Input.GetKeyDown(KeyCode.R) && currentAmmo < maxAmmo)
             RequestReloadServerRpc();
     }
 
-    void HandleShootingLogic()
+    private void SyncOwnerInputFromBridge()
     {
-        if (fireInputHeld && Time.time >= nextShotTime)
+        if (!UsesPolledInput())
+            return;
+
+        fireInputHeld = inputBridge.FireHeld;
+
+        if (inputBridge.ConsumeReloadPressed() && !isReloading && currentAmmo < maxAmmo)
+            RequestReloadServerRpc();
+    }
+
+    private bool UsesPolledInput()
+    {
+        if (inputBridge == null)
+            inputBridge = GetComponent<LocalPlayerInputBridge>();
+
+        return inputBridge != null && inputBridge.isActiveAndEnabled;
+    }
+
+    private void HandleShootingLogic()
+    {
+        if (!fireInputHeld || Time.time < nextShotTime)
+            return;
+
+        if (currentAmmo > 0)
         {
-            if (currentAmmo > 0)
-            {
-                Shoot();
-                if (characterData != null && characterData.fireMode != FireMode.FullAuto) fireInputHeld = false;
-            }
-            else RequestReloadServerRpc();
+            Shoot();
+            if (characterData != null && characterData.fireMode != FireMode.FullAuto)
+                fireInputHeld = false;
+        }
+        else
+        {
+            RequestReloadServerRpc();
         }
     }
 
-    void UpdateAimTargetPosition()
+    private void UpdateAimTargetPosition()
     {
-        if (aimTarget == null || mainCamera == null) return;
+        if (aimTarget == null || mainCamera == null)
+            return;
 
-        Ray ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
-        RaycastHit hit;
-        Vector3 targetPosition;
+        Ray ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        Vector3 targetPosition = ray.origin + ray.direction * maxDistance;
 
-        if (Physics.Raycast(ray, out hit, maxDistance, hitLayers))
+        if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, hitLayers))
             targetPosition = hit.point;
-        else
-            targetPosition = ray.origin + ray.direction * maxDistance;
 
         aimTarget.position = Vector3.Lerp(aimTarget.position, targetPosition, Time.deltaTime * 20f);
     }
@@ -279,88 +265,123 @@ public class PlayerShooting : NetworkBehaviour
         hasNextShotBonus = true;
         nextShotDamageBonus = damageBonus;
         nextShotAreaBonus = areaBonus;
-    }
 
-    void Shoot()
-    {
-        Vector3 shotDirection = GetShotDirection();
-
-        ExecuteShootVisual(shotDirection, true);
-        ShootServerRpc(shotDirection);
-
-        float atkSpeed = (characterData != null && characterData.attackSpeed > 0) ? characterData.attackSpeed : 1f;
-        nextShotTime = Time.time + (1f / atkSpeed);
-        currentAmmo--;
-
-        if (currentAmmo <= 0) RequestReloadServerRpc();
+        if (IsOwner && !IsServer)
+            SyncNextShotBonusServerRpc(damageBonus, areaBonus);
     }
 
     [ServerRpc]
-    private void ShootServerRpc(Vector3 direction)
+    private void SyncNextShotBonusServerRpc(float damageBonus, float areaBonus)
     {
-        ShootVisualClientRpc(direction);
+        hasNextShotBonus = true;
+        nextShotDamageBonus = damageBonus;
+        nextShotAreaBonus = areaBonus;
+    }
+
+    private void Shoot()
+    {
+        Vector3 shotDirection = GetShotDirection();
+        Vector3 shotOrigin = firePoint != null ? firePoint.position : transform.position;
+        int characterIndex = ResolveCharacterLibraryIndex(characterData);
+        bool empoweredShot = hasNextShotBonus;
+
+        ExecuteShootVisual(shotOrigin, shotDirection, true, empoweredShot);
+        RequestShootServerRpc(shotOrigin, shotDirection, characterIndex);
+
+        float attackSpeed = characterData != null && characterData.attackSpeed > 0f ? characterData.attackSpeed : 1f;
+        nextShotTime = Time.time + (1f / attackSpeed);
+        currentAmmo--;
+        ConsumeNextShotBonusLocal();
+
+        if (currentAmmo <= 0)
+            RequestReloadServerRpc();
+    }
+
+    [ServerRpc]
+    private void RequestShootServerRpc(Vector3 origin, Vector3 direction, int characterIndex, ServerRpcParams rpcParams = default)
+    {
+        if (direction.sqrMagnitude <= 0.0001f)
+            return;
+
+        if (!EnsureServerCharacterData(characterIndex))
+            return;
+
+        if (combatManager == null)
+            combatManager = GetComponent<PlayerCombatManager>();
+
+        if (combatManager != null && combatManager.netCombatType.Value != CombatType.Ranged)
+            return;
+
+        if (isReloading || currentAmmo <= 0 || Time.time < nextShotTime)
+            return;
+
+        direction.Normalize();
+
+        float attackSpeed = characterData != null && characterData.attackSpeed > 0f ? characterData.attackSpeed : 1f;
+        nextShotTime = Time.time + (1f / attackSpeed);
+        currentAmmo--;
+
+        float damage = CalculateAuthoritativeDamage(out bool isCritical, out float areaRadius);
+        float armorPenetration = characterData != null ? characterData.armorPenetration : 0f;
+
+        SpawnServerProjectile(origin, direction, damage, isCritical, armorPenetration, areaRadius > 0f, areaRadius, rpcParams.Receive.SenderClientId);
+        ShootVisualClientRpc(origin, direction);
+
+        if (currentAmmo <= 0 && !isReloading)
+            ReloadClientRpc();
     }
 
     [ClientRpc]
-    private void ShootVisualClientRpc(Vector3 direction)
+    private void ShootVisualClientRpc(Vector3 origin, Vector3 direction)
     {
-        if (IsOwner) return;
-        ExecuteShootVisual(direction, false);
+        if (IsOwner)
+            return;
+
+        ExecuteShootVisual(origin, direction, false, false);
     }
 
-    private void ExecuteShootVisual(Vector3 direction, bool isOwnerShot)
+    private void ExecuteShootVisual(Vector3 origin, Vector3 direction, bool isOwnerShot, bool empoweredShot)
     {
-        // Trigger apenas pelo owner: NGO NetworkAnimator propaga automaticamente para os remotos.
-        // Remotos receberiam o trigger via ClientRpc E via propagação do NetworkAnimator — duplicata.
-        if (isOwnerShot && networkAnimator != null) networkAnimator.SetTrigger("Shoot");
+        if (isOwnerShot && networkAnimator != null)
+            networkAnimator.SetTrigger("Shoot");
 
         PlayShootSound();
 
-        if (firePoint != null)
-        {
-            firePoint.rotation = Quaternion.LookRotation(direction);
+        Vector3 spawnPosition = firePoint != null ? firePoint.position : origin;
+        Quaternion spawnRotation = Quaternion.LookRotation(direction);
 
-            if (muzzleFlashPrefab != null)
-            {
-                GameObject flash = GlobalVFXPool.GetVFX(muzzleFlashPrefab, firePoint.position, firePoint.rotation, 1.5f);
+        if (firePoint != null)
+            firePoint.rotation = spawnRotation;
+
+        if (muzzleFlashPrefab != null)
+        {
+            GameObject flash = GlobalVFXPool.GetVFX(muzzleFlashPrefab, spawnPosition, spawnRotation, 1.5f);
+            if (flash != null && firePoint != null)
                 flash.transform.SetParent(firePoint);
-            }
         }
 
-        if (projectilePool != null)
+        if (projectileVisualPrefab != null)
         {
-            GameObject visualProjectile = projectilePool.GetProjectile(firePoint.position, Quaternion.LookRotation(direction));
-            if (visualProjectile != null)
-            {
-                ProjectileVisual visualScript = visualProjectile.GetComponent<ProjectileVisual>();
-                if (visualScript != null)
-                {
-                    float damage = 0;
-                    bool isCrit = false;
+            GameObject visualProjectile = Instantiate(projectileVisualPrefab, spawnPosition, spawnRotation);
+            ProjectileVisual visualScript = visualProjectile.GetComponent<ProjectileVisual>();
+            if (visualScript != null)
+                visualScript.InitializeVisual(direction);
+        }
 
-                    float armPen = (characterData != null) ? characterData.armorPenetration : 0f;
-                    
-                    bool isEmpoweredBySkill = hasNextShotBonus;
-                    float explosionRadius = 0f;
-
-                    if (isOwnerShot)
-                        damage = CalculateDamage(out isCrit, out explosionRadius);
-
-                    visualScript.Initialize(damage, isCrit, armPen, playerHealth, direction, isEmpoweredBySkill, explosionRadius);
-
-                    if (isOwnerShot && tipoDeSom == "Arco" && isEmpoweredBySkill)
-                    {
-                        JuiceEvents.OnCameraShake?.Invoke(-direction, empoweredShotShake.amplitude, empoweredShotShake.frequency, empoweredShotShake.duration);
-                    }
-                }
-            }
+        if (isOwnerShot && tipoDeSom == "Arco" && empoweredShot)
+        {
+            JuiceEvents.OnCameraShake?.Invoke(
+                -direction,
+                empoweredShotShake.amplitude,
+                empoweredShotShake.frequency,
+                empoweredShotShake.duration);
         }
     }
 
-    void PlayShootSound()
+    private void PlayShootSound()
     {
-        string eventToPlay = "";
-        bool isFullAuto = (characterData != null && characterData.fireMode == FireMode.FullAuto);
+        string eventToPlay = string.Empty;
+        bool isFullAuto = characterData != null && characterData.fireMode == FireMode.FullAuto;
 
         if (tipoDeSom == "Arco")
             eventToPlay = isFullAuto ? eventoTiroContinuoArco : eventoTiroUnicoArco;
@@ -371,9 +392,9 @@ public class PlayerShooting : NetworkBehaviour
             RuntimeManager.PlayOneShot(eventToPlay, transform.position);
     }
 
-    float CalculateDamage(out bool isCritical, out float areaRadius)
+    private float CalculateAuthoritativeDamage(out bool isCritical, out float areaRadius)
     {
-        float finalDamage = (characterData != null) ? characterData.damage : 10f;
+        float finalDamage = characterData != null ? characterData.damage : 10f;
         isCritical = false;
         areaRadius = 0f;
 
@@ -383,35 +404,125 @@ public class PlayerShooting : NetworkBehaviour
             isCritical = true;
         }
 
-        if (playerHealth != null) finalDamage *= playerHealth.damageMultiplier.Value;
+        if (playerHealth != null)
+            finalDamage *= playerHealth.damageMultiplier.Value;
 
         if (hasNextShotBonus)
         {
             finalDamage *= nextShotDamageBonus;
             areaRadius = nextShotAreaBonus;
-            hasNextShotBonus = false;
-            nextShotDamageBonus = 1f;
-            nextShotAreaBonus = 1f;
+            ConsumeNextShotBonusLocal();
         }
+
         return finalDamage;
+    }
+
+    private void ConsumeNextShotBonusLocal()
+    {
+        hasNextShotBonus = false;
+        nextShotDamageBonus = 1f;
+        nextShotAreaBonus = 1f;
+    }
+
+    public void NotifyConfirmedDamageServer(float damageAmount)
+    {
+        if (!IsServer || damageAmount <= 0f)
+            return;
+
+        ClientRpcParams targetOwner = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] { OwnerClientId }
+            }
+        };
+
+        ConfirmDamageDealtClientRpc(damageAmount, targetOwner);
+    }
+
+    [ClientRpc]
+    private void ConfirmDamageDealtClientRpc(float damageAmount, ClientRpcParams clientRpcParams = default)
+    {
+        if (playerHealth == null)
+            playerHealth = GetComponent<PlayerHealthSystem>();
+
+        playerHealth?.TriggerDamageDealt(damageAmount);
+    }
+
+    public void BroadcastExplosionVfxFromServer(Vector3 position, float radius)
+    {
+        if (!IsServer)
+            return;
+
+        PlayExplosionVfxAuthoritativeClientRpc(position, radius);
+    }
+
+    [ClientRpc]
+    private void PlayExplosionVfxAuthoritativeClientRpc(Vector3 position, float radius)
+    {
+        PlayExplosionLocal(position, radius);
+    }
+
+    private void SpawnServerProjectile(
+        Vector3 origin,
+        Vector3 direction,
+        float damage,
+        bool isCritical,
+        float armorPenetration,
+        bool empoweredShot,
+        float explosionRadius,
+        ulong attackerClientId)
+    {
+        if (projectileVisualPrefab == null)
+            return;
+
+        GameObject serverProjectileObject = Instantiate(projectileVisualPrefab, origin, Quaternion.LookRotation(direction));
+        ProjectileVisual projectileVisual = serverProjectileObject.GetComponent<ProjectileVisual>();
+        if (projectileVisual != null)
+            projectileVisual.enabled = false;
+
+        float projectileSpeed = projectileVisual != null ? projectileVisual.speed : 80f;
+        float projectileLifetime = projectileVisual != null ? projectileVisual.maxLifetime : 2f;
+
+        ServerAuthoritativeProjectile authoritativeProjectile =
+            serverProjectileObject.GetComponent<ServerAuthoritativeProjectile>();
+        if (authoritativeProjectile == null)
+            authoritativeProjectile = serverProjectileObject.AddComponent<ServerAuthoritativeProjectile>();
+
+        authoritativeProjectile.Initialize(
+            this,
+            attackerClientId,
+            damage,
+            isCritical,
+            armorPenetration,
+            direction,
+            projectileSpeed,
+            projectileLifetime,
+            empoweredShot,
+            explosionRadius);
+    }
+
+    private bool EnsureServerCharacterData(int characterIndex)
+    {
+        if (characterData != null)
+            return true;
+
+        characterData = ResolveCharacterDataFromNetworkState(characterIndex);
+        return characterData != null;
     }
 
     public void RequestDamageOnEnemy(ulong enemyNetworkObjectId, float damage, float armorPenetration, bool isCritical)
     {
-        if (!IsOwner) return;
-        
-        // Passo 2: Em vez de disparar um ServerRpc desta arma, chamamos diretamente 
-        // o ponto centralizado de dano que fica no próprio inimigo.
-        if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(enemyNetworkObjectId, out NetworkObject enemyNetObj))
-        {
-            var networkedEnemy = enemyNetObj.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedEnemy>();
-            if (networkedEnemy != null && networkedEnemy.IsSpawned)
-            {
-                // Como chamamos a função do inimigo a partir deste script local, o NGO 
-                // usa nosso SenderClientId embutido automaticamente nos pacotes de rede.
-                networkedEnemy.TakeDamageServerRpc(damage, armorPenetration, isCritical);
-            }
-        }
+        if (!IsOwner)
+            return;
+
+        if (NetworkManager.Singleton == null ||
+            !NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(enemyNetworkObjectId, out NetworkObject enemyNetObj))
+            return;
+
+        NetworkedEnemy networkedEnemy = enemyNetObj.GetComponent<NetworkedEnemy>();
+        if (networkedEnemy != null && networkedEnemy.IsSpawned)
+            networkedEnemy.TakeDamageServerRpc(damage, armorPenetration, isCritical);
     }
 
     [ServerRpc]
@@ -426,12 +537,13 @@ public class PlayerShooting : NetworkBehaviour
         StartReloadLocal();
     }
 
-    void StartReloadLocal()
+    private void StartReloadLocal()
     {
-        if (isReloading) return;
+        if (isReloading)
+            return;
 
-        float relSpeed = (characterData != null && characterData.reloadSpeed > 0) ? characterData.reloadSpeed : 2f;
-        float multiplier = 3.0f / relSpeed;
+        float reloadSpeed = characterData != null && characterData.reloadSpeed > 0f ? characterData.reloadSpeed : 2f;
+        float multiplier = 3.0f / reloadSpeed;
 
         if (animator != null && networkAnimator != null)
         {
@@ -445,41 +557,43 @@ public class PlayerShooting : NetworkBehaviour
         isReloading = true;
         reloadStartTime = Time.time;
 
-        Invoke("FinishReload", relSpeed);
+        Invoke(nameof(FinishReload), reloadSpeed);
     }
 
-    void FinishReload()
+    private void FinishReload()
     {
         currentAmmo = maxAmmo;
         isReloading = false;
     }
 
-    Vector3 GetShotDirection()
+    private Vector3 GetShotDirection()
     {
-        if (mainCamera == null) return transform.forward;
+        if (mainCamera == null || firePoint == null)
+            return transform.forward;
 
-        Ray ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
-        RaycastHit hit;
-        if (Physics.Raycast(ray, out hit, maxDistance, hitLayers))
+        Ray ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, hitLayers))
             return (hit.point - firePoint.position).normalized;
-        else
-            return ray.direction;
+
+        return ray.direction.normalized;
     }
 
     public float GetRemainingReloadTime()
     {
-        if (!isReloading) return 0;
-        float relSpeed = (characterData != null) ? characterData.reloadSpeed : 2f;
-        return relSpeed - (Time.time - reloadStartTime);
+        if (!isReloading)
+            return 0f;
+
+        float reloadSpeed = characterData != null ? characterData.reloadSpeed : 2f;
+        return reloadSpeed - (Time.time - reloadStartTime);
     }
 
     public void RequestExplosionVfx(Vector3 position, float radius)
     {
-        if (IsOwner)
-        {
-            PlayExplosionLocal(position, radius);
-            RequestExplosionVfxServerRpc(position, radius);
-        }
+        if (!IsOwner)
+            return;
+
+        PlayExplosionLocal(position, radius);
+        RequestExplosionVfxServerRpc(position, radius);
     }
 
     [ServerRpc]
@@ -491,24 +605,35 @@ public class PlayerShooting : NetworkBehaviour
     [ClientRpc]
     private void PlayExplosionVfxClientRpc(Vector3 position, float radius)
     {
-        if (IsOwner) return;
+        if (IsOwner)
+            return;
+
         PlayExplosionLocal(position, radius);
     }
 
     private void PlayExplosionLocal(Vector3 position, float radius)
     {
-        if (explosionVfxPrefab != null)
-        {
-            GameObject vfx = GlobalVFXPool.GetVFX(explosionVfxPrefab, position, Quaternion.identity, 3f);
-            var vfxGraph = vfx.GetComponent<UnityEngine.VFX.VisualEffect>();
-            if (vfxGraph != null && vfxGraph.HasFloat(explosionVfxRadiusParam))
-            {
-                vfxGraph.SetFloat(explosionVfxRadiusParam, radius);
-            }
-            else
-            {
-                vfx.transform.localScale = Vector3.one * radius;
-            }
-        }
+        if (explosionVfxPrefab == null)
+            return;
+
+        GameObject vfx = GlobalVFXPool.GetVFX(explosionVfxPrefab, position, Quaternion.identity, 3f);
+        if (vfx == null)
+            return;
+
+        UnityEngine.VFX.VisualEffect vfxGraph = vfx.GetComponent<UnityEngine.VFX.VisualEffect>();
+        if (vfxGraph != null && vfxGraph.HasFloat(explosionVfxRadiusParam))
+            vfxGraph.SetFloat(explosionVfxRadiusParam, radius);
+        else
+            vfx.transform.localScale = Vector3.one * radius;
+    }
+
+    private int ResolveCharacterLibraryIndex(CharacterBase character)
+    {
+        if (character == null || GameDataManager.Instance?.bibliotecaOriginalPersonagens == null)
+            return -1;
+
+        string cleanName = character.name.Replace("(Clone)", "");
+        return GameDataManager.Instance.bibliotecaOriginalPersonagens.FindIndex(
+            item => item != null && item.name == cleanName);
     }
 }

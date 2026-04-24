@@ -85,6 +85,7 @@ public class PlayerMovement : NetworkBehaviour
 
     private bool jaMoveuTutorial = false;
     private PlayerHealthSystem healthSystem;
+    private LocalPlayerInputBridge inputBridge;
 
     private Vector2 inputMove;
     private bool inputRun;
@@ -93,6 +94,8 @@ public class PlayerMovement : NetworkBehaviour
     {
         controller = GetComponent<CharacterController>();
         healthSystem = GetComponent<PlayerHealthSystem>();
+        inputBridge = GetComponent<LocalPlayerInputBridge>();
+        TryResolveCriticalReferences(false);
 
         if (modelPivot != null)
             animator = modelPivot.GetComponentInChildren<Animator>();
@@ -111,6 +114,7 @@ public class PlayerMovement : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        TryResolveCriticalReferences(true);
 
         if (!IsOwner)
         {
@@ -129,6 +133,12 @@ public class PlayerMovement : NetworkBehaviour
 
     private void InitializeOwner()
     {
+        if (controller != null && !controller.enabled)
+            controller.enabled = true;
+
+        if (inputBridge == null)
+            inputBridge = GetComponent<LocalPlayerInputBridge>();
+
         if (cameraController == null && Camera.main != null)
         {
             cameraController = Camera.main.transform;
@@ -168,20 +178,25 @@ public class PlayerMovement : NetworkBehaviour
 
     public void OnMove(InputAction.CallbackContext ctx)
     {
-        if (!IsOwner) return;
+        if (!IsOwner || UsesPolledInput()) return;
         inputMove = ctx.ReadValue<Vector2>();
     }
 
     public void OnRun(InputAction.CallbackContext ctx)
     {
-        if (!IsOwner) return;
+        if (!IsOwner || UsesPolledInput()) return;
         inputRun = ctx.ReadValueAsButton();
     }
 
     public void OnJump(InputAction.CallbackContext ctx)
     {
-        if (!IsOwner) return;
+        if (!IsOwner || UsesPolledInput()) return;
         if (!ctx.started) return;
+        HandleJumpPressed();
+    }
+
+    private void HandleJumpPressed()
+    {
         if (GetComponent<MergulhoTintaLogic>() != null) return;
         if (PauseControl.isPaused || BuildManager.isBuildingMode || isFloating || isDashing) return;
 
@@ -230,9 +245,12 @@ public class PlayerMovement : NetworkBehaviour
 
     public void OnAim(InputAction.CallbackContext ctx)
     {
-        if (!IsOwner) return;
-        bool aimingInput = ctx.ReadValueAsButton();
+        if (!IsOwner || UsesPolledInput()) return;
+        SetAimState(ctx.ReadValueAsButton());
+    }
 
+    private void SetAimState(bool aimingInput)
+    {
         if (aimingInput != isAiming)
         {
             isAiming = aimingInput;
@@ -267,6 +285,8 @@ public class PlayerMovement : NetworkBehaviour
             }
             return;
         }
+
+        SyncOwnerInputFromBridge();
 
         isGrounded = controller.isGrounded;
         if (isGrounded) hasDoubleJumped = false;
@@ -330,6 +350,12 @@ public class PlayerMovement : NetworkBehaviour
 
     private void LateUpdate()
     {
+        if (modelPivot == null)
+        {
+            TryResolveCriticalReferences(IsOwner);
+            if (modelPivot == null) return;
+        }
+
         if (!IsOwner)
         {
             // Remotos: aplicar rotacao sincronizada ao modelPivot
@@ -483,5 +509,67 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
-    public Transform GetModelPivot() => modelPivot;
+    public Transform GetModelPivot()
+    {
+        if (modelPivot == null)
+            TryResolveCriticalReferences(false);
+
+        return modelPivot;
+    }
+
+    private void TryResolveCriticalReferences(bool logErrors)
+    {
+        if (cameraController == null && Camera.main != null)
+            cameraController = Camera.main.transform;
+
+        if (modelPivot == null)
+        {
+            Transform namedPivot = transform.Find("ModelPivot");
+            if (namedPivot != null)
+            {
+                modelPivot = namedPivot;
+            }
+            else
+            {
+                Animator fallbackAnimator = GetComponentInChildren<Animator>(true);
+                if (fallbackAnimator != null)
+                {
+                    Transform candidate = fallbackAnimator.transform;
+                    if (candidate.parent != null && candidate.parent != transform)
+                        candidate = candidate.parent;
+
+                    modelPivot = candidate;
+                }
+            }
+        }
+
+        if (animator == null && modelPivot != null)
+            animator = modelPivot.GetComponentInChildren<Animator>(true);
+
+        if (logErrors && modelPivot == null)
+        {
+            Debug.LogError($"[PlayerMovement] modelPivot nao configurado para '{name}'. Verifique o prefab e o PlayerNetworkSetup.");
+        }
+    }
+
+    private void SyncOwnerInputFromBridge()
+    {
+        if (!UsesPolledInput())
+            return;
+
+        inputMove = inputBridge.Move;
+        inputRun = inputBridge.SprintHeld;
+        SetAimState(inputBridge.AimHeld);
+
+        if (inputBridge.ConsumeJumpPressed())
+            HandleJumpPressed();
+    }
+
+    private bool UsesPolledInput()
+    {
+        if (inputBridge == null)
+            inputBridge = GetComponent<LocalPlayerInputBridge>();
+
+        return inputBridge != null && inputBridge.isActiveAndEnabled;
+    }
 }

@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using System.Collections;
 using System.Linq;
 using System.Collections.Generic;
+using ExoBeasts.Multiplayer.Sync;
 
 public class UpgradePanelUI : MonoBehaviour
 {
@@ -32,8 +33,10 @@ public class UpgradePanelUI : MonoBehaviour
     public float sellRefundPercentage = 0.4f;
 
     private TowerController currentTower;
+    private NetworkedBuilding currentNetworkedBuilding;
     private CanvasGroup panelCanvasGroup;
     private const int MAX_TOTAL_POINTS = 6;
+    private int lastUiStateHash = int.MinValue;
 
     void Awake()
     {
@@ -48,6 +51,8 @@ public class UpgradePanelUI : MonoBehaviour
         {
             sellButton.onClick.AddListener(SellTower);
         }
+
+        TryResolveUpgradeTooltipTargets();
     }
 
     void Start()
@@ -55,9 +60,25 @@ public class UpgradePanelUI : MonoBehaviour
         HidePanel();
     }
 
+    void Update()
+    {
+        if (currentTower == null || uiPanel == null || !uiPanel.activeInHierarchy)
+            return;
+
+        int currentHash = CaptureUiStateHash();
+        if (currentHash == lastUiStateHash)
+            return;
+
+        lastUiStateHash = currentHash;
+        UpdatePanelInfo();
+    }
+
     public void ShowPanel(TowerController tower)
     {
         currentTower = tower;
+        currentNetworkedBuilding = tower != null ? tower.GetComponent<NetworkedBuilding>() : null;
+        lastUiStateHash = int.MinValue;
+        TryResolveUpgradeTooltipTargets();
         uiPanel.SetActive(true);
 
         if (towerImage != null && currentTower.towerData.characterIcon != null)
@@ -72,6 +93,8 @@ public class UpgradePanelUI : MonoBehaviour
     public void HidePanel()
     {
         currentTower = null;
+        currentNetworkedBuilding = null;
+        lastUiStateHash = int.MinValue;
         uiPanel.SetActive(false);
     }
 
@@ -108,24 +131,25 @@ public class UpgradePanelUI : MonoBehaviour
         for (int i = 0; i < 3; i++) totalPointsSpent += GetCurrentLevel(i);
 
         bool isFullyUpgraded = totalPointsSpent >= MAX_TOTAL_POINTS;
+        bool canInteractLocally = currentNetworkedBuilding == null || currentNetworkedBuilding.CanInteractLocally();
 
-        UpdatePathButton(0, upgradeButton1, costText1, levelText1, isFullyUpgraded, totalPointsSpent);
-        UpdatePathButton(1, upgradeButton2, costText2, levelText2, isFullyUpgraded, totalPointsSpent);
-        UpdatePathButton(2, upgradeButton3, costText3, levelText3, isFullyUpgraded, totalPointsSpent);
+        UpdatePathButton(0, upgradeButton1, costText1, levelText1, isFullyUpgraded, totalPointsSpent, canInteractLocally);
+        UpdatePathButton(1, upgradeButton2, costText2, levelText2, isFullyUpgraded, totalPointsSpent, canInteractLocally);
+        UpdatePathButton(2, upgradeButton3, costText3, levelText3, isFullyUpgraded, totalPointsSpent, canInteractLocally);
 
         if (sellPriceText != null)
         {
-            int refundAmount = Mathf.FloorToInt(currentTower.totalCostSpent * sellRefundPercentage);
+            int refundAmount = Mathf.FloorToInt(currentTower.TotalCostSpent * sellRefundPercentage);
             sellPriceText.text = $"Vender por <color=#76D7C4>{refundAmount}G</color>";
         }
 
-        panelCanvasGroup.interactable = !isFullyUpgraded;
-        panelCanvasGroup.alpha = isFullyUpgraded ? 0.5f : 1f;
+        panelCanvasGroup.interactable = !isFullyUpgraded && canInteractLocally;
+        panelCanvasGroup.alpha = (!isFullyUpgraded && canInteractLocally) ? 1f : 0.5f;
 
         ResetTowerImageAlpha();
     }
 
-    void UpdatePathButton(int pathIndex, Button button, TextMeshProUGUI costText, TextMeshProUGUI levelText, bool isFullyUpgraded, int totalPointsSpent)
+    void UpdatePathButton(int pathIndex, Button button, TextMeshProUGUI costText, TextMeshProUGUI levelText, bool isFullyUpgraded, int totalPointsSpent, bool canInteractLocally)
     {
         UpgradeTooltip tooltip = button.GetComponent<UpgradeTooltip>();
 
@@ -219,7 +243,7 @@ public class UpgradePanelUI : MonoBehaviour
             bool canAfford = CurrencyManager.Instance.HasEnoughCurrency(geoditeCost, CurrencyType.Geodites) &&
                              CurrencyManager.Instance.HasEnoughCurrency(darkEtherCost, CurrencyType.DarkEther);
 
-            button.interactable = canAfford && !isFullyUpgraded;
+            button.interactable = canInteractLocally && canAfford && !isFullyUpgraded;
             costText.text = !isFullyUpgraded ? costString : "";
 
             tooltipDescription = $"<b>Próximo Nível ({currentLevel + 1}): {nextUpgrade.upgradeName}</b>\n{nextUpgrade.description}";
@@ -258,6 +282,15 @@ public class UpgradePanelUI : MonoBehaviour
     public void UpgradePath(int pathIndex)
     {
         if (currentTower == null) return;
+        if (currentNetworkedBuilding != null && currentNetworkedBuilding.IsSpawned)
+        {
+            currentNetworkedBuilding.RequestUpgradeServerRpc(pathIndex);
+            if (TutorialManager.Instance != null)
+                TutorialManager.Instance.TriggerTutorial("NEXT_WAVE");
+
+            StartCoroutine(RefreshUIAfterFrame());
+            return;
+        }
 
         if (pathIndex >= currentTower.towerData.upgradePaths.Count || currentTower.towerData.upgradePaths[pathIndex] == null) return;
 
@@ -314,9 +347,78 @@ public class UpgradePanelUI : MonoBehaviour
     {
         if (currentTower == null) return;
 
+        if (currentNetworkedBuilding != null && currentNetworkedBuilding.IsSpawned)
+        {
+            currentNetworkedBuilding.RequestSellServerRpc(sellRefundPercentage);
+            HidePanel();
+            return;
+        }
+
         currentTower.SellTower(sellRefundPercentage);
 
         HidePanel();
+    }
+
+    private int CaptureUiStateHash()
+    {
+        if (currentTower == null)
+            return 0;
+
+        int hash = currentTower.TotalCostSpent;
+        for (int i = 0; i < 3; i++)
+            hash = (hash * 31) + GetCurrentLevel(i);
+
+        return hash;
+    }
+
+    private void TryResolveUpgradeTooltipTargets()
+    {
+        Transform tooltipPanelTransform = FindChildByNormalizedName(transform, "tooltippanel");
+        TextMeshProUGUI upgradeNameTarget = FindTextByNormalizedName(transform, "nomedocaminho");
+        TextMeshProUGUI descriptionTarget = FindTextByNormalizedName(transform, "descricaodocaminho");
+
+        UpgradeTooltip[] tooltips = GetComponentsInChildren<UpgradeTooltip>(true);
+        foreach (UpgradeTooltip tooltip in tooltips)
+        {
+            if (tooltip == null) continue;
+            if (tooltip.tooltipPanel == null && tooltipPanelTransform != null)
+                tooltip.tooltipPanel = tooltipPanelTransform.gameObject;
+
+            if (tooltip.upgradeNameText == null)
+                tooltip.upgradeNameText = upgradeNameTarget;
+
+            if (tooltip.descriptionText == null)
+                tooltip.descriptionText = descriptionTarget;
+        }
+    }
+
+    private Transform FindChildByNormalizedName(Transform root, string normalizedName)
+    {
+        foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (NormalizeName(child.name) == normalizedName)
+                return child;
+        }
+
+        return null;
+    }
+
+    private TextMeshProUGUI FindTextByNormalizedName(Transform root, string normalizedName)
+    {
+        foreach (TextMeshProUGUI text in root.GetComponentsInChildren<TextMeshProUGUI>(true))
+        {
+            if (NormalizeName(text.gameObject.name) == normalizedName)
+                return text;
+        }
+
+        return null;
+    }
+
+    private string NormalizeName(string value)
+    {
+        return string.IsNullOrEmpty(value)
+            ? string.Empty
+            : value.Replace(" ", "").Trim().ToLowerInvariant();
     }
 
     private IEnumerator RefreshUIAfterFrame()

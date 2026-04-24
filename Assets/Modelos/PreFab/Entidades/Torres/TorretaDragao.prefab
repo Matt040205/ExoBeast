@@ -134,6 +134,8 @@ GameObject:
   - component: {fileID: -7455273069582053334}
   - component: {fileID: 961821673171643992}
   - component: {fileID: -1997046969559067820}
+  - component: {fileID: 3488153431136868185}
+  - component: {fileID: 1945485625212473899}
   m_Layer: 8
   m_Name: TorretaDragao
   m_TagString: Untagged
@@ -262,11 +264,16 @@ MonoBehaviour:
   towerData: {fileID: 11400000, guid: 78cb2df0fda232c4792b569b2d154ee6, type: 2}
   partToRotate: {fileID: 0}
   firePoint: {fileID: 0}
+  tempoDeSpawn: 2
+  materialHolograma: {fileID: 0}
+  materialToon: {fileID: 0}
+  materialOutline: {fileID: 0}
   animator: {fileID: 0}
   shootTrigger: Attack
   towerModeBool: IsTower
   rotationOffset: {x: 0, y: 0, z: 0}
   enemyTag: Enemy
+  IsInvulnerable: 0
 --- !u!114 &-7455273069582053334
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -294,6 +301,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   moveSpeed: 3.5
+  patrolVisionRadius: 15
 --- !u!195 &-1997046969559067820
 NavMeshAgent:
   m_ObjectHideFlags: 0
@@ -316,3 +324,44 @@ NavMeshAgent:
   m_BaseOffset: 0.5
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
+--- !u!114 &3488153431136868185
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8490162969109981554}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 0
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+--- !u!114 &1945485625212473899
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8490162969109981554}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 271a053691a15b048a86dbc304328fd0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Type:
+    m_InternalValue: 0
+  Level:
+    m_InternalValue: 1
+  Health:
+    m_InternalValue: 100
+  IsActive:
+    m_InternalValue: 1

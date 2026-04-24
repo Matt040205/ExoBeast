@@ -1,7 +1,7 @@
+using System.Collections;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
-using Unity.Netcode;
-using System.Collections;
 
 namespace ExoBeasts.Multiplayer.Sync
 {
@@ -30,57 +30,48 @@ namespace ExoBeasts.Multiplayer.Sync
         [ServerRpc(RequireOwnership = false)]
         public void TakeDamageServerRpc(float damage, float armorPen, bool isCrit, ServerRpcParams rpcParams = default)
         {
-            if (IsDead.Value) return;
-
-            // PASSO 3 - A MÁGICA: O `ServerRpcParams rpcParams = default` diz ao Netcode para preencher
-            // automaticamente os metadados da mensagem na chegada ao Servidor.
-            // Aqui ele captura exatamente de onde a requisição veio, resolvendo o bug do 'ID 0' (pois
-            // o `SenderClientId` conterá o ID verdadeiro de quem disparou o ServerRpc na ponta cliente).
             ulong attackerId = rpcParams.Receive.SenderClientId;
+            ApplyDamageServer(damage, armorPen, isCrit, attackerId, out _);
+        }
 
-            if (localHealth != null)
-            {
-                // Passamos o ID salvo do atacante para o próximo sistema, garantindo o rastreio
-                localHealth.TakeDamage(damage, armorPen, isCrit, attackerId);
-            }
+        public bool ApplyDamageServer(float damage, float armorPen, bool isCrit, ulong attackerId, out float finalDamage)
+        {
+            finalDamage = 0f;
+
+            if (!IsServer || IsDead.Value || localHealth == null)
+                return false;
+
+            localHealth.TakeDamageDetailed(damage, armorPen, isCrit, attackerId, out finalDamage);
+            return finalDamage > 0f;
         }
 
         public void TriggerHitVisual(float finalDamage, bool isCritical, ulong attackerId)
         {
             if (!IsServer) return;
 
-            // Flash branco → todos os clientes veem
             ShowHitFlashClientRpc();
 
-            // Aqui montamos o envio seletivo: a variável Send agrupa as regras do ClientRpc.
-            // Passamos especificamente o `attackerId` que foi capturado via ServerRpcParams lá de cima.
             ClientRpcParams popupParams = new ClientRpcParams
             {
                 Send = new ClientRpcSendParams
                 {
-                    // Se não for fornecido, ou ficar vazio, faria broadcast.
-                    // Com o ID verdadeiro (ex: 2) invés do default '0', apenas o cliente '2' receberá isso.
                     TargetClientIds = new ulong[] { attackerId }
                 }
             };
-            
-            // Disparamos o ClientRpc de volta para a UI, embutindo as ClientRpcParams exclusivas para o alvo
+
             ShowDamagePopupClientRpc(finalDamage, isCritical, popupParams);
         }
 
         [ClientRpc]
         private void ShowHitFlashClientRpc()
         {
-            // Flash aparece para todo mundo, sem popup
             if (localHealth != null)
                 localHealth.ShowHitVisualLocal(0f, false, showPopup: false);
         }
 
         [ClientRpc]
-        private void ShowDamagePopupClientRpc(float damageAmount, bool isCritical,
-                                       ClientRpcParams clientRpcParams = default)
+        private void ShowDamagePopupClientRpc(float damageAmount, bool isCritical, ClientRpcParams clientRpcParams = default)
         {
-            // Se você recebeu este RPC, você É o atacante — mostra o popup sem comparação
             if (localHealth != null)
                 localHealth.ShowHitVisualLocal(damageAmount, isCritical, showPopup: true);
         }
@@ -91,9 +82,7 @@ namespace ExoBeasts.Multiplayer.Sync
             IsDead.Value = true;
 
             if (HordeManager.Instance != null)
-            {
                 HordeManager.Instance.OnEnemyKilledServerRpc();
-            }
 
             OnEnemyDiedClientRpc();
 
@@ -117,11 +106,8 @@ namespace ExoBeasts.Multiplayer.Sync
                 anim.SetTrigger("isDead");
             }
 
-            // Desova do efeito visual de morte (se configurado) independente do script do inimigo
             if (localHealth != null && localHealth.deathVfxPrefab != null)
-            {
                 GlobalVFXPool.GetVFX(localHealth.deathVfxPrefab, transform.position, transform.rotation, 4f);
-            }
         }
 
         private void OnDeathStateChanged(bool oldVal, bool newVal)
@@ -144,9 +130,7 @@ namespace ExoBeasts.Multiplayer.Sync
         {
             var combatInfo = GetComponent<EnemyCombatSystem>();
             if (combatInfo != null && combatInfo.attackVfxPrefab != null)
-            {
                 GlobalVFXPool.GetVFX(combatInfo.attackVfxPrefab, position, rotation, 2f);
-            }
         }
     }
 }

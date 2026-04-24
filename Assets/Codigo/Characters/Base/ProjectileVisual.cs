@@ -55,6 +55,11 @@ public class ProjectileVisual : MonoBehaviour
         Invoke(nameof(ReturnToPool), maxLifetime);
     }
 
+    public void InitializeVisual(Vector3 direction)
+    {
+        Initialize(0f, false, 0f, null, direction, false, 0f);
+    }
+
     public void SetPoolReference(ProjectilePool poolReference)
     {
         pool = poolReference;
@@ -142,7 +147,7 @@ public class ProjectileVisual : MonoBehaviour
         }
         else
         {
-            gameObject.SetActive(false);
+            Destroy(gameObject);
         }
     }
 }

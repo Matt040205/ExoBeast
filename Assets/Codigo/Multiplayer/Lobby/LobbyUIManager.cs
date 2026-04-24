@@ -91,6 +91,14 @@ public class LobbyUIManager : MonoBehaviour
         if (painelLobby != null)
             painelLobby.anchoredPosition = posLobbyEscondido;
 
+        if (GameModeManager.CurrentMode == GameMode.Multiplayer && GameModeManager.IsNetworkSession)
+        {
+            Debug.Log("[LobbyUIManager] Fluxo legado desativado em EscolherPersonagem porque a sessao de rede ja esta ativa.");
+            _visible = false;
+            enabled = false;
+            return;
+        }
+
         _auth  = EOSAuthenticator.Instance;
         _lobby = LobbyManager.Instance;
         SubscribeToEvents();

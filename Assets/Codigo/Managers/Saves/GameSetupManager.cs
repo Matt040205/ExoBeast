@@ -1,9 +1,10 @@
 using UnityEngine;
 using Unity.Netcode;
-using System.Collections;
+using Unity.Netcode.Components;
 using System.Collections.Generic;
 using ExoBeasts.Multiplayer.GameServer;
 using ExoBeasts.Multiplayer.Core;
+using ExoBeasts.Multiplayer.Sync;
 
 /// <summary>
 /// ── GameSetupManager ───────────────────────────────────
@@ -79,53 +80,36 @@ public class GameSetupManager : NetworkBehaviour
             return;
 
         GameObject prefabToSpawn = null;
-        CharacterBase characterEscolhido = null; // <--- Guarda o cartão de dados selecionado
+        CharacterBase characterEscolhido = null;
 
-        // 1. Verifica se estamos spawnando o avatar DO PRÓPRIO JOGADOR (Local)
-        bool isLocalPlayer = (NetworkManager.Singleton != null && clientId == NetworkManager.Singleton.LocalClientId);
+        List<CharacterBase> biblioteca = GameDataManager.Instance?.bibliotecaOriginalPersonagens;
+        int charIndex = -1;
 
-        // Fonte primaria: CharacterChoiceCache (populado pelo LobbyManager via ConnectionApproval).
-        int charIndex = CharacterChoiceCache.Get(clientId, fallback: 0);
-
-        // Prioridade MÁXIMA para o próprio jogador: usar a sua própria equipeSelecionada[0] (O Comandante)
-        var equipe = GameDataManager.Instance.equipeSelecionada;
-        if (isLocalPlayer && equipe != null && equipe.Length > 0 && equipe[0] != null)
+        if (ExoBeasts.Managers.GameModeManager.CurrentMode == ExoBeasts.Managers.GameMode.Multiplayer)
         {
-            characterEscolhido = equipe[0];
-            prefabToSpawn = characterEscolhido.commanderPrefab;
-            
-            // Para manter a consistencia com o PlayerRegistry, se o local tiver a biblioteca carregada, a gente resgata o Index correto
-            var bib = GameDataManager.Instance.bibliotecaOriginalPersonagens;
-            if (bib != null) {
-                int foundIndex = bib.IndexOf(characterEscolhido);
-                if (foundIndex >= 0) charIndex = foundIndex;
+            if (!CharacterChoiceCache.TryGet(clientId, out charIndex))
+            {
+                _spawnedClientIds.Remove(clientId);
+                Debug.LogError($"[GameSetupManager] Spawn bloqueado: clientId={clientId} ainda nao registrou escolha autoritativa de comandante.");
+                return;
             }
-            Debug.Log($"[GameSetupManager] Usando equipeSelecionada[0] ({characterEscolhido.name}) para o LocalPlayer!");
         }
-        else
+        else if (!CharacterChoiceCache.TryGet(clientId, out charIndex))
         {
-            // 2. Se for um jogador REMOTO conectando, ou fallback se a equipe nula:
-            // Lemos o Payload da rede já extraído no charIndex
-            var biblioteca = GameDataManager.Instance.bibliotecaOriginalPersonagens;
+            charIndex = ResolveSingleplayerCharacterIndex(biblioteca);
+        }
 
-            if (biblioteca != null && charIndex >= 0 && charIndex < biblioteca.Count)
-            {
-                characterEscolhido = biblioteca[charIndex];
-                prefabToSpawn = characterEscolhido?.commanderPrefab;
-                Debug.Log($"[GameSetupManager] Usando biblioteca[{charIndex}] ({characterEscolhido?.name}) para jogador Remoto {clientId}");
-            }
-            else if (equipe != null && equipe.Length > 0 && equipe[0] != null)
-            {
-                // Fallback de Segurança Extremo
-                characterEscolhido = equipe[0];
-                prefabToSpawn = characterEscolhido.commanderPrefab;
-            }
+        if (biblioteca != null && charIndex >= 0 && charIndex < biblioteca.Count)
+        {
+            characterEscolhido = biblioteca[charIndex];
+            prefabToSpawn = characterEscolhido?.commanderPrefab;
+            Debug.Log($"[GameSetupManager] Spawn resolvido via CharacterChoiceCache: clientId={clientId}, charIndex={charIndex}, personagem={characterEscolhido?.name}");
         }
 
         if (prefabToSpawn == null)
         {
             _spawnedClientIds.Remove(clientId);
-            Debug.LogError($"[GameSetupManager] Falha crítica: nenhum 'commanderPrefab' encontrado para clientId={clientId} (charIndex={charIndex}). Configure GameDataManager.bibliotecaOriginalPersonagens ou equipeSelecionada[0] no Inspector.");
+            Debug.LogError($"[GameSetupManager] Falha critica: nenhum commanderPrefab encontrado para clientId={clientId} (charIndex={charIndex}). Verifique CharacterChoiceCache e GameDataManager.bibliotecaOriginalPersonagens.");
             return;
         }
 
@@ -147,6 +131,7 @@ public class GameSetupManager : NetworkBehaviour
 
         // Instancia o boneco físico
         GameObject playerInstance = Instantiate(prefabToSpawn, pos, rot);
+        EnsureRuntimePlayerNetworkContract(playerInstance);
 
         // =================================================================
         // A INJEÇÃO MÁGICA: Cola o characterData no boneco ANTES dele ligar!
@@ -184,9 +169,7 @@ public class GameSetupManager : NetworkBehaviour
         Debug.Log($"[GameSetupManager] Spawnou clientId={clientId} como charIndex={charIndex} ({characterEscolhido?.name})");
 
         if (BuildManager.Instance != null && GameDataManager.Instance != null)
-        {
             BuildManager.Instance.SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);
-        }
     }
 
     public override void OnNetworkDespawn()
@@ -198,5 +181,44 @@ public class GameSetupManager : NetworkBehaviour
         }
         _spawnedClientIds.Clear();
         base.OnNetworkDespawn();
+    }
+
+    private int ResolveSingleplayerCharacterIndex(List<CharacterBase> biblioteca)
+    {
+        CharacterBase[] equipeSelecionada = GameDataManager.Instance?.equipeSelecionada;
+        if (biblioteca == null || equipeSelecionada == null || equipeSelecionada.Length == 0)
+            return 0;
+
+        CharacterBase comandante = equipeSelecionada[0];
+        if (comandante == null)
+            return 0;
+
+        string cleanName = comandante.name.Replace("(Clone)", "");
+        int characterIndex = biblioteca.FindIndex(character => character != null && character.name == cleanName);
+        return characterIndex >= 0 ? characterIndex : 0;
+    }
+
+    private void EnsureRuntimePlayerNetworkContract(GameObject playerInstance)
+    {
+        if (playerInstance == null)
+            return;
+
+        if (playerInstance.GetComponent<PlayerNetworkSetup>() == null)
+        {
+            playerInstance.AddComponent<PlayerNetworkSetup>();
+            Debug.LogWarning($"[GameSetupManager] '{playerInstance.name}' recebeu PlayerNetworkSetup em runtime para padronizar o contrato multiplayer.");
+        }
+
+        if (playerInstance.GetComponent<LocalPlayerInputBridge>() == null &&
+            playerInstance.GetComponent<UnityEngine.InputSystem.PlayerInput>() != null)
+        {
+            playerInstance.AddComponent<LocalPlayerInputBridge>();
+        }
+
+        if (playerInstance.GetComponent<Unity.Netcode.Components.NetworkTransform>() == null)
+        {
+            playerInstance.AddComponent<ClientNetworkTransform>();
+            Debug.LogWarning($"[GameSetupManager] '{playerInstance.name}' recebeu ClientNetworkTransform em runtime.");
+        }
     }
 }

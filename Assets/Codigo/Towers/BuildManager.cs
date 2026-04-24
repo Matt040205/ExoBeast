@@ -4,6 +4,8 @@ using UnityEngine.EventSystems;
 using Unity.Netcode;
 using System.Collections;
 using System.Collections.Generic;
+using ExoBeasts.Multiplayer.Core;
+using ExoBeasts.Multiplayer.Sync;
 
 /// <summary>
 /// ── BuildManager ───────────────────────────────────────
@@ -48,6 +50,23 @@ public class BuildManager : NetworkBehaviour
             return;
         }
         Instance = this;
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+        // Inicializa o UI de build em todos os clientes ao entrar na cena.
+        // Sem isso, clientes remotos só recebem SetAvailableTowers após a primeira
+        // construção (via NotifyBuildingPlacedClientRpc), deixando os tooltips vazios.
+        StartCoroutine(InitBuildUIWhenReady());
+    }
+
+    private IEnumerator InitBuildUIWhenReady()
+    {
+        yield return new WaitUntil(() =>
+            GameDataManager.Instance != null &&
+            GameDataManager.Instance.equipeSelecionada != null);
+        SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);
     }
 
     public void SelectTowerToBuild(CharacterBase towerData)
@@ -161,7 +180,7 @@ public class BuildManager : NetworkBehaviour
             currentBuildGhost.transform.position = ray.GetPoint(20f);
         }
 
-        bool hasEnoughCurrency = CurrencyManager.Instance.HasEnoughCurrency(selectedBuildableCost, CurrencyType.Geodites);
+        bool hasEnoughCurrency = HasEnoughBuildCurrency(selectedBuildableData);
         bool isBuildAllowed = IsBuildAllowedLocal(selectedBuildableData);
 
         var ghostRenderer = currentBuildGhost.GetComponentInChildren<MeshRenderer>();
@@ -181,12 +200,43 @@ public class BuildManager : NetworkBehaviour
         return true;
     }
 
+    private bool HasEnoughBuildCurrency(object buildableData)
+    {
+        if (CurrencyManager.Instance == null)
+            return false;
+
+        if (buildableData is TrapDataSO trapData)
+        {
+            return CurrencyManager.Instance.HasEnoughCurrency(trapData.geoditeCost, CurrencyType.Geodites) &&
+                   CurrencyManager.Instance.HasEnoughCurrency(trapData.darkEtherCost, CurrencyType.DarkEther);
+        }
+
+        return CurrencyManager.Instance.HasEnoughCurrency(selectedBuildableCost, CurrencyType.Geodites);
+    }
+
     // =================================================================
     // O RADAR BRUTO: Procura e conta tudo que existe fisicamente no mapa!
     // =================================================================
     public int GetTrapCount(TrapDataSO trapData)
     {
         if (trapData == null || trapData.prefab == null) return 0;
+
+        NetworkedTrapVisual[] networkedTraps = FindObjectsByType<NetworkedTrapVisual>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        if (networkedTraps != null && networkedTraps.Length > 0)
+        {
+            int networkedCount = 0;
+            foreach (NetworkedTrapVisual trapVisual in networkedTraps)
+            {
+                if (trapVisual == null) continue;
+
+                TrapDataSO resolvedData = trapVisual.TrapData;
+                if (resolvedData == trapData ||
+                    (resolvedData != null && resolvedData.prefab != null && resolvedData.prefab.name == trapData.prefab.name))
+                    networkedCount++;
+            }
+
+            return networkedCount;
+        }
 
         int count = 0;
         string baseName = trapData.prefab.name.Trim();
@@ -242,11 +292,11 @@ public class BuildManager : NetworkBehaviour
             if (trapIndex == -1) return;
             RequestPlaceTrapServerRpc(trapIndex, finalPosition, selectedBuildableCost);
         }
-        else
+        else if (selectedBuildableData is CharacterBase towerData)
         {
-            int prefabIndex = buildablePrefabs.IndexOf(selectedBuildablePrefab);
-            if (prefabIndex == -1) return;
-            RequestPlaceBuildingServerRpc(prefabIndex, finalPosition, selectedBuildableCost);
+            int characterIndex = GetCharacterLibraryIndex(towerData);
+            if (characterIndex < 0) return;
+            RequestPlaceBuildingServerRpc(characterIndex, finalPosition, selectedBuildableCost);
         }
 
         ClearSelection();
@@ -256,31 +306,31 @@ public class BuildManager : NetworkBehaviour
     private void RequestPlaceTrapServerRpc(int trapIndex, Vector3 pos, int cost, ServerRpcParams rpcParams = default)
     {
         if (trapIndex < 0 || trapIndex >= availableTraps.Count) return;
-        if (!CurrencyManager.Instance.HasEnoughCurrency(cost, CurrencyType.Geodites)) return;
 
         TrapDataSO trapData = availableTraps[trapIndex];
         if (trapData == null || trapData.prefab == null) return;
+        if (!CurrencyManager.Instance.HasEnoughCurrency(trapData.geoditeCost, CurrencyType.Geodites)) return;
+        if (!CurrencyManager.Instance.HasEnoughCurrency(trapData.darkEtherCost, CurrencyType.DarkEther)) return;
 
         if (trapData.buildLimit > 0 && GetTrapCount(trapData) >= trapData.buildLimit) return;
 
-        CurrencyManager.Instance.SpendCurrency(cost, CurrencyType.Geodites);
+        if (trapData.geoditeCost > 0)
+            CurrencyManager.Instance.SpendCurrency(trapData.geoditeCost, CurrencyType.Geodites);
+
+        if (trapData.darkEtherCost > 0)
+            CurrencyManager.Instance.SpendCurrency(trapData.darkEtherCost, CurrencyType.DarkEther);
 
         // Dispara o ClientRpc para os outros jogadores verem o feixe antes da torre spawnar
         PlaySpawnBeamClientRpc(pos, rpcParams.Receive.SenderClientId);
 
-        StartCoroutine(SpawnTrapWithDelay(trapData, pos));
+        StartCoroutine(SpawnTrapWithDelay(trapData, trapIndex, pos, rpcParams.Receive.SenderClientId));
     }
 
-    private IEnumerator SpawnTrapWithDelay(TrapDataSO trapData, Vector3 pos)
+    private IEnumerator SpawnTrapWithDelay(TrapDataSO trapData, int trapIndex, Vector3 pos, ulong builderClientId)
     {
         yield return new WaitForSeconds(0.05f); // Micro-delay
 
-        // 1. Spawna o prefab VISUAL
-        GameObject newTrap = Instantiate(trapData.prefab, pos, Quaternion.identity);
-        if (newTrap.TryGetComponent<NetworkObject>(out var netObj))
-            netObj.Spawn();
-
-        // 2. Spawna o prefab de LOGICA (onde ficam os scripts de efeito)
+        NetworkObject logicNetObj = null;
         if (trapData.logicPrefab != null)
         {
             GameObject logicObj = Instantiate(trapData.logicPrefab, pos, Quaternion.identity);
@@ -288,8 +338,24 @@ public class BuildManager : NetworkBehaviour
             TrapLogicBase logicBase = logicObj.GetComponent<TrapLogicBase>();
             if (logicBase != null) logicBase.trapData = trapData;
 
-            if (logicObj.TryGetComponent<NetworkObject>(out var logicNetObj))
-                logicNetObj.Spawn();
+            if (logicObj.TryGetComponent<NetworkObject>(out var spawnedLogicNetObj))
+            {
+                spawnedLogicNetObj.Spawn();
+                logicNetObj = spawnedLogicNetObj;
+            }
+        }
+
+        GameObject newTrap = Instantiate(trapData.prefab, pos, Quaternion.identity);
+        if (newTrap.TryGetComponent<NetworkObject>(out var netObj))
+        {
+            NetworkedTrapVisual networkedTrapVisual = newTrap.GetComponent<NetworkedTrapVisual>();
+            if (networkedTrapVisual != null)
+            {
+                ulong logicObjectId = logicNetObj != null ? logicNetObj.NetworkObjectId : 0;
+                networkedTrapVisual.InitializeServer(builderClientId, trapIndex, logicObjectId);
+            }
+
+            netObj.Spawn();
         }
 
         NotifyBuildingPlacedClientRpc(pos);
@@ -297,21 +363,31 @@ public class BuildManager : NetworkBehaviour
 
 
     [ServerRpc(RequireOwnership = false)]
-    private void RequestPlaceBuildingServerRpc(int prefabIndex, Vector3 pos, int cost, ServerRpcParams rpcParams = default)
+    private void RequestPlaceBuildingServerRpc(int characterIndex, Vector3 pos, int cost, ServerRpcParams rpcParams = default)
     {
         if (!CurrencyManager.Instance.HasEnoughCurrency(cost, CurrencyType.Geodites)) return;
 
-        GameObject prefabToSpawn = buildablePrefabs[prefabIndex];
+        var biblioteca = GameDataManager.Instance?.bibliotecaOriginalPersonagens;
+        if (biblioteca == null || characterIndex < 0 || characterIndex >= biblioteca.Count) return;
+
+        CharacterBase characterData = biblioteca[characterIndex];
+        GameObject prefabToSpawn = characterData?.towerPrefab;
+
+        if (prefabToSpawn == null)
+        {
+            Debug.LogError($"[BuildManager] Torre de índice {characterIndex} não possui towerPrefab válido. Verifique bibliotecaOriginalPersonagens e NetworkPrefabs.");
+            return;
+        }
 
         CurrencyManager.Instance.SpendCurrency(cost, CurrencyType.Geodites);
 
         // Dispara o ClientRpc para os outros jogadores verem o feixe antes da torre spawnar
         PlaySpawnBeamClientRpc(pos, rpcParams.Receive.SenderClientId);
 
-        StartCoroutine(SpawnBuildingWithDelay(prefabToSpawn, pos));
+        StartCoroutine(SpawnBuildingWithDelay(prefabToSpawn, characterIndex, cost, pos, rpcParams.Receive.SenderClientId));
     }
 
-    private IEnumerator SpawnBuildingWithDelay(GameObject prefabToSpawn, Vector3 pos)
+    private IEnumerator SpawnBuildingWithDelay(GameObject prefabToSpawn, int characterIndex, int cost, Vector3 pos, ulong builderClientId)
     {
         yield return new WaitForSeconds(0.05f); // Micro-delay
 
@@ -319,6 +395,10 @@ public class BuildManager : NetworkBehaviour
 
         if (newBuildObject.TryGetComponent<NetworkObject>(out var netObj))
         {
+            NetworkedBuilding networkedBuilding = newBuildObject.GetComponent<NetworkedBuilding>();
+            if (networkedBuilding != null)
+                networkedBuilding.InitializeTowerServer(builderClientId, characterIndex, cost);
+
             netObj.Spawn();
         }
 
@@ -363,70 +443,7 @@ public class BuildManager : NetworkBehaviour
 
     public void SetAvailableTowers(CharacterBase[] equipe)
     {
-        List<CharacterBase> torres = new List<CharacterBase>();
-
-        int meuStartSlot = 0;
-        int meuEndSlot = equipe != null ? equipe.Length - 1 : 7;
-
-        if (NetworkManager.Singleton != null && (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer))
-        {
-            if (ExoBeasts.Multiplayer.Lobby.LobbyManager.Instance != null && ExoBeasts.Multiplayer.Auth.SessionManager.Instance != null)
-            {
-                var membros = ExoBeasts.Multiplayer.Lobby.LobbyManager.Instance.GetMembers();
-                string meuId = ExoBeasts.Multiplayer.Auth.SessionManager.Instance.GetUserId();
-                int meuIndice = membros.FindIndex(m => m.productUserId == meuId);
-                int total = membros.Count;
-
-                if (meuIndice != -1)
-                {
-                    if (total == 2) { meuStartSlot = meuIndice * 4; meuEndSlot = meuStartSlot + 3; }
-                    else if (total == 3)
-                    {
-                        if (meuIndice == 0) { meuStartSlot = 0; meuEndSlot = 3; }
-                        else if (meuIndice == 1) { meuStartSlot = 4; meuEndSlot = 5; }
-                        else { meuStartSlot = 6; meuEndSlot = 7; }
-                    }
-                    else if (total == 4) { meuStartSlot = meuIndice * 2; meuEndSlot = meuStartSlot + 1; }
-                }
-            }
-        }
-
-        if (equipe != null)
-        {
-            for (int i = meuStartSlot; i <= meuEndSlot; i++)
-            {
-                if (i >= equipe.Length) break;
-
-                CharacterBase personagem = equipe[i];
-                
-                // Ignora o primeiro slot do range local, pois ele é sempre o seu Comandante
-                bool isMyCommanderSlot = (i == meuStartSlot);
-
-                if (personagem != null && !isMyCommanderSlot && personagem.towerPrefab != null)
-                {
-                    torres.Add(personagem);
-
-                    if (!buildablePrefabs.Contains(personagem.towerPrefab))
-                        buildablePrefabs.Add(personagem.towerPrefab);
-                }
-            }
-        }
-
-        if (availableTraps != null)
-        {
-            foreach (TrapDataSO trap in availableTraps)
-            {
-                if (trap != null && trap.prefab != null && !buildablePrefabs.Contains(trap.prefab))
-                {
-                    buildablePrefabs.Add(trap.prefab);
-                }
-            }
-        }
-
-        if (UIManager.Instance != null)
-        {
-            UIManager.Instance.UpdateBuildUI(torres, availableTraps);
-        }
+        TryPopulateBuildUiFromCanonicalSlots(equipe);
     }
 
     public void ClearSelection()
@@ -436,5 +453,82 @@ public class BuildManager : NetworkBehaviour
         selectedBuildablePrefab = null;
         selectedBuildableCost = 0;
         selectedBuildableData = null;
+    }
+
+    public TrapDataSO GetTrapDataByIndex(int trapIndex)
+    {
+        if (trapIndex < 0 || trapIndex >= availableTraps.Count)
+            return null;
+
+        return availableTraps[trapIndex];
+    }
+
+    private bool TryPopulateBuildUiFromCanonicalSlots(CharacterBase[] equipe)
+    {
+        List<CharacterBase> torres = new List<CharacterBase>();
+        buildablePrefabs.RemoveAll(prefab => prefab == null);
+
+        if (equipe != null)
+        {
+            foreach (int slot in ResolveLocalTowerSlots())
+            {
+                if (slot < 0 || slot >= equipe.Length) continue;
+
+                CharacterBase personagem = equipe[slot];
+                if (personagem == null || personagem.towerPrefab == null) continue;
+
+                torres.Add(personagem);
+                if (!buildablePrefabs.Contains(personagem.towerPrefab))
+                    buildablePrefabs.Add(personagem.towerPrefab);
+            }
+        }
+
+        if (availableTraps != null)
+        {
+            foreach (TrapDataSO trap in availableTraps)
+            {
+                if (trap != null && trap.prefab != null && !buildablePrefabs.Contains(trap.prefab))
+                    buildablePrefabs.Add(trap.prefab);
+            }
+        }
+
+        if (UIManager.Instance != null)
+            UIManager.Instance.UpdateBuildUI(torres, availableTraps);
+
+        return true;
+    }
+
+    private List<int> ResolveLocalTowerSlots()
+    {
+        if (NetworkManager.Singleton != null &&
+            (NetworkManager.Singleton.IsClient || NetworkManager.Singleton.IsServer) &&
+            ExoBeasts.Multiplayer.Lobby.LobbyManager.Instance != null &&
+            ExoBeasts.Multiplayer.Auth.SessionManager.Instance != null)
+        {
+            var lobbyManager = ExoBeasts.Multiplayer.Lobby.LobbyManager.Instance;
+            var membros = lobbyManager.GetOrderedMembers();
+            string meuId = ExoBeasts.Multiplayer.Auth.SessionManager.Instance.GetUserId();
+            int meuIndice = lobbyManager.GetCanonicalMemberIndex(meuId);
+
+            if (meuIndice >= 0)
+                return PartySlotLayout.GetTowerSlots(membros.Count, meuIndice);
+        }
+
+        return new List<int> { 1, 2, 3, 4, 5, 6, 7 };
+    }
+
+    private int GetCharacterLibraryIndex(CharacterBase towerData)
+    {
+        if (towerData == null || GameDataManager.Instance?.bibliotecaOriginalPersonagens == null)
+            return -1;
+
+        string cleanName = towerData.name.Replace("(Clone)", "");
+        int index = GameDataManager.Instance.bibliotecaOriginalPersonagens.FindIndex(
+            character => character != null && character.name == cleanName);
+
+        if (index < 0)
+            Debug.LogWarning($"[BuildManager] Torre '{towerData.name}' nao encontrada em bibliotecaOriginalPersonagens.");
+
+        return index;
     }
 }

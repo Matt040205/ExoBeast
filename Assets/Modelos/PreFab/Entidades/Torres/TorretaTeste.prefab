@@ -133,6 +133,8 @@ GameObject:
   - component: {fileID: 788748140417209817}
   - component: {fileID: -7718011741673260999}
   - component: {fileID: 4276337714761865269}
+  - component: {fileID: 1973803410343095469}
+  - component: {fileID: 5621648275812254944}
   m_Layer: 8
   m_Name: TorretaTeste
   m_TagString: Untagged
@@ -262,12 +264,16 @@ MonoBehaviour:
   towerData: {fileID: 11400000, guid: 9630a35620054cf4db1008eb33d8d40a, type: 2}
   partToRotate: {fileID: 8979761867010122128}
   firePoint: {fileID: 7005541549158291408}
+  tempoDeSpawn: 2
+  materialHolograma: {fileID: 0}
+  materialToon: {fileID: 0}
+  materialOutline: {fileID: 0}
   animator: {fileID: 3062070630762511338}
   shootTrigger: Shoot
   towerModeBool: IsTower
   rotationOffset: {x: 0, y: 0, z: 0}
   enemyTag: Enemy
-  currentPathLevels: 
+  IsInvulnerable: 0
 --- !u!114 &-7718011741673260999
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -303,6 +309,47 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 2
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &1973803410343095469
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7734725407009037971}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 0
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+--- !u!114 &5621648275812254944
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7734725407009037971}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 271a053691a15b048a86dbc304328fd0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Type:
+    m_InternalValue: 0
+  Level:
+    m_InternalValue: 1
+  Health:
+    m_InternalValue: 100
+  IsActive:
+    m_InternalValue: 1
 --- !u!1001 &3108193705573530447
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -86,6 +86,13 @@ public class EnemyHealthSystem : MonoBehaviour
 
     public bool TakeDamage(float damage, float armorPenetration = 0f, bool isCritical = false, ulong attackerId = 0)
     {
+        return TakeDamageDetailed(damage, armorPenetration, isCritical, attackerId, out _);
+    }
+
+    public bool TakeDamageDetailed(float damage, float armorPenetration, bool isCritical, ulong attackerId, out float finalDamageApplied)
+    {
+        finalDamageApplied = 0f;
+
         if (networkedEnemy != null && networkedEnemy.IsSpawned && !networkedEnemy.IsServer) return false;
         if (isDead) return false;
 
@@ -94,6 +101,7 @@ public class EnemyHealthSystem : MonoBehaviour
         float effectiveArmor = Mathf.Max(0, baseArmor - currentArmorModifier - armorToIgnore);
         float finalDamage = damageWithMark * (1.0f - Mathf.Clamp01(effectiveArmor / 100f));
         if (finalDamage < 0) finalDamage = 0;
+        finalDamageApplied = finalDamage;
 
         currentHealth -= finalDamage;
 

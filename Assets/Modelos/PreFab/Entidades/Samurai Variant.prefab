@@ -1651,6 +1651,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 2682399473942067493, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       insertIndex: -1
       addedObject: {fileID: -3770982364983483125}
+    - targetCorrespondingSourceObject: {fileID: 2682399473942067493, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7615310060340711775}
   m_SourcePrefab: {fileID: 100100000, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
 --- !u!4 &5251540604817601221 stripped
 Transform:
@@ -1674,7 +1677,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3614457225
+  GlobalObjectIdHash: 2792833894
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -1748,6 +1751,7 @@ MonoBehaviour:
   playerShooting: {fileID: 0}
   meleeCombat: {fileID: 0}
   playerCombatManager: {fileID: 0}
+  localInputBridge: {fileID: 0}
   localOnlyObjects: []
 --- !u!114 &8963359345184973215
 MonoBehaviour:
@@ -1778,9 +1782,8 @@ MonoBehaviour:
     amplitude: 1.5
     frequency: 10
     duration: 0.15
-  trailVfxPrefab: {fileID: 0}
   trailSpacing: 1.5
-  trailDuration: 2
+  personalHitVfxPrefab: {fileID: 0}
 --- !u!114 &1494149449045411526
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1842,14 +1845,23 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 384314b1b2b5a74498978b5a8c7633f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  activeTime: 0.3
-  meshRefreshRate: 0.05
   meshDestroyDelay: 2
-  positionToSpawn: {fileID: 6906416966143403624}
   mat: {fileID: 2100000, guid: 6c8f99907bbca27468fdaabf2ee7bfdf, type: 2}
   shaderVarRef: _Alpha
   shaderVarRate: 0.1
   shaderVarRefreshRate: 0.05
+--- !u!114 &7615310060340711775
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6275176270602792791}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b79657e49eccd0f4ebae13d0c0d67bb9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!4 &8904199890752782246 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 702061340975147476, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}

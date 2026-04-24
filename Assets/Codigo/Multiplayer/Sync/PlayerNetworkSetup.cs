@@ -21,14 +21,22 @@ namespace ExoBeasts.Multiplayer.Sync
         [SerializeField] private MonoBehaviour playerShooting;
         [SerializeField] private MeleeCombatSystem meleeCombat;
         [SerializeField] private MonoBehaviour playerCombatManager;
+        [SerializeField] private LocalPlayerInputBridge localInputBridge;
 
         [Header("Objetos exclusivos do jogador local")]
         [SerializeField] private GameObject[] localOnlyObjects;
 
         public override void OnNetworkSpawn()
         {
-            if (characterController == null)
-                characterController = GetComponent<CharacterController>();
+            // Auto-fallback: resolve any SerializedFields left unassigned in the Inspector.
+            // Needed because "Samurai Variant" prefab has all fields at {fileID: 0}.
+            if (movement == null) movement = GetComponent<PlayerMovement>();
+            if (cameraController == null) cameraController = GetComponent<CameraController>();
+            if (characterController == null) characterController = GetComponent<CharacterController>();
+            if (playerShooting == null) playerShooting = GetComponent<PlayerShooting>();
+            if (meleeCombat == null) meleeCombat = GetComponent<MeleeCombatSystem>();
+            if (playerCombatManager == null) playerCombatManager = GetComponent<PlayerCombatManager>();
+            if (localInputBridge == null) localInputBridge = GetComponent<LocalPlayerInputBridge>();
 
             if (IsOwner)
                 SetupAsLocalPlayer();
@@ -55,14 +63,29 @@ namespace ExoBeasts.Multiplayer.Sync
             yield return null;
 
             // ── 0. PlayerInput — garantir ActionMap "Player" ativa ───────────────────
-            // SwitchCurrentActionMap força o mapa correto antes que auto-switch para "UI"
-            // possa ocorrer (m_NeverAutoSwitchControlSchemes = 0 nos prefabs).
+            // Disable→Enable cycle forces fresh Keyboard&Mouse pairing.
+            // When multiple player prefabs instantiate on the same machine, the first
+            // PlayerInput.Awake() grabs the device. If the local avatar spawns second,
+            // it fails to pair. By this coroutine frame all remote PlayerInputs are
+            // already disabled (SetupAsRemotePlayer runs sync in OnNetworkSpawn),
+            // so re-enabling here succeeds on the fresh OnEnable pairing attempt.
             var playerInput = GetComponent<PlayerInput>();
             if (playerInput != null)
             {
+                playerInput.enabled = false;
+                yield return null; // one extra frame — lets Input System fully release remote devices
                 playerInput.enabled = true;
                 playerInput.SwitchCurrentActionMap("Player");
             }
+
+            if (localInputBridge == null)
+                localInputBridge = GetComponent<LocalPlayerInputBridge>();
+
+            if (localInputBridge == null)
+                localInputBridge = gameObject.AddComponent<LocalPlayerInputBridge>();
+
+            localInputBridge.enabled = true;
+
             Debug.Log("[PlayerNetworkSetup] PlayerInput configurado no ActionMap 'Player'.");
 
             // ── 1. Cursor ────────────────────────────────────────────────────────────
@@ -138,12 +161,19 @@ namespace ExoBeasts.Multiplayer.Sync
             var playerInput = GetComponent<PlayerInput>();
             if (playerInput != null) playerInput.enabled = false;
 
-            if (movement != null) movement.enabled = false;
+            if (localInputBridge == null) localInputBridge = GetComponent<LocalPlayerInputBridge>();
+            if (localInputBridge != null) localInputBridge.enabled = false;
+
             if (cameraController != null) cameraController.enabled = false;
-            if (characterController != null) characterController.enabled = false;
-            if (playerShooting != null) playerShooting.enabled = false;
-            if (meleeCombat != null) meleeCombat.enabled = false;
-            if (playerCombatManager != null) playerCombatManager.enabled = false;
+
+            // Servidor precisa manter a lógica de gameplay viva para validar tiros,
+            // cooldowns e demais RPCs enviados por jogadores possuídos por outros clientes.
+            if (!IsServer)
+            {
+                if (playerShooting != null) playerShooting.enabled = false;
+                if (meleeCombat != null) meleeCombat.enabled = false;
+                if (playerCombatManager != null) playerCombatManager.enabled = false;
+            }
 
             if (localOnlyObjects != null)
             {

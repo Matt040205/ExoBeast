@@ -50,6 +50,13 @@ MonoBehaviour:
   aimTransitionSpeed: 10
   mouseSensitivity: 2
   verticalAngleLimit: 80
+  normalMaxDistance: 3
+  aimMaxDistance: 1.5
+  minCameraDistance: 0.5
+  collisionRadius: 0.2
+  obstacleMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
 --- !u!1 &2086700447321655050
 GameObject:
   m_ObjectHideFlags: 0
@@ -340,6 +347,9 @@ GameObject:
   - component: {fileID: 808424768392245374}
   - component: {fileID: 2211947184268509011}
   - component: {fileID: -2034026881209421602}
+  - component: {fileID: 5738464622027490514}
+  - component: {fileID: 3417547770801766067}
+  - component: {fileID: 7926698676025372789}
   m_Layer: 6
   m_Name: Polvo
   m_TagString: Player
@@ -480,7 +490,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 671670237
+  GlobalObjectIdHash: 3774886228
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -508,6 +518,7 @@ MonoBehaviour:
   rotationSpeed: 15
   cameraController: {fileID: 0}
   modelPivot: {fileID: 8556343297349792464}
+  doubleJumpVfxPrefab: {fileID: 0}
   aimRig: {fileID: 0}
   aimConstraint: {fileID: 0}
   aimLayerMask:
@@ -551,6 +562,10 @@ MonoBehaviour:
   isBuffed: 0
   isCountering: 0
   respawnPointNameOrTag: RespawnPoint
+  tempoDeSpawn: 2
+  materialHolograma: {fileID: 0}
+  materialToon: {fileID: 0}
+  materialOutline: {fileID: 0}
 --- !u!114 &2838156437463877109
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -567,6 +582,13 @@ MonoBehaviour:
   firePoint: {fileID: 7918053145919156436}
   projectileVisualPrefab: {fileID: 6569401662765405448, guid: 28d19a6cedd4d634a93234500f6d2067, type: 3}
   impactEffectPrefab: {fileID: 0}
+  muzzleFlashPrefab: {fileID: 0}
+  explosionVfxPrefab: {fileID: 0}
+  explosionVfxRadiusParam: Radius
+  empoweredShotShake:
+    amplitude: 3
+    frequency: 0.5
+    duration: 0.3
   aimTarget: {fileID: 0}
   aimTargetDistance: 20
   tipoDeSom: Arma
@@ -874,3 +896,66 @@ MonoBehaviour:
   m_DefaultActionMap: Player
   m_SplitScreenIndex: -1
   m_Camera: {fileID: 0}
+--- !u!114 &5738464622027490514
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7665187458952505880}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 39a8f8059c3bbd44588b7a78de2c5fd4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  movement: {fileID: 0}
+  cameraController: {fileID: 0}
+  characterController: {fileID: 0}
+  playerShooting: {fileID: 0}
+  meleeCombat: {fileID: 0}
+  playerCombatManager: {fileID: 0}
+  localInputBridge: {fileID: 0}
+  localOnlyObjects: []
+--- !u!114 &3417547770801766067
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7665187458952505880}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8677b7b54059753489604164fe32f82b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  UseUnreliableDeltas: 0
+  SyncPositionX: 1
+  SyncPositionY: 1
+  SyncPositionZ: 1
+  SyncRotAngleX: 1
+  SyncRotAngleY: 1
+  SyncRotAngleZ: 1
+  SyncScaleX: 1
+  SyncScaleY: 1
+  SyncScaleZ: 1
+  PositionThreshold: 0.001
+  RotAngleThreshold: 0.01
+  ScaleThreshold: 0.01
+  UseQuaternionSynchronization: 0
+  UseQuaternionCompression: 0
+  UseHalfFloatPrecision: 0
+  InLocalSpace: 0
+  Interpolate: 1
+  SlerpPosition: 0
+--- !u!114 &7926698676025372789
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7665187458952505880}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b79657e49eccd0f4ebae13d0c0d67bb9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 

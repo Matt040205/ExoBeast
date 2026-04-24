@@ -24,6 +24,7 @@ public class CuttingBladeLogic : NetworkBehaviour
     private CommanderAbilityController abilityController;
     private Ability sourceAbility;
     private bool resetCooldownOnKill;
+    private Vector3 dashForward;
 
     [Header("Juice Configs")]
     [SerializeField] private CameraShakeConfig dashShake = new CameraShakeConfig(1.5f, 10f, 0.15f);
@@ -36,7 +37,7 @@ public class CuttingBladeLogic : NetworkBehaviour
 
     private PlayerMovement playerMovement;
 
-    public void StartDash(GameObject quemUsou, CharacterController cont, Transform pivot, float dist, float dmg, string som, CommanderAbilityController abCont, Ability ability, bool resetOnKill)
+    public void StartDash(GameObject quemUsou, CharacterController cont, Transform pivot, Vector3 capturedForward, float dist, float dmg, string som, CommanderAbilityController abCont, Ability ability, bool resetOnKill)
     {
         dashDistance = dist;
         damage = dmg;
@@ -45,6 +46,12 @@ public class CuttingBladeLogic : NetworkBehaviour
         sourceAbility = ability;
         resetCooldownOnKill = resetOnKill;
         modelPivot = pivot;
+        dashForward = capturedForward.normalized;
+        if (dashForward.sqrMagnitude < 0.001f)
+        {
+            Debug.LogError("[CuttingBladeLogic] Direcao de dash invalida recebida. Abortando habilidade.");
+            return;
+        }
 
         if (IsOwner)
         {
@@ -61,22 +68,30 @@ public class CuttingBladeLogic : NetworkBehaviour
             {
                 Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { OwnerClientId } }
             };
-            ExecuteDashOnOwnerClientRpc(dist, dmg, som, resetOnKill, clientRpcParams);
+            ExecuteDashOnOwnerClientRpc(dist, dmg, som, resetOnKill, dashForward, clientRpcParams);
         }
     }
 
     // Executa o dash na máquina do owner (tem acesso ao CharacterController local)
     [ClientRpc]
-    private void ExecuteDashOnOwnerClientRpc(float dist, float dmg, string som, bool resetOnKill, ClientRpcParams _ = default)
+    private void ExecuteDashOnOwnerClientRpc(float dist, float dmg, string som, bool resetOnKill, Vector3 capturedForward, ClientRpcParams _ = default)
     {
         dashDistance = dist;
         damage = dmg;
         eventoDash = som;
         resetCooldownOnKill = resetOnKill;
-        modelPivot = transform;
         controller = GetComponent<CharacterController>();
         playerMovement = GetComponent<PlayerMovement>();
         abilityController = GetComponent<CommanderAbilityController>();
+        dashForward = capturedForward.normalized;
+        // Usa o modelPivot do PlayerMovement (filho que rotaciona com o input) — igual ao caminho direto.
+        // Usar transform (root) aqui causaria dash na direção de spawn porque o root não rotaciona.
+        modelPivot = (playerMovement != null) ? playerMovement.GetModelPivot() : null;
+        if (modelPivot == null)
+        {
+            Debug.LogError("[CuttingBladeLogic] modelPivot nao encontrado no owner. Abortando dash para evitar usar a rotacao de spawn.");
+            return;
+        }
         // sourceAbility fica null aqui — SetAbilityUsage/ResetCooldown tolerarão null via null-check
         StartCoroutine(DashCoroutine(gameObject));
     }
@@ -99,7 +114,7 @@ public class CuttingBladeLogic : NetworkBehaviour
         }
 
         Vector3 startPosition = transform.position;
-        Vector3 dashDirection = modelPivot.forward;
+        Vector3 dashDirection = dashForward.sqrMagnitude > 0.001f ? dashForward : modelPivot.forward;
 
         if (IsOwner)
         {
@@ -134,7 +149,7 @@ public class CuttingBladeLogic : NetworkBehaviour
         {
             float actualDist = Vector3.Distance(startPosition, finalPosition);
             Vector3 dashDir = (finalPosition - startPosition).normalized;
-            if (actualDist < 0.1f) dashDir = transform.forward;
+            if (actualDist < 0.1f) dashDir = dashDirection;
             
             RaycastHit[] localHits = Physics.SphereCastAll(startPosition, 2f, dashDir, actualDist);
             List<EnemyHealthSystem> enemiesHitLocal = new List<EnemyHealthSystem>();
@@ -181,7 +196,7 @@ public class CuttingBladeLogic : NetworkBehaviour
     {
         float actualDistance = Vector3.Distance(start, end);
         Vector3 dashDirection = (end - start).normalized;
-        if (actualDistance < 0.1f) dashDirection = transform.forward;
+        if (actualDistance < 0.1f) dashDirection = dashForward.sqrMagnitude > 0.001f ? dashForward : transform.forward;
 
         float dashRadius = 2f;
         RaycastHit[] hits = Physics.SphereCastAll(start, dashRadius, dashDirection, actualDistance);

@@ -3,166 +3,222 @@ using Unity.Netcode;
 
 namespace ExoBeasts.Multiplayer.Sync
 {
-    /// <summary>
-    /// ── NetworkedBuilding ────────────────────────────────
-    /// Sincroniza estado de torres e armadilhas em rede.
-    ///
-    ///  ▸ NetworkVariables: Type, Level, Health, IsActive (server-write)
-    ///  ▸ TakeDamageServerRpc: dano de inimigos, destroi ao chegar a 0
-    ///  ▸ UpgradeServerRpc: incrementa Level (max 3), notifica via ClientRpc
-    ///  ▸ RepairServerRpc: restaura Health ate o maximo
-    /// ─────────────────────────────────────────────────────
-    /// </summary>
+    [RequireComponent(typeof(NetworkObject))]
     public class NetworkedBuilding : NetworkBehaviour
     {
-        [Header("Building Data")]
-        public NetworkVariable<BuildingType> Type = new NetworkVariable<BuildingType>(
-            BuildingType.Tower,
-            NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server
-        );
+        [SerializeField] private TowerController towerController;
 
-        public NetworkVariable<int> Level = new NetworkVariable<int>(
-            1,
+        public NetworkVariable<ulong> BuilderClientId = new NetworkVariable<ulong>(
+            0,
             NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server
-        );
+            NetworkVariableWritePermission.Server);
 
-        public NetworkVariable<float> Health = new NetworkVariable<float>(
-            100f,
+        public NetworkVariable<int> CharacterIndex = new NetworkVariable<int>(
+            -1,
             NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server
-        );
+            NetworkVariableWritePermission.Server);
+
+        public NetworkVariable<int> TotalCostSpent = new NetworkVariable<int>(
+            0,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
+        public NetworkVariable<int> DpsLevel = new NetworkVariable<int>(
+            0,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
+        public NetworkVariable<int> ControlLevel = new NetworkVariable<int>(
+            0,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
+        public NetworkVariable<int> SupportLevel = new NetworkVariable<int>(
+            0,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
 
         public NetworkVariable<bool> IsActive = new NetworkVariable<bool>(
             true,
             NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Server
-        );
+            NetworkVariableWritePermission.Server);
+
+        private int _lastAppliedSignature = int.MinValue;
 
         public override void OnNetworkSpawn()
         {
-            Debug.Log($"[NetworkedBuilding] Spawned - Type: {Type.Value}, Level: {Level.Value}");
+            if (towerController == null)
+                towerController = GetComponent<TowerController>();
 
-            Level.OnValueChanged += OnLevelChanged;
-            Health.OnValueChanged += OnHealthChanged;
+            DpsLevel.OnValueChanged += OnAnyStateChanged;
+            ControlLevel.OnValueChanged += OnAnyStateChanged;
+            SupportLevel.OnValueChanged += OnAnyStateChanged;
+            TotalCostSpent.OnValueChanged += OnAnyStateChanged;
             IsActive.OnValueChanged += OnActiveChanged;
 
-            if (IsServer)
+            ApplySynchronizedState();
+        }
+
+        public void RefreshVisualState()
+        {
+            ApplySynchronizedState();
+        }
+
+        public void InitializeTowerServer(ulong builderClientId, int characterIndex, int initialCostSpent)
+        {
+            if (!IsServer) return;
+
+            BuilderClientId.Value = builderClientId;
+            CharacterIndex.Value = characterIndex;
+            TotalCostSpent.Value = initialCostSpent;
+            DpsLevel.Value = 0;
+            ControlLevel.Value = 0;
+            SupportLevel.Value = 0;
+            IsActive.Value = true;
+            ApplySynchronizedState();
+        }
+
+        public bool CanInteractLocally()
+        {
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+                return true;
+
+            return BuilderClientId.Value == NetworkManager.Singleton.LocalClientId;
+        }
+
+        [ServerRpc(RequireOwnership = false)]
+        public void RequestUpgradeServerRpc(int pathIndex, ServerRpcParams rpcParams = default)
+        {
+            if (!IsServer || !IsActive.Value || !CanRequesterModify(rpcParams.Receive.SenderClientId))
+                return;
+
+            if (towerController == null)
+                towerController = GetComponent<TowerController>();
+
+            if (towerController == null || towerController.towerData == null || towerController.towerData.upgradePaths == null)
+                return;
+
+            if (pathIndex < 0 || pathIndex >= towerController.towerData.upgradePaths.Count)
+                return;
+
+            UpgradePath path = towerController.towerData.upgradePaths[pathIndex];
+            if (path == null || path.upgradesInPath == null)
+                return;
+
+            int currentLevel = GetPathLevel(pathIndex);
+            int totalPointsSpent = DpsLevel.Value + ControlLevel.Value + SupportLevel.Value;
+            if (totalPointsSpent >= 6 || currentLevel >= path.upgradesInPath.Count)
+                return;
+
+            Upgrade nextUpgrade = path.upgradesInPath[currentLevel];
+            int geoditeCost = nextUpgrade.geoditeCost;
+            int darkEtherCost = nextUpgrade.darkEtherCost;
+
+            if (CurrencyManager.Instance == null ||
+                !CurrencyManager.Instance.HasEnoughCurrency(geoditeCost, CurrencyType.Geodites) ||
+                !CurrencyManager.Instance.HasEnoughCurrency(darkEtherCost, CurrencyType.DarkEther))
             {
-                InitializeServerData();
+                return;
             }
+
+            if (geoditeCost > 0)
+                CurrencyManager.Instance.SpendCurrency(geoditeCost, CurrencyType.Geodites);
+
+            if (darkEtherCost > 0)
+                CurrencyManager.Instance.SpendCurrency(darkEtherCost, CurrencyType.DarkEther);
+
+            SetPathLevel(pathIndex, currentLevel + 1);
+            TotalCostSpent.Value += geoditeCost + darkEtherCost;
+            ApplySynchronizedState();
         }
 
-        private void InitializeServerData()
+        [ServerRpc(RequireOwnership = false)]
+        public void RequestSellServerRpc(float refundPercentage, ServerRpcParams rpcParams = default)
         {
-        }
+            if (!IsServer || !CanRequesterModify(rpcParams.Receive.SenderClientId))
+                return;
 
-        private void OnLevelChanged(int oldValue, int newValue)
-        {
-            Debug.Log($"[NetworkedBuilding] Level mudou: {oldValue} -> {newValue}");
-        }
-
-        private void OnHealthChanged(float oldValue, float newValue)
-        {
-            Debug.Log($"[NetworkedBuilding] Vida mudou: {oldValue} -> {newValue}");
-
-            if (newValue <= 0 && oldValue > 0)
+            if (CurrencyManager.Instance != null)
             {
-                OnBuildingDestroyed();
+                int refundAmount = Mathf.FloorToInt(TotalCostSpent.Value * refundPercentage);
+                if (refundAmount > 0)
+                    CurrencyManager.Instance.AddCurrency(refundAmount, CurrencyType.Geodites);
             }
+
+            IsActive.Value = false;
+
+            if (NetworkObject != null && NetworkObject.IsSpawned)
+                NetworkObject.Despawn(true);
+            else
+                Destroy(gameObject);
+        }
+
+        private void OnAnyStateChanged(int oldValue, int newValue)
+        {
+            ApplySynchronizedState();
         }
 
         private void OnActiveChanged(bool oldValue, bool newValue)
         {
-            Debug.Log($"[NetworkedBuilding] Ativo mudou: {oldValue} -> {newValue}");
+            if (!newValue && gameObject != null)
+                gameObject.SetActive(false);
         }
 
-        [ServerRpc(RequireOwnership = false)]
-        public void TakeDamageServerRpc(float damage, ulong attackerId)
+        private void ApplySynchronizedState()
         {
-            if (!IsServer) return;
+            if (towerController == null)
+                towerController = GetComponent<TowerController>();
 
-            Health.Value = Mathf.Max(0, Health.Value - damage);
-            Debug.Log($"[NetworkedBuilding] Dano recebido: {damage}. Vida: {Health.Value}");
-
-            if (Health.Value <= 0)
-            {
-                DestroyBuilding();
-            }
-        }
-
-        [ServerRpc(RequireOwnership = false)]
-        public void UpgradeServerRpc(ServerRpcParams rpcParams = default)
-        {
-            if (!IsServer) return;
-
-            if (Level.Value >= 3)
-            {
-                Debug.LogWarning("[NetworkedBuilding] Nivel maximo atingido");
+            if (towerController == null || towerController.towerData == null)
                 return;
-            }
 
-            Level.Value++;
-            Debug.Log($"[NetworkedBuilding] Upgrade para nivel {Level.Value}");
-            OnBuildingUpgradedClientRpc(Level.Value);
+            int signature =
+                (DpsLevel.Value * 1000000) +
+                (ControlLevel.Value * 100000) +
+                (SupportLevel.Value * 10000) +
+                TotalCostSpent.Value;
+
+            if (_lastAppliedSignature == signature)
+                return;
+
+            _lastAppliedSignature = signature;
+            towerController.ApplyNetworkUpgradeState(
+                DpsLevel.Value,
+                ControlLevel.Value,
+                SupportLevel.Value,
+                TotalCostSpent.Value);
         }
 
-        [ClientRpc]
-        private void OnBuildingUpgradedClientRpc(int newLevel)
+        private bool CanRequesterModify(ulong senderClientId)
         {
-            Debug.Log($"[NetworkedBuilding] Efeito de upgrade para nivel {newLevel}");
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+                return true;
+
+            return senderClientId == BuilderClientId.Value;
         }
 
-        private void DestroyBuilding()
+        private int GetPathLevel(int pathIndex)
         {
-            if (!IsServer) return;
-
-            Debug.Log("[NetworkedBuilding] Construcao destruida");
-            IsActive.Value = false;
-            OnBuildingDestroyedClientRpc();
-
-            if (NetworkObject != null && NetworkObject.IsSpawned)
-            {
-                NetworkObject.Despawn();
-                Destroy(gameObject, 2f);
-            }
+            if (pathIndex == 0) return DpsLevel.Value;
+            if (pathIndex == 1) return ControlLevel.Value;
+            if (pathIndex == 2) return SupportLevel.Value;
+            return 0;
         }
 
-        private void OnBuildingDestroyed()
+        private void SetPathLevel(int pathIndex, int level)
         {
-            Debug.Log("[NetworkedBuilding] Building destruido localmente");
-        }
-
-        [ClientRpc]
-        private void OnBuildingDestroyedClientRpc()
-        {
-            Debug.Log("[NetworkedBuilding] Efeito de destruicao");
-        }
-
-        [ServerRpc(RequireOwnership = false)]
-        public void RepairServerRpc(float amount)
-        {
-            if (!IsServer) return;
-
-            float maxHealth = 100f;
-            Health.Value = Mathf.Min(maxHealth, Health.Value + amount);
-            Debug.Log($"[NetworkedBuilding] Reparado: +{amount}. Vida: {Health.Value}");
+            if (pathIndex == 0) DpsLevel.Value = level;
+            else if (pathIndex == 1) ControlLevel.Value = level;
+            else if (pathIndex == 2) SupportLevel.Value = level;
         }
 
         public override void OnNetworkDespawn()
         {
-            Level.OnValueChanged -= OnLevelChanged;
-            Health.OnValueChanged -= OnHealthChanged;
+            DpsLevel.OnValueChanged -= OnAnyStateChanged;
+            ControlLevel.OnValueChanged -= OnAnyStateChanged;
+            SupportLevel.OnValueChanged -= OnAnyStateChanged;
+            TotalCostSpent.OnValueChanged -= OnAnyStateChanged;
             IsActive.OnValueChanged -= OnActiveChanged;
         }
-    }
-
-    public enum BuildingType
-    {
-        Tower,
-        Trap,
-        Wall,
-        Special
     }
 }

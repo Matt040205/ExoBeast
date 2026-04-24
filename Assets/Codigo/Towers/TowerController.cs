@@ -2,6 +2,7 @@ using UnityEngine;
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using Unity.Netcode;
 
 public class TowerController : MonoBehaviour
 {
@@ -59,6 +60,14 @@ public class TowerController : MonoBehaviour
     private float fireCountdown = 0f;
 
     private TowerAbilitySystem abilitySystem;
+    private NetworkObject networkObject;
+    private ExoBeasts.Multiplayer.Sync.NetworkedBuilding networkedBuilding;
+
+    void Awake()
+    {
+        networkObject = GetComponent<NetworkObject>();
+        networkedBuilding = GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>();
+    }
 
     void Start()
     {
@@ -77,6 +86,9 @@ public class TowerController : MonoBehaviour
 
         // Removemos UpdateAbilities do Start pois os níveis começam zerados ou definidos pelo AbilitySystem
         InvokeRepeating("UpdateTarget", 0f, 0.5f);
+
+        if (networkedBuilding != null)
+            networkedBuilding.RefreshVisualState();
     }
 
     void SetupTowerMode()
@@ -147,6 +159,56 @@ public class TowerController : MonoBehaviour
         if (path == TowerPath.DPS) currentPathLevels[0]++;
         else if (path == TowerPath.Control) currentPathLevels[1]++;
         else if (path == TowerPath.Support) currentPathLevels[2]++;
+    }
+
+    public void ApplyNetworkUpgradeState(int dpsLevel, int controlLevel, int supportLevel, int syncedTotalCostSpent)
+    {
+        if (towerData == null) return;
+
+        RebuildFromBaseStats();
+        ReplayUpgradePath(TowerPath.DPS, dpsLevel);
+        ReplayUpgradePath(TowerPath.Control, controlLevel);
+        ReplayUpgradePath(TowerPath.Support, supportLevel);
+        totalCostSpent = Mathf.Max(towerData.cost, syncedTotalCostSpent);
+    }
+
+    public int TotalCostSpent => totalCostSpent;
+    public float CurrentHealth => currentHealth;
+
+    private void RebuildFromBaseStats()
+    {
+        foreach (TowerBehavior behavior in activeBehaviors)
+        {
+            if (behavior != null)
+                Destroy(behavior.gameObject);
+        }
+
+        activeBehaviors.Clear();
+        currentPathLevels = new int[3] { 0, 0, 0 };
+        CloneBaseStats();
+    }
+
+    private void ReplayUpgradePath(TowerPath path, int levelCount)
+    {
+        int pathIndex = GetPathIndex(path);
+        if (pathIndex < 0 || towerData.upgradePaths == null || pathIndex >= towerData.upgradePaths.Count)
+            return;
+
+        UpgradePath upgradePath = towerData.upgradePaths[pathIndex];
+        if (upgradePath == null || upgradePath.upgradesInPath == null)
+            return;
+
+        int safeLevelCount = Mathf.Min(levelCount, upgradePath.upgradesInPath.Count);
+        for (int i = 0; i < safeLevelCount; i++)
+            ApplyUpgrade(upgradePath.upgradesInPath[i], 0, 0, path);
+    }
+
+    private int GetPathIndex(TowerPath path)
+    {
+        if (path == TowerPath.DPS) return 0;
+        if (path == TowerPath.Control) return 1;
+        if (path == TowerPath.Support) return 2;
+        return -1;
     }
 
     private void ApplyModifier(StatModifier modifier)
@@ -243,6 +305,7 @@ public class TowerController : MonoBehaviour
 
     private void ProcessDamageInstance(EnemyHealthSystem healthSystem)
     {
+        if (!HasCombatAuthority()) return;
         if (healthSystem == null) return;
         float damageToDeal = currentDamage;
         bool isCritical = UnityEngine.Random.value <= currentCritChance;
@@ -344,6 +407,7 @@ public class TowerController : MonoBehaviour
 
     public void TakeDamage(float amount, Transform attacker = null)
     {
+        if (!HasCombatAuthority()) return;
         if (IsDestroyed || IsInvulnerable) return;
         float remainingDamage = amount;
 
@@ -497,6 +561,7 @@ public class TowerController : MonoBehaviour
 
     public void FireExtraProjectileAt(EnemyHealthSystem target, float damagePercent)
     {
+        if (!HasCombatAuthority()) return;
         if (target == null) return;
         float damageToDeal = currentDamage * damagePercent;
         
@@ -520,5 +585,13 @@ public class TowerController : MonoBehaviour
     {
         Gizmos.color = Color.cyan;
         Gizmos.DrawWireSphere(transform.position, CurrentRange);
+    }
+
+    private bool HasCombatAuthority()
+    {
+        if (networkObject == null || !networkObject.IsSpawned || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+            return true;
+
+        return NetworkManager.Singleton.IsServer;
     }
 }

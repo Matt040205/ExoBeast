@@ -684,21 +684,35 @@ namespace ExoBeasts.Multiplayer.Lobby
         /// </summary>
         private int GetMyCharacterIndex()
         {
-            // Prioriza a escolha real armazenada em cache pela tela de Selecao
-            if (GameDataManager.Instance != null && GameDataManager.Instance.equipeSelecionada != null && GameDataManager.Instance.equipeSelecionada.Length > 0)
+            string myUid = SessionManager.Instance?.GetUserId();
+            if (!string.IsNullOrEmpty(myUid) &&
+                GameDataManager.Instance != null &&
+                GameDataManager.Instance.equipeSelecionada != null)
             {
-                var charBase = GameDataManager.Instance.equipeSelecionada[0];
-                if (charBase != null && GameDataManager.Instance.bibliotecaOriginalPersonagens != null)
+                int myIndex = GetCanonicalMemberIndex(myUid);
+                int totalPlayers = GetOrderedMembers().Count;
+                if (myIndex >= 0)
                 {
-                    int index = GameDataManager.Instance.bibliotecaOriginalPersonagens.IndexOf(charBase);
-                    if (index >= 0) return index;
+                    int commanderSlot = PartySlotLayout.GetCommanderSlot(totalPlayers, myIndex);
+                    CharacterBase[] equipe = GameDataManager.Instance.equipeSelecionada;
+                    if (commanderSlot >= 0 && commanderSlot < equipe.Length)
+                    {
+                        CharacterBase charBase = equipe[commanderSlot];
+                        if (charBase != null && GameDataManager.Instance.bibliotecaOriginalPersonagens != null)
+                        {
+                            string cleanName = charBase.name.Replace("(Clone)", "");
+                            int index = GameDataManager.Instance.bibliotecaOriginalPersonagens.FindIndex(
+                                c => c != null && c.name == cleanName);
+                            if (index >= 0)
+                                return index;
+                        }
+                    }
                 }
             }
 
             // Fallback
-            string myUid = SessionManager.Instance?.GetUserId();
             if (string.IsNullOrEmpty(myUid)) return 0;
-            var me = _members.Find(m => m.productUserId == myUid);
+            var me = GetOrderedMembers().Find(m => m.productUserId == myUid);
             return me != null && me.selectedCharacterIndex >= 0 ? me.selectedCharacterIndex : 0;
         }
 
@@ -715,7 +729,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             if (req.Payload != null && req.Payload.Length >= 4)
                 charIndex = System.BitConverter.ToInt32(req.Payload, 0);
 
-            CharacterChoiceCache.ByClientId[req.ClientNetworkId] = charIndex;
+            CharacterChoiceCache.SetClientCharacterIndex(req.ClientNetworkId, charIndex, "LobbyManager.ConnectionApproval");
             Debug.Log($"[LobbyManager][DBG] ConnectionApproval recebido: clientId={req.ClientNetworkId} | payloadSize={req.Payload?.Length ?? 0} | charIndex={charIndex}");
 
             res.Approved = true;
@@ -793,7 +807,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             // clientes que ainda estao conectados. O Clear acontece em ClearLobbyState (LeaveLobby),
             // que e o momento em que o estado realmente precisa ser descartado.
             int hostCharIndex = GetMyCharacterIndex();
-            CharacterChoiceCache.HostCharacterIndex = hostCharIndex;
+            CharacterChoiceCache.SetHostCharacterIndex(hostCharIndex, "LobbyManager.StartMatch");
             Debug.Log($"[LobbyManager] Host charIndex cacheado: {hostCharIndex}");
 
             nm.NetworkConfig.ConnectionApproval = true;
@@ -1705,6 +1719,34 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         public bool IsInLobby() => _isInLobby;
         public LobbyInfo GetCurrentLobby() => _currentLobby;
-        public List<LobbyMember> GetMembers() => _members;
+        public List<LobbyMember> GetMembers() => GetOrderedMembers();
+
+        public List<LobbyMember> GetOrderedMembers()
+        {
+            List<LobbyMember> orderedMembers = new List<LobbyMember>(_members);
+            orderedMembers.Sort(CompareLobbyMembers);
+            return orderedMembers;
+        }
+
+        public int GetCanonicalMemberIndex(string productUserId)
+        {
+            if (string.IsNullOrEmpty(productUserId))
+                return -1;
+
+            return GetOrderedMembers().FindIndex(member => member.productUserId == productUserId);
+        }
+
+        private static int CompareLobbyMembers(LobbyMember left, LobbyMember right)
+        {
+            bool leftIsHost = left != null && left.isHost;
+            bool rightIsHost = right != null && right.isHost;
+
+            if (leftIsHost != rightIsHost)
+                return leftIsHost ? -1 : 1;
+
+            string leftId = left?.productUserId ?? string.Empty;
+            string rightId = right?.productUserId ?? string.Empty;
+            return string.Compare(leftId, rightId, StringComparison.Ordinal);
+        }
     }
 }

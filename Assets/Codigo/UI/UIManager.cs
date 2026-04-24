@@ -142,6 +142,8 @@ public class UIManager : MonoBehaviour
 
         buildButtonUI.ClearTrapButtons();
         buildButtonUI.CreateTrapBuildButtons(traps);
+
+        WireBuildTooltips();
     }
 
     public void ShowHUD()
@@ -201,5 +203,59 @@ public class UIManager : MonoBehaviour
         int minutes = Mathf.FloorToInt(timeInSeconds / 60);
         int seconds = Mathf.FloorToInt(timeInSeconds % 60);
         timerText.text = string.Format("{0:00}:{1:00}", minutes, seconds);
+    }
+
+    private void WireBuildTooltips()
+    {
+        BuildTooltipTrigger[] tooltipTriggers = GetComponentsInChildren<BuildTooltipTrigger>(true);
+        if (tooltipTriggers == null || tooltipTriggers.Length == 0)
+            return;
+
+        Transform tooltipPanelTransform = FindChildByNormalizedName(transform, "tooltippanel");
+        TextMeshProUGUI nomeTarget = FindTextByNormalizedName(transform, "nomedabuild");
+        TextMeshProUGUI descricaoTarget = FindTextByNormalizedName(transform, "descricaodabuild");
+
+        foreach (BuildTooltipTrigger tooltipTrigger in tooltipTriggers)
+        {
+            if (tooltipTrigger == null) continue;
+
+            if (tooltipTrigger.tooltipPanel == null && tooltipPanelTransform != null)
+                tooltipTrigger.tooltipPanel = tooltipPanelTransform.gameObject;
+
+            if (tooltipTrigger.nomeText == null)
+                tooltipTrigger.nomeText = nomeTarget;
+
+            if (tooltipTrigger.descricaoText == null)
+                tooltipTrigger.descricaoText = descricaoTarget;
+        }
+    }
+
+    private Transform FindChildByNormalizedName(Transform root, string normalizedName)
+    {
+        foreach (Transform child in root.GetComponentsInChildren<Transform>(true))
+        {
+            if (NormalizeName(child.name) == normalizedName)
+                return child;
+        }
+
+        return null;
+    }
+
+    private TextMeshProUGUI FindTextByNormalizedName(Transform root, string normalizedName)
+    {
+        foreach (TextMeshProUGUI text in root.GetComponentsInChildren<TextMeshProUGUI>(true))
+        {
+            if (NormalizeName(text.gameObject.name) == normalizedName)
+                return text;
+        }
+
+        return null;
+    }
+
+    private string NormalizeName(string value)
+    {
+        return string.IsNullOrEmpty(value)
+            ? string.Empty
+            : value.Replace(" ", "").Trim().ToLowerInvariant();
     }
 }

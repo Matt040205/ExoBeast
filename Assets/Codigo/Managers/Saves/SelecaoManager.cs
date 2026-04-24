@@ -5,9 +5,11 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Unity.Netcode;
+using Unity.Collections;
 using DG.Tweening;
 using ExoBeasts.Managers;
 using ExoBeasts.Multiplayer.Lobby;
+using ExoBeasts.Multiplayer.Core;
 
 /// <summary>
 /// ── SelecaoManager ─────────────────────────────────────
@@ -82,6 +84,10 @@ public class SelecaoManager : NetworkBehaviour
 
     private bool _isReady = false;
 
+    // Custom message key — lets clients register their character choice on the server
+    // without needing this NetworkBehaviour to be spawned as a NetworkObject in the scene.
+    private const string k_CharChoiceMsg = "ExoBeasts.CharacterChoice";
+
     private void Awake() => Instance = this;
 
     void Start()
@@ -95,6 +101,11 @@ public class SelecaoManager : NetworkBehaviour
             LobbyManager.Instance.OnMemberJoined  += OnMemberUpdatedCheck;
         }
 
+        // Registra handler de escolha de personagem no servidor.
+        // CustomMessagingManager não requer NetworkObject spawnado — funciona se NGO estiver ativo.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            NetworkManager.Singleton.CustomMessagingManager.RegisterNamedMessageHandler(k_CharChoiceMsg, OnCharacterChoiceReceived);
+
         StartCoroutine(SetupScene());
     }
 
@@ -105,6 +116,9 @@ public class SelecaoManager : NetworkBehaviour
             LobbyManager.Instance.OnMemberUpdated -= OnMemberUpdatedCheck;
             LobbyManager.Instance.OnMemberJoined  -= OnMemberUpdatedCheck;
         }
+
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+            NetworkManager.Singleton.CustomMessagingManager.UnregisterNamedMessageHandler(k_CharChoiceMsg);
     }
 
     public override void OnNetworkSpawn() => CalcularLimitesDeSlots();
@@ -157,9 +171,10 @@ public class SelecaoManager : NetworkBehaviour
             return;
         }
 
-        var membros = ExoBeasts.Multiplayer.Lobby.LobbyManager.Instance.GetMembers();
+        var lobbyManager = ExoBeasts.Multiplayer.Lobby.LobbyManager.Instance;
+        var membros = lobbyManager.GetOrderedMembers();
         string meuId = ExoBeasts.Multiplayer.Auth.SessionManager.Instance.GetUserId();
-        int meuIndice = membros.FindIndex(m => m.productUserId == meuId);
+        int meuIndice = lobbyManager.GetCanonicalMemberIndex(meuId);
         int total = membros.Count;
 
         if (GameDataManager.Instance != null)
@@ -174,30 +189,7 @@ public class SelecaoManager : NetworkBehaviour
 
     private List<int> ObterSlotsDoJogador(int totalJogadores, int indiceJogador)
     {
-        List<int> slots = new List<int>();
-        if (totalJogadores == 2)
-        {
-            if (indiceJogador == 0) slots.AddRange(new int[]{0, 1, 4, 5});
-            else if (indiceJogador == 1) slots.AddRange(new int[]{2, 3, 6, 7});
-        }
-        else if (totalJogadores == 3)
-        {
-            if (indiceJogador == 0) slots.AddRange(new int[]{0, 1, 4, 5});
-            else if (indiceJogador == 1) slots.AddRange(new int[]{2, 3});
-            else if (indiceJogador == 2) slots.AddRange(new int[]{6, 7});
-        }
-        else if (totalJogadores == 4)
-        {
-            if (indiceJogador == 0) slots.AddRange(new int[]{0, 1});
-            else if (indiceJogador == 1) slots.AddRange(new int[]{2, 3});
-            else if (indiceJogador == 2) slots.AddRange(new int[]{4, 5});
-            else if (indiceJogador == 3) slots.AddRange(new int[]{6, 7});
-        }
-        else 
-        {
-            slots.AddRange(new int[]{0, 1, 2, 3, 4, 5, 6, 7});
-        }
-        return slots;
+        return PartySlotLayout.GetSlots(totalJogadores, indiceJogador);
     }
 
     void CriarGridEquipe()
@@ -254,18 +246,22 @@ public class SelecaoManager : NetworkBehaviour
 
     void ConfirmarEscolha()
     {
-        int id = todosOsPersonagens.IndexOf(personagemEmVisualizacao);
+        // localId: índice em todosOsPersonagens (personagensDoJogador) — usado para UI
+        int localId = todosOsPersonagens.IndexOf(personagemEmVisualizacao);
         int slotConfirmado = slotSendoEditado;
 
+        // Aplica localmente sempre (feedback imediato, independente de RPC)
+        AplicarEscolhaLocal(localId, slotConfirmado);
+
+        // Registra escolha do Comandante no cache do servidor via CustomMessage.
+        // Funciona mesmo sem NetworkObject spawnado nesta cena.
+        // CRÍTICO: usa índice em bibliotecaOriginalPersonagens — mesma lista que GameSetupManager usa no spawn.
+        if (slotsPermitidos.Count > 0 && slotConfirmado == slotsPermitidos[0])
+            RegisterChoiceWithServer();
+
+        // Sincroniza seleção de UI com outros clientes (requer NetworkObject spawnado)
         if (IsNetworkActive)
-        {
-            ConfirmarEscolhaServerRpc(id, slotConfirmado);
-            // Atualiza CharacterChoiceCache no servidor ao confirmar o Comandante (slot principal do jogador)
-            if (slotsPermitidos.Count > 0 && slotConfirmado == slotsPermitidos[0])
-                RegisterCommanderChoiceServerRpc(id);
-        }
-        else
-            AplicarEscolhaLocal(id, slotConfirmado);
+            ConfirmarEscolhaServerRpc(localId, slotConfirmado);
 
         VoltarParaPainelEquipe();
 
@@ -309,8 +305,52 @@ public class SelecaoManager : NetworkBehaviour
 
     [ServerRpc(RequireOwnership = false)]
     void RegisterCommanderChoiceServerRpc(int charId, ServerRpcParams rpcParams = default)
+        => CharacterChoiceCache.SetClientCharacterIndex(
+            rpcParams.Receive.SenderClientId,
+            charId,
+            "RegisterCommanderChoiceServerRpc");
+
+    // Registra escolha de personagem no servidor sem depender de IsSpawned.
+    // Host atualiza o cache diretamente; clientes enviam via CustomMessagingManager.
+    private void RegisterChoiceWithServer()
     {
-        ExoBeasts.Multiplayer.Core.CharacterChoiceCache.ByClientId[rpcParams.Receive.SenderClientId] = charId;
+        var bib = GameDataManager.Instance?.bibliotecaOriginalPersonagens;
+        int bibliotecaId = (bib != null) ? bib.IndexOf(personagemEmVisualizacao) : -1;
+        if (bibliotecaId < 0)
+        {
+            Debug.LogWarning($"[SelecaoManager] Personagem '{personagemEmVisualizacao?.name}' não encontrado em bibliotecaOriginalPersonagens. Spawn pode usar índice errado.");
+            return;
+        }
+
+        var nm = NetworkManager.Singleton;
+        if (nm == null) return;
+
+        if (LobbyManager.Instance != null)
+            LobbyManager.Instance.SelectCharacter(bibliotecaId);
+
+        if (nm.IsServer)
+        {
+            CharacterChoiceCache.SetHostCharacterIndex(bibliotecaId, "SelecaoManager.RegisterChoiceWithServer");
+            Debug.Log($"[SelecaoManager] Host commander choice: index={bibliotecaId} ({personagemEmVisualizacao?.name})");
+        }
+        else if (nm.IsClient)
+        {
+            var writer = new FastBufferWriter(sizeof(int), Allocator.Temp);
+            writer.WriteValueSafe(bibliotecaId);
+            nm.CustomMessagingManager.SendNamedMessage(k_CharChoiceMsg, NetworkManager.ServerClientId, writer);
+            writer.Dispose();
+            Debug.Log($"[SelecaoManager] Client commander choice sent: index={bibliotecaId} ({personagemEmVisualizacao?.name})");
+        }
+    }
+
+    private void OnCharacterChoiceReceived(ulong senderId, FastBufferReader reader)
+    {
+        reader.ReadValueSafe(out int charIdx);
+        CharacterChoiceCache.SetClientCharacterIndex(senderId, charIdx, "SelecaoManager.CustomMessage");
+        Debug.Log($"[SelecaoManager] Commander choice registered: clientId={senderId}, index={charIdx}");
+
+        if (IsServer)
+            AtualizarEstadoBotaoJogar();
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -323,8 +363,7 @@ public class SelecaoManager : NetworkBehaviour
     {
         if (botaoJogar == null || GameDataManager.Instance == null) return;
 
-        bool localPronto = GameDataManager.Instance.equipeSelecionada[0] != null &&
-                           GameDataManager.Instance.equipeSelecionada[1] != null;
+        bool localPronto = HasLocalCommanderAndFirstTowerSelected();
 
         if (GameModeManager.CurrentMode == GameMode.Multiplayer)
         {
@@ -350,6 +389,32 @@ public class SelecaoManager : NetworkBehaviour
             botaoJogar.gameObject.SetActive(IsNetworkActive ? IsServer : true);
             botaoJogar.interactable = localPronto;
         }
+    }
+
+    private bool HasLocalCommanderAndFirstTowerSelected()
+    {
+        CharacterBase[] equipe = GameDataManager.Instance?.equipeSelecionada;
+        if (equipe == null || equipe.Length == 0)
+            return false;
+
+        List<int> slotsLocais = slotsPermitidos;
+        if ((slotsLocais == null || slotsLocais.Count == 0) && LobbyManager.Instance != null)
+        {
+            string myUid = ExoBeasts.Multiplayer.Auth.SessionManager.Instance?.GetUserId() ?? "";
+            List<LobbyMember> membros = LobbyManager.Instance.GetOrderedMembers();
+            int meuIndice = LobbyManager.Instance.GetCanonicalMemberIndex(myUid);
+            slotsLocais = PartySlotLayout.GetSlots(membros.Count, meuIndice);
+        }
+
+        if (slotsLocais == null || slotsLocais.Count < 2)
+            return equipe.Length > 1 && equipe[0] != null && equipe[1] != null;
+
+        int commanderSlot = slotsLocais[0];
+        int firstTowerSlot = slotsLocais[1];
+        return commanderSlot < equipe.Length &&
+               firstTowerSlot < equipe.Length &&
+               equipe[commanderSlot] != null &&
+               equipe[firstTowerSlot] != null;
     }
 
     public void AbrirPainelDetalhes(CharacterBase p)
@@ -417,7 +482,16 @@ public class SelecaoManager : NetworkBehaviour
             {
                 var nm = NetworkManager.Singleton;
                 if (nm != null && nm.IsServer)
+                {
+                    if (!AllConnectedPlayersHaveCommanderChoice())
+                    {
+                        Debug.LogWarning("[SelecaoManager] Partida bloqueada: ainda existe jogador sem comandante confirmado no cache autoritativo.");
+                        AtualizarEstadoBotaoJogar();
+                        return;
+                    }
+
                     nm.SceneManager.LoadScene(nomeDaCenaDoJogo, UnityEngine.SceneManagement.LoadSceneMode.Single);
+                }
             }
             else
                 StartCoroutine(IniciarPartidaSingleplayer());
@@ -486,7 +560,7 @@ public class SelecaoManager : NetworkBehaviour
         
         if (!isHost) return;
 
-        var members = LobbyManager.Instance.GetMembers();
+        var members = LobbyManager.Instance.GetOrderedMembers();
         bool todosProntos = false;
         
         if (members != null && members.Count >= 1) // Em testes pode estar sozinho, ou >1
@@ -496,7 +570,7 @@ public class SelecaoManager : NetworkBehaviour
 
         if (botaoJogar != null)
         {
-            botaoJogar.interactable = todosProntos;
+            botaoJogar.interactable = todosProntos && AllConnectedPlayersHaveCommanderChoice();
         }
     }
 
@@ -504,7 +578,7 @@ public class SelecaoManager : NetworkBehaviour
     {
         if (containerListaJogadores == null || GameModeManager.CurrentMode != GameMode.Multiplayer) return;
         
-        var members = LobbyManager.Instance?.GetMembers() ?? new List<LobbyMember>();
+        var members = LobbyManager.Instance?.GetOrderedMembers() ?? new List<LobbyMember>();
         string localUid = ExoBeasts.Multiplayer.Auth.SessionManager.Instance?.GetUserId() ?? "";
         var lobby = LobbyManager.Instance?.GetCurrentLobby();
         
@@ -699,4 +773,22 @@ public class SelecaoManager : NetworkBehaviour
     }
     
     void ToggleRemoveMode() { isRemoveMode = !isRemoveMode; if (botaoRemover != null) botaoRemover.image.color = isRemoveMode ? corModoRemover : corOriginalBotaoRemover; }
+
+    private bool AllConnectedPlayersHaveCommanderChoice()
+    {
+        if (GameModeManager.CurrentMode != GameMode.Multiplayer)
+            return true;
+
+        var nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsServer)
+            return false;
+
+        foreach (ulong clientId in nm.ConnectedClientsIds)
+        {
+            if (!CharacterChoiceCache.HasChoice(clientId))
+                return false;
+        }
+
+        return true;
+    }
 }

@@ -132,6 +132,8 @@ GameObject:
   - component: {fileID: -7841050139351807017}
   - component: {fileID: -2765442275493307593}
   - component: {fileID: -205302558624587401}
+  - component: {fileID: 6706855937760444586}
+  - component: {fileID: 8975838662378109577}
   m_Layer: 8
   m_Name: TorretaPolvo
   m_TagString: Untagged
@@ -260,6 +262,10 @@ MonoBehaviour:
   towerData: {fileID: 11400000, guid: 6be7037535adf3347bc4a1b2a3d84af7, type: 2}
   partToRotate: {fileID: 0}
   firePoint: {fileID: 3182203365280486715}
+  tempoDeSpawn: 2
+  materialHolograma: {fileID: 0}
+  materialToon: {fileID: 0}
+  materialOutline: {fileID: 0}
   animator: {fileID: 0}
   shootTrigger: Attack
   towerModeBool: IsTower
@@ -280,3 +286,44 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   circleVisual: {fileID: 3133207879263788234}
   highlightMaterial: {fileID: 2100000, guid: 51cf0a9826ba27448a353b1ac7a3850f, type: 2}
+--- !u!114 &6706855937760444586
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3448483011433730354}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 0
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+--- !u!114 &8975838662378109577
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3448483011433730354}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 271a053691a15b048a86dbc304328fd0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  Type:
+    m_InternalValue: 0
+  Level:
+    m_InternalValue: 1
+  Health:
+    m_InternalValue: 100
+  IsActive:
+    m_InternalValue: 1

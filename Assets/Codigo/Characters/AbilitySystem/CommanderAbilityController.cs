@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using FMODUnity;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.Core;
 using ExoBeasts.Multiplayer.Lobby;  // LobbyManager — índice de membro do lobby
 using ExoBeasts.Multiplayer.Auth;   // SessionManager — productUserId local
 
@@ -94,17 +95,14 @@ public class CommanderAbilityController : NetworkBehaviour
 
         if (lobbyMgr != null && sessionMgr != null)
         {
-            var membros  = lobbyMgr.GetMembers();
+            var membros  = lobbyMgr.GetOrderedMembers();
             string meuId = sessionMgr.GetUserId();
-            int meuIndice = membros.FindIndex(m => m.productUserId == meuId);
+            int meuIndice = lobbyMgr.GetCanonicalMemberIndex(meuId);
             int total     = membros.Count;
 
             if (meuIndice >= 0)
-            {
-                if      (total == 2) commanderSlot = meuIndice * 4;
-                else if (total == 3) commanderSlot = meuIndice == 0 ? 0 : meuIndice == 1 ? 4 : 6;
-                else if (total == 4) commanderSlot = meuIndice * 2;
-            }
+                commanderSlot = PartySlotLayout.GetCommanderSlot(total, meuIndice);
+
         }
 
         return (commanderSlot < equipe.Length && equipe[commanderSlot] != null)

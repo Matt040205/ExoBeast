@@ -39,7 +39,18 @@ public class CuttingBladeAbility : Ability
         }
 
         Transform modelPivot = movementScript.GetModelPivot();
-        if (modelPivot == null) return false;
+        if (modelPivot == null)
+        {
+            Debug.LogError("CuttingBladeAbility: modelPivot nao encontrado. Verifique PlayerMovement/modelPivot no prefab Samurai Variant.");
+            return false;
+        }
+
+        Vector3 dashForward = modelPivot.forward;
+        if (dashForward.sqrMagnitude < 0.001f)
+        {
+            Debug.LogError("CuttingBladeAbility: direcao de dash invalida. modelPivot.forward veio zerado.");
+            return false;
+        }
 
         // CuttingBladeLogic must be pre-attached to the player prefab — AddComponent is forbidden on spawned NetworkObjects
         CuttingBladeLogic logic = quemUsou.GetComponent<CuttingBladeLogic>();
@@ -54,6 +65,7 @@ public class CuttingBladeAbility : Ability
             quemUsou,
             controller,
             modelPivot,
+            dashForward.normalized,
             dashDistance,
             damage,
             eventoDash,

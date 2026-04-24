@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine.UI;
+using ExoBeasts.Multiplayer.Sync;
 
 public class TowerSelectionManager : MonoBehaviour
 {
@@ -20,7 +21,7 @@ public class TowerSelectionManager : MonoBehaviour
     public LayerMask towerLayerMask;
 
     private TowerController selectedTower;
-    private TrapLogicBase selectedTrap;
+    private NetworkedTrapVisual selectedTrap;
     private Component currentlyHighlighted;
     private Camera mainCamera;
 
@@ -81,9 +82,18 @@ public class TowerSelectionManager : MonoBehaviour
         if (Physics.Raycast(ray, out hit, 1000f, towerLayerMask))
         {
             hitComponent = hit.collider.GetComponentInParent<TowerController>();
+            if (hitComponent is TowerController tower)
+            {
+                NetworkedBuilding networkedBuilding = tower.GetComponent<NetworkedBuilding>();
+                if (networkedBuilding != null && !networkedBuilding.CanInteractLocally())
+                    hitComponent = null;
+            }
+
             if (hitComponent == null)
             {
-                hitComponent = hit.collider.GetComponentInParent<TrapLogicBase>();
+                NetworkedTrapVisual trapVisual = hit.collider.GetComponentInParent<NetworkedTrapVisual>();
+                if (trapVisual != null && trapVisual.CanInteractLocally())
+                    hitComponent = trapVisual;
             }
         }
 
@@ -121,7 +131,7 @@ public class TowerSelectionManager : MonoBehaviour
                 }
                 else
                 {
-                    TrapLogicBase trap = currentlyHighlighted as TrapLogicBase;
+                    NetworkedTrapVisual trap = currentlyHighlighted as NetworkedTrapVisual;
                     if (trap != null)
                     {
                         SelectTrap(trap);
@@ -137,6 +147,10 @@ public class TowerSelectionManager : MonoBehaviour
 
     void SelectTower(TowerController tower)
     {
+        NetworkedBuilding networkedBuilding = tower != null ? tower.GetComponent<NetworkedBuilding>() : null;
+        if (networkedBuilding != null && !networkedBuilding.CanInteractLocally())
+            return;
+
         if (tower == selectedTower && upgradePanel.IsPanelVisible())
         {
             DeselectAll();
@@ -157,8 +171,11 @@ public class TowerSelectionManager : MonoBehaviour
         }
     }
 
-    void SelectTrap(TrapLogicBase trap)
+    void SelectTrap(NetworkedTrapVisual trap)
     {
+        if (trap != null && !trap.CanInteractLocally())
+            return;
+
         if (trap == selectedTrap && trapSellPanel.activeSelf)
         {
             DeselectAll();
@@ -168,10 +185,10 @@ public class TowerSelectionManager : MonoBehaviour
             DeselectAll();
             selectedTrap = trap;
 
-            if (trapSellPanel != null && trap.trapData != null)
+            if (trapSellPanel != null && trap.TrapData != null)
             {
-                float refundPercentage = trap.sellRefundPercentage;
-                int geoditeRefund = Mathf.FloorToInt(trap.trapData.geoditeCost * refundPercentage);
+                float refundPercentage = trap.SellRefundPercentage;
+                int geoditeRefund = Mathf.FloorToInt(trap.TrapData.geoditeCost * refundPercentage);
 
                 if (trapSellPriceText != null)
                 {
