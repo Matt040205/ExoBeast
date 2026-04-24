@@ -124,11 +124,25 @@ public class PlayerMovement : NetworkBehaviour
             // Rig de mira nao interfere nos remotos
             if (aimRig != null) aimRig.weight = 0f;
 
+            // Quando PlayerNetworkSetup nao esta no prefab (clientes NGO nao recebem
+            // componentes adicionados em runtime pelo servidor via EnsureRuntimePlayerNetworkContract),
+            // desabilitar PlayerInput aqui para evitar conflito de keyboard device pairing.
+            if (GetComponent<ExoBeasts.Multiplayer.Sync.PlayerNetworkSetup>() == null)
+            {
+                var pi = GetComponent<PlayerInput>();
+                if (pi != null) pi.enabled = false;
+            }
+
             // Script permanece ATIVO para que o Update() possa aplicar animacoes sincronizadas
             return;
         }
 
         InitializeOwner();
+
+        // Fallback: se PlayerNetworkSetup nao foi injetado pelo servidor (cliente NGO),
+        // inicializar o PlayerInput e LocalPlayerInputBridge aqui.
+        if (GetComponent<ExoBeasts.Multiplayer.Sync.PlayerNetworkSetup>() == null)
+            StartCoroutine(SetupOwnerInputFallback());
     }
 
     private void InitializeOwner()
@@ -382,6 +396,13 @@ public class PlayerMovement : NetworkBehaviour
 
     private void HandleMovement()
     {
+        // Retry camera reference: on clients, Camera.main can be null at OnNetworkSpawn time.
+        if (cameraController == null)
+        {
+            if (Camera.main != null) cameraController = Camera.main.transform;
+            else return;
+        }
+
         direction = new Vector3(inputMove.x, 0f, inputMove.y);
         currentSpeed = inputRun ? runSpeed : walkSpeed;
 
@@ -550,6 +571,39 @@ public class PlayerMovement : NetworkBehaviour
         {
             Debug.LogError($"[PlayerMovement] modelPivot nao configurado para '{name}'. Verifique o prefab e o PlayerNetworkSetup.");
         }
+    }
+
+    private IEnumerator SetupOwnerInputFallback()
+    {
+        yield return null; // aguarda Start() dos demais MonoBehaviours
+
+        var pi = GetComponent<PlayerInput>();
+        if (pi != null)
+        {
+            pi.enabled = false;
+            yield return null; // libera devices capturados por PlayerInputs remotos
+            pi.enabled = true;
+            pi.SwitchCurrentActionMap("Player");
+        }
+
+        if (inputBridge == null)
+            inputBridge = GetComponent<LocalPlayerInputBridge>();
+        if (inputBridge == null)
+            inputBridge = gameObject.AddComponent<LocalPlayerInputBridge>();
+
+        inputBridge.enabled = true;
+
+        // Retry camera reference: Camera.main may have been null during InitializeOwner().
+        if (cameraController == null && Camera.main != null)
+            cameraController = Camera.main.transform;
+
+        if (TopDownCameraManager.Instance != null)
+            TopDownCameraManager.Instance.SetCameraTarget(transform);
+
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+
+        Debug.Log("[PlayerMovement] SetupOwnerInputFallback: PlayerInput e bridge configurados (PlayerNetworkSetup ausente no prefab).");
     }
 
     private void SyncOwnerInputFromBridge()

@@ -36,6 +36,14 @@ public class LocalPlayerInputBridge : MonoBehaviour
 
     private void OnEnable()
     {
+        // Limpa referências antes de re-cachear: o PlayerInput pode ter passado por um
+        // ciclo disable→enable que invalida o estado interno das actions.
+        moveAction = null;
+        sprintAction = null;
+        jumpAction = null;
+        aimAction = null;
+        fireAction = null;
+        reloadAction = null;
         CacheActions();
         ResetLatchedState();
     }
