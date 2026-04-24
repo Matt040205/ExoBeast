@@ -277,11 +277,24 @@ public class PlayerHealthSystem : NetworkBehaviour
 
         Renderer[] allRenderers = GetComponentsInChildren<Renderer>();
         System.Collections.Generic.List<Renderer> targetRenderers = new System.Collections.Generic.List<Renderer>();
+        
+        // Dicionário para guardar as texturas originais
+        System.Collections.Generic.Dictionary<Renderer, Texture> texturasOriginais = new System.Collections.Generic.Dictionary<Renderer, Texture>();
+
         foreach (Renderer r in allRenderers)
         {
             if (r is MeshRenderer || r is SkinnedMeshRenderer)
             {
                 targetRenderers.Add(r);
+
+                // Tenta extrair a textura original antes de trocar pelo holograma
+                if (r.sharedMaterial != null)
+                {
+                    if (r.sharedMaterial.HasProperty("_BaseMap"))
+                        texturasOriginais[r] = r.sharedMaterial.GetTexture("_BaseMap");
+                    else if (r.sharedMaterial.HasProperty("_MainTex"))
+                        texturasOriginais[r] = r.sharedMaterial.GetTexture("_MainTex");
+                }
             }
         }
 
@@ -317,9 +330,21 @@ public class PlayerHealthSystem : NetworkBehaviour
         // Passo E: Materiais Finais
         if (materialToon != null && materialOutline != null)
         {
-            Material[] finalMaterials = new Material[] { materialToon, materialOutline };
             foreach (Renderer r in targetRenderers)
             {
+                // Cria uma instância do material toon para não alterar o original
+                Material matToonInstance = new Material(materialToon);
+
+                // Restaura a textura original salva
+                if (texturasOriginais.TryGetValue(r, out Texture texOriginal) && texOriginal != null)
+                {
+                    if (matToonInstance.HasProperty("_BaseMap"))
+                        matToonInstance.SetTexture("_BaseMap", texOriginal);
+                    else if (matToonInstance.HasProperty("_MainTex"))
+                        matToonInstance.SetTexture("_MainTex", texOriginal);
+                }
+
+                Material[] finalMaterials = new Material[] { matToonInstance, materialOutline };
                 r.materials = finalMaterials;
             }
         }
