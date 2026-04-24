@@ -70,7 +70,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 15912487291283997}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -128,9 +128,9 @@ CapsuleCollider:
   m_Enabled: 1
   serializedVersion: 2
   m_Radius: 0.5
-  m_Height: 2
+  m_Height: 2.224102
   m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}
+  m_Center: {x: 0, y: 0.11205101, z: 0}
 --- !u!143 &938941990832875582
 CharacterController:
   m_ObjectHideFlags: 0
@@ -168,7 +168,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 1608426598
+  GlobalObjectIdHash: 2725242546
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -898,7 +898,7 @@ Transform:
   m_GameObject: {fileID: 8988213748382329408}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.24312592, y: 0.0838356, z: -0.021579742}
+  m_LocalPosition: {x: 1.1599998, y: 0.39999962, z: -2}
   m_LocalScale: {x: 1, y: 1.1999999, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -957,8 +957,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 625c14eee3ad46c99df7c7c891ef668a, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   Damping: {x: 0.1, y: 0.5, z: 0.3}
   ShoulderOffset: {x: 1.16, y: 0, z: 0}
   VerticalArmLength: 0.4
@@ -969,7 +969,7 @@ MonoBehaviour:
     CollisionFilter:
       serializedVersion: 2
       m_Bits: 1
-    IgnoreTag:
+    IgnoreTag: 
     CameraRadius: 0.2
     DampingIntoCollision: 0
     DampingFromCollision: 0.5
@@ -983,15 +983,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 412044681694345357, guid: 757a95b4422eb104491b30f3b53f3984, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 97.94838
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 412044681694345357, guid: 757a95b4422eb104491b30f3b53f3984, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 9.1996565
+      value: -1.04
       objectReference: {fileID: 0}
     - target: {fileID: 412044681694345357, guid: 757a95b4422eb104491b30f3b53f3984, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 41.563442
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 412044681694345357, guid: 757a95b4422eb104491b30f3b53f3984, type: 3}
       propertyPath: m_LocalRotation.w
