@@ -88,7 +88,17 @@ namespace ExoBeasts.Multiplayer.Sync
 
             Debug.Log("[PlayerNetworkSetup] PlayerInput configurado no ActionMap 'Player'.");
 
-            // ── 1. Cursor ────────────────────────────────────────────────────────────
+            // ── 1. Estado de jogo ─────────────────────────────────────────────────────
+            // Garante que o modo pausa e o modo construção estejam desativados ao iniciar.
+            // IMPORTANTE: feito APÓS o PlayerInput/bridge estarem prontos — qualquer exceção
+            // em ForceBuildMode (ToggleBuildMode → UI/câmera) não pode interromper o setup de input.
+            PauseControl.isPaused = false;
+            if (BuildManager.Instance != null)
+                BuildManager.Instance.ForceBuildMode(false);
+            else
+                BuildManager.isBuildingMode = false;
+
+            // ── 2. Cursor ────────────────────────────────────────────────────────────
             // PlayerMovement.Start() trava o cursor apenas se o tutorial "PLAYER_MOVEMENT"
             // estiver concluído. Em multiplayer, clientes remotos podem não ter completado
             // o tutorial na sua máquina — aplicamos o lock diretamente aqui.
@@ -96,7 +106,7 @@ namespace ExoBeasts.Multiplayer.Sync
             Cursor.visible   = false;
             Debug.Log("[PlayerNetworkSetup] Cursor travado para jogador local (multiplayer bypass).");
 
-            // ── 2. Torres disponíveis ─────────────────────────────────────────────────
+            // ── 3. Torres disponíveis ─────────────────────────────────────────────────
             // GameSetupManager.SpawnPlayerServerSide chama SetAvailableTowers apenas no
             // servidor (host). Clientes não-host nunca recebem essa chamada, então suas
             // torres não aparecem no BuildUI. Chamamos aqui com os dados locais do cliente.

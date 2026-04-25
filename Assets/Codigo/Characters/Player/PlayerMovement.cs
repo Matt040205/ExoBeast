@@ -86,6 +86,7 @@ public class PlayerMovement : NetworkBehaviour
     private bool jaMoveuTutorial = false;
     private PlayerHealthSystem healthSystem;
     private LocalPlayerInputBridge inputBridge;
+    private bool loggedMovementFallbackWithoutCamera;
 
     private Vector2 inputMove;
     private bool inputRun;
@@ -153,10 +154,7 @@ public class PlayerMovement : NetworkBehaviour
         if (inputBridge == null)
             inputBridge = GetComponent<LocalPlayerInputBridge>();
 
-        if (cameraController == null && Camera.main != null)
-        {
-            cameraController = Camera.main.transform;
-        }
+        TryResolveCriticalReferences(false);
 
         if (aimRig != null) aimRig.weight = 0f;
 
@@ -305,11 +303,20 @@ public class PlayerMovement : NetworkBehaviour
         isGrounded = controller.isGrounded;
         if (isGrounded) hasDoubleJumped = false;
 
-        if (PauseControl.isPaused || BuildManager.isBuildingMode || isDashing)
+        if (PauseControl.isPaused || isDashing)
         {
             if (animator != null && !isDashing) animator.SetFloat("MovementSpeed", 0f);
             netMovementSpeed.Value = 0f;
             StopFootstepSound();
+            return;
+        }
+
+        if (BuildManager.isBuildingMode)
+        {
+            if (animator != null) animator.SetFloat("MovementSpeed", 0f);
+            netMovementSpeed.Value = 0f;
+            StopFootstepSound();
+            ApplyGravity();
             return;
         }
 
@@ -396,12 +403,7 @@ public class PlayerMovement : NetworkBehaviour
 
     private void HandleMovement()
     {
-        // Retry camera reference: on clients, Camera.main can be null at OnNetworkSpawn time.
-        if (cameraController == null)
-        {
-            if (Camera.main != null) cameraController = Camera.main.transform;
-            else return;
-        }
+        TryResolveCriticalReferences(false);
 
         direction = new Vector3(inputMove.x, 0f, inputMove.y);
         currentSpeed = inputRun ? runSpeed : walkSpeed;
@@ -411,15 +413,15 @@ public class PlayerMovement : NetworkBehaviour
 
         if (direction.sqrMagnitude > 0.01f)
         {
-            // Tutorial de build mode agora e encadeado via callback no PLAYER_MOVEMENT
-            // Nao precisa mais do trigger aqui
+            bool hasCameraBasis = TryGetMovementBasis(out Vector3 basisForward, out Vector3 basisRight);
+            Vector3 moveDir = (basisRight * direction.x) + (basisForward * direction.z);
 
-            Vector3 moveDir;
+            if (moveDir.sqrMagnitude > 0.0001f)
+                moveDir.Normalize();
 
             if (isAiming)
             {
-                float lookAngle = cameraController.eulerAngles.y;
-                moveDir = Quaternion.Euler(0f, lookAngle, 0f) * direction;
+                targetAngle = Mathf.Atan2(basisForward.x, basisForward.z) * Mathf.Rad2Deg;
 
                 if (animator != null)
                 {
@@ -429,8 +431,7 @@ public class PlayerMovement : NetworkBehaviour
             }
             else
             {
-                targetAngle = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg + cameraController.eulerAngles.y;
-                moveDir = Quaternion.Euler(0f, targetAngle, 0f) * Vector3.forward;
+                targetAngle = Mathf.Atan2(moveDir.x, moveDir.z) * Mathf.Rad2Deg;
 
                 if (animator != null)
                 {
@@ -441,7 +442,17 @@ public class PlayerMovement : NetworkBehaviour
                 }
             }
 
-            controller.Move(moveDir.normalized * finalSpeed * Time.deltaTime);
+            if (!hasCameraBasis && !loggedMovementFallbackWithoutCamera)
+            {
+                Debug.LogWarning("[PlayerMovement] cameraController ainda nao estava pronto; usando orientacao fallback para nao bloquear o movimento do owner.");
+                loggedMovementFallbackWithoutCamera = true;
+            }
+            else if (hasCameraBasis)
+            {
+                loggedMovementFallbackWithoutCamera = false;
+            }
+
+            controller.Move(moveDir * finalSpeed * Time.deltaTime);
             if (isGrounded) PlayFootstepSound();
             else StopFootstepSound();
         }
@@ -540,8 +551,17 @@ public class PlayerMovement : NetworkBehaviour
 
     private void TryResolveCriticalReferences(bool logErrors)
     {
-        if (cameraController == null && Camera.main != null)
-            cameraController = Camera.main.transform;
+        if (cameraController == null)
+        {
+            CameraController localCameraController = GetComponent<CameraController>();
+            if (localCameraController == null)
+                localCameraController = GetComponentInChildren<CameraController>(true);
+
+            if (localCameraController != null)
+                cameraController = localCameraController.transform;
+            else if (Camera.main != null)
+                cameraController = Camera.main.transform;
+        }
 
         if (modelPivot == null)
         {
@@ -593,9 +613,7 @@ public class PlayerMovement : NetworkBehaviour
 
         inputBridge.enabled = true;
 
-        // Retry camera reference: Camera.main may have been null during InitializeOwner().
-        if (cameraController == null && Camera.main != null)
-            cameraController = Camera.main.transform;
+        TryResolveCriticalReferences(false);
 
         if (TopDownCameraManager.Instance != null)
             TopDownCameraManager.Instance.SetCameraTarget(transform);
@@ -625,5 +643,31 @@ public class PlayerMovement : NetworkBehaviour
             inputBridge = GetComponent<LocalPlayerInputBridge>();
 
         return inputBridge != null && inputBridge.isActiveAndEnabled;
+    }
+
+    private bool TryGetMovementBasis(out Vector3 basisForward, out Vector3 basisRight)
+    {
+        Transform basisSource = cameraController;
+        bool usingCameraController = basisSource != null;
+
+        if (basisSource == null)
+            basisSource = modelPivot != null ? modelPivot : transform;
+
+        basisForward = basisSource.forward;
+        basisRight = basisSource.right;
+        basisForward.y = 0f;
+        basisRight.y = 0f;
+
+        if (basisForward.sqrMagnitude <= 0.0001f)
+            basisForward = Vector3.forward;
+        else
+            basisForward.Normalize();
+
+        if (basisRight.sqrMagnitude <= 0.0001f)
+            basisRight = Vector3.Cross(Vector3.up, basisForward).normalized;
+        else
+            basisRight.Normalize();
+
+        return usingCameraController;
     }
 }

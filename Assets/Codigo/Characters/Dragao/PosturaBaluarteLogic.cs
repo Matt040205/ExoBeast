@@ -5,6 +5,7 @@ public class PosturaBaluarteLogic : MonoBehaviour
     private float counterDamage;
     private float counterForce;
     private GameObject owner;
+    private Transform facingTransform;
     private PlayerHealthSystem playerHealth;
 
     public void Setup(GameObject owner, float duration, float dmg, float force, CommanderAbilityController controller, Ability ability)
@@ -12,6 +13,7 @@ public class PosturaBaluarteLogic : MonoBehaviour
         this.owner = owner;
         this.counterDamage = dmg;
         this.counterForce = force;
+        this.facingTransform = AbilityAimUtility.ResolveAimTransform(owner);
 
         if (controller != null) controller.SetAbilityUsage(ability, true);
 
@@ -53,7 +55,7 @@ public class PosturaBaluarteLogic : MonoBehaviour
         if (other.CompareTag("Enemy"))
         {
             Vector3 dirToEnemy = (other.transform.position - owner.transform.position).normalized;
-            float dot = Vector3.Dot(owner.transform.forward, dirToEnemy);
+            float dot = Vector3.Dot(GetOwnerForward(), dirToEnemy);
 
             if (dot > 0.5f)
             {
@@ -71,7 +73,16 @@ public class PosturaBaluarteLogic : MonoBehaviour
         if (ai != null)
         {
             ai.ApplySlip();
-            ai.ApplyKnockback(owner.transform.forward, counterForce);
+            ai.ApplyKnockback(GetOwnerForward(), counterForce);
         }
+    }
+
+    private Vector3 GetOwnerForward()
+    {
+        if (facingTransform == null && owner != null)
+            facingTransform = AbilityAimUtility.ResolveAimTransform(owner);
+
+        Transform source = facingTransform != null ? facingTransform : owner != null ? owner.transform : transform;
+        return AbilityAimUtility.ResolveFlatForward(source);
     }
 }

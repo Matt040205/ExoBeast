@@ -41,9 +41,11 @@ public class HabilidadeTemorSismico : Ability
         if (!string.IsNullOrEmpty(sfxSlam))
             RuntimeManager.PlayOneShot(sfxSlam, quemUsou.transform.position);
 
-        // Instancia, configura e spawna em rede — todos os clientes veem o VFX.
+        // Instancia, configura e spawna em rede â€” todos os clientes veem o VFX.
         TemorSismicoLogic logic = Object.Instantiate(
-            logicPrefab, quemUsou.transform.position, quemUsou.transform.rotation);
+            logicPrefab,
+            quemUsou.transform.position,
+            AbilityAimUtility.ResolveAimRotation(quemUsou));
 
         logic.Setup(quemUsou, range, angle, damage, knockUpDuration, knockUpForce,
             vulnerabilityMultiplier, vulnerabilityDuration);
@@ -54,7 +56,7 @@ public class HabilidadeTemorSismico : Ability
         }
         else
         {
-            Debug.LogWarning("[TemorSismico] Prefab sem NetworkObject — VFX visivel apenas no servidor. Adicione NetworkObject ao prefab.");
+            Debug.LogWarning("[TemorSismico] Prefab sem NetworkObject â€” VFX visivel apenas no servidor. Adicione NetworkObject ao prefab.");
         }
 
         return true;

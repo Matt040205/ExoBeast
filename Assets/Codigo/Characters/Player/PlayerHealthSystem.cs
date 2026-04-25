@@ -32,6 +32,7 @@ public class PlayerHealthSystem : NetworkBehaviour
     private float timeSinceLastDamage;
     private Transform respawnPoint;
     private Coroutine buffCoroutine;
+    private Coroutine spawnMaterializationCoroutine;
 
     [Header("Configuração de Respawn")]
     public string respawnPointNameOrTag = "RespawnPoint";
@@ -72,7 +73,7 @@ public class PlayerHealthSystem : NetworkBehaviour
         }
 
         // Inicia o fluxo de materialização ao spawnar pela primeira vez
-        StartCoroutine(SpawnMaterializationFlow());
+        RestartSpawnMaterializationFlow();
     }
 
     private IEnumerator WaitAndRegisterHUD()
@@ -251,31 +252,76 @@ public class PlayerHealthSystem : NetworkBehaviour
             Physics.SyncTransforms(); // Sincroniza a física imediatamente para o teleporte
         }
 
-        StartCoroutine(SpawnMaterializationFlow());
+        RestartSpawnMaterializationFlow();
+    }
+
+    private void RestartSpawnMaterializationFlow()
+    {
+        if (spawnMaterializationCoroutine != null)
+            StopCoroutine(spawnMaterializationCoroutine);
+
+        spawnMaterializationCoroutine = StartCoroutine(SpawnMaterializationFlow());
+    }
+
+    private void RestoreOwnerGameplayState(
+        CharacterController controller,
+        bool controllerWasEnabled,
+        PlayerMovement movementScript,
+        bool movementWasEnabled,
+        PlayerShooting shootingScript,
+        bool shootingWasEnabled,
+        PlayerCombatManager combatScript,
+        bool combatWasEnabled)
+    {
+        if (!IsOwner)
+            return;
+
+        if (controller != null)
+            controller.enabled = controllerWasEnabled;
+
+        if (movementScript != null)
+            movementScript.enabled = movementWasEnabled;
+
+        if (shootingScript != null)
+            shootingScript.enabled = shootingWasEnabled;
+
+        if (combatScript != null)
+            combatScript.enabled = combatWasEnabled;
     }
 
     private IEnumerator SpawnMaterializationFlow()
     {
         // Passo A: Bloqueio
         CharacterController controller = null;
-        MonoBehaviour movementScript = null;
-        MonoBehaviour shootingScript = null;
-        MonoBehaviour combatScript = null;
+        PlayerMovement movementScript = null;
+        PlayerShooting shootingScript = null;
+        PlayerCombatManager combatScript = null;
+        bool controllerWasEnabled = false;
+        bool movementWasEnabled = false;
+        bool shootingWasEnabled = false;
+        bool combatWasEnabled = false;
 
         if (IsOwner)
         {
             controller = GetComponent<CharacterController>();
-            movementScript = GetComponent("PlayerMovement") as MonoBehaviour;
-            shootingScript = GetComponent("PlayerShooting") as MonoBehaviour;
-            combatScript = GetComponent("PlayerCombatManager") as MonoBehaviour;
+            movementScript = GetComponent<PlayerMovement>();
+            shootingScript = GetComponent<PlayerShooting>();
+            combatScript = GetComponent<PlayerCombatManager>();
 
-            if (controller != null) controller.enabled = false;
-            if (movementScript != null) movementScript.enabled = false;
-            if (shootingScript != null) shootingScript.enabled = false;
-            if (combatScript != null) combatScript.enabled = false;
+            controllerWasEnabled = controller != null && controller.enabled;
+            movementWasEnabled = movementScript != null && movementScript.enabled;
+            shootingWasEnabled = shootingScript != null && shootingScript.enabled;
+            combatWasEnabled = combatScript != null && combatScript.enabled;
+
+            if (controllerWasEnabled) controller.enabled = false;
+            if (movementWasEnabled) movementScript.enabled = false;
+            if (shootingWasEnabled) shootingScript.enabled = false;
+            if (combatWasEnabled) combatScript.enabled = false;
         }
 
-        Renderer[] allRenderers = GetComponentsInChildren<Renderer>();
+        try
+        {
+        Renderer[] allRenderers = GetComponentsInChildren<Renderer>(true);
         System.Collections.Generic.List<Renderer> targetRenderers = new System.Collections.Generic.List<Renderer>();
         
         // Dicionário para guardar as texturas originais
@@ -350,12 +396,20 @@ public class PlayerHealthSystem : NetworkBehaviour
         }
 
         // Passo F: Liberação
-        if (IsOwner)
+        }
+        finally
         {
-            if (controller != null) controller.enabled = true;
-            if (movementScript != null) movementScript.enabled = true;
-            if (shootingScript != null) shootingScript.enabled = true;
-            if (combatScript != null) combatScript.enabled = true;
+            RestoreOwnerGameplayState(
+                controller,
+                controllerWasEnabled,
+                movementScript,
+                movementWasEnabled,
+                shootingScript,
+                shootingWasEnabled,
+                combatScript,
+                combatWasEnabled);
+
+            spawnMaterializationCoroutine = null;
         }
     }
 

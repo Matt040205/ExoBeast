@@ -110,6 +110,41 @@ public class CommanderAbilityController : NetworkBehaviour
             : (equipe.Length > 0 ? equipe[0] : null);
     }
 
+    private T ResolveAbilityOfType<T>() where T : Ability
+    {
+        if (characterData == null)
+            return null;
+
+        if (characterData.ability1 is T ability1)
+            return ability1;
+
+        if (characterData.ability2 is T ability2)
+            return ability2;
+
+        if (characterData.ultimate is T ultimate)
+            return ultimate;
+
+        return null;
+    }
+
+    private bool CanSendOwnerOnlyAbilityProxy()
+    {
+        return IsServer &&
+               NetworkManager.Singleton != null &&
+               OwnerClientId != NetworkManager.ServerClientId;
+    }
+
+    private ClientRpcParams BuildOwnerOnlyRpcParams()
+    {
+        return new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] { OwnerClientId }
+            }
+        };
+    }
+
     void OnDestroy()
     {
         if (IsOwner && playerHealth != null)
@@ -191,6 +226,73 @@ public class CommanderAbilityController : NetworkBehaviour
         // Sem isso o Player 2 (owner) nunca sabe que a habilidade entrou em cooldown:
         // abilityCooldowns fica em 0 local, gerando ausencia de feedback e ativacoes inconsistentes.
         abilityCooldowns[ability] = ability.cooldown;
+    }
+
+    public void StartLocalMergulhoTintaOwnerProxy(float duration, float exitDamage, float damageRadius)
+    {
+        HabilidadeMergulhoTinta ability = ResolveAbilityOfType<HabilidadeMergulhoTinta>();
+        if (ability == null || !CanSendOwnerOnlyAbilityProxy())
+            return;
+
+        StartLocalMergulhoTintaOwnerClientRpc(duration, exitDamage, damageRadius, BuildOwnerOnlyRpcParams());
+    }
+
+    [ClientRpc]
+    private void StartLocalMergulhoTintaOwnerClientRpc(
+        float duration,
+        float exitDamage,
+        float damageRadius,
+        ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        HabilidadeMergulhoTinta ability = ResolveAbilityOfType<HabilidadeMergulhoTinta>();
+        if (ability == null || GetComponent<MergulhoTintaLogic>() != null)
+            return;
+
+        MergulhoTintaLogic logic = gameObject.AddComponent<MergulhoTintaLogic>();
+        logic.StartDive(duration, exitDamage, damageRadius, ability.visualPuddlePrefab, ability, false);
+    }
+
+    public void StartLocalObraPrimaOwnerProxy(
+        float duration,
+        int shotsCount,
+        float damagePerShot,
+        float radius,
+        float silenceDuration)
+    {
+        HabilidadeObraPrima ability = ResolveAbilityOfType<HabilidadeObraPrima>();
+        if (ability == null || ability.logicPrefab == null || !CanSendOwnerOnlyAbilityProxy())
+            return;
+
+        StartLocalObraPrimaOwnerClientRpc(
+            duration,
+            shotsCount,
+            damagePerShot,
+            radius,
+            silenceDuration,
+            BuildOwnerOnlyRpcParams());
+    }
+
+    [ClientRpc]
+    private void StartLocalObraPrimaOwnerClientRpc(
+        float duration,
+        int shotsCount,
+        float damagePerShot,
+        float radius,
+        float silenceDuration,
+        ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        HabilidadeObraPrima ability = ResolveAbilityOfType<HabilidadeObraPrima>();
+        if (ability == null || ability.logicPrefab == null)
+            return;
+
+        ObraPrimaLogic logic = Instantiate(ability.logicPrefab, transform);
+        logic.StartUltimate(gameObject, duration, shotsCount, damagePerShot, radius, silenceDuration, false);
     }
 
     [ServerRpc]

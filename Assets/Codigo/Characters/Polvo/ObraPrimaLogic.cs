@@ -5,13 +5,21 @@ public class ObraPrimaLogic : MonoBehaviour
 {
     private float _damagePerShot; // Dano por "tiro"
     private int _shotsCount;      // Quantidade de tiros
-    private float _duration;      // DuraÁ„o total
+    private float _duration;      // Dura√ß√£o total
     private float _radius;        // Raio de alcance
     private float _silenceDur;
     private Transform _owner;
+    private bool _applyDamage = true;
 
-    // Atualizei os par‚metros para receber tiros e dano por tiro
-    public void StartUltimate(GameObject owner, float duration, int shotsCount, float damagePerShot, float radius, float silenceDur)
+    // Atualizei os par√¢metros para receber tiros e dano por tiro
+    public void StartUltimate(
+        GameObject owner,
+        float duration,
+        int shotsCount,
+        float damagePerShot,
+        float radius,
+        float silenceDur,
+        bool applyDamage = true)
     {
         _owner = owner.transform;
         _duration = duration;
@@ -19,6 +27,7 @@ public class ObraPrimaLogic : MonoBehaviour
         _damagePerShot = damagePerShot;
         _radius = radius;
         _silenceDur = silenceDur;
+        _applyDamage = applyDamage;
 
         // Inicia a rotina de tiros
         StartCoroutine(DealDamageRoutine());
@@ -26,25 +35,28 @@ public class ObraPrimaLogic : MonoBehaviour
 
     private IEnumerator DealDamageRoutine()
     {
-        // Calcula o tempo de intervalo entre cada tiro baseada na duraÁ„o total
-        // Ex: Se durar 5s e tiver 5 tiros, o intervalo È 1s.
+        // Calcula o tempo de intervalo entre cada tiro baseada na dura√ß√£o total
+        // Ex: Se durar 5s e tiver 5 tiros, o intervalo √© 1s.
         float interval = _duration / _shotsCount;
 
         for (int i = 0; i < _shotsCount; i++)
         {
             ApplyDamagePulse();
 
-            // Espera o tempo do intervalo antes do prÛximo tiro
+            // Espera o tempo do intervalo antes do pr√≥ximo tiro
             yield return new WaitForSeconds(interval);
         }
 
-        // Destroi o objeto apÛs o ˙ltimo tiro terminar
+        // Destroi o objeto ap√≥s o √∫ltimo tiro terminar
         Destroy(gameObject);
     }
 
     private void ApplyDamagePulse()
     {
-        // Detecta inimigos na ·rea
+        if (!_applyDamage)
+            return;
+
+        // Detecta inimigos na √°rea
         Collider[] hits = Physics.OverlapSphere(transform.position, _radius);
 
         foreach (var hit in hits)
@@ -59,7 +71,7 @@ public class ObraPrimaLogic : MonoBehaviour
                     enemyHealth.TakeDamage(_damagePerShot);
                 }
 
-                // LÛgica dos status (Pintado/Silence)
+                // L√≥gica dos status (Pintado/Silence)
                 // var enemyStatus = hit.GetComponent<EnemyStatus>();
                 // if (enemyStatus != null) 
                 // { 

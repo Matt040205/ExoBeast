@@ -54,11 +54,13 @@ public class BuildManager : NetworkBehaviour
             return;
         }
         Instance = this;
+        isBuildingMode = false;
     }
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        ForceBuildMode(false);
         // Inicializa o UI de build em todos os clientes ao entrar na cena.
         // Sem isso, clientes remotos só recebem SetAvailableTowers após a primeira
         // construção (via NotifyBuildingPlacedClientRpc), deixando os tooltips vazios.
@@ -117,8 +119,7 @@ public class BuildManager : NetworkBehaviour
     public void OnBuild(InputAction.CallbackContext ctx)
     {
         if (!ctx.performed) return;
-        isBuildingMode = !isBuildingMode;
-        ToggleBuildMode(isBuildingMode);
+        ForceBuildMode(!isBuildingMode);
     }
 
     void Update()
@@ -169,6 +170,12 @@ public class BuildManager : NetworkBehaviour
         }
 
         if (UIManager.Instance != null) UIManager.Instance.ShowBuildUI(state);
+    }
+
+    public void ForceBuildMode(bool state)
+    {
+        isBuildingMode = state;
+        ToggleBuildMode(state);
     }
 
     void HandleBuildGhost()

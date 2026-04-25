@@ -4,13 +4,13 @@ using FMODUnity;
 [CreateAssetMenu(fileName = "Aqui Nao", menuName = "ExoBeasts/Personagens/Dragao/Habilidade/Aqui Nao")]
 public class HabilidadeAquiNao : Ability
 {
-    [Header("Configurações")]
+    [Header("ConfiguraÃ§Ãµes")]
     public float radius = 5f;
     public float damage = 40f;
     public float knockbackForce = 15f;
     public float stunDuration = 1f;
 
-    [Header("Lógica")]
+    [Header("LÃ³gica")]
     public AquiNaoLogic logicPrefab;
 
     [Header("FMOD")]
@@ -29,7 +29,10 @@ public class HabilidadeAquiNao : Ability
             RuntimeManager.PlayOneShot(sfxSwing, quemUsou.transform.position);
         }
 
-        AquiNaoLogic logic = Instantiate(logicPrefab, quemUsou.transform.position, quemUsou.transform.rotation);
+        AquiNaoLogic logic = Instantiate(
+            logicPrefab,
+            quemUsou.transform.position,
+            AbilityAimUtility.ResolveAimRotation(quemUsou));
         logic.Setup(quemUsou, radius, damage, knockbackForce, stunDuration, controller, this);
 
         return true;

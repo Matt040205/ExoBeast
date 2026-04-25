@@ -2,13 +2,13 @@ using UnityEngine;
 using Unity.Netcode;
 
 /// <summary>
-/// ── TemorSismicoLogic ────────────────────────────────────
+/// â”€â”€ TemorSismicoLogic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /// NetworkBehaviour spawnado pelo servidor ao usar Temor Sismico (Q do Dragao).
 ///
-///  ▸ Server: aplica dano, vulnerabilidade e knockback em inimigos no cone
-///  ▸ Todos os clientes: veem o VFX (particulas no prefab) via NGO spawn
-///  ▸ Destruido apos 2s automaticamente no servidor
-/// ─────────────────────────────────────────────────────────
+///  â–¸ Server: aplica dano, vulnerabilidade e knockback em inimigos no cone
+///  â–¸ Todos os clientes: veem o VFX (particulas no prefab) via NGO spawn
+///  â–¸ Destruido apos 2s automaticamente no servidor
+/// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class TemorSismicoLogic : NetworkBehaviour
@@ -34,9 +34,9 @@ public class TemorSismicoLogic : NetworkBehaviour
         _vulnDuration = vulnDuration;
         _setupReady = true;
 
-        // Posicionar no owner (chamado antes do Spawn, transform já foi definido no Instantiate)
+        // Posicionar no owner (chamado antes do Spawn, transform jÃ¡ foi definido no Instantiate)
         transform.position = owner.transform.position;
-        transform.rotation = owner.transform.rotation;
+        transform.rotation = AbilityAimUtility.ResolveAimRotation(owner);
     }
 
     public override void OnNetworkSpawn()

@@ -3,12 +3,12 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "Mergulho na Tinta", menuName = "ExoBeasts/Personagens/Polvo/Habilidade/Mergulho na Tinta")]
 public class HabilidadeMergulhoTinta : Ability
 {
-    [Header("Configurações do Mergulho")]
+    [Header("ConfiguraÃ§Ãµes do Mergulho")]
     public float duration = 3f;
     public float exitDamage = 40f;
     public float damageRadius = 4f;
 
-    [Tooltip("O prefab visual da poça (sem collider!)")]
+    [Tooltip("O prefab visual da poÃ§a (sem collider!)")]
     public GameObject visualPuddlePrefab;
 
     public override bool Activate(GameObject quemUsou)
@@ -16,7 +16,11 @@ public class HabilidadeMergulhoTinta : Ability
         if (quemUsou.GetComponent<MergulhoTintaLogic>() != null) return false;
 
         MergulhoTintaLogic logic = quemUsou.AddComponent<MergulhoTintaLogic>();
-        logic.StartDive(duration, exitDamage, damageRadius, visualPuddlePrefab, this);
+        if (!logic.StartDive(duration, exitDamage, damageRadius, visualPuddlePrefab, this))
+            return false;
+
+        CommanderAbilityController controller = quemUsou.GetComponent<CommanderAbilityController>();
+        controller?.StartLocalMergulhoTintaOwnerProxy(duration, exitDamage, damageRadius);
 
         return true;
     }

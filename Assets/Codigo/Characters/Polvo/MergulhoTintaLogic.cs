@@ -1,6 +1,7 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
+using Unity.Netcode;
 
 public class MergulhoTintaLogic : MonoBehaviour
 {
@@ -17,28 +18,57 @@ public class MergulhoTintaLogic : MonoBehaviour
     private CommanderAbilityController _abilityScript;
     private PlayerHealthSystem _playerHealth;
     private Ability _sourceAbility;
+    private NetworkObject _networkObject;
 
     private const int GHOST_LAYER = 2;
     private const string POCA_TAG = "Poca";
 
     public LayerMask groundLayerMask = 1;
 
-    public void StartDive(float duration, float damage, float radius, GameObject puddlePrefab, Ability abilitySource)
+    private bool HasServerAuthority
+    {
+        get
+        {
+            if (_networkObject == null || !_networkObject.IsSpawned)
+                return true;
+
+            NetworkManager networkManager = _networkObject.NetworkManager;
+            return networkManager == null || networkManager.IsServer;
+        }
+    }
+
+    private bool IsLocalOwnerInstance
+    {
+        get
+        {
+            if (_networkObject == null || !_networkObject.IsSpawned)
+                return true;
+
+            NetworkManager networkManager = _networkObject.NetworkManager;
+            if (networkManager == null)
+                return true;
+
+            return _networkObject.OwnerClientId == networkManager.LocalClientId;
+        }
+    }
+
+    public bool StartDive(float duration, float damage, float radius, GameObject puddlePrefab, Ability abilitySource, bool validateGround = true)
     {
         _abilityScript = GetComponent<CommanderAbilityController>();
         _sourceAbility = abilitySource;
+        _networkObject = GetComponent<NetworkObject>();
 
-        if (!CheckIfGrounded())
+        if (validateGround && !CheckIfGrounded())
         {
-            if (_abilityScript != null)
+            if (_abilityScript != null && HasServerAuthority)
             {
                 _abilityScript.SetAbilityUsage(_sourceAbility, false);
             }
             Destroy(this);
-            return;
+            return false;
         }
 
-        if (_abilityScript != null)
+        if (_abilityScript != null && HasServerAuthority)
         {
             _abilityScript.SetAbilityUsage(_sourceAbility, true);
         }
@@ -61,8 +91,8 @@ public class MergulhoTintaLogic : MonoBehaviour
         int enemyLayer = LayerMask.NameToLayer("Enemy");
         if (enemyLayer != -1) Physics.IgnoreLayerCollision(GHOST_LAYER, enemyLayer, true);
 
-        if (_shootingScript) _shootingScript.enabled = false;
-        if (_abilityScript) _abilityScript.enabled = false;
+        if (_shootingScript != null && IsLocalOwnerInstance) _shootingScript.enabled = false;
+        if (_abilityScript != null && IsLocalOwnerInstance) _abilityScript.enabled = false;
         foreach (var r in _renderers) r.enabled = false;
 
         if (puddlePrefab != null)
@@ -71,9 +101,11 @@ public class MergulhoTintaLogic : MonoBehaviour
             _puddleInstance = Instantiate(puddlePrefab, spawnPos, Quaternion.Euler(90f, 0f, 0f));
         }
 
-        ConfundirInimigos(radius * 3f);
+        if (HasServerAuthority)
+            ConfundirInimigos(radius * 3f);
 
         Invoke(nameof(EndDive), duration);
+        return true;
     }
 
     void ConfundirInimigos(float areaDeEfeito)
@@ -129,17 +161,30 @@ public class MergulhoTintaLogic : MonoBehaviour
     void EndDive()
     {
         gameObject.tag = _originalTag;
-        if (_shootingScript) _shootingScript.enabled = true;
-        if (_abilityScript) _abilityScript.enabled = true;
+        if (_shootingScript != null && IsLocalOwnerInstance) _shootingScript.enabled = true;
+        if (_abilityScript != null && IsLocalOwnerInstance) _abilityScript.enabled = true;
         foreach (var r in _renderers) r.enabled = true;
         if (_puddleInstance != null) Destroy(_puddleInstance);
 
-        CausarDanoEmArea();
+        if (HasServerAuthority)
+            CausarDanoEmArea();
+
         StartCoroutine(WaitUntilClearToSurface());
     }
 
     IEnumerator WaitUntilClearToSurface()
     {
+        if (!HasServerAuthority)
+        {
+            SetLayerRecursively(gameObject, _originalLayer);
+
+            int ownerEnemyLayer = LayerMask.NameToLayer("Enemy");
+            if (ownerEnemyLayer != -1) Physics.IgnoreLayerCollision(GHOST_LAYER, ownerEnemyLayer, false);
+
+            Destroy(this);
+            yield break;
+        }
+
         bool isClear = false;
         float maxSafetyWait = 5.0f;
         float timer = 0f;

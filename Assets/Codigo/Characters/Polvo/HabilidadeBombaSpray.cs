@@ -3,7 +3,7 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "Bomba de Spray", menuName = "ExoBeasts/Personagens/Polvo/Habilidade/Bomba de Spray")]
 public class HabilidadeBombaSpray : Ability
 {
-    [Header("Configurações da Bomba")]
+    [Header("ConfiguraÃ§Ãµes da Bomba")]
     public float throwForce = 15f;
     public float explosionRadius = 6f;
     public float cloudDuration = 4f;
@@ -46,22 +46,12 @@ public class HabilidadeBombaSpray : Ability
 
     private Vector3 GetAimDirection(GameObject quemUsou, Vector3 originPoint)
     {
-        Camera cam = Camera.main;
-        if (cam == null) return quemUsou.transform.forward;
+        Vector3 aimForward = AbilityAimUtility.ResolveAimForward(quemUsou);
+        if (aimForward.sqrMagnitude <= 0.0001f && quemUsou != null)
+            aimForward = AbilityAimUtility.ResolveFlatForward(quemUsou.transform);
 
-        Ray ray = cam.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0));
-        RaycastHit hit;
-        Vector3 targetPoint;
-
-        if (Physics.Raycast(ray, out hit, 100f, aimLayers))
-        {
-            targetPoint = hit.point;
-        }
-        else
-        {
-            targetPoint = ray.GetPoint(100f);
-        }
-
-        return (targetPoint - originPoint).normalized;
+        // Mantem um arco leve para a lata nao colidir no proprio chao ao nascer.
+        Vector3 throwDirection = (aimForward + Vector3.up * 0.15f).normalized;
+        return throwDirection.sqrMagnitude > 0.0001f ? throwDirection : Vector3.forward;
     }
 }

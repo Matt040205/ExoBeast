@@ -248,10 +248,12 @@ public class PlayerShooting : NetworkBehaviour
 
     private void UpdateAimTargetPosition()
     {
-        if (aimTarget == null || mainCamera == null)
+        if (aimTarget == null)
             return;
 
-        Ray ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        if (!TryBuildAimRay(out Ray ray))
+            return;
+
         Vector3 targetPosition = ray.origin + ray.direction * maxDistance;
 
         if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, hitLayers))
@@ -566,12 +568,75 @@ public class PlayerShooting : NetworkBehaviour
         isReloading = false;
     }
 
+    private void TryResolveAimingReferences()
+    {
+        if (mainCamera == null)
+            mainCamera = Camera.main;
+
+        if (cameraController == null)
+            cameraController = GetComponentInChildren<CameraController>();
+
+        if (modelPivot == null)
+        {
+            PlayerMovement playerMovement = GetComponent<PlayerMovement>();
+            if (playerMovement != null)
+                modelPivot = playerMovement.GetModelPivot();
+        }
+
+        if (firePoint == null)
+            firePoint = transform;
+    }
+
+    private bool TryBuildAimRay(out Ray ray)
+    {
+        TryResolveAimingReferences();
+
+        if (mainCamera != null)
+        {
+            ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+            return true;
+        }
+
+        if (cameraController != null)
+        {
+            ray = new Ray(cameraController.transform.position, cameraController.transform.forward);
+            return true;
+        }
+
+        ray = default;
+        return false;
+    }
+
+    private Vector3 GetFallbackShotDirection()
+    {
+        TryResolveAimingReferences();
+
+        Transform fallbackTransform = modelPivot != null ? modelPivot : firePoint;
+        if (fallbackTransform == null)
+            fallbackTransform = transform;
+
+        Vector3 fallbackDirection = fallbackTransform.forward;
+        return fallbackDirection.sqrMagnitude > 0.0001f ? fallbackDirection.normalized : transform.forward;
+    }
+
     private Vector3 GetShotDirection()
     {
-        if (mainCamera == null || firePoint == null)
-            return transform.forward;
+        TryResolveAimingReferences();
 
-        Ray ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
+        if (firePoint == null)
+            return GetFallbackShotDirection();
+
+        if (!TryBuildAimRay(out Ray ray))
+        {
+            if (aimTarget != null)
+            {
+                Vector3 aimTargetDirection = aimTarget.position - firePoint.position;
+                if (aimTargetDirection.sqrMagnitude > 0.0001f)
+                    return aimTargetDirection.normalized;
+            }
+
+            return GetFallbackShotDirection();
+        }
 
         // Ponto virtual no mundo aonde a mira aponta (mesmo padrão de UpdateAimTargetPosition).
         // Se o raycast acertar algo, usa o ponto de impacto real.
@@ -582,7 +647,11 @@ public class PlayerShooting : NetworkBehaviour
         if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, hitLayers))
             targetPoint = hit.point;
 
-        return (targetPoint - firePoint.position).normalized;
+        Vector3 shotDirection = targetPoint - firePoint.position;
+        if (shotDirection.sqrMagnitude <= 0.0001f)
+            return GetFallbackShotDirection();
+
+        return shotDirection.normalized;
     }
 
     public float GetRemainingReloadTime()
