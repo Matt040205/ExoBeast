@@ -67,7 +67,8 @@ public class EnemyPoolManager : MonoBehaviour
             pools[prefabName] = new Queue<GameObject>();
             for (int i = 0; i < initialPoolSize; i++)
             {
-                CreateNewInPool(prefab, prefabName);
+                GameObject preWarmed = CreateNewInPool(prefab, prefabName);
+                pools[prefabName].Enqueue(preWarmed); // Pré-popula a fila
             }
         }
 
@@ -118,7 +119,9 @@ public class EnemyPoolManager : MonoBehaviour
         if (navAgent != null) navAgent.enabled = false;
 
         newObj.SetActive(false);
-        pools[prefabName].Enqueue(newObj);
+        // NÃO enfileira aqui — o chamador (GetPooledEnemy) já usa o retorno diretamente.
+        // Enfileirar causava o objeto aparecer na fila E ser usado ao mesmo tempo,
+        // resultando em reuso duplicado na próxima chamada.
         return newObj;
     }
 

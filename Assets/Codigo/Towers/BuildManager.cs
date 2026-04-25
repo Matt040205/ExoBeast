@@ -33,6 +33,10 @@ public class BuildManager : NetworkBehaviour
     [Header("Armadilhas Disponíveis")]
     public List<TrapDataSO> availableTraps = new List<TrapDataSO>();
 
+    [Header("Área Jogável")]
+    [Tooltip("Collider (trigger) que define os limites do mapa. Armadilhas e torres só podem ser colocadas dentro desta área. Deixe vazio para desabilitar o check.")]
+    public Collider playableAreaBounds;
+
     [Header("Dono Local")]
     public static bool isBuildingMode = false;
 
@@ -63,10 +67,31 @@ public class BuildManager : NetworkBehaviour
 
     private IEnumerator InitBuildUIWhenReady()
     {
+        // Espera GameDataManager existir E pelo menos um slot de equipe estar preenchido.
+        // O array equipeSelecionada sempre existe (8 slots null), então checar apenas
+        // != null não é suficiente — em multiplayer, os slots são preenchidos no SelecaoManager
+        // e podem ainda estar vazios quando esta cena carrega.
+        float elapsed = 0f;
+        const float timeout = 5f;
+
         yield return new WaitUntil(() =>
-            GameDataManager.Instance != null &&
-            GameDataManager.Instance.equipeSelecionada != null);
-        SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);
+        {
+            elapsed += Time.deltaTime;
+            if (elapsed >= timeout) return true; // timeout — tenta com o que tiver
+
+            if (GameDataManager.Instance == null) return false;
+            var equipe = GameDataManager.Instance.equipeSelecionada;
+            if (equipe == null) return false;
+
+            // Verifica se pelo menos um slot está preenchido
+            foreach (var slot in equipe)
+                if (slot != null) return true;
+
+            return false;
+        });
+
+        if (GameDataManager.Instance != null)
+            SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);
     }
 
     public void SelectTowerToBuild(CharacterBase towerData)
@@ -168,9 +193,21 @@ public class BuildManager : NetworkBehaviour
         RaycastHit hit;
         bool isOverValidSurface = false;
 
-        if (Physics.Raycast(ray, out hit))
+        // Desativa temporariamente o collider da Área Jogável para que o raycast
+        // nunca bata nele, não importa em qual Layer o usuário o colocou.
+        if (playableAreaBounds != null) playableAreaBounds.enabled = false;
+
+        bool raycastHit = Physics.Raycast(ray, out hit, 1000f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+        
+        if (playableAreaBounds != null) playableAreaBounds.enabled = true;
+
+        if (raycastHit)
         {
             isOverValidSurface = GridPlacement.IsPlacementValid(hit, selectedBuildableData as ScriptableObject);
+
+            // Bloqueia placement fora da área jogável do mapa
+            if (isOverValidSurface && !IsInsidePlayableArea(hit.point))
+                isOverValidSurface = false;
 
             float calculatedHeight = CalculateRequiredHeight(hit.point, selectedBuildablePrefab);
             currentBuildGhost.transform.position = new Vector3(hit.point.x, hit.point.y + calculatedHeight, hit.point.z);
@@ -189,6 +226,20 @@ public class BuildManager : NetworkBehaviour
             isCurrentPlacementValid = isOverValidSurface && hasEnoughCurrency && isBuildAllowed;
             ghostRenderer.material = (isCurrentPlacementValid) ? validPlacementMaterial : invalidPlacementMaterial;
         }
+    }
+
+    /// <summary>
+    /// Verifica se um ponto do mundo está dentro da área jogável definida pelo
+    /// collider playableAreaBounds, checando APENAS eixos X e Z (horizontal).
+    /// Isso evita bugs se o cubo estiver um pouco acima ou abaixo do chão real.
+    /// </summary>
+    private bool IsInsidePlayableArea(Vector3 worldPoint)
+    {
+        if (playableAreaBounds == null) return true;
+
+        Bounds b = playableAreaBounds.bounds;
+        return (worldPoint.x >= b.min.x && worldPoint.x <= b.max.x &&
+                worldPoint.z >= b.min.z && worldPoint.z <= b.max.z);
     }
 
     private bool IsBuildAllowedLocal(object buildableData)

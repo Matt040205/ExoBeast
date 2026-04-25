@@ -315,7 +315,13 @@ public class SelecaoManager : NetworkBehaviour
     private void RegisterChoiceWithServer()
     {
         var bib = GameDataManager.Instance?.bibliotecaOriginalPersonagens;
-        int bibliotecaId = (bib != null) ? bib.IndexOf(personagemEmVisualizacao) : -1;
+        // Usa comparação por nome — personagemEmVisualizacao é um clone de
+        // personagensDoJogador, e a biblioteca contém os ScriptableObjects originais.
+        // IndexOf falharia aqui pois compara por referência (clone ≠ original).
+        string cleanName = personagemEmVisualizacao?.name?.Replace("(Clone)", "") ?? "";
+        int bibliotecaId = (bib != null)
+            ? bib.FindIndex(c => c != null && c.name == cleanName)
+            : -1;
         if (bibliotecaId < 0)
         {
             Debug.LogWarning($"[SelecaoManager] Personagem '{personagemEmVisualizacao?.name}' não encontrado em bibliotecaOriginalPersonagens. Spawn pode usar índice errado.");

@@ -121,6 +121,10 @@ public class PlayerHUD : MonoBehaviour
             }
         }
 
+        // Em multiplayer, o ObjectiveHealthSystem pode não ter spawnado quando Start() rodou.
+        if (objectiveHealth == null)
+            FindObjectiveAndShootingSystems();
+
         if (playerHealth != null) UpdateHealthDisplay();
         if (playerShooting != null) UpdateAmmoDisplay();
         if (objectiveHealth != null) UpdateObjectiveHealthDisplay();

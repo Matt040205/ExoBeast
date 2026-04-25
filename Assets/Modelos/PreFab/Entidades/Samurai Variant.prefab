@@ -1144,6 +1144,10 @@ PrefabInstance:
       propertyPath: m_Data.m_DampRotation
       value: 0.001
       objectReference: {fileID: 0}
+    - target: {fileID: 414561533210532575, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     - target: {fileID: 573096255506189436, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: aimRig
       value: 
@@ -1232,6 +1236,10 @@ PrefabInstance:
       propertyPath: m_Data.m_DampRotation
       value: 0.001
       objectReference: {fileID: 0}
+    - target: {fileID: 1458758049813393618, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     - target: {fileID: 1527235181715017189, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_Height
       value: 2.8215983
@@ -1264,6 +1272,14 @@ PrefabInstance:
       propertyPath: m_Data.m_DampRotation
       value: 0.001
       objectReference: {fileID: 0}
+    - target: {fileID: 2502667293617130168, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
+    - target: {fileID: 2525787876896743403, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     - target: {fileID: 2658915299399628099, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_Weight
       value: 1
@@ -1279,6 +1295,10 @@ PrefabInstance:
     - target: {fileID: 2682399473942067493, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_Name
       value: Samurai Variant
+      objectReference: {fileID: 0}
+    - target: {fileID: 2682399473942067493, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_Layer
+      value: 6
       objectReference: {fileID: 0}
     - target: {fileID: 2684468934285267859, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: modelPivot
@@ -1436,6 +1456,10 @@ PrefabInstance:
       propertyPath: m_Data.m_DampRotation
       value: 0.001
       objectReference: {fileID: 0}
+    - target: {fileID: 6155770393861766862, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     - target: {fileID: 6223803647213047839, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_Weight
       value: 1
@@ -1580,6 +1604,10 @@ PrefabInstance:
       propertyPath: m_Data.m_DampRotation
       value: 0.001
       objectReference: {fileID: 0}
+    - target: {fileID: 8961694249658910085, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_Layer
+      value: 6
+      objectReference: {fileID: 0}
     - target: {fileID: 9082450080556859796, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_Weight
       value: 1
@@ -1677,7 +1705,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 2792833894
+  GlobalObjectIdHash: 3614457225
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1

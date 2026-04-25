@@ -313,7 +313,9 @@ public class HordeManager : NetworkBehaviour
         enemiesSpawnedCount = 0;
         EnemiesRemaining = enemiesToSpawnTotal;
 
-        Debug.Log($"[HordeManager] Iniciando Horda {CurrentHorde} com {enemiesToSpawnTotal} inimigos!");
+        Debug.Log($"[HordeManager] Iniciando Horda {CurrentHorde} com {enemiesToSpawnTotal} inimigos! " +
+                  $"Tipos disponíveis: {(enemyTypes != null ? enemyTypes.Length : 0)}" +
+                  (enemyTypes != null ? $" [{string.Join(", ", System.Array.ConvertAll(enemyTypes, e => e != null ? e.name : "NULL"))}]" : ""));
 
         if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
         spawnCoroutine = StartCoroutine(SpawnEnemiesOverTime());
@@ -341,7 +343,7 @@ public class HordeManager : NetworkBehaviour
 
     private void SpawnSingleEnemy()
     {
-        if (spawnPaths == null || spawnPaths.Count == 0 || enemyTypes.Length == 0) return;
+        if (spawnPaths == null || spawnPaths.Count == 0 || enemyTypes == null || enemyTypes.Length == 0) return;
 
         int pathIndex = GetRandomPathIndex();
         SpawnPath selectedPath = spawnPaths[pathIndex];
@@ -351,6 +353,12 @@ public class HordeManager : NetworkBehaviour
         int enemyTypeIndex = Random.Range(0, enemyTypes.Length);
         EnemyDataSO enemyData = enemyTypes[enemyTypeIndex];
 
+        if (enemyData == null || enemyData.enemyPrefab == null)
+        {
+            Debug.LogWarning($"[HordeManager] enemyTypes[{enemyTypeIndex}] é null ou sem prefab! Pulando spawn.");
+            return;
+        }
+
         GameObject newEnemy = null;
 
         if (EnemyPoolManager.Instance != null)
@@ -359,8 +367,17 @@ public class HordeManager : NetworkBehaviour
         }
         else if (IsLocalMode)
         {
-            // Fallback caso o pool não exista em local
+            // Fallback local sem pool
             newEnemy = Instantiate(enemyData.enemyPrefab, selectedPath.spawnPoint.position, selectedPath.spawnPoint.rotation);
+        }
+        else if (IsServer)
+        {
+            // Fallback rede sem pool — instancia e spawna via NGO diretamente.
+            // Sem isso, em builds onde o EnemyPoolManager não inicializou a tempo,
+            // nenhum inimigo era spawnado (o else if IsLocalMode retornava false).
+            newEnemy = Instantiate(enemyData.enemyPrefab, selectedPath.spawnPoint.position, selectedPath.spawnPoint.rotation);
+            if (newEnemy.TryGetComponent<NetworkObject>(out var netObj))
+                netObj.Spawn(true);
         }
 
         if (newEnemy != null)

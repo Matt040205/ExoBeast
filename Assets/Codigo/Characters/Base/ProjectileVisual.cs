@@ -32,6 +32,13 @@ public class ProjectileVisual : MonoBehaviour
     private bool isEmpoweredSkill = false;
     private float explosionRadius = 0f;
 
+    // Grace period: ignora colisões nos primeiros frames para não colidir
+    // com o muzzle flash, arma, ou outros colliders do atirador que nascem
+    // na mesma posição do projétil.
+    private float spawnTime;
+    private const float SPAWN_GRACE_PERIOD = 0.05f;
+    private Transform ownerRoot;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
@@ -49,15 +56,26 @@ public class ProjectileVisual : MonoBehaviour
         this.hasHit = false;
         this.isEmpoweredSkill = isEmpoweredSkill;
         this.explosionRadius = explosionRadius;
+        this.spawnTime = Time.time;
+
+        // Guarda a raiz do atirador para ignorar colisões com filhos dele
+        // (muzzle flash, arma, acessórios, VFX parenteados ao firePoint).
+        if (playerHealth != null)
+            ownerRoot = playerHealth.transform;
 
         rb.linearVelocity = direction * speed;
         CancelInvoke(nameof(ReturnToPool));
         Invoke(nameof(ReturnToPool), maxLifetime);
     }
 
-    public void InitializeVisual(Vector3 direction)
+    public void InitializeVisual(Vector3 direction, Transform shooterRoot = null)
     {
         Initialize(0f, false, 0f, null, direction, false, 0f);
+        // Para projéteis visuais, o ownerRoot não é setado via playerHealth.
+        // O chamador pode passar o Transform do atirador para evitar colisões
+        // com o muzzle flash, arma e acessórios parenteados nele.
+        if (shooterRoot != null)
+            ownerRoot = shooterRoot;
     }
 
     public void SetPoolReference(ProjectilePool poolReference)
@@ -67,9 +85,23 @@ public class ProjectileVisual : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
+        // OnTriggerEnter é chamado pelo Unity mesmo em MonoBehaviours desabilitados.
+        // No projétil do servidor, o ProjectileVisual é desabilitado para deixar o
+        // ServerAuthoritativeProjectile lidar com colisão e dano. Sem este check,
+        // o ProjectileVisual destruía o GameObject antes do server processar o dano.
+        if (!enabled) return;
+
         if (hasHit) return;
 
         if (other.CompareTag("Player")) return;
+
+        // Grace period: ignora qualquer colisão nos primeiros frames após spawn.
+        // Impede que o projétil colida com o muzzle flash, partículas de VFX,
+        // ou outros colliders que existem no ponto de disparo.
+        if (Time.time - spawnTime < SPAWN_GRACE_PERIOD) return;
+
+        // Ignora colliders que são filhos do atirador (arma, acessórios, VFX).
+        if (ownerRoot != null && other.transform.IsChildOf(ownerRoot)) return;
 
         hasHit = true;
         rb.linearVelocity = Vector3.zero;

@@ -100,6 +100,14 @@ namespace ExoBeasts.Multiplayer.Sync
             // GameSetupManager.SpawnPlayerServerSide chama SetAvailableTowers apenas no
             // servidor (host). Clientes não-host nunca recebem essa chamada, então suas
             // torres não aparecem no BuildUI. Chamamos aqui com os dados locais do cliente.
+            // Aguarda até 3s pelo BuildManager (NetworkBehaviour que pode spawnar depois).
+            float buildWait = 0f;
+            while (BuildManager.Instance == null && buildWait < 3f)
+            {
+                buildWait += Time.deltaTime;
+                yield return null;
+            }
+
             if (BuildManager.Instance != null && GameDataManager.Instance != null)
             {
                 BuildManager.Instance.SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);

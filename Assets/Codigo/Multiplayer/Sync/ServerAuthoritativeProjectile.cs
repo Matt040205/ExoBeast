@@ -18,6 +18,11 @@ namespace ExoBeasts.Multiplayer.Sync
         private bool isEmpoweredSkill;
         private float explosionRadius;
 
+        // Grace period: mesma proteção do ProjectileVisual.
+        private float spawnTime;
+        private const float SPAWN_GRACE_PERIOD = 0.05f;
+        private Transform ownerRoot;
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody>();
@@ -49,6 +54,8 @@ namespace ExoBeasts.Multiplayer.Sync
             isEmpoweredSkill = empoweredSkill;
             explosionRadius = empoweredExplosionRadius;
             hasHit = false;
+            spawnTime = Time.time;
+            ownerRoot = shooting != null ? shooting.transform : null;
 
             SuppressPresentation();
 
@@ -63,6 +70,14 @@ namespace ExoBeasts.Multiplayer.Sync
                 return;
 
             if (other == null || other.CompareTag("Player"))
+                return;
+
+            // Grace period: ignora colisões nos primeiros frames (muzzle flash, VFX).
+            if (Time.time - spawnTime < SPAWN_GRACE_PERIOD)
+                return;
+
+            // Ignora colliders filhos do atirador.
+            if (ownerRoot != null && other.transform.IsChildOf(ownerRoot))
                 return;
 
             hasHit = true;

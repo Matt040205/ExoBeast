@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.EventSystems;
 using System.Collections.Generic;
 using TMPro;
@@ -50,7 +50,14 @@ public class TowerSelectionManager : MonoBehaviour
 
     void Update()
     {
-        if (Time.timeScale == 0 || mainCamera == null) return;
+        if (Time.timeScale == 0) return;
+
+        // Atualiza a referência da câmera a cada frame.
+        // O Cinemachine troca a câmera ativa ao entrar/sair do build mode,
+        // e a referência antiga pode ficar stale ou null — travando todo
+        // o sistema de seleção de torres na segunda entrada.
+        mainCamera = Camera.main;
+        if (mainCamera == null) return;
 
         if (!BuildManager.isBuildingMode || (BuildManager.Instance != null && BuildManager.Instance.IsHoldingBuilding))
         {
@@ -68,7 +75,9 @@ public class TowerSelectionManager : MonoBehaviour
 
     private void HandleHoverHighlighting()
     {
-        if (EventSystem.current.IsPointerOverGameObject()) { Debug.Log("[TowerSelection] Mouse is over UI!"); if (currentlyHighlighted != null)
+        if (EventSystem.current.IsPointerOverGameObject())
+        {
+            if (currentlyHighlighted != null)
             {
                 (currentlyHighlighted as TowerController)?.GetComponent<TowerSelectionCircle>()?.Unhighlight();
                 currentlyHighlighted = null;
@@ -77,7 +86,8 @@ public class TowerSelectionManager : MonoBehaviour
         }
 
         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        RaycastHit hit; Component hitComponent = null; Debug.Log($"[TowerSelection] Raycast shot at {Input.mousePosition}");
+        RaycastHit hit;
+        Component hitComponent = null;
 
         if (Physics.Raycast(ray, out hit, 1000f, towerLayerMask))
         {
@@ -97,7 +107,7 @@ public class TowerSelectionManager : MonoBehaviour
             }
         }
 
-        Debug.Log($"[TowerSelection] Hit component: {(hitComponent != null ? hitComponent.name : "null")}"); if (hitComponent != currentlyHighlighted)
+        if (hitComponent != currentlyHighlighted)
         {
             if (currentlyHighlighted != null)
             {

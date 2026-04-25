@@ -34,8 +34,13 @@ public class Teleportador : TrapLogicBase
         SetupPortal();
     }
 
+    private bool isSetup = false;
+
     private void SetupPortal()
     {
+        if (isSetup) return;
+        isSetup = true;
+
         GetComponent<Collider>().isTrigger = true;
 
         if (portais.Count >= MAX_PORTAIS)

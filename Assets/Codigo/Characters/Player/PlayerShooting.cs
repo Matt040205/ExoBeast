@@ -365,7 +365,7 @@ public class PlayerShooting : NetworkBehaviour
             GameObject visualProjectile = Instantiate(projectileVisualPrefab, spawnPosition, spawnRotation);
             ProjectileVisual visualScript = visualProjectile.GetComponent<ProjectileVisual>();
             if (visualScript != null)
-                visualScript.InitializeVisual(direction);
+                visualScript.InitializeVisual(direction, transform);
         }
 
         if (isOwnerShot && tipoDeSom == "Arco" && empoweredShot)
@@ -572,10 +572,17 @@ public class PlayerShooting : NetworkBehaviour
             return transform.forward;
 
         Ray ray = mainCamera.ViewportPointToRay(new Vector3(0.5f, 0.5f, 0f));
-        if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, hitLayers))
-            return (hit.point - firePoint.position).normalized;
 
-        return ray.direction.normalized;
+        // Ponto virtual no mundo aonde a mira aponta (mesmo padrão de UpdateAimTargetPosition).
+        // Se o raycast acertar algo, usa o ponto de impacto real.
+        // Se não acertar (hitLayers vazia, ambiente fora do range, etc), usa o ponto
+        // mais distante ao longo do raio da câmera — nunca o forward da câmera cru,
+        // que ignora o parallax entre câmera e firePoint e faz o tiro sair deslocado.
+        Vector3 targetPoint = ray.origin + ray.direction * maxDistance;
+        if (Physics.Raycast(ray, out RaycastHit hit, maxDistance, hitLayers))
+            targetPoint = hit.point;
+
+        return (targetPoint - firePoint.position).normalized;
     }
 
     public float GetRemainingReloadTime()
