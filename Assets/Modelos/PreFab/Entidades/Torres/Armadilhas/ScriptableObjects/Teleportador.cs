@@ -43,6 +43,8 @@ public class Teleportador : TrapLogicBase
 
         GetComponent<Collider>().isTrigger = true;
 
+        portais.RemoveAll(p => p == null);
+
         if (portais.Count >= MAX_PORTAIS)
         {
             if (isServerMode)
@@ -113,6 +115,18 @@ public class Teleportador : TrapLogicBase
             NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(jogadorNetId, out var netObj))
         {
             TeleportarLocal(netObj.gameObject, destino);
+
+            // Para o jogador local: garantir que build mode não ficou preso e cursor está correto
+            if (netObj.IsOwner)
+            {
+                if (BuildManager.Instance != null)
+                    BuildManager.Instance.ForceBuildMode(false);
+                else
+                    BuildManager.isBuildingMode = false;
+
+                Cursor.lockState = CursorLockMode.Locked;
+                Cursor.visible = false;
+            }
         }
     }
 
@@ -121,9 +135,10 @@ public class Teleportador : TrapLogicBase
         CharacterController cc = jogador.GetComponent<CharacterController>();
         if (cc != null)
         {
+            bool ccEraHabilitado = cc.enabled;
             cc.enabled = false;
             jogador.transform.position = destino;
-            cc.enabled = true;
+            if (ccEraHabilitado) cc.enabled = true;
         }
         else
         {

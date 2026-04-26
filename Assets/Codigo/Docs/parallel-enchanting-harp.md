@@ -1,5 +1,10 @@
 # Plano de Implementação Multiplayer — ExoBeasts V3
 
+> Status: historico.
+> Este documento contem detalhes da migracao antiga e pode citar nomes ja removidos.
+> Para o estado atual do multiplayer, use `Assets/Codigo/Docs/Estado_Atual_Multiplayer.md`.
+> Para o comportamento dos agentes, use `Assets/Diretrizes_Multiagente.md`.
+
 ## Especificações do Projeto
 
 | Item | Valor |

@@ -68,13 +68,25 @@ public class Espinhos : TrapLogicBase
         {
             yield return new WaitForSeconds(tempoRecarga);
 
-            if (animatorEspinhos != null) animatorEspinhos.SetTrigger("Ativar");
+            AtivarEspinhosClientRpc();
             AplicarDano();
 
             yield return new WaitForSeconds(tempoAtivo);
 
-            if (animatorEspinhos != null) animatorEspinhos.SetTrigger("Desativar");
+            DesativarEspinhosClientRpc();
         }
+    }
+
+    [ClientRpc]
+    private void AtivarEspinhosClientRpc()
+    {
+        if (animatorEspinhos != null) animatorEspinhos.SetTrigger("Ativar");
+    }
+
+    [ClientRpc]
+    private void DesativarEspinhosClientRpc()
+    {
+        if (animatorEspinhos != null) animatorEspinhos.SetTrigger("Desativar");
     }
 
     private void AplicarDano()

@@ -41,6 +41,10 @@ public class HabilidadeBombaSpray : Ability
             abilityScript.SetAbilityUsage(this, true);
         }
 
+        // Proxy para o owner-cliente ver a bomba voar e explodir localmente
+        abilityScript?.StartLocalBombaSprayOwnerProxy(
+            spawnPos, throwDirection, throwForce, explosionRadius, cloudDuration);
+
         return true;
     }
 

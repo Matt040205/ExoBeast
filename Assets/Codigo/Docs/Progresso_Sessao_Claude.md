@@ -1,5 +1,10 @@
 # Progresso — Sessão Claude (Março 2026)
 
+> Status: historico.
+> Este registro descreve uma sessao antiga de trabalho e nao deve ser tratado como
+> estado atual do multiplayer.
+> Para o fluxo atual, use `Assets/Codigo/Docs/Estado_Atual_Multiplayer.md`.
+
 ## Visão Geral
 
 Esta sessão cobriu 3 sprints independentes. Todas as correções de código foram aplicadas; itens marcados com 🎮 requerem ação manual no Editor Unity.

@@ -1,5 +1,11 @@
 # Plano de Migração Multiplayer - ExoBeasts V3
 
+> Status: historico.
+> Este plano foi substituido pelo estado atual em
+> `Assets/Codigo/Docs/Estado_Atual_Multiplayer.md` e pelas diretrizes em
+> `Assets/Diretrizes_Multiagente.md`.
+> Mantenha este arquivo apenas como registro da proposta antiga.
+
 ## Contexto
 
 O ExoBeasts V3 é um tower defense em terceira pessoa (Unity 6, NGO 1.12.0) que precisa ser portado para multiplayer P2P (até 4 jogadores) mantendo modo singleplayer. O projeto já possui infraestrutura multiplayer completa (EOS Auth, Lobby, NetworkBootstrap, Sync wrappers) na pasta `Assets/Codigo/Multiplayer/`, mas os **scripts core do jogo** ainda não foram migrados. A documentação PDF (DocMultiExo.pdf, 180 páginas) fornece instruções detalhadas por script. Este plano organiza e prioriza essa migração.

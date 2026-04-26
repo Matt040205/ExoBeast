@@ -136,6 +136,8 @@ public class PlayerHUD : MonoBehaviour
     {
         if (ObjectiveHealthSystem.Instance != null)
         {
+            if (objectiveHealth != null)
+                objectiveHealth.OnHealthChanged -= OnObjectiveHealthChanged;
             objectiveHealth = ObjectiveHealthSystem.Instance;
             objectiveHealth.OnHealthChanged += OnObjectiveHealthChanged;
             OnObjectiveHealthChanged();
@@ -183,6 +185,11 @@ public class PlayerHUD : MonoBehaviour
 
     void UpdateObjectiveHealthDisplay()
     {
+        if (objectiveHealth == null) return;
+
+        // Leitura direta toda frame — mais resiliente que depender exclusivamente do callback
+        targetObjectiveHealthPercent = objectiveHealth.currentHealth.Value / objectiveHealth.maxHealth;
+
         if (objectiveHealthBarFill != null)
         {
             objectiveHealthBarFill.fillAmount = Mathf.Lerp(objectiveHealthBarFill.fillAmount, targetObjectiveHealthPercent, healthLerpSpeed * Time.deltaTime);

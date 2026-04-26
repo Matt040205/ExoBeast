@@ -42,6 +42,21 @@ public class PosturaBaluarteLogic : MonoBehaviour
         Destroy(gameObject, duration);
     }
 
+    /// <summary>
+    /// Versão visual-only para o owner-cliente: sem collider de detecção, apenas feedback de UI.
+    /// Chamada via ClientRpc de CommanderAbilityController.
+    /// </summary>
+    public void SetupProxy(float duration)
+    {
+        playerHealth = GetComponentInParent<PlayerHealthSystem>();
+        if (playerHealth != null) playerHealth.isCountering = true;
+
+        var col = GetComponent<SphereCollider>();
+        if (col != null) col.enabled = false;
+
+        Destroy(gameObject, duration);
+    }
+
     void OnDestroy()
     {
         if (playerHealth != null)

@@ -115,6 +115,16 @@ public class EnemyController : MonoBehaviour
         }
 
         currentMoveSpeed = originalMoveSpeed;
+
+        // Refresh de alvo após breve delay para capturar clientes que registraram no PlayerRegistry
+        // depois que a onda de inimigos começou a spawnar (race condition de timing)
+        StartCoroutine(RefreshTargetAfterDelay(0.5f));
+    }
+
+    private IEnumerator RefreshTargetAfterDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        playerTransform = FindNearestPlayer();
     }
 
     void Update()

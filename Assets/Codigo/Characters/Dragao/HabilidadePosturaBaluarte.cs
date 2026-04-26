@@ -15,9 +15,12 @@ public class HabilidadePosturaBaluarte : Ability
 
         CommanderAbilityController controller = quemUsou.GetComponent<CommanderAbilityController>();
 
-        // Instancia como FILHO do player para seguir ele
+        // Lógica de counter roda no servidor
         PosturaBaluarteLogic logic = Instantiate(logicPrefab, quemUsou.transform);
         logic.Setup(quemUsou, duration, counterDamage, counterKnockback, controller, this);
+
+        // Proxy para o owner-cliente receber feedback visual e isCountering local
+        controller?.StartLocalPosturaBaluarteOwnerProxy(duration);
 
         return true;
     }

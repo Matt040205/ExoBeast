@@ -1,357 +1,213 @@
-# Guia de Setup Multiplayer — Configuracao de Cenas e Prefabs
-**ExoBeasts V3 — Projeto PI3D**
-**Data:** Marco 2026
+# Guia de Setup Multiplayer - Cenas e Prefabs
 
----
+Status: ativo
+Publico: quem monta cenas e prefabs do multiplayer
+Ler primeiro: `Estado_Atual_Multiplayer.md`
+Nao usar como fonte de verdade: `SETUP_INSTRUCTIONS.md` e guias antigos de migracao
 
-## Indice
-1. [Visao Geral do Fluxo](#1-visao-geral-do-fluxo)
-2. [Passo 1: Player 1.prefab](#2-passo-1-player-1prefab)
-3. [Passo 2: SceneMapTest.unity — Hierarquia](#3-passo-2-scenemaptestunity--hierarquia)
-4. [Passo 3: NetworkManager — Registrar Prefabs](#4-passo-3-networkmanager--registrar-prefabs)
-5. [Passo 4: Build Settings](#5-passo-4-build-settings)
-6. [Passo 5: Testar com MPPM](#6-passo-5-testar-com-mppm)
-7. [Erros de Cache Unity (ILPP)](#7-erros-de-cache-unity-ilpp)
-8. [Troubleshooting](#8-troubleshooting)
-9. [Referencia Rapida — Componentes por GameObject](#9-referencia-rapida--componentes-por-gameobject)
+Guia operacional atual para configurar cenas, prefabs e testes do multiplayer.
 
----
+## Fluxo atual
 
-## 1. Visao Geral do Fluxo
-
-```
-LobbyScene.unity                    SceneMapTest.unity
-┌─────────────────────┐              ┌─────────────────────────────────┐
-│  EOSManager         │──persiste──→│                                 │
-│  EOSAuthenticator   │  (DontDe-   │  [GameManager]                  │
-│  SessionManager     │  stroyOn-   │    NetworkObject                │
-│  LobbyManager       │  Load)      │    GameSetupManager             │
-│  NetworkManager     │             │    MatchManager                 │
-│  HostManager        │             │    CurrencyManager              │
-│  NetworkBootstrap   │             │                                 │
-│                     │             │  [NetworkSystems]               │
-│  LobbyPlaceholder   │             │    NetworkObject                │
-│  UI (lobby local)   │             │    PlayerRegistry               │
-│                     │             │    GameServerManager            │
-│  Botao StartMatch ──┼──carrega──→│    PlayerIdentityBridge         │
-│                     │             │                                 │
-└─────────────────────┘             │  [HordeSystem]                  │
-                                    │    NetworkObject                │
- Objetos que PERSISTEM              │    HordeManager                 │
- entre cenas (lobby→jogo):          │    EnemyPoolManager             │
-  • NetworkManager                  │                                 │
-  • EOSManager                      │  [Objective] (cristal/base)     │
-  • EOSAuthenticator                │    NetworkObject                │
-  • SessionManager                  │    ObjectiveHealthSystem        │
-  • LobbyManager                    │    Collider + Mesh              │
-  • HostManager                     │                                 │
-  • NetworkBootstrap                │  SpawnPoint_1..4 (transforms)   │
-                                    │  EnemySpawnPoints               │
-                                    │  Terreno, Luzes, etc.           │
-                                    └─────────────────────────────────┘
+```text
+EOSAuthTest.unity -> LobbyScene.unity -> SceneMapTest.unity
 ```
 
-**IMPORTANTE:** O `NetworkManager` (da Unity) persiste entre cenas via DontDestroyOnLoad.
-Ele NAO precisa existir na SceneMapTest — ele ja vem da LobbyScene.
+- `LobbyScene.unity` e a cena de entrada do fluxo multiplayer.
+- `SceneMapTest.unity` e a cena de gameplay carregada pela rede.
+- `Network Test.unity` continua como teste direto de Host/Client sem EOS Lobby.
+- `NetworkBootstrap.unity` nao existe neste repositorio; o bootstrap e feito por componentes.
 
----
+## LobbyScene.unity
 
-## 2. Passo 1: Player 1.prefab
+Coloque aqui o runtime que precisa sobreviver ate a troca de cena:
 
-### Onde fica
-`Assets/Prefabs/Player 1.prefab` (ou onde quer que esteja no projeto)
+- `NetworkManager`
+- `UnityTransport`
+- objeto do plugin externo `PlayEveryWare EOSManager`
+- `EOSManagerWrapper`
+- `EOSAuthenticator`
+- `SessionManager`
+- `UGSBootstrap`
+- `LobbyManager`
+- `LobbySceneUI` como interface canonica
 
-### Componentes que JA EXISTEM (nao mexer)
+Componentes de apoio que ainda existem para teste/debug:
+
+- `LobbyUIManager`
+- `LobbyPlaceholderUI`
+- `MenuLobbyPanel`
+
+Observacoes:
+
+- O `NetworkManager` precisa continuar vivo ate `SceneMapTest`.
+- O fluxo atual de lobby publica o endereco de conexao e aguarda os clientes antes de carregar a cena de jogo.
+
+## Player prefab
+
+No prefab do jogador, mantenha os componentes locais do gameplay e adicione os componentes de rede abaixo:
+
+- `NetworkObject`
+- `ClientNetworkTransform`
+- `NetworkAnimator`
+- `PlayerNetworkSetup`
+
+Componentes locais que o prefab normalmente ja possui:
+
+- `PlayerMovement`
+- `PlayerHealthSystem`
+- `PlayerShooting`
+- `MeleeCombatSystem`
+- `PlayerCombatManager`
+- `CameraController`
 - `CharacterController`
-- `Animator`
-- `PlayerMovement` (NetworkBehaviour)
-- `PlayerHealthSystem` (NetworkBehaviour)
-- `PlayerShooting` (NetworkBehaviour)
-- `MeleeCombatSystem` (NetworkBehaviour)
-- `PlayerCombatManager` (NetworkBehaviour)
+- `LocalPlayerInputBridge`
 
-### Componentes que voce PRECISA ADICIONAR
+Campos que o `PlayerNetworkSetup` tenta resolver:
 
-| Componente | Configuracao |
-|---|---|
-| **NetworkObject** | Add Component → Netcode → NetworkObject. Deixar padrao. |
-| **ClientNetworkTransform** | Add Component → Netcode → ClientNetworkTransform. Configurar: `Interpolate = true`, `Position Threshold = 0.001`, `Rotation Threshold = 0.01` |
-| **NetworkAnimator** | Add Component → Netcode → NetworkAnimator. Arrastar o `Animator` do player para o campo "Animator". |
-| **PlayerNetworkSetup** | Add Component → buscar "PlayerNetworkSetup". Arrastar as referencias no Inspector (ver abaixo). |
+- `movement`
+- `cameraController`
+- `characterController`
+- `playerShooting`
+- `meleeCombat`
+- `playerCombatManager`
+- `localInputBridge`
+- `localOnlyObjects`
 
-### Configurar PlayerNetworkSetup no Inspector
+Regras:
 
-Abra o componente `PlayerNetworkSetup` e arraste:
+- Nao use `NetworkedPlayerController` como fonte principal do setup local/remoto.
+- O setup atual acontece em `PlayerNetworkSetup.OnNetworkSpawn()`.
+- O jogador remoto deve ter input, camera e objetos locais desligados.
 
-| Campo | Arrastar... |
-|---|---|
-| Movement | O componente `PlayerMovement` do mesmo GameObject |
-| Camera Controller | O componente `CameraController` (ou `ThirdPersonCamera`) |
-| Character Controller | O componente `CharacterController` do mesmo GameObject |
-| Player Shooting | O componente `PlayerShooting` do mesmo GameObject |
-| Melee Combat | O componente `MeleeCombatSystem` do mesmo GameObject |
-| Player Combat Manager | O componente `PlayerCombatManager` do mesmo GameObject |
-| Local Only Objects | Arrastar GameObjects que so devem aparecer para o jogador local (ex: camera pessoal, HUD 3D, mira) |
+## 4. SceneMapTest.unity
 
-### O que NAO colocar no prefab
-- **NAO adicionar `NetworkedPlayerController`** — ele tem um sistema de vida duplicado que conflita com `PlayerHealthSystem`
-- **NAO adicionar `NetworkTransform` normal** — o jogador usa `ClientNetworkTransform` (owner-authoritative)
+Hierarquia sugerida para a cena de gameplay:
 
----
+### 4.1 GameManager
 
-## 3. Passo 2: SceneMapTest.unity — Hierarquia
+- `NetworkObject`
+- `GameSetupManager`
+- `MatchManager`
+- `CurrencyManager`
 
-Abra a cena `Assets/Codigo/Multiplayer/SceneMapTest.unity` e crie os seguintes GameObjects:
+### 4.2 NetworkSystems
 
-### 3.1 [GameManager]
-1. Criar GameObject vazio → renomear para `GameManager`
-2. Add Component: **NetworkObject**
-3. Add Component: **GameSetupManager**
-   - `Character Prefabs` (array): Arrastar `Player 1.prefab` no slot [0]
-   - `Spawn Points` (array): Arrastar os 4 transforms de spawn (criar a seguir)
-4. Add Component: **MatchManager** (sem configuracao extra)
-5. Add Component: **CurrencyManager** (sem configuracao extra)
+- `NetworkObject`
+- `PlayerRegistry`
+- `GameServerManager`
+- `PlayerIdentityBridge`
 
-### 3.2 [NetworkSystems]
-1. Criar GameObject vazio → renomear para `NetworkSystems`
-2. Add Component: **NetworkObject**
-3. Add Component: **PlayerRegistry** (sem configuracao extra)
-4. Add Component: **GameServerManager** (sem configuracao extra)
-5. Add Component: **PlayerIdentityBridge** (sem configuracao extra)
+### 4.3 HordeSystem
 
-### 3.3 [HordeSystem]
-1. Criar GameObject vazio → renomear para `HordeSystem`
-2. Add Component: **NetworkObject**
-3. Add Component: **HordeManager**
-   - Configurar campos de horda (dados de ondas, referencia a EnemyPoolManager, spawn points de inimigos)
-4. Add Component: **EnemyPoolManager**
-   - Configurar `Initial Pool Size` (ex: 20)
+- `NetworkObject`
+- `HordeManager`
+- `EnemyPoolManager`
 
-> **NOTA:** EnemyPoolManager eh MonoBehaviour, NAO precisa de NetworkObject proprio.
-> Ele mora no mesmo GameObject do HordeManager que JA tem NetworkObject.
+### 4.4 Objective
 
-### 3.4 [Objective]
-1. Criar GameObject (cubo/esfera ou modelo do cristal) → renomear para `Objective`
-2. Add Component: **NetworkObject**
-3. Add Component: **ObjectiveHealthSystem**
-   - `Max Health`: 1000 (ou o valor desejado)
-4. Add Component: **Collider** (se ainda nao tiver) — para inimigos detectarem onde atacar
-5. Posicionar onde a base/cristal deve ficar no mapa
+- `NetworkObject`
+- `ObjectiveHealthSystem`
+- `Collider`
 
-### 3.5 SpawnPoints (4 transforms)
-1. Criar 4 GameObjects vazios:
-   - `SpawnPoint_1`, `SpawnPoint_2`, `SpawnPoint_3`, `SpawnPoint_4`
-2. Posicionar onde os jogadores devem nascer (espaçados)
-3. Arrastar todos os 4 para o array `Spawn Points` do `GameSetupManager`
+### 4.5 Spawn points
 
-> **DICA:** Adicione um icone colorido (clique no cubo de cor no Inspector)
-> para visualizar os spawn points na Scene view.
+- `SpawnPoint_1`
+- `SpawnPoint_2`
+- `SpawnPoint_3`
+- `SpawnPoint_4`
 
-### 3.6 EnemySpawnPoints
-1. Criar quantos GameObjects vazios precisar para spawn de inimigos
-2. Arrastar para o campo correspondente do `HordeManager`
+### 4.6 Pontos de inimigos
 
-### Hierarquia Final da Cena
+- Crie os transforms que o `HordeManager` vai usar como spawn points.
 
-```
-SceneMapTest (cena)
-├── GameManager            [NetworkObject, GameSetupManager, MatchManager, CurrencyManager]
-├── NetworkSystems         [NetworkObject, PlayerRegistry, GameServerManager, PlayerIdentityBridge]
-├── HordeSystem            [NetworkObject, HordeManager, EnemyPoolManager]
-├── Objective              [NetworkObject, ObjectiveHealthSystem, Collider, Mesh]
-├── SpawnPoint_1           [Transform vazio]
-├── SpawnPoint_2           [Transform vazio]
-├── SpawnPoint_3           [Transform vazio]
-├── SpawnPoint_4           [Transform vazio]
-├── EnemySpawn_1           [Transform vazio]
-├── EnemySpawn_2           [Transform vazio]
-├── Directional Light      [ja existe]
-├── Terrain / Chao         [ja existe]
-└── (outros objetos de cenario)
-```
+Notas:
 
----
+- Todo objeto que tenha `NetworkBehaviour` precisa de `NetworkObject` na raiz.
+- Os managers de gameplay que vivem fora da pasta multiplayer continuam validos, mas devem
+  ser tratados como parte do cenario e nao como parte do core de rede.
 
-## 4. Passo 3: NetworkManager — Registrar Prefabs
+## 5. NetworkManager e prefabs registrados
 
-O `NetworkManager` fica na **LobbyScene** (persiste entre cenas). Voce precisa registrar TODOS os prefabs que serao spawnados pela rede.
+Registre no `NetworkManager` todo prefab que for spawnado pela rede:
 
-### Como registrar:
-1. Abrir `LobbyScene.unity`
-2. Selecionar o GameObject que tem o componente `NetworkManager`
-3. No Inspector, expandir **NetworkManager → NetworkConfig → Prefab List**
-4. Clicar "+" e arrastar cada prefab:
+- prefab do jogador
+- prefabs de inimigo
+- prefabs de torre
+- prefabs de armadilha
+- qualquer outro prefab que chame `NetworkObject.Spawn()`
 
-| Prefab | Obrigatorio? | Motivo |
-|---|---|---|
-| **Player 1.prefab** | SIM | Spawnado pelo GameSetupManager |
-| **Cada prefab de inimigo** | SIM | Spawnados pelo EnemyPoolManager |
-| **Cada prefab de torre** (se tiver NetworkObject) | SIM | Spawnados pelo BuildManager |
-| **Cada prefab de armadilha** (se tiver NetworkObject) | SIM | Spawnados pelo BuildManager |
+Se um prefab nao estiver na lista, o cliente nao vai conseguir instanciar o objeto.
 
-> **REGRA:** Todo GameObject que chama `NetworkObject.Spawn()` no codigo
-> PRECISA estar nesta lista. Se nao estiver, o erro sera:
-> `"NetworkPrefab not found for hash XXXX"` e o objeto nao aparece no cliente.
+## 6. Build Settings
 
-### Prefabs de inimigo — como encontrar
-Os prefabs de inimigos sao referenciados nos `EnemyDataSO` (ScriptableObjects em `Assets/`).
-Cada um tem um campo `enemyPrefab`. Arraste esses mesmos prefabs para a Prefab List.
+Garanta que estas cenas existam no build:
 
----
+- `LobbyScene`
+- `SceneMapTest`
+- `EOSAuthTest`
+- `Network Test`
+- `Win`
+- `Lose`
 
-## 5. Passo 4: Build Settings
+Use exatamente os mesmos nomes que aparecem nas strings do codigo.
 
-1. **File → Build Settings**
-2. Garantir que TODAS estas cenas estao na lista (arrastar do Project):
-   - `LobbyScene` (index 0 ou qualquer)
-   - `SceneMapTest` (OBRIGATORIO — sera carregada via NGO)
-   - `Win` (cena de vitoria)
-   - `Lose` (cena de derrota)
-3. A cena que o NGO carrega via `NetworkManager.SceneManager.LoadScene("SceneMapTest")` PRECISA estar no Build Settings, senao o erro eh silencioso e a cena simplesmente nao carrega.
+## 7. Teste com MPPM
 
----
+1. Abra `LobbyScene.unity`.
+2. Rode o editor principal e faca login.
+3. Crie ou entre em um lobby.
+4. No clone MPPM, entre no mesmo lobby.
+5. Verifique se o host publica os dados de conexao.
+6. Inicie a partida.
+7. Confirme que ambos carregam `SceneMapTest.unity`.
 
-## 6. Passo 5: Testar com MPPM
+O que checar:
 
-### Pre-requisitos
-- MPPM (Multiplayer Play Mode) v1.6.3 instalado
-- Pelo menos 1 clone virtual configurado
-
-### Passo a passo
-1. **Window → Multiplayer Play Mode** → Ativar 1 clone
-2. Abrir a `LobbyScene` como cena ativa
-3. Clicar **Play** no Editor principal
-4. No Editor: clicar "Login" → "Create Lobby"
-5. Copiar o Lobby ID (botao "Copiar ID")
-6. No clone MPPM: clicar "Login" → colar ID no campo "ID:" → "Join by ID"
-7. Verificar que ambos aparecem na lista de membros
-8. No Editor (host): clicar "Start Match"
-9. Ambos devem carregar `SceneMapTest` e spawnar jogadores
-
-### O que verificar
-- [ ] Ambos os jogadores aparecem na cena?
-- [ ] Cada jogador se move independentemente?
-- [ ] Mover o jogador A — o jogador B ve o movimento?
-- [ ] Atirar com jogador A — o jogador B ve o tiro?
-- [ ] Inimigos spawnam (se HordeManager esta configurado)?
-- [ ] Console sem erros vermelhos criticos?
-
----
-
-## 7. Erros de Cache Unity (ILPP)
-
-Se voce ver erros como:
-```
-NetworkBehaviourILPP: ... TriggerHitVisualClientRpc ... must be marked with 'ClientRpc' attribute!
-```
-
-Isto eh cache antigo do compilador Unity. O codigo-fonte esta correto mas o Unity ainda tem uma versao compilada antiga em cache.
-
-### Solucao:
-1. **Fechar Unity completamente**
-2. Navegar ate a pasta do projeto: `ExoBeasts_V3/PI3D/`
-3. **Deletar a pasta `Library/`** inteira
-4. Reabrir o projeto no Unity — ele vai reimportar tudo (demora ~2-5 min)
-
-> **NOTA:** Deletar Library/ eh seguro. Ela eh recriada automaticamente.
-> Nenhum asset, codigo ou configuracao de cena eh perdido.
-> So nao delete `Assets/`, `Packages/` ou `ProjectSettings/`.
-
----
+- ambos os jogadores aparecem na sala
+- cada jogador se move de forma independente
+- o jogador remoto nao rouba camera ou input
+- o `ConnectionApproval` carrega o personagem correto
+- nao ha `AudioListener` duplicado
+- nao ha erro de `NetworkPrefab not found`
 
 ## 8. Troubleshooting
 
-### "Player nao aparece apos Start Match"
-- Verificar que `Player 1.prefab` tem `NetworkObject`
-- Verificar que `Player 1.prefab` esta na Prefab List do NetworkManager
-- Verificar que `GameSetupManager` existe na SceneMapTest com `characterPrefabs[0]` preenchido
-- Verificar que `SpawnPoints` estao arrastados no GameSetupManager
+- Player nao spawna: confira `NetworkObject` no prefab e a lista de prefabs do `NetworkManager`.
+- Jogador nao se move: confira `ClientNetworkTransform` e `PlayerNetworkSetup`.
+- Kamera pisca: confira se componentes remotos foram desativados.
+- Cliente nao conecta: confira `SERVER_ADDRESS`, `RELAY_CODE` e o estado do `UGSBootstrap`.
+- Personagem errado: confira `CharacterChoiceCache` e o payload de `ConnectionApproval`.
 
-### "Jogador spawna mas nao se move"
-- Verificar que `ClientNetworkTransform` esta no prefab
-- Verificar que `PlayerNetworkSetup` esta no prefab e as refs estao arrastadas
-- Verificar no Console se aparece "[PlayerNetworkSetup] Jogador LOCAL inicializado"
+## 9. Referencia rapida
 
-### "Inimigos nao spawnam"
-- Verificar que `HordeManager` existe na cena com `NetworkObject`
-- Verificar que `EnemyPoolManager` esta configurado
-- Verificar que os prefabs de inimigo estao na Prefab List do NetworkManager
-- Verificar que `PlayerRegistry` existe na cena (HordeManager espera jogadores)
+### LobbyScene
 
-### "Erro: NetworkPrefab not found"
-- O prefab que esta sendo spawnado nao esta registrado no NetworkManager
-- Abrir LobbyScene → NetworkManager → Prefab List → adicionar o prefab faltante
+- `NetworkManager`
+- `UnityTransport`
+- `EOSManager` do plugin externo
+- `EOSManagerWrapper`
+- `EOSAuthenticator`
+- `SessionManager`
+- `UGSBootstrap`
+- `LobbyManager`
+- `LobbySceneUI`
 
-### "Erro: Multiple NetworkObjects on same GameObject"
-- Um prefab tem mais de um `NetworkObject`. Remover o duplicado.
-- Filhos do prefab NAO devem ter `NetworkObject` proprio (a menos que sejam nested prefabs intencionais)
+### Player prefab
 
-### "Erro: Can't write to NetworkVariable (non-server)"
-- Um cliente esta tentando alterar um valor que so o servidor pode alterar
-- Verificar que o codigo tem `if (!IsServer) return;` antes de alterar NetworkVariables
+- `NetworkObject`
+- `ClientNetworkTransform`
+- `NetworkAnimator`
+- `PlayerNetworkSetup`
 
-### "Camera piscando / multiplos AudioListeners"
-- Cameras e AudioListeners de jogadores remotos nao estao sendo desativados
-- Verificar que `PlayerNetworkSetup` esta desabilitando `cameraController` para `!IsOwner`
-- Adicionar a camera e AudioListener ao array `localOnlyObjects`
+### SceneMapTest
 
----
-
-## 9. Referencia Rapida — Componentes por GameObject
-
-### Player 1.prefab
-```
-✅ Ja existe          ➕ Adicionar
-─────────────────────────────────
-✅ CharacterController  ➕ NetworkObject
-✅ Animator             ➕ ClientNetworkTransform
-✅ PlayerMovement       ➕ NetworkAnimator
-✅ PlayerHealthSystem   ➕ PlayerNetworkSetup
-✅ PlayerShooting
-✅ MeleeCombatSystem
-✅ PlayerCombatManager
-
-❌ NAO ADICIONAR: NetworkedPlayerController, NetworkTransform (normal)
-```
-
-### SceneMapTest — GameManager
-```
-➕ NetworkObject
-➕ GameSetupManager     → characterPrefabs[], spawnPoints[]
-➕ MatchManager
-➕ CurrencyManager
-```
-
-### SceneMapTest — NetworkSystems
-```
-➕ NetworkObject
-➕ PlayerRegistry
-➕ GameServerManager
-➕ PlayerIdentityBridge
-```
-
-### SceneMapTest — HordeSystem
-```
-➕ NetworkObject
-➕ HordeManager         → dados de onda, spawn points de inimigos
-➕ EnemyPoolManager     → initialPoolSize
-```
-
-### SceneMapTest — Objective
-```
-➕ NetworkObject
-➕ ObjectiveHealthSystem → maxHealth
-➕ Collider
-```
-
-### LobbyScene — NetworkManager
-```
-✅ Ja existe
-➕ Prefab List: Player 1.prefab + todos os enemy prefabs + tower prefabs
-```
-
----
-
-**Apos completar todos os passos, salve TODAS as cenas (Ctrl+S em cada uma) e tente o fluxo com MPPM.**
-
-Se aparecerem erros de ILPP (cache), delete a pasta `Library/` conforme Secao 7.
+- `GameSetupManager`
+- `MatchManager`
+- `CurrencyManager`
+- `PlayerRegistry`
+- `GameServerManager`
+- `PlayerIdentityBridge`
+- `HordeManager`
+- `EnemyPoolManager`
+- `ObjectiveHealthSystem`

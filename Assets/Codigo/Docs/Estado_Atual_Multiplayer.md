@@ -1,0 +1,131 @@
+# Estado Atual do Multiplayer
+
+Status: canonico
+Publico: agentes e devs do multiplayer
+Ler primeiro: `Assets/Diretrizes_Multiagente.md`
+Nao usar como fonte de verdade: docs historicas, planos antigos e nomes removidos
+
+Documento canonico do multiplayer atual. Leia este arquivo para entender o que existe hoje,
+o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como atuais.
+
+## Docs ativos relacionados
+
+- `Assets/Codigo/Multiplayer/README.md` - indice curto
+- `Assets/Codigo/Docs/Guia_Setup_Multiplayer_Cenas.md` - setup de cena e prefab
+- `Assets/Codigo/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
+- `Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
+
+## O que mudou em relacao aos docs antigos
+
+- O wrapper atual do EOS e `EOSManagerWrapper.cs`, nao `EOSManager.cs`.
+- `NetworkedCurrency.cs` e `NetworkedHorde.cs` nao sao referencia ativa.
+- O lobby publica `SERVER_ADDRESS`, `SERVER_PORT`, `RELAY_CODE` e `LOBBY_STATE`.
+- A escolha de personagem viaja em `ConnectionApproval` e fica cacheada em `CharacterChoiceCache`.
+- O fluxo atual separa melhor Editor/MPPM de builds.
+- `PlayerNetworkSetup` centraliza o setup do jogador local e remoto.
+- `PlayerIdentityBridge` liga `clientId` ao `productUserId` e ao `sessionToken`.
+- `ServerAuthoritativeProjectile` faz dano no servidor, mas nao e um `NetworkObject` visual.
+
+## Visao geral atual
+
+```text
+Login EOS -> criar/entrar lobby -> ready + personagem -> StartMatch
+-> host publica dados de conexao -> clientes leem atributos do lobby
+-> NGO conecta -> SceneMapTest carrega -> spawn dos players e inicio da partida
+```
+
+## Core de inicializacao
+
+- `NetworkBootstrap.cs` segue como ponto de entrada para testes Host/Client com NGO.
+- `EOSManagerWrapper.cs` carrega `EOSConfig_Main`, valida credenciais, aguarda o `EOSManager` externo e expoe `PlatformInterface`, `ConnectInterface` e `AuthInterface`.
+- `EOSConfig.cs` carrega e valida `EOSCredentials.json`.
+- `HostManager.cs` continua como helper para fluxos antigos de Host/Client.
+- `UGSBootstrap.cs` inicializa Unity Services e auth anonima antes do Relay em builds.
+- `WindowsPlatformSpecifics.cs` registra a implementacao Windows e isola cache/temp do EOS por clone MPPM.
+- `MppmHelper.cs` detecta clones por `--virtual-project-clone`, `-vpId=` ou variavel de ambiente.
+
+## Auth e sessao
+
+- `EOSAuthenticator.cs` faz login anonimo via Device ID.
+- Em clone MPPM ele remove o Device ID antigo antes de criar um novo.
+- O `DeviceModel` recebe um sufixo de clone no MPPM.
+- `SessionManager.cs` guarda `userId`, `displayName`, `currentLobbyId`, `currentMatchId` e `sessionToken`.
+- Depois do login bem-sucedido, `EOSManagerWrapper.SetConnected(true)` e `SessionManager.StartSession()` sao chamados.
+
+## Lobby e inicio de partida
+
+- `LobbyData.cs` define `LobbyInfo`, `LobbyMember`, `LobbySettings`, `LobbySearchFilter`, `LobbyState`, `LobbyAttributes` e `MemberAttributes`.
+- `LobbyManager.cs` faz create, search, join e leave, atualiza atributos de membro e publica dados de conexao da partida.
+- `SetReady()` e `SelectCharacter()` atualizam os atributos do membro no EOS.
+- `StartMatch()` cacheia a escolha do host, ativa `ConnectionApproval`, inicia o Host NGO e publica `RELAY_CODE`, `SERVER_ADDRESS` e `SERVER_PORT` quando o suporte de build esta pronto.
+- Em Editor/MPPM o fluxo usa conexao direta com `127.0.0.1` ou IP local.
+- `ProcessLobbyAttributes()` observa mudancas no lobby e dispara a conexao do cliente.
+- `LeaveLobby()` limpa estado interno, sessao de lobby e cache de escolha de personagem.
+
+## Identidade e spawn
+
+- `CharacterChoiceCache.cs` guarda a escolha do host e dos clientes ate o spawn.
+- `PlayerNetworkSetup.cs` resolve referencias do prefab do jogador, habilita o owner e desabilita componentes remotos.
+- `PlayerIdentityBridge.cs` faz a ponte entre `clientId` do NGO, identidade EOS e token de sessao.
+- `PlayerRegistry.cs` mantem o registro server-side dos jogadores conectados e ajuda a buscar o jogador mais proximo.
+
+## Sync
+
+- `NetworkedPlayerController.cs` continua como componente de sincronizacao.
+- `NetworkedBuilding.cs` e o sync das construcoes.
+- `NetworkedEnemy.cs` e o sync dos inimigos.
+- `ServerAuthoritativeProjectile.cs` e um `MonoBehaviour` local que resolve dano no servidor e suprime a apresentacao visual.
+
+## Game server e estado da partida
+
+- `GameServerManager.cs` valida conexoes, registra jogadores e notifica entradas e saidas.
+- `MatchManager.cs` controla `CurrentMatchState`, `CurrentWave` e `MatchTime` via `NetworkVariables`.
+
+## UIs e testes atuais
+
+- `LobbySceneUI.cs` e a interface canonica de lobby em Canvas.
+- `LobbyUIManager.cs` e `LobbyPlaceholderUI.cs` continuam como superficies de teste e debug.
+- `MenuLobbyPanel.cs` serve como painel simples para testes de menu.
+- `EOSAuthTest.unity` valida apenas autenticacao.
+- `Network Test.unity` valida Host/Client direto sem EOS Lobby.
+- `LobbyScene.unity` valida auth + lobby + inicio de partida.
+- `SceneMapTest.unity` valida o mapa de jogo apos a conexao.
+
+## Arquivos atuais
+
+- `Core/NetworkBootstrap.cs`
+- `Core/EOSManagerWrapper.cs`
+- `Core/EOSConfig.cs`
+- `Core/HostManager.cs`
+- `Core/MppmHelper.cs`
+- `Core/WindowsPlatformSpecifics.cs`
+- `Core/CharacterChoiceCache.cs`
+- `Core/PlayerIdentityBridge.cs`
+- `Core/UGSBootstrap.cs`
+- `Auth/EOSAuthenticator.cs`
+- `Auth/SessionManager.cs`
+- `Lobby/LobbyData.cs`
+- `Lobby/LobbyManager.cs`
+- `Lobby/LobbySceneUI.cs`
+- `Lobby/LobbyUIManager.cs`
+- `GameServer/GameServerManager.cs`
+- `GameServer/MatchManager.cs`
+- `GameServer/PlayerRegistry.cs`
+- `Sync/PlayerNetworkSetup.cs`
+- `Sync/ServerAuthoritativeProjectile.cs`
+- `Testing/EOSAuthTest.cs`
+- `Testing/NetworkConnectionTest.cs`
+- `Testing/LobbyPlaceholderUI.cs`
+- `Testing/MenuLobbyPanel.cs`
+
+## Nao usar como atual
+
+- `EOSManager.cs` como arquivo do projeto.
+- `NetworkedCurrency.cs` e `NetworkedHorde.cs` como verdade atual do fluxo multiplayer.
+- `NetworkBootstrap.unity`, porque nao existe no repositorio atual.
+
+## Resumo curto
+
+O multiplayer atual e um fluxo EOS + Lobby + NGO com suporte a MPPM, Relay em builds,
+identidade de jogador separada do `clientId` e setup local/remoto centralizado em
+`PlayerNetworkSetup`.

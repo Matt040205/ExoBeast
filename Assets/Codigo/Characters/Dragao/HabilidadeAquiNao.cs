@@ -23,17 +23,21 @@ public class HabilidadeAquiNao : Ability
 
         CommanderAbilityController controller = quemUsou.GetComponent<CommanderAbilityController>();
 
-        // Toca som
+        // Som e lógica rodam no servidor
         if (!string.IsNullOrEmpty(sfxSwing))
-        {
             RuntimeManager.PlayOneShot(sfxSwing, quemUsou.transform.position);
-        }
 
         AquiNaoLogic logic = Instantiate(
             logicPrefab,
             quemUsou.transform.position,
             AbilityAimUtility.ResolveAimRotation(quemUsou));
         logic.Setup(quemUsou, radius, damage, knockbackForce, stunDuration, controller, this);
+
+        // Proxy para o owner-cliente ver VFX e ouvir som localmente
+        controller?.StartLocalAquiNaoOwnerProxy(
+            quemUsou.transform.position,
+            AbilityAimUtility.ResolveAimRotation(quemUsou),
+            sfxSwing);
 
         return true;
     }

@@ -19,6 +19,9 @@ public class BombaSprayProjectile : MonoBehaviour
     private bool jaBateu = false;
     private bool jaExplodiu = false;
 
+    // Flag para cópias visuais no owner-cliente: aplicam VFX mas não dano/slow (servidor-only)
+    private bool _isVisualProxy = false;
+
     // Configura os dados quando e lancada (chamado pela Habilidade)
     public void Launch(Vector3 velocity, float radius, float cloudDuration)
     {
@@ -28,6 +31,16 @@ public class BombaSprayProjectile : MonoBehaviour
 
         // 1. Inicia o timer de seguranca (7s)
         Invoke(nameof(Explode), tempoMaximoVida);
+    }
+
+    /// <summary>
+    /// Versão visual-only para o owner-cliente: a bomba voa e mostra VFX, mas não aplica
+    /// slow/cegueira (lógica de gameplay roda apenas no servidor).
+    /// </summary>
+    public void LaunchVisualProxy(Vector3 velocity, float radius, float cloudDuration)
+    {
+        _isVisualProxy = true;
+        Launch(velocity, radius, cloudDuration);
     }
 
     void OnCollisionEnter(Collision collision)
@@ -50,25 +63,25 @@ public class BombaSprayProjectile : MonoBehaviour
         if (jaExplodiu) return;
         jaExplodiu = true;
 
-        // Cria a nuvem de gas no local da granada
         if (gasCloudPrefab != null)
         {
-            Quaternion rot = Quaternion.identity;
-
-            // Instancia a nuvem
-            GameObject cloud = Instantiate(gasCloudPrefab, transform.position, rot);
-
-            // Configura o tamanho
+            GameObject cloud = Instantiate(gasCloudPrefab, transform.position, Quaternion.identity);
             cloud.transform.localScale = Vector3.one * _radius;
 
-            // Inicializa a logica de dano/cegueira da nuvem
-            NuvemDeTintaLogic logic = cloud.GetComponent<NuvemDeTintaLogic>();
-            if (logic == null) logic = cloud.AddComponent<NuvemDeTintaLogic>();
-
-            logic.Setup(_duration);
+            // Proxies visuais instanciam a nuvem mas sem lógica de slow/cegueira
+            // (lógica de gameplay é servidor-only e roda na instância real)
+            if (!_isVisualProxy)
+            {
+                NuvemDeTintaLogic logic = cloud.GetComponent<NuvemDeTintaLogic>();
+                if (logic == null) logic = cloud.AddComponent<NuvemDeTintaLogic>();
+                logic.Setup(_duration);
+            }
+            else
+            {
+                Destroy(cloud, _duration);
+            }
         }
 
-        // Destroi a granada
         Destroy(gameObject);
     }
 }

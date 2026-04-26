@@ -3,6 +3,12 @@
 
 Ultima atualizacao: 2026-03-25
 
+> Status: historico.
+> A documentacao ativa agora inclui `Assets/Diretrizes_Multiagente.md`,
+> `Assets/Claude.md`, `Assets/Gemini.md`, `Assets/Codex.md` e
+> `Assets/Codigo/Docs/Estado_Atual_Multiplayer.md`.
+> Use este arquivo apenas como contexto da reorganizacao antiga.
+
 ---
 
 ## 1. O que foi feito

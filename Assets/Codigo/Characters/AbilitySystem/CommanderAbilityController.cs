@@ -295,6 +295,73 @@ public class CommanderAbilityController : NetworkBehaviour
         logic.StartUltimate(gameObject, duration, shotsCount, damagePerShot, radius, silenceDuration, false);
     }
 
+    public void StartLocalAquiNaoOwnerProxy(Vector3 pos, Quaternion rot, string sfxSwing)
+    {
+        HabilidadeAquiNao ability = ResolveAbilityOfType<HabilidadeAquiNao>();
+        if (ability == null || !CanSendOwnerOnlyAbilityProxy()) return;
+        StartLocalAquiNaoOwnerClientRpc(pos, rot, sfxSwing, BuildOwnerOnlyRpcParams());
+    }
+
+    [ClientRpc]
+    private void StartLocalAquiNaoOwnerClientRpc(Vector3 pos, Quaternion rot, string sfxSwing,
+        ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner) return;
+
+        HabilidadeAquiNao ability = ResolveAbilityOfType<HabilidadeAquiNao>();
+        if (ability == null) return;
+
+        if (!string.IsNullOrEmpty(sfxSwing))
+            FMODUnity.RuntimeManager.PlayOneShot(sfxSwing, pos);
+
+        if (ability.logicPrefab != null)
+        {
+            AquiNaoLogic logic = Object.Instantiate(ability.logicPrefab, pos, rot);
+            Object.Destroy(logic.gameObject, 0.5f);
+        }
+    }
+
+    public void StartLocalBombaSprayOwnerProxy(Vector3 spawnPos, Vector3 direction, float force, float radius, float duration)
+    {
+        HabilidadeBombaSpray ability = ResolveAbilityOfType<HabilidadeBombaSpray>();
+        if (ability?.projectilePrefab == null || !CanSendOwnerOnlyAbilityProxy()) return;
+        StartLocalBombaSprayOwnerClientRpc(spawnPos, direction, force, radius, duration, BuildOwnerOnlyRpcParams());
+    }
+
+    [ClientRpc]
+    private void StartLocalBombaSprayOwnerClientRpc(Vector3 spawnPos, Vector3 direction, float force,
+        float radius, float duration, ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner) return;
+
+        HabilidadeBombaSpray ability = ResolveAbilityOfType<HabilidadeBombaSpray>();
+        if (ability?.projectilePrefab == null) return;
+
+        BombaSprayProjectile bomba = Object.Instantiate(
+            ability.projectilePrefab, spawnPos, Quaternion.LookRotation(direction));
+        bomba.LaunchVisualProxy(direction * force, radius, duration);
+    }
+
+    public void StartLocalPosturaBaluarteOwnerProxy(float duration)
+    {
+        HabilidadePosturaBaluarte ability = ResolveAbilityOfType<HabilidadePosturaBaluarte>();
+        if (ability == null || !CanSendOwnerOnlyAbilityProxy()) return;
+        StartLocalPosturaBaluarteOwnerClientRpc(duration, BuildOwnerOnlyRpcParams());
+    }
+
+    [ClientRpc]
+    private void StartLocalPosturaBaluarteOwnerClientRpc(float duration,
+        ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner) return;
+
+        HabilidadePosturaBaluarte ability = ResolveAbilityOfType<HabilidadePosturaBaluarte>();
+        if (ability?.logicPrefab == null) return;
+
+        PosturaBaluarteLogic logic = Object.Instantiate(ability.logicPrefab, transform);
+        logic.SetupProxy(duration);
+    }
+
     [ServerRpc]
     private void RequestActivateUltimateServerRpc()
     {
