@@ -15,6 +15,20 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - `Assets/Codigo/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
 - `Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
 
+## Ultima atualizacao: correcoes Host/Client Dragao e Polvo (2026-04-27)
+
+- `NetworkGameplayResolver.cs` foi adicionado para centralizar resolucao de `CharacterIndex`, atacante e `PlayerHealthSystem`.
+- `GameSetupManager` agora define `NetworkedPlayerController.CharacterIndex` no spawn e injeta `characterData` nos sistemas do player.
+- `NetworkedPlayerController.CharacterIndex` ficou com escrita do servidor, e o registro de jogadores passou a ficar concentrado no `PlayerRegistry` via fluxo de setup.
+- `CommanderAbilityController` saiu do polling via `Input.GetKeyDown` e agora usa `LocalPlayerInputBridge` com `Ability1`, `Ability2` e `Ultimate` (`Q`, `E`, `X`).
+- O dano autoritativo de Dragao, Polvo, torres e tiros passou a carregar `attackerClientId` e `PlayerHealthSystem`, garantindo popup, hit flash e `TriggerDamageDealt` para o cliente correto.
+- `MergulhoTintaLogic` passou a decidir entrada e saida no servidor, chamar `EnemyController.LoseTarget()` e reenviar a posicao final de superficie para o owner.
+- `EnemyPoolManager` deixou de reparentear `NetworkObject` no caminho do cliente, removendo o `NotServerException`.
+- `BuildManager` sanitiza ghosts e buildables runtime; torres nao herdam input, camera, audio ou scripts de player. `TorretaPolvo.prefab` tambem foi limpo.
+- `CameraController` e `TopDownCameraManager` ficaram restritos a camera local ativa e a um unico conjunto de listeners (`AudioListener` e `StudioListener`).
+- `PassiveEscamasAdamantium` e `PassivaTracoUrbano` agora respeitam autoridade de servidor e owner local.
+- Validacao executada: `dotnet build PI3D.sln` concluiu com sucesso sem erros.
+
 ## O que mudou em relacao aos docs antigos
 
 - O wrapper atual do EOS e `EOSManagerWrapper.cs`, nao `EOSManager.cs`.

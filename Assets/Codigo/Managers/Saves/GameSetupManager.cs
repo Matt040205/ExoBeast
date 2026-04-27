@@ -138,6 +138,12 @@ public class GameSetupManager : NetworkBehaviour
         // =================================================================
         if (characterEscolhido != null)
         {
+            if (playerInstance.TryGetComponent<PlayerCombatManager>(out var combatManager))
+                combatManager.characterData = characterEscolhido;
+
+            if (playerInstance.TryGetComponent<MeleeCombatSystem>(out var meleeCombat))
+                meleeCombat.characterData = characterEscolhido;
+
             if (playerInstance.TryGetComponent<PlayerShooting>(out var shooting))
                 shooting.characterData = characterEscolhido;
 
@@ -146,7 +152,13 @@ public class GameSetupManager : NetworkBehaviour
 
             if (playerInstance.TryGetComponent<CommanderAbilityController>(out var ability))
                 ability.characterData = characterEscolhido;
+
+            if (playerInstance.TryGetComponent<CommanderController>(out var commander))
+                commander.characterData = characterEscolhido;
         }
+
+        if (playerInstance.TryGetComponent<NetworkedPlayerController>(out var networkedPlayerController))
+            networkedPlayerController.CharacterIndex.Value = charIndex;
 
         NetworkObject netObj = playerInstance.GetComponent<NetworkObject>();
         if (netObj != null)

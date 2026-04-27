@@ -17,11 +17,20 @@ public class LocalPlayerInputBridge : MonoBehaviour
     private InputAction aimAction;
     private InputAction fireAction;
     private InputAction reloadAction;
+    private InputAction ability1Action;
+    private InputAction ability2Action;
+    private InputAction ultimateAction;
 
     private bool wasJumpHeld;
     private bool wasReloadHeld;
+    private bool wasAbility1Held;
+    private bool wasAbility2Held;
+    private bool wasUltimateHeld;
     private bool jumpPressed;
     private bool reloadPressed;
+    private bool ability1Pressed;
+    private bool ability2Pressed;
+    private bool ultimatePressed;
 
     public Vector2 Move { get; private set; }
     public bool SprintHeld { get; private set; }
@@ -44,6 +53,9 @@ public class LocalPlayerInputBridge : MonoBehaviour
         aimAction = null;
         fireAction = null;
         reloadAction = null;
+        ability1Action = null;
+        ability2Action = null;
+        ultimateAction = null;
         CacheActions();
         ResetLatchedState();
     }
@@ -75,6 +87,21 @@ public class LocalPlayerInputBridge : MonoBehaviour
         if (reloadHeldNow && !wasReloadHeld)
             reloadPressed = true;
         wasReloadHeld = reloadHeldNow;
+
+        bool ability1HeldNow = ability1Action != null && ability1Action.IsPressed();
+        if (ability1HeldNow && !wasAbility1Held)
+            ability1Pressed = true;
+        wasAbility1Held = ability1HeldNow;
+
+        bool ability2HeldNow = ability2Action != null && ability2Action.IsPressed();
+        if (ability2HeldNow && !wasAbility2Held)
+            ability2Pressed = true;
+        wasAbility2Held = ability2HeldNow;
+
+        bool ultimateHeldNow = ultimateAction != null && ultimateAction.IsPressed();
+        if (ultimateHeldNow && !wasUltimateHeld)
+            ultimatePressed = true;
+        wasUltimateHeld = ultimateHeldNow;
     }
 
     public bool ConsumeJumpPressed()
@@ -95,6 +122,33 @@ public class LocalPlayerInputBridge : MonoBehaviour
         return true;
     }
 
+    public bool ConsumeAbility1Pressed()
+    {
+        if (!ability1Pressed)
+            return false;
+
+        ability1Pressed = false;
+        return true;
+    }
+
+    public bool ConsumeAbility2Pressed()
+    {
+        if (!ability2Pressed)
+            return false;
+
+        ability2Pressed = false;
+        return true;
+    }
+
+    public bool ConsumeUltimatePressed()
+    {
+        if (!ultimatePressed)
+            return false;
+
+        ultimatePressed = false;
+        return true;
+    }
+
     private void CacheActions()
     {
         if (playerInput == null || playerInput.actions == null)
@@ -106,14 +160,23 @@ public class LocalPlayerInputBridge : MonoBehaviour
         aimAction ??= playerInput.actions.FindAction("Aim", throwIfNotFound: false);
         fireAction ??= playerInput.actions.FindAction("Attack", throwIfNotFound: false);
         reloadAction ??= playerInput.actions.FindAction("Reload", throwIfNotFound: false);
+        ability1Action ??= playerInput.actions.FindAction("Ability1", throwIfNotFound: false);
+        ability2Action ??= playerInput.actions.FindAction("Ability2", throwIfNotFound: false);
+        ultimateAction ??= playerInput.actions.FindAction("Ultimate", throwIfNotFound: false);
     }
 
     private void ResetLatchedState()
     {
         wasJumpHeld = false;
         wasReloadHeld = false;
+        wasAbility1Held = false;
+        wasAbility2Held = false;
+        wasUltimateHeld = false;
         jumpPressed = false;
         reloadPressed = false;
+        ability1Pressed = false;
+        ability2Pressed = false;
+        ultimatePressed = false;
     }
 
     private void ClearState()

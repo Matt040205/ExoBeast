@@ -4,6 +4,8 @@ using UnityEngine.EventSystems;
 using Unity.Netcode;
 using System.Collections;
 using System.Collections.Generic;
+using Unity.Cinemachine;
+using FMODUnity;
 using ExoBeasts.Multiplayer.Core;
 using ExoBeasts.Multiplayer.Sync;
 
@@ -189,6 +191,7 @@ public class BuildManager : NetworkBehaviour
         if (currentBuildGhost == null)
         {
             currentBuildGhost = Instantiate(selectedBuildablePrefab);
+            SanitizeGhostPreview(currentBuildGhost);
 
             var towerController = currentBuildGhost.GetComponentInChildren<TowerController>();
             if (towerController) towerController.enabled = false;
@@ -450,6 +453,7 @@ public class BuildManager : NetworkBehaviour
         yield return new WaitForSeconds(0.05f); // Micro-delay
 
         GameObject newBuildObject = Instantiate(prefabToSpawn, pos, Quaternion.identity);
+        SanitizeRuntimeBuildable(newBuildObject, false);
 
         if (newBuildObject.TryGetComponent<NetworkObject>(out var netObj))
         {
@@ -588,5 +592,79 @@ public class BuildManager : NetworkBehaviour
             Debug.LogWarning($"[BuildManager] Torre '{towerData.name}' nao encontrada em bibliotecaOriginalPersonagens.");
 
         return index;
+    }
+
+    private void SanitizeGhostPreview(GameObject buildGhost)
+    {
+        SanitizeRuntimeBuildable(buildGhost, true);
+    }
+
+    private void SanitizeRuntimeBuildable(GameObject buildableInstance, bool isPreview)
+    {
+        if (buildableInstance == null)
+            return;
+
+        foreach (PlayerInput playerInput in buildableInstance.GetComponentsInChildren<PlayerInput>(true))
+            playerInput.enabled = false;
+
+        foreach (LocalPlayerInputBridge inputBridge in buildableInstance.GetComponentsInChildren<LocalPlayerInputBridge>(true))
+            inputBridge.enabled = false;
+
+        foreach (PlayerMovement movement in buildableInstance.GetComponentsInChildren<PlayerMovement>(true))
+            movement.enabled = false;
+
+        foreach (PlayerShooting shooting in buildableInstance.GetComponentsInChildren<PlayerShooting>(true))
+            shooting.enabled = false;
+
+        foreach (MeleeCombatSystem melee in buildableInstance.GetComponentsInChildren<MeleeCombatSystem>(true))
+            melee.enabled = false;
+
+        foreach (PlayerCombatManager combatManager in buildableInstance.GetComponentsInChildren<PlayerCombatManager>(true))
+            combatManager.enabled = false;
+
+        foreach (CommanderAbilityController abilityController in buildableInstance.GetComponentsInChildren<CommanderAbilityController>(true))
+            abilityController.enabled = false;
+
+        foreach (CommanderController commanderController in buildableInstance.GetComponentsInChildren<CommanderController>(true))
+            commanderController.enabled = false;
+
+        foreach (PlayerHealthSystem healthSystem in buildableInstance.GetComponentsInChildren<PlayerHealthSystem>(true))
+            healthSystem.enabled = false;
+
+        foreach (PauseControl pauseControl in buildableInstance.GetComponentsInChildren<PauseControl>(true))
+            pauseControl.enabled = false;
+
+        foreach (PlayerNetworkSetup networkSetup in buildableInstance.GetComponentsInChildren<PlayerNetworkSetup>(true))
+            networkSetup.enabled = false;
+
+        foreach (NetworkedPlayerController networkedPlayerController in buildableInstance.GetComponentsInChildren<NetworkedPlayerController>(true))
+            networkedPlayerController.enabled = false;
+
+        foreach (CameraController cameraController in buildableInstance.GetComponentsInChildren<CameraController>(true))
+            cameraController.enabled = false;
+
+        foreach (ClientNetworkTransform networkTransform in buildableInstance.GetComponentsInChildren<ClientNetworkTransform>(true))
+            networkTransform.enabled = false;
+
+        foreach (CinemachineCamera cinematicCamera in buildableInstance.GetComponentsInChildren<CinemachineCamera>(true))
+            cinematicCamera.enabled = false;
+
+        foreach (AudioListener audioListener in buildableInstance.GetComponentsInChildren<AudioListener>(true))
+            audioListener.enabled = false;
+
+        foreach (StudioListener studioListener in buildableInstance.GetComponentsInChildren<StudioListener>(true))
+            studioListener.enabled = false;
+
+        foreach (CharacterController characterController in buildableInstance.GetComponentsInChildren<CharacterController>(true))
+            characterController.enabled = false;
+
+        foreach (CapsuleCollider capsuleCollider in buildableInstance.GetComponentsInChildren<CapsuleCollider>(true))
+            capsuleCollider.enabled = false;
+
+        if (!isPreview)
+            return;
+
+        foreach (Collider colliderComponent in buildableInstance.GetComponentsInChildren<Collider>(true))
+            colliderComponent.enabled = false;
     }
 }

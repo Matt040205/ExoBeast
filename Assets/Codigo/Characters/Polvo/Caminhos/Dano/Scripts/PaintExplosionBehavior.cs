@@ -1,11 +1,7 @@
 using UnityEngine;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.Sync;
 
-/// <summary>
-/// ── PaintExplosionBehavior ─────────────────────────────────
-/// Faz os inimigos explodirem em tinta ao morrer.
-/// ───────────────────────────────────────────────────────────
-/// </summary>
 public class PaintExplosionBehavior : TowerBehavior
 {
     [Header("Configuraes da Exploso")]
@@ -20,41 +16,34 @@ public class PaintExplosionBehavior : TowerBehavior
         if (!IsServer) return;
 
         if (towerController != null)
-        {
             towerController.OnEnemyKilled += HandleEnemyKilled;
-        }
     }
 
     private void HandleEnemyKilled(EnemyHealthSystem target)
     {
+        NetworkGameplayResolver.TryResolveAttackerFromBuilding(this, out ulong attackerClientId, out PlayerHealthSystem attackerHealth);
         Vector3 position = target.transform.position;
 
         if (explosionVFX != null)
-        {
             Instantiate(explosionVFX, position, Quaternion.identity);
-        }
 
         Collider[] hits = Physics.OverlapSphere(position, explosionRadius);
         float damageToDeal = towerController.CurrentDamage * explosionDamagePct;
 
-        foreach (var hit in hits)
+        foreach (Collider hit in hits)
         {
-            if (hit.CompareTag("Enemy") && hit.gameObject != target.gameObject)
-            {
-                EnemyHealthSystem hp = hit.GetComponent<EnemyHealthSystem>();
-                if (hp != null && !hp.isDead)
-                {
-                    hp.TakeDamage(damageToDeal);
-                }
-            }
+            if (!hit.CompareTag("Enemy") || hit.gameObject == target.gameObject)
+                continue;
+
+            EnemyHealthSystem hp = hit.GetComponent<EnemyHealthSystem>();
+            if (hp != null && !hp.isDead)
+                hp.ApplyAuthoritativeDamage(damageToDeal, 0f, false, attackerClientId, attackerHealth);
         }
     }
 
     private void OnDestroy()
     {
         if (towerController != null)
-        {
             towerController.OnEnemyKilled -= HandleEnemyKilled;
-        }
     }
 }

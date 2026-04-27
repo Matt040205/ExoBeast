@@ -1,15 +1,16 @@
 using UnityEngine;
 using Unity.Cinemachine;
 using Unity.Netcode;
+using FMODUnity;
 
 /// <summary>
-/// ── CameraController ───────────────────────────────────
+/// â”€â”€ CameraController â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /// Controla camera Cinemachine de terceira pessoa com mira (aim).
 ///
-///  ▸ Owner: processa input de mouse, troca entre camera normal e aim
-///  ▸ Remoto: desativa Camera, AudioListener e Cinemachine cameras
-///  ▸ GetAimDirection(): retorna direcao de mira para PlayerShooting
-/// ─────────────────────────────────────────────────────
+///  â–¸ Owner: processa input de mouse, troca entre camera normal e aim
+///  â–¸ Remoto: desativa Camera, AudioListener e Cinemachine cameras
+///  â–¸ GetAimDirection(): retorna direcao de mira para PlayerShooting
+/// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /// </summary>
 public class CameraController : NetworkBehaviour
 {
@@ -28,8 +29,8 @@ public class CameraController : NetworkBehaviour
     public float aimMaxDistance = 1.5f;
     public float minCameraDistance = 0.5f;
     public float collisionRadius = 0.2f;
-    [Tooltip("Camadas (Layers) que vão bloquear a câmera. Recomendo usar 'Default'.")]
-    public LayerMask obstacleMask = -1; // -1 significa todas as layers
+    [Tooltip("Camadas (Layers) que vÃ£o bloquear a cÃ¢mera. Recomendo usar 'Default'.")]
+    public LayerMask obstacleMask = -1;
 
     public bool isAiming { get; private set; }
 
@@ -47,20 +48,23 @@ public class CameraController : NetworkBehaviour
 
         if (!IsOwner)
         {
-            // Desativar camera e audio de jogadores remotos
-            var cam = GetComponentInChildren<Camera>();
-            if (cam != null) cam.enabled = false;
+            foreach (Camera cam in GetComponentsInChildren<Camera>(true))
+                cam.enabled = false;
 
-            var listener = GetComponentInChildren<AudioListener>();
-            if (listener != null) listener.enabled = false;
+            foreach (AudioListener listener in GetComponentsInChildren<AudioListener>(true))
+                listener.enabled = false;
 
-            // Desativar Cinemachine cameras se existirem
+            foreach (StudioListener listener in GetComponentsInChildren<StudioListener>(true))
+                listener.enabled = false;
+
             if (normalCamera != null) normalCamera.enabled = false;
             if (aimCamera != null) aimCamera.enabled = false;
 
-            this.enabled = false; // Nao processar Update/LateUpdate
+            enabled = false;
             return;
         }
+
+        EnsureLocalAudioRig();
     }
 
     private void Start()
@@ -73,11 +77,15 @@ public class CameraController : NetworkBehaviour
 
         normalCamera.Priority.Value = PriorityNormal;
         aimCamera.Priority.Value = 5;
+
+        if (IsOwner)
+            EnsureLocalAudioRig();
     }
 
     private void Update()
     {
-        if (PauseControl.isPaused) return;
+        if (PauseControl.isPaused)
+            return;
 
         HandleCameraRotation();
         HandleAimToggle();
@@ -109,6 +117,7 @@ public class CameraController : NetworkBehaviour
             isAiming = true;
             aimCamera.Priority.Value = PriorityAim;
         }
+
         if (Input.GetMouseButtonUp(1))
         {
             isAiming = false;
@@ -118,75 +127,111 @@ public class CameraController : NetworkBehaviour
 
     private void UpdateCameraOffsets()
     {
-        if (normalFollow == null || aimFollow == null) return;
+        if (normalFollow == null || aimFollow == null)
+            return;
 
         Vector3 targetAimOffset = aimFollow.ShoulderOffset;
-        targetAimOffset.x = isAiming ? shoulderOffset : 0;
-        aimFollow.ShoulderOffset = Vector3.Lerp(aimFollow.ShoulderOffset, targetAimOffset, aimTransitionSpeed * Time.deltaTime);
+        targetAimOffset.x = isAiming ? shoulderOffset : 0f;
+        aimFollow.ShoulderOffset = Vector3.Lerp(
+            aimFollow.ShoulderOffset,
+            targetAimOffset,
+            aimTransitionSpeed * Time.deltaTime);
 
         Vector3 targetNormalOffset = normalFollow.ShoulderOffset;
         targetNormalOffset.y = isAiming ? 1.2f : 1.8f;
-        normalFollow.ShoulderOffset = Vector3.Lerp(normalFollow.ShoulderOffset, targetNormalOffset, aimTransitionSpeed * Time.deltaTime);
+        normalFollow.ShoulderOffset = Vector3.Lerp(
+            normalFollow.ShoulderOffset,
+            targetNormalOffset,
+            aimTransitionSpeed * Time.deltaTime);
     }
 
     private void HandleCameraCollision()
     {
-        if (normalFollow == null || aimFollow == null) return;
+        if (normalFollow == null || aimFollow == null)
+            return;
 
         CinemachineThirdPersonFollow activeFollow = isAiming ? aimFollow : normalFollow;
         CinemachineThirdPersonFollow inactiveFollow = isAiming ? normalFollow : aimFollow;
         float targetMaxDistance = isAiming ? aimMaxDistance : normalMaxDistance;
 
-        // Ponto âncora padrão que a Cinemachine usa para focar
         Vector3 focusPos = transform.position + transform.TransformDirection(activeFollow.ShoulderOffset);
-        
-        // A direção para trás da câmera
         Vector3 dirToCam = -transform.forward;
-
-        // A posição alvo final onde a câmera tentará ficar
         Vector3 desiredCameraPos = focusPos + dirToCam * targetMaxDistance;
+        Vector3 safePos = transform.position + Vector3.up;
 
-        // PONTO SEGURO: Projetamos o raio do centro do jogador do peito p/ evitar que inicie dentro de uma parede
-        Vector3 safePos = transform.position + Vector3.up * 1f;
-
-        // Direção e distância isolada do peito do jogador até a posição da câmera
         Vector3 rayDir = desiredCameraPos - safePos;
         float rayDist = rayDir.magnitude;
-        if (rayDist > 0.001f) rayDir.Normalize();
+        if (rayDist > 0.001f)
+            rayDir.Normalize();
 
         float distance = targetMaxDistance;
-
-        // Um SphereCast partindo do "peito" da personagem (onde sabemos com 100% que estamos fora de paredes)
         RaycastHit[] hits = Physics.SphereCastAll(safePos, collisionRadius, rayDir, rayDist, obstacleMask);
         float closestFraction = 1f;
 
-        foreach (var hit in hits)
+        foreach (RaycastHit hit in hits)
         {
-            if (hit.collider.isTrigger) continue; // ignora triggers
-            if (hit.collider.transform.root == this.transform.root) continue; // ignora o próprio player
+            if (hit.collider.isTrigger)
+                continue;
+
+            if (hit.collider.transform.root == transform.root)
+                continue;
 
             float fraction = hit.distance / rayDist;
             if (fraction < closestFraction)
-            {
                 closestFraction = fraction;
-            }
         }
 
         if (closestFraction < 1f)
         {
-            // Bateu em algo! O ponto de colisão seguro antes de atravessar a construção:
             Vector3 hitPos = safePos + rayDir * (rayDist * closestFraction);
-
-            // Agora nós projetamos esse hitPos de volta para o eixo linear onde a câmera anda (dirToCam)
             distance = Vector3.Dot(hitPos - focusPos, dirToCam);
         }
 
         distance = Mathf.Max(distance - collisionRadius, minCameraDistance);
+        activeFollow.CameraDistance = Mathf.Lerp(
+            activeFollow.CameraDistance,
+            distance,
+            Time.deltaTime * aimTransitionSpeed);
 
-        // Suaviza a colisão para não tremular
-        activeFollow.CameraDistance = Mathf.Lerp(activeFollow.CameraDistance, distance, Time.deltaTime * aimTransitionSpeed);
-        
-        // Mantém a câmera secundária restaurada
         inactiveFollow.CameraDistance = isAiming ? normalMaxDistance : aimMaxDistance;
+    }
+
+    private void EnsureLocalAudioRig()
+    {
+        if (!IsOwner)
+            return;
+
+        Camera[] cameras = GetComponentsInChildren<Camera>(true);
+        Camera activeCamera = null;
+        foreach (Camera cam in cameras)
+        {
+            if (cam != null && cam.isActiveAndEnabled)
+            {
+                activeCamera = cam;
+                break;
+            }
+        }
+
+        if (activeCamera == null && cameras.Length > 0)
+            activeCamera = cameras[0];
+
+        foreach (AudioListener listener in GetComponentsInChildren<AudioListener>(true))
+            listener.enabled = activeCamera != null && listener.gameObject == activeCamera.gameObject;
+
+        StudioListener activeStudioListener = null;
+        if (activeCamera != null)
+        {
+            activeStudioListener = activeCamera.GetComponent<StudioListener>();
+            if (activeStudioListener == null)
+                activeStudioListener = activeCamera.gameObject.AddComponent<StudioListener>();
+
+            activeStudioListener.enabled = true;
+        }
+
+        foreach (StudioListener listener in GetComponentsInChildren<StudioListener>(true))
+        {
+            if (listener != activeStudioListener)
+                listener.enabled = false;
+        }
     }
 }

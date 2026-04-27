@@ -1,35 +1,38 @@
 using UnityEngine;
+using ExoBeasts.Multiplayer.Sync;
 
 public class AquiNaoLogic : MonoBehaviour
 {
     public void Setup(GameObject owner, float radius, float damage, float force, float stunTime, CommanderAbilityController controller, Ability ability)
     {
-        if (controller != null) controller.SetAbilityUsage(ability, true);
+        if (controller != null)
+            controller.SetAbilityUsage(ability, true);
+
+        NetworkGameplayResolver.TryResolveAttackerFromPlayer(owner, out ulong attackerClientId, out PlayerHealthSystem attackerHealth);
 
         Collider[] hits = Physics.OverlapSphere(transform.position, radius);
         int wallMask = LayerMask.GetMask("Default", "Ground", "Terrain", "Wall");
 
-        foreach (var hit in hits)
+        foreach (Collider hit in hits)
         {
-            if (hit.CompareTag("Enemy"))
-            {
-                EnemyHealthSystem hp = hit.GetComponent<EnemyHealthSystem>();
-                if (hp != null) hp.TakeDamage(damage);
+            if (!hit.CompareTag("Enemy"))
+                continue;
 
-                Vector3 direction = (hit.transform.position - transform.position).normalized;
-                direction.y = 0.2f;
+            EnemyHealthSystem hp = hit.GetComponent<EnemyHealthSystem>();
+            if (hp != null)
+                hp.ApplyAuthoritativeDamage(damage, 0f, false, attackerClientId, attackerHealth);
 
-                bool hitWall = Physics.Raycast(hit.transform.position, direction, 2f, wallMask);
+            Vector3 direction = (hit.transform.position - transform.position).normalized;
+            direction.y = 0.2f;
 
-                EnemyController enemyAI = hit.GetComponent<EnemyController>();
+            bool hitWall = Physics.Raycast(hit.transform.position, direction, 2f, wallMask);
+            EnemyController enemyAI = hit.GetComponent<EnemyController>();
 
-                if (hitWall)
-                {
-                    if (enemyAI != null) enemyAI.ApplySlow(1f, stunTime);
-                }
+            if (hitWall && enemyAI != null)
+                enemyAI.ApplySlow(1f, stunTime);
 
-                if (enemyAI != null) enemyAI.ApplyKnockback(direction, force);
-            }
+            if (enemyAI != null)
+                enemyAI.ApplyKnockback(direction, force);
         }
 
         Destroy(gameObject, 0.5f);

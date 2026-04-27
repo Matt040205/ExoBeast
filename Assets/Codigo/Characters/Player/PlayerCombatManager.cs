@@ -1,5 +1,6 @@
 using UnityEngine;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.Sync;
 
 /// <summary>
 /// ── PlayerCombatManager ────────────────────────────────
@@ -30,25 +31,34 @@ public class PlayerCombatManager : NetworkBehaviour
         NetworkVariableWritePermission.Server
     );
 
+    private bool initialCombatTypeApplied;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
+        TryResolveCharacterData();
         netCombatType.OnValueChanged += OnCombatTypeChanged;
+        ApplyCharacterDataToSystems();
+
+        if (IsServer && characterData != null && !initialCombatTypeApplied)
+        {
+            netCombatType.Value = characterData.combatType;
+            initialCombatTypeApplied = true;
+        }
+
         UpdateCombatStateVisuals(netCombatType.Value);
 
         if (IsOwner)
         {
-            if (healthSystem != null) healthSystem.characterData = characterData;
-            if (shootingSystem != null) shootingSystem.characterData = characterData;
-            if (meleeSystem != null) meleeSystem.characterData = characterData;
-            
             UpdateAttackScripts(netCombatType.Value);
         }
     }
 
     void Update()
     {
+        TryResolveCharacterData();
+
         if (!IsOwner) return;
 
         if (Input.GetKeyDown(KeyCode.Tab))
@@ -98,5 +108,37 @@ public class PlayerCombatManager : NetworkBehaviour
     {
         netCombatType.OnValueChanged -= OnCombatTypeChanged;
         base.OnNetworkDespawn();
+    }
+
+    private void TryResolveCharacterData()
+    {
+        if (characterData == null)
+            NetworkGameplayResolver.TryResolveCharacterData(this, out characterData, allowOwnerLocalFallback: IsOwner);
+
+        if (characterData == null)
+            return;
+
+        ApplyCharacterDataToSystems();
+
+        if (IsServer && !initialCombatTypeApplied)
+        {
+            netCombatType.Value = characterData.combatType;
+            initialCombatTypeApplied = true;
+        }
+    }
+
+    private void ApplyCharacterDataToSystems()
+    {
+        if (characterData == null)
+            return;
+
+        if (healthSystem != null)
+            healthSystem.characterData = characterData;
+
+        if (shootingSystem != null)
+            shootingSystem.characterData = characterData;
+
+        if (meleeSystem != null)
+            meleeSystem.characterData = characterData;
     }
 }

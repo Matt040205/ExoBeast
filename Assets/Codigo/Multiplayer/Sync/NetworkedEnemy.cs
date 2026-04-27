@@ -31,17 +31,35 @@ namespace ExoBeasts.Multiplayer.Sync
         public void TakeDamageServerRpc(float damage, float armorPen, bool isCrit, ServerRpcParams rpcParams = default)
         {
             ulong attackerId = rpcParams.Receive.SenderClientId;
-            ApplyDamageServer(damage, armorPen, isCrit, attackerId, out _);
+            PlayerHealthSystem attackerHealth = NetworkGameplayResolver.ResolvePlayerHealth(attackerId);
+            ApplyDamageServer(damage, armorPen, isCrit, attackerId, attackerHealth, out _);
         }
 
         public bool ApplyDamageServer(float damage, float armorPen, bool isCrit, ulong attackerId, out float finalDamage)
+        {
+            return ApplyDamageServer(damage, armorPen, isCrit, attackerId, null, out finalDamage);
+        }
+
+        public bool ApplyDamageServer(
+            float damage,
+            float armorPen,
+            bool isCrit,
+            ulong attackerId,
+            PlayerHealthSystem attackerHealth,
+            out float finalDamage)
         {
             finalDamage = 0f;
 
             if (!IsServer || IsDead.Value || localHealth == null)
                 return false;
 
-            localHealth.TakeDamageDetailed(damage, armorPen, isCrit, attackerId, out finalDamage);
+            localHealth.ApplyAuthoritativeDamageDetailed(
+                damage,
+                armorPen,
+                isCrit,
+                attackerId,
+                attackerHealth,
+                out finalDamage);
             return finalDamage > 0f;
         }
 

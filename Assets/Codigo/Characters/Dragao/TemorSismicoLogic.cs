@@ -1,15 +1,7 @@
 using UnityEngine;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.Sync;
 
-/// <summary>
-/// â”€â”€ TemorSismicoLogic â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-/// NetworkBehaviour spawnado pelo servidor ao usar Temor Sismico (Q do Dragao).
-///
-///  â–¸ Server: aplica dano, vulnerabilidade e knockback em inimigos no cone
-///  â–¸ Todos os clientes: veem o VFX (particulas no prefab) via NGO spawn
-///  â–¸ Destruido apos 2s automaticamente no servidor
-/// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-/// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class TemorSismicoLogic : NetworkBehaviour
 {
@@ -21,9 +13,18 @@ public class TemorSismicoLogic : NetworkBehaviour
     private float _vulnMultiplier;
     private float _vulnDuration;
     private bool _setupReady;
+    private ulong _attackerClientId;
+    private PlayerHealthSystem _attackerHealth;
 
-    public void Setup(GameObject owner, float range, float angle, float damage,
-        float knockUpDuration, float knockUpForce, float vulnMultiplier, float vulnDuration)
+    public void Setup(
+        GameObject owner,
+        float range,
+        float angle,
+        float damage,
+        float knockUpDuration,
+        float knockUpForce,
+        float vulnMultiplier,
+        float vulnDuration)
     {
         _range = range;
         _angle = angle;
@@ -33,8 +34,8 @@ public class TemorSismicoLogic : NetworkBehaviour
         _vulnMultiplier = vulnMultiplier;
         _vulnDuration = vulnDuration;
         _setupReady = true;
+        NetworkGameplayResolver.TryResolveAttackerFromPlayer(owner, out _attackerClientId, out _attackerHealth);
 
-        // Posicionar no owner (chamado antes do Spawn, transform jÃ¡ foi definido no Instantiate)
         transform.position = owner.transform.position;
         transform.rotation = AbilityAimUtility.ResolveAimRotation(owner);
     }
@@ -43,7 +44,8 @@ public class TemorSismicoLogic : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        if (!IsServer) return;
+        if (!IsServer)
+            return;
 
         if (_setupReady)
             ApplyEffects();
@@ -55,17 +57,19 @@ public class TemorSismicoLogic : NetworkBehaviour
     {
         Collider[] hits = Physics.OverlapSphere(transform.position, _range);
 
-        foreach (var hit in hits)
+        foreach (Collider hit in hits)
         {
-            if (!hit.CompareTag("Enemy")) continue;
+            if (!hit.CompareTag("Enemy"))
+                continue;
 
             Vector3 dirToEnemy = (hit.transform.position - transform.position).normalized;
-            if (Vector3.Angle(transform.forward, dirToEnemy) >= _angle / 2f) continue;
+            if (Vector3.Angle(transform.forward, dirToEnemy) >= _angle / 2f)
+                continue;
 
             EnemyHealthSystem hp = hit.GetComponent<EnemyHealthSystem>();
             if (hp != null)
             {
-                hp.TakeDamage(_damage);
+                hp.ApplyAuthoritativeDamage(_damage, 0f, false, _attackerClientId, _attackerHealth);
 
                 if (_vulnMultiplier > 1f)
                     hp.AplicarVulnerabilidadeTemporaria(_vulnMultiplier, _vulnDuration);

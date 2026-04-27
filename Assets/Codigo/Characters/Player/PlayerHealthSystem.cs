@@ -2,6 +2,7 @@ using UnityEngine;
 using System;
 using System.Collections;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.Sync;
 
 /// <summary>
 /// ── PlayerHealthSystem ─────────────────────────────────
@@ -50,6 +51,7 @@ public class PlayerHealthSystem : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        TryResolveCharacterData();
 
         if (IsServer)
         {
@@ -86,6 +88,7 @@ public class PlayerHealthSystem : NetworkBehaviour
 
     void Update()
     {
+        TryResolveCharacterData();
         if (!IsServer) return;
         HandleRegeneration();
     }
@@ -416,5 +419,11 @@ public class PlayerHealthSystem : NetworkBehaviour
     void NotifyHealthChanged()
     {
         OnHealthChanged?.Invoke();
+    }
+
+    private void TryResolveCharacterData()
+    {
+        if (characterData == null)
+            NetworkGameplayResolver.TryResolveCharacterData(this, out characterData, allowOwnerLocalFallback: IsOwner);
     }
 }

@@ -89,8 +89,7 @@ public class PlayerShooting : NetworkBehaviour
 
     private void InitializeShooting()
     {
-        if (characterData == null)
-            characterData = ResolveCharacterDataFromNetworkState();
+        EnsureCharacterDataResolved();
 
         maxAmmo = characterData != null ? characterData.magazineSize : 10;
         if (currentAmmo <= 0 || currentAmmo > maxAmmo)
@@ -123,52 +122,10 @@ public class PlayerShooting : NetworkBehaviour
 
     private CharacterBase ResolveCharacterDataFromNetworkState(int preferredIndex = -1)
     {
-        if (GameDataManager.Instance?.bibliotecaOriginalPersonagens == null)
-            return null;
-
-        int resolvedIndex = preferredIndex;
-
-        if (resolvedIndex < 0 && IsServer && PlayerRegistry.Instance != null)
-            resolvedIndex = PlayerRegistry.Instance.GetPlayerCharacterChoice(OwnerClientId);
-
-        if (resolvedIndex < 0 && CharacterChoiceCache.TryGet(OwnerClientId, out int cachedChoice))
-            resolvedIndex = cachedChoice;
-
-        if (resolvedIndex >= 0 && resolvedIndex < GameDataManager.Instance.bibliotecaOriginalPersonagens.Count)
-            return GameDataManager.Instance.bibliotecaOriginalPersonagens[resolvedIndex];
-
-        if (IsOwner)
-            return ResolveLocalCommanderCharacter();
-
-        return null;
-    }
-
-    private CharacterBase ResolveLocalCommanderCharacter()
-    {
-        GameDataManager gdm = GameDataManager.Instance;
-        if (gdm == null || gdm.equipeSelecionada == null || gdm.equipeSelecionada.Length == 0)
-            return null;
-
-        int commanderSlot = 0;
-        LobbyManager lobbyMgr = LobbyManager.Instance;
-        SessionManager sessionMgr = SessionManager.Instance;
-
-        if (lobbyMgr != null && sessionMgr != null)
-        {
-            string myUserId = sessionMgr.GetUserId();
-            int myIndex = lobbyMgr.GetCanonicalMemberIndex(myUserId);
-            int totalPlayers = lobbyMgr.GetOrderedMembers().Count;
-
-            if (myIndex >= 0)
-                commanderSlot = PartySlotLayout.GetCommanderSlot(totalPlayers, myIndex);
-        }
-
-        if (commanderSlot >= 0 &&
-            commanderSlot < gdm.equipeSelecionada.Length &&
-            gdm.equipeSelecionada[commanderSlot] != null)
-            return gdm.equipeSelecionada[commanderSlot];
-
-        return gdm.equipeSelecionada[0];
+        return NetworkGameplayResolver.ResolveCharacterData(
+            this,
+            preferredIndex,
+            allowOwnerLocalFallback: IsOwner);
     }
 
     public void OnFire(InputAction.CallbackContext ctx)
@@ -194,6 +151,7 @@ public class PlayerShooting : NetworkBehaviour
         if (!IsOwner)
             return;
 
+        EnsureCharacterDataResolved();
         SyncOwnerInputFromBridge();
 
         if (PauseControl.isPaused || BuildManager.isBuildingMode)
@@ -347,7 +305,7 @@ public class PlayerShooting : NetworkBehaviour
         if (isOwnerShot && networkAnimator != null)
             networkAnimator.SetTrigger("Shoot");
 
-        PlayShootSound();
+        PlayShootSound(origin);
 
         Vector3 spawnPosition = firePoint != null ? firePoint.position : origin;
         Quaternion spawnRotation = Quaternion.LookRotation(direction);
@@ -380,7 +338,7 @@ public class PlayerShooting : NetworkBehaviour
         }
     }
 
-    private void PlayShootSound()
+    private void PlayShootSound(Vector3 emissionPosition)
     {
         string eventToPlay = string.Empty;
         bool isFullAuto = characterData != null && characterData.fireMode == FireMode.FullAuto;
@@ -391,7 +349,7 @@ public class PlayerShooting : NetworkBehaviour
             eventToPlay = isFullAuto ? eventoTiroContinuoArma : eventoTiroUnicoArma;
 
         if (!string.IsNullOrEmpty(eventToPlay))
-            RuntimeManager.PlayOneShot(eventToPlay, transform.position);
+            RuntimeManager.PlayOneShot(eventToPlay, emissionPosition);
     }
 
     private float CalculateAuthoritativeDamage(out bool isCritical, out float areaRadius)
@@ -506,11 +464,7 @@ public class PlayerShooting : NetworkBehaviour
 
     private bool EnsureServerCharacterData(int characterIndex)
     {
-        if (characterData != null)
-            return true;
-
-        characterData = ResolveCharacterDataFromNetworkState(characterIndex);
-        return characterData != null;
+        return EnsureCharacterDataResolved(characterIndex);
     }
 
     public void RequestDamageOnEnemy(ulong enemyNetworkObjectId, float damage, float armorPenetration, bool isCritical)
@@ -711,5 +665,23 @@ public class PlayerShooting : NetworkBehaviour
         string cleanName = character.name.Replace("(Clone)", "");
         return GameDataManager.Instance.bibliotecaOriginalPersonagens.FindIndex(
             item => item != null && item.name == cleanName);
+    }
+
+    private bool EnsureCharacterDataResolved(int preferredIndex = -1)
+    {
+        if (characterData == null)
+            characterData = ResolveCharacterDataFromNetworkState(preferredIndex);
+
+        if (characterData == null)
+            return false;
+
+        int resolvedMaxAmmo = characterData.magazineSize > 0 ? characterData.magazineSize : 10;
+        if (maxAmmo != resolvedMaxAmmo)
+            maxAmmo = resolvedMaxAmmo;
+
+        if (currentAmmo <= 0 || currentAmmo > maxAmmo)
+            currentAmmo = maxAmmo;
+
+        return true;
     }
 }

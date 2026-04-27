@@ -1,9 +1,10 @@
 using UnityEngine;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.Sync;
 
 public class DragonThornsBehavior : TowerBehavior
 {
-    [Header("Configurações do Espinho")]
+    [Header("ConfiguraÃ§Ãµes do Espinho")]
     public float damageReflectionPercent = 0.20f;
 
     public override void Initialize(TowerController owner)
@@ -12,32 +13,27 @@ public class DragonThornsBehavior : TowerBehavior
         if (!IsServer) return;
 
         if (towerController != null)
-        {
             towerController.OnDamageTaken += HandleDamageTaken;
-        }
     }
 
     private void HandleDamageTaken(float damage, Transform attacker)
     {
-        if (attacker != null)
+        NetworkGameplayResolver.TryResolveAttackerFromBuilding(this, out ulong attackerClientId, out PlayerHealthSystem attackerHealth);
+
+        if (attacker == null)
+            return;
+
+        EnemyHealthSystem enemyHealth = attacker.GetComponent<EnemyHealthSystem>();
+        if (enemyHealth != null && !enemyHealth.isDead)
         {
-            EnemyHealthSystem enemyHealth = attacker.GetComponent<EnemyHealthSystem>();
-            if (enemyHealth != null && !enemyHealth.isDead)
-            {
-                float damageToReflect = damage * damageReflectionPercent;
-                // Devolve dano sem depender de animação usando HitScan nativo do inimigo
-                enemyHealth.TakeDamage(damageToReflect);
-                
-                // Opcional: Instanciar particula de Thorns no alvo
-            }
+            float damageToReflect = damage * damageReflectionPercent;
+            enemyHealth.ApplyAuthoritativeDamage(damageToReflect, 0f, false, attackerClientId, attackerHealth);
         }
     }
 
     private void OnDestroy()
     {
         if (towerController != null)
-        {
             towerController.OnDamageTaken -= HandleDamageTaken;
-        }
     }
 }

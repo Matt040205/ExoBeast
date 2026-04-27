@@ -1,14 +1,16 @@
 using UnityEngine;
+using Unity.Netcode;
+using ExoBeasts.Multiplayer.Sync;
 
 public class TurretController : MonoBehaviour
 {
     // A tag que identifica os inimigos no seu projeto
-    [Header("Configurações da Torre")]
+    [Header("ConfiguraÃ§Ãµes da Torre")]
     [Tooltip("A tag dos objetos inimigos.")]
     [SerializeField] private string enemyTag = "Enemy";
 
     // O alcance (range) da torreta
-    [Tooltip("O alcance de detecção da torre.")]
+    [Tooltip("O alcance de detecÃ§Ã£o da torre.")]
     [SerializeField] private float attackRange = 10f;
 
     // O dano que a torreta causa
@@ -20,18 +22,24 @@ public class TurretController : MonoBehaviour
     [SerializeField] private float fireRate = 1f;
 
     // A vida que a torreta tem
-    [Tooltip("A vida máxima da torreta.")]
+    [Tooltip("A vida mÃ¡xima da torreta.")]
     [SerializeField] private float maxHealth = 100f;
     private float currentHealth;
 
     private float nextFireTime;
     private Transform targetEnemy;
+    private NetworkObject networkObject;
+
+    void Awake()
+    {
+        networkObject = GetComponent<NetworkObject>();
+    }
 
     void Start()
     {
         // Inicializa a vida da torre
         currentHealth = maxHealth;
-        // Chama a função de busca de inimigos a cada 0.5 segundos para otimizar
+        // Chama a funÃ§Ã£o de busca de inimigos a cada 0.5 segundos para otimizar
         InvokeRepeating("FindTarget", 0f, 0.5f);
     }
 
@@ -56,18 +64,18 @@ public class TurretController : MonoBehaviour
         // Encontra todos os objetos com a tag 'Enemy'
         GameObject[] enemies = GameObject.FindGameObjectsWithTag(enemyTag);
 
-        // Verifica se há inimigos no array
+        // Verifica se hÃ¡ inimigos no array
         if (enemies.Length > 0)
         {
             Transform closestEnemy = null;
             float closestDistance = Mathf.Infinity;
 
-            // Percorre a lista de inimigos para encontrar o mais próximo e dentro do alcance
+            // Percorre a lista de inimigos para encontrar o mais prÃ³ximo e dentro do alcance
             foreach (GameObject enemy in enemies)
             {
                 float distance = Vector3.Distance(transform.position, enemy.transform.position);
 
-                // Se o inimigo estiver dentro do alcance e for o mais próximo até agora
+                // Se o inimigo estiver dentro do alcance e for o mais prÃ³ximo atÃ© agora
                 if (distance <= attackRange && distance < closestDistance)
                 {
                     closestDistance = distance;
@@ -78,30 +86,42 @@ public class TurretController : MonoBehaviour
         }
         else
         {
-            // Se não houver inimigos, o alvo é nulo
+            // Se nÃ£o houver inimigos, o alvo Ã© nulo
             targetEnemy = null;
         }
     }
 
     private void LookAtTarget()
     {
-        // Calcula a direção para o alvo
+        // Calcula a direÃ§Ã£o para o alvo
         Vector3 direction = targetEnemy.position - transform.position;
-        // Cria uma rotação para olhar nessa direção
+        // Cria uma rotaÃ§Ã£o para olhar nessa direÃ§Ã£o
         Quaternion lookRotation = Quaternion.LookRotation(direction);
-        // Aplica a rotação de forma suave
+        // Aplica a rotaÃ§Ã£o de forma suave
         transform.rotation = Quaternion.Slerp(transform.rotation, lookRotation, Time.deltaTime * 10f);
     }
 
     private void ShootAtTarget()
     {
+        if (!HasCombatAuthority())
+            return;
+
         // Tenta obter o componente EnemyHealthSystem do alvo
         EnemyHealthSystem healthSystem = targetEnemy.GetComponent<EnemyHealthSystem>();
 
         if (healthSystem != null)
         {
+            ulong attackerClientId = NetworkManager.ServerClientId;
+            PlayerHealthSystem attackerHealth = null;
+            NetworkGameplayResolver.TryResolveAttackerFromBuilding(this, out attackerClientId, out attackerHealth);
+
             // Aplica o dano e verifica se o inimigo morreu
-            bool isDead = healthSystem.TakeDamage(damagePerShot);
+            bool isDead = healthSystem.ApplyAuthoritativeDamage(
+                damagePerShot,
+                0f,
+                false,
+                attackerClientId,
+                attackerHealth);
 
             if (isDead)
             {
@@ -111,10 +131,18 @@ public class TurretController : MonoBehaviour
         }
     }
 
-    // Desenha o alcance da torre na cena do Unity para facilitar a visualização
+    // Desenha o alcance da torre na cena do Unity para facilitar a visualizaÃ§Ã£o
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, attackRange);
+    }
+
+    private bool HasCombatAuthority()
+    {
+        if (networkObject == null || !networkObject.IsSpawned || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+            return true;
+
+        return NetworkManager.Singleton.IsServer;
     }
 }

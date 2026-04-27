@@ -89,6 +89,38 @@ public class EnemyHealthSystem : MonoBehaviour
         return TakeDamageDetailed(damage, armorPenetration, isCritical, attackerId, out _);
     }
 
+    public bool ApplyAuthoritativeDamage(
+        float damage,
+        float armorPenetration,
+        bool isCritical,
+        ulong attackerId,
+        PlayerHealthSystem attackerHealth = null)
+    {
+        return ApplyAuthoritativeDamageDetailed(
+            damage,
+            armorPenetration,
+            isCritical,
+            attackerId,
+            attackerHealth,
+            out _);
+    }
+
+    public bool ApplyAuthoritativeDamageDetailed(
+        float damage,
+        float armorPenetration,
+        bool isCritical,
+        ulong attackerId,
+        PlayerHealthSystem attackerHealth,
+        out float finalDamageApplied)
+    {
+        bool result = TakeDamageDetailed(damage, armorPenetration, isCritical, attackerId, out finalDamageApplied);
+
+        if (finalDamageApplied > 0f && attackerHealth != null)
+            attackerHealth.TriggerDamageDealt(finalDamageApplied);
+
+        return result;
+    }
+
     public bool TakeDamageDetailed(float damage, float armorPenetration, bool isCritical, ulong attackerId, out float finalDamageApplied)
     {
         finalDamageApplied = 0f;

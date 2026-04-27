@@ -143,7 +143,9 @@ public class EnemyPoolManager : MonoBehaviour
             pools[prefabName] = new Queue<GameObject>();
         }
 
-        if (IsNGOServer && enemy.TryGetComponent<NetworkObject>(out var netObj))
+        bool hasNetworkObject = enemy.TryGetComponent<NetworkObject>(out var netObj);
+
+        if (IsNGOServer && hasNetworkObject)
         {
             if (netObj.IsSpawned)
             {
@@ -152,7 +154,9 @@ public class EnemyPoolManager : MonoBehaviour
         }
 
         enemy.SetActive(false);
-        enemy.transform.SetParent(transform);
+
+        if (IsNGOServer || !hasNetworkObject)
+            enemy.transform.SetParent(transform);
 
         if (!pools[prefabName].Contains(enemy))
             pools[prefabName].Enqueue(enemy);

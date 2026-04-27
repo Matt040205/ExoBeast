@@ -3,28 +3,29 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.Sync;
 
 public class TowerController : MonoBehaviour
 {
-    [Header("Referências Principais")]
+    [Header("ReferÃªncias Principais")]
     public CharacterBase towerData;
     public Transform partToRotate;
     public Transform firePoint;
 
-    [Header("Materialização (Spawn)")]
+    [Header("MaterializaÃ§Ã£o (Spawn)")]
     [SerializeField] private float tempoDeSpawn = 2f;
     [SerializeField] private Material materialHolograma;
     [SerializeField] private Material materialToon;
     [SerializeField] private Material materialOutline;
     private bool isMaterializing = false;
 
-    [Header("Visual e Animação")]
+    [Header("Visual e AnimaÃ§Ã£o")]
     public Animator animator;
     public string shootTrigger = "Attack";
     public string towerModeBool = "IsTower";
     public Vector3 rotationOffset;
 
-    [Header("Configurações de IA")]
+    [Header("ConfiguraÃ§Ãµes de IA")]
     [SerializeField] private string enemyTag = "Enemy";
     public bool TargetsFlyingEnemies { get; set; } = false;
 
@@ -51,7 +52,7 @@ public class TowerController : MonoBehaviour
 
     private List<TowerBehavior> activeBehaviors = new List<TowerBehavior>();
 
-    // Tracking universal dos níveis
+    // Tracking universal dos nÃ­veis
     public int[] currentPathLevels { get; private set; } = new int[3] { 0, 0, 0 };
 
     private Transform targetEnemy;
@@ -61,7 +62,7 @@ public class TowerController : MonoBehaviour
 
     private TowerAbilitySystem abilitySystem;
     private NetworkObject networkObject;
-    private ExoBeasts.Multiplayer.Sync.NetworkedBuilding networkedBuilding;
+    private NetworkedBuilding networkedBuilding;
 
     void Awake()
     {
@@ -84,7 +85,7 @@ public class TowerController : MonoBehaviour
 
         StartCoroutine(SpawnMaterializationFlow());
 
-        // Removemos UpdateAbilities do Start pois os níveis começam zerados ou definidos pelo AbilitySystem
+        // Removemos UpdateAbilities do Start pois os nÃ­veis comeÃ§am zerados ou definidos pelo AbilitySystem
         InvokeRepeating("UpdateTarget", 0f, 0.5f);
 
         if (networkedBuilding != null)
@@ -128,8 +129,8 @@ public class TowerController : MonoBehaviour
         IsDestroyed = false;
     }
 
-    // --- MUDANÇA IMPORTANTE AQUI ---
-    // Adicionei o parametro 'TowerPath path' para sabermos qual caminho está sendo upado
+    // --- MUDANÃ‡A IMPORTANTE AQUI ---
+    // Adicionei o parametro 'TowerPath path' para sabermos qual caminho estÃ¡ sendo upado
     public void ApplyUpgrade(Upgrade upgradeToApply, int geoditeCost, int darkEtherCost, TowerPath path)
     {
         if (upgradeToApply == null) return;
@@ -155,7 +156,7 @@ public class TowerController : MonoBehaviour
             }
         }
 
-        // 3. Incrementa o nível na base da torre para UI funcionar
+        // 3. Incrementa o nÃ­vel na base da torre para UI funcionar
         if (path == TowerPath.DPS) currentPathLevels[0]++;
         else if (path == TowerPath.Control) currentPathLevels[1]++;
         else if (path == TowerPath.Support) currentPathLevels[2]++;
@@ -320,7 +321,16 @@ public class TowerController : MonoBehaviour
             }
         }
 
-        bool enemyDied = healthSystem.TakeDamage(damageToDeal, currentArmorPenetration);
+        ulong attackerClientId = NetworkManager.ServerClientId;
+        PlayerHealthSystem attackerHealth = null;
+        NetworkGameplayResolver.TryResolveAttackerFromBuilding(this, out attackerClientId, out attackerHealth);
+
+        bool enemyDied = healthSystem.ApplyAuthoritativeDamage(
+            damageToDeal,
+            currentArmorPenetration,
+            isCritical,
+            attackerClientId,
+            attackerHealth);
 
         if (enemyDied) OnEnemyKilled?.Invoke(healthSystem);
         OnTargetDamaged?.Invoke(healthSystem);
@@ -458,7 +468,7 @@ public class TowerController : MonoBehaviour
         {
             TowerSelectionManager.Instance.DeselectAll();
         }
-        // Ao invés de Destruir o GameObject (que quebra os scripts de Reviver), nós apenas escondemos a torre visualmente
+        // Ao invÃ©s de Destruir o GameObject (que quebra os scripts de Reviver), nÃ³s apenas escondemos a torre visualmente
         foreach (Renderer r in GetComponentsInChildren<Renderer>()) 
         {
             r.enabled = false;
@@ -504,7 +514,7 @@ public class TowerController : MonoBehaviour
             }
         }
 
-        // Passo C e D: Animação do Shader
+        // Passo C e D: AnimaÃ§Ã£o do Shader
         float elapsedTime = 0f;
         while (elapsedTime < tempoDeSpawn)
         {
@@ -534,7 +544,7 @@ public class TowerController : MonoBehaviour
             }
         }
 
-        // Passo F: Liberação
+        // Passo F: LiberaÃ§Ã£o
         isMaterializing = false;
     }
 
@@ -576,7 +586,16 @@ public class TowerController : MonoBehaviour
             }
         }
 
-        bool enemyDied = target.TakeDamage(damageToDeal, currentArmorPenetration);
+        ulong attackerClientId = NetworkManager.ServerClientId;
+        PlayerHealthSystem attackerHealth = null;
+        NetworkGameplayResolver.TryResolveAttackerFromBuilding(this, out attackerClientId, out attackerHealth);
+
+        bool enemyDied = target.ApplyAuthoritativeDamage(
+            damageToDeal,
+            currentArmorPenetration,
+            isCritical,
+            attackerClientId,
+            attackerHealth);
         if (enemyDied) OnEnemyKilled?.Invoke(target);
         if (isCritical) OnCriticalHit?.Invoke(target);
     }

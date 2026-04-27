@@ -19,7 +19,7 @@ namespace ExoBeasts.Multiplayer.Sync
         public NetworkVariable<int> CharacterIndex = new NetworkVariable<int>(
             -1,
             NetworkVariableReadPermission.Everyone,
-            NetworkVariableWritePermission.Owner
+            NetworkVariableWritePermission.Server
         );
 
         [Header("Synchronized Stats")]
@@ -53,10 +53,6 @@ namespace ExoBeasts.Multiplayer.Sync
             NetworkAmmo.OnValueChanged += OnAmmoChanged;
             CharacterIndex.OnValueChanged += OnCharacterChanged;
 
-            if (IsServer)
-            {
-                GameServer.PlayerRegistry.Instance?.RegisterPlayer(OwnerClientId, gameObject);
-            }
         }
 
         private void InitializeServerData()
@@ -142,10 +138,6 @@ namespace ExoBeasts.Multiplayer.Sync
             NetworkAmmo.OnValueChanged -= OnAmmoChanged;
             CharacterIndex.OnValueChanged -= OnCharacterChanged;
 
-            if (IsServer)
-            {
-                GameServer.PlayerRegistry.Instance?.UnregisterPlayer(OwnerClientId);
-            }
         }
     }
 }

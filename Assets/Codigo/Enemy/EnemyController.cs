@@ -7,20 +7,10 @@ using ExoBeasts.Multiplayer.GameServer;
 
 public enum AITargetPriority { Player, Objective }
 
-/// <summary>
-/// ── EnemyController ────────────────────────────────────
-/// IA de inimigo que roda apenas no servidor (NetworkedEnemy controla enable/disable).
-///
-///  ▸ Server: decide alvo (jogador mais proximo via PlayerRegistry ou patrulha)
-///  ▸ Server: persegue jogador ou segue waypoints ate o objetivo
-///  ▸ Suporta status effects: slow, slip, root, knockback, blind, paint stacks
-///  ▸ AttackObjectiveAndDie: dano no objetivo e auto-destruicao ao fim da patrulha
-/// ─────────────────────────────────────────────────────
-/// </summary>
 [RequireComponent(typeof(NavMeshAgent))]
 public class EnemyController : MonoBehaviour
 {
-    [Header("Inteligência Artificial")]
+    [Header("InteligÃªncia Artificial")]
     public AITargetPriority mainPriority = AITargetPriority.Player;
     public float findDistance = 15f;
     public float attackDistance = 2f;
@@ -29,7 +19,7 @@ public class EnemyController : MonoBehaviour
     public float maxChaseTime = 10f;
     public float maxChaseDistance = 20f;
 
-    [Header("Configurações Físicas")]
+    [Header("ConfiguraÃ§Ãµes FÃ­sicas")]
     public float originalMoveSpeed = 3.5f;
 
     [Header("Status")]
@@ -45,7 +35,7 @@ public class EnemyController : MonoBehaviour
     private Transform target;
     public Transform Target => target;
 
-    private Transform playerTransform; // Alvo atual de jogador
+    private Transform playerTransform;
     private List<Transform> patrolPoints;
     private int currentPointIndex = 0;
     private Transform lastWaypointReached;
@@ -92,8 +82,7 @@ public class EnemyController : MonoBehaviour
         target = null;
         currentChaseTimer = 0f;
         speedModifier = 1f;
-        
-        // Dispara notificação puramente no Server (notifica o UINotificationManager)
+
         EnemyEvents.OnEnemySpawned?.Invoke(pathIndex + 1);
         isRooted = false;
         isSlipping = false;
@@ -104,7 +93,6 @@ public class EnemyController : MonoBehaviour
         if (healthSystem != null) healthSystem.InitializeHealth(level);
         if (combatSystem != null) combatSystem.InitializeCombat(data, level);
 
-        // Garante que o NavMeshAgent está na posição correta no NavMesh
         if (agent != null)
         {
             agent.enabled = false;
@@ -115,9 +103,6 @@ public class EnemyController : MonoBehaviour
         }
 
         currentMoveSpeed = originalMoveSpeed;
-
-        // Refresh de alvo após breve delay para capturar clientes que registraram no PlayerRegistry
-        // depois que a onda de inimigos começou a spawnar (race condition de timing)
         StartCoroutine(RefreshTargetAfterDelay(0.5f));
     }
 
@@ -135,15 +120,12 @@ public class EnemyController : MonoBehaviour
         DecideTarget();
 
         if (target != null)
-        {
             ChaseTarget();
-        }
         else
-        {
             Patrol();
-        }
 
-        if (paintStacks > 0 && Time.time > paintStackResetTime) paintStacks = 0;
+        if (paintStacks > 0 && Time.time > paintStackResetTime)
+            paintStacks = 0;
     }
 
     private Coroutine tauntCoroutine;
@@ -153,7 +135,8 @@ public class EnemyController : MonoBehaviour
         if (tauntCoroutine != null) StopCoroutine(tauntCoroutine);
         tauntCoroutine = StartCoroutine(TauntRoutine(tauntTarget, duration));
     }
-    private System.Collections.IEnumerator TauntRoutine(Transform tauntTarget, float duration)
+
+    private IEnumerator TauntRoutine(Transform tauntTarget, float duration)
     {
         float timer = 0f;
         while (timer < duration && tauntTarget != null && !IsDead)
@@ -208,35 +191,75 @@ public class EnemyController : MonoBehaviour
 
     private Transform FindNearestPlayer()
     {
-        // Tenta via PlayerRegistry (modo rede)
+        Transform nearestVisiblePlayer = null;
+        float nearestVisibleDistance = float.MaxValue;
+        Transform nearestPocaPlayer = null;
+        float nearestPocaDistance = float.MaxValue;
+
         if (PlayerRegistry.Instance != null)
         {
             var players = PlayerRegistry.Instance.GetAllPlayers();
             if (players.Count > 0)
             {
-                float minDistance = float.MaxValue;
-                Transform nearest = null;
-
-                foreach (var p in players.Values)
+                foreach (GameObject playerObject in players.Values)
                 {
-                    if (p == null) continue;
-                    float dist = Vector3.Distance(transform.position, p.transform.position);
-                    if (dist < minDistance)
+                    if (playerObject == null)
+                        continue;
+
+                    float distance = Vector3.Distance(transform.position, playerObject.transform.position);
+                    if (playerObject.CompareTag(TAG_POCA))
                     {
-                        minDistance = dist;
-                        nearest = p.transform;
+                        if (distance < nearestPocaDistance)
+                        {
+                            nearestPocaDistance = distance;
+                            nearestPocaPlayer = playerObject.transform;
+                        }
+                        continue;
+                    }
+
+                    if (distance < nearestVisibleDistance)
+                    {
+                        nearestVisibleDistance = distance;
+                        nearestVisiblePlayer = playerObject.transform;
                     }
                 }
-                if (nearest != null) return nearest;
+
+                if (nearestVisiblePlayer != null)
+                    return nearestVisiblePlayer;
+
+                if (nearestPocaPlayer != null)
+                    return nearestPocaPlayer;
             }
         }
 
-        // Fallback: busca por tag "Player"
-        GameObject player = GameObject.FindWithTag("Player");
-        if (player != null) return player.transform;
+        GameObject[] fallbackPlayers = GameObject.FindGameObjectsWithTag("Player");
+        foreach (GameObject playerObject in fallbackPlayers)
+        {
+            if (playerObject == null)
+                continue;
 
-        // Último recurso: mantém o alvo atual
-        return playerTransform;
+            float distance = Vector3.Distance(transform.position, playerObject.transform.position);
+            if (playerObject.CompareTag(TAG_POCA))
+            {
+                if (distance < nearestPocaDistance)
+                {
+                    nearestPocaDistance = distance;
+                    nearestPocaPlayer = playerObject.transform;
+                }
+                continue;
+            }
+
+            if (distance < nearestVisibleDistance)
+            {
+                nearestVisibleDistance = distance;
+                nearestVisiblePlayer = playerObject.transform;
+            }
+        }
+
+        if (nearestVisiblePlayer != null)
+            return nearestVisiblePlayer;
+
+        return nearestPocaPlayer != null ? nearestPocaPlayer : playerTransform;
     }
 
     private void Patrol()
@@ -248,7 +271,6 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        // Se o agent não está no NavMesh, tenta recolocar (não morre)
         if (agent == null || !agent.enabled || !agent.isOnNavMesh)
         {
             if (agent != null)
@@ -261,28 +283,28 @@ public class EnemyController : MonoBehaviour
         }
 
         Transform waypoint = patrolPoints[currentPointIndex];
-        if (waypoint == null) { currentPointIndex++; return; }
+        if (waypoint == null)
+        {
+            currentPointIndex++;
+            return;
+        }
 
-        // Notificação de 50% do caminho percorrido (só dispara 1 vez por inimigo)
         if (!hasTriggeredHalfway && patrolPoints.Count > 0 && currentPointIndex >= patrolPoints.Count / 2)
         {
             hasTriggeredHalfway = true;
             EnemyEvents.OnEnemyHalfway?.Invoke(pathIndex + 1);
         }
 
-        // Usa distância HORIZONTAL (ignora Y) para detectar chegada — evita problemas com altura
         Vector3 flatPos = new Vector3(transform.position.x, 0, transform.position.z);
         Vector3 flatWaypoint = new Vector3(waypoint.position.x, 0, waypoint.position.z);
         float distToWaypoint = Vector3.Distance(flatPos, flatWaypoint);
 
         if (distToWaypoint <= 3.0f)
         {
-            // Chegou ao waypoint, avança para o próximo
             currentPointIndex++;
             return;
         }
 
-        // Move em direção ao waypoint
         if (anim != null) anim.SetBool("isWalking", true);
         MoveTowardsPosition(waypoint.position);
     }
@@ -296,11 +318,11 @@ public class EnemyController : MonoBehaviour
         if (distanceToTarget <= attackDistance)
         {
             if (agent != null && agent.enabled && agent.isOnNavMesh) agent.isStopped = true;
-            
+
             if (anim != null)
             {
                 anim.SetBool("isWalking", false);
-                    anim.SetTrigger("doAttack");
+                anim.SetTrigger("doAttack");
             }
 
             Vector3 direction = (target.position - transform.position).normalized;
@@ -332,12 +354,9 @@ public class EnemyController : MonoBehaviour
     {
         var objective = ObjectiveHealthSystem.Instance;
         if (objective != null && enemyData != null)
-        {
             objective.TakeDamage(enemyData.GetDamage(nivel));
-        }
 
         EnemyEvents.OnEnemyReachedBase?.Invoke();
-
         HandleDeath();
     }
 
@@ -349,7 +368,6 @@ public class EnemyController : MonoBehaviour
         if (anim != null)
         {
             anim.SetBool("isWalking", false);
-            // Só tenta trigger se o parâmetro existir no Animator
             foreach (var param in anim.parameters)
             {
                 if (param.name == "isDead" && param.type == AnimatorControllerParameterType.Trigger)
@@ -363,7 +381,6 @@ public class EnemyController : MonoBehaviour
         if (agent != null && agent.enabled && agent.isOnNavMesh)
             agent.isStopped = true;
 
-        // Notifica o HordeManager sobre a morte do inimigo
         if (HordeManager.Instance != null)
         {
             if (HordeManager.Instance.IsLocalMode)
@@ -372,7 +389,6 @@ public class EnemyController : MonoBehaviour
                 HordeManager.Instance.OnEnemyKilledServerRpc();
         }
 
-        // Sempre devolve ao pool após delay (funciona em local E Host)
         StartCoroutine(ReturnToPoolAfterDelay(1.5f));
     }
 
@@ -420,9 +436,8 @@ public class EnemyController : MonoBehaviour
         isKnockedBack = true;
         if (agent != null) agent.isStopped = true;
         if (rb != null && !rb.isKinematic)
-        {
             rb.AddForce(direction.normalized * force, ForceMode.Impulse);
-        }
+
         yield return new WaitForSeconds(0.5f);
         if (agent != null) agent.isStopped = false;
         isKnockedBack = false;
@@ -439,6 +454,7 @@ public class EnemyController : MonoBehaviour
         speedModifier = 1f;
         isSlowed = false;
     }
+
     public void ApplyStun(float duration) { if (!IsDead) StartCoroutine(RootRoutine(duration)); }
 
     private IEnumerator RootRoutine(float duration)
@@ -451,4 +467,25 @@ public class EnemyController : MonoBehaviour
     }
 
     public void SetPatrolPoints(List<Transform> points) => patrolPoints = points;
+
+    public void LoseTarget()
+    {
+        target = null;
+        playerTransform = null;
+        currentChaseTimer = 0f;
+
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
+            agent.ResetPath();
+    }
+
+    public void RefreshTargetNow()
+    {
+        if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsServer)
+            return;
+
+        playerTransform = FindNearestPlayer();
+        target = null;
+        currentChaseTimer = 0f;
+        DecideTarget();
+    }
 }

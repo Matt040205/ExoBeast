@@ -1,26 +1,44 @@
 using UnityEngine;
+using Unity.Netcode;
 
-[CreateAssetMenu(fileName = "Traço Urbano", menuName = "ExoBeasts/Personagens/Polvo/Passiva/Traço Urbano")]
+[CreateAssetMenu(fileName = "TraÃ§o Urbano", menuName = "ExoBeasts/Personagens/Polvo/Passiva/TraÃ§o Urbano")]
 public class PassivaTracoUrbano : PassivaAbility
 {
-    [Header("Configurações do Traço")]
-    public float speedBoostMultiplier = 1.3f; // 30% mais rápido
+    [Header("ConfiguraÃ§Ãµes do TraÃ§o")]
+    public float speedBoostMultiplier = 1.3f;
     public float inkDuration = 5f;
-    public float slowPercent = 0.3f; // 30% de lentidão
+    public float slowPercent = 0.3f;
 
-    [Tooltip("Prefab da poça de tinta que fica no chão")]
+    [Tooltip("Prefab da poÃ§a de tinta que fica no chÃ£o")]
     public GameObject inkTrailPrefab;
 
     public override void OnEquip(GameObject owner)
     {
-        // Adiciona o componente lógico ao jogador
-        TracoUrbanoLogic logic = owner.AddComponent<TracoUrbanoLogic>();
+        if (owner == null)
+            return;
+
+        NetworkObject networkObject = owner.GetComponent<NetworkObject>();
+        if (networkObject != null && networkObject.IsSpawned && !networkObject.IsOwner)
+            return;
+
+        TracoUrbanoLogic logic = owner.GetComponent<TracoUrbanoLogic>();
+        if (logic == null)
+            logic = owner.AddComponent<TracoUrbanoLogic>();
+
         logic.Initialize(speedBoostMultiplier, inkDuration, slowPercent, inkTrailPrefab);
     }
 
     public override void OnUnequip(GameObject owner)
     {
+        if (owner == null)
+            return;
+
+        NetworkObject networkObject = owner.GetComponent<NetworkObject>();
+        if (networkObject != null && networkObject.IsSpawned && !networkObject.IsOwner)
+            return;
+
         TracoUrbanoLogic logic = owner.GetComponent<TracoUrbanoLogic>();
-        if (logic != null) Destroy(logic);
+        if (logic != null)
+            Object.Destroy(logic);
     }
 }

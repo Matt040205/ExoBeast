@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using System.Collections;
 using Unity.Netcode;
+using ExoBeasts.Multiplayer.Sync;
 
 public class MergulhoTintaLogic : MonoBehaviour
 {
@@ -19,6 +20,7 @@ public class MergulhoTintaLogic : MonoBehaviour
     private PlayerHealthSystem _playerHealth;
     private Ability _sourceAbility;
     private NetworkObject _networkObject;
+    private bool _isLocalProxy;
 
     private const int GHOST_LAYER = 2;
     private const string POCA_TAG = "Poca";
@@ -57,25 +59,23 @@ public class MergulhoTintaLogic : MonoBehaviour
         _abilityScript = GetComponent<CommanderAbilityController>();
         _sourceAbility = abilitySource;
         _networkObject = GetComponent<NetworkObject>();
+        _isLocalProxy = (_networkObject != null && _networkObject.IsSpawned && !HasServerAuthority);
 
         if (validateGround && !CheckIfGrounded())
         {
             if (_abilityScript != null && HasServerAuthority)
-            {
                 _abilityScript.SetAbilityUsage(_sourceAbility, false);
-            }
+
             Destroy(this);
             return false;
         }
 
         if (_abilityScript != null && HasServerAuthority)
-        {
             _abilityScript.SetAbilityUsage(_sourceAbility, true);
-        }
 
         _damage = damage;
         _radius = radius;
-        _renderers = GetComponentsInChildren<Renderer>();
+        _renderers = GetComponentsInChildren<Renderer>(true);
         _shootingScript = GetComponent<PlayerShooting>();
         _playerHealth = GetComponent<PlayerHealthSystem>();
 
@@ -93,7 +93,7 @@ public class MergulhoTintaLogic : MonoBehaviour
 
         if (_shootingScript != null && IsLocalOwnerInstance) _shootingScript.enabled = false;
         if (_abilityScript != null && IsLocalOwnerInstance) _abilityScript.enabled = false;
-        foreach (var r in _renderers) r.enabled = false;
+        foreach (Renderer renderer in _renderers) renderer.enabled = false;
 
         if (puddlePrefab != null)
         {
@@ -111,18 +111,21 @@ public class MergulhoTintaLogic : MonoBehaviour
     void ConfundirInimigos(float areaDeEfeito)
     {
         Collider[] hits = Physics.OverlapSphere(transform.position, areaDeEfeito);
-        foreach (var hit in hits)
+        foreach (Collider hit in hits)
         {
-            if (hit.CompareTag("Enemy"))
+            if (!hit.CompareTag("Enemy"))
+                continue;
+
+            NavMeshAgent agent = hit.GetComponent<NavMeshAgent>();
+            if (agent != null)
             {
-                NavMeshAgent agent = hit.GetComponent<NavMeshAgent>();
-                if (agent != null)
-                {
-                    agent.ResetPath();
-                    agent.velocity = Vector3.zero;
-                }
-                hit.SendMessage("LoseTarget", SendMessageOptions.DontRequireReceiver);
+                agent.ResetPath();
+                agent.velocity = Vector3.zero;
             }
+
+            EnemyController enemyController = hit.GetComponent<EnemyController>();
+            if (enemyController != null)
+                enemyController.LoseTarget();
         }
     }
 
@@ -130,9 +133,8 @@ public class MergulhoTintaLogic : MonoBehaviour
     {
         Vector3 origin = transform.position + Vector3.up * 1.0f;
         if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 5f, groundLayerMask, QueryTriggerInteraction.Ignore))
-        {
             return hit.point + Vector3.up * 0.02f;
-        }
+
         return transform.position + Vector3.up * 0.02f;
     }
 
@@ -160,39 +162,32 @@ public class MergulhoTintaLogic : MonoBehaviour
 
     void EndDive()
     {
-        gameObject.tag = _originalTag;
-        if (_shootingScript != null && IsLocalOwnerInstance) _shootingScript.enabled = true;
-        if (_abilityScript != null && IsLocalOwnerInstance) _abilityScript.enabled = true;
-        foreach (var r in _renderers) r.enabled = true;
-        if (_puddleInstance != null) Destroy(_puddleInstance);
+        if (_isLocalProxy)
+            return;
 
         if (HasServerAuthority)
+        {
             CausarDanoEmArea();
+            StartCoroutine(WaitUntilClearToSurface());
+            return;
+        }
 
-        StartCoroutine(WaitUntilClearToSurface());
+        CompleteOwnerProxySurfaceExit(transform.position);
     }
 
     IEnumerator WaitUntilClearToSurface()
     {
-        if (!HasServerAuthority)
-        {
-            SetLayerRecursively(gameObject, _originalLayer);
-
-            int ownerEnemyLayer = LayerMask.NameToLayer("Enemy");
-            if (ownerEnemyLayer != -1) Physics.IgnoreLayerCollision(GHOST_LAYER, ownerEnemyLayer, false);
-
-            Destroy(this);
-            yield break;
-        }
-
         bool isClear = false;
         float maxSafetyWait = 5.0f;
         float timer = 0f;
-        LayerMask enemyMask = 1 << LayerMask.NameToLayer("Enemy");
+        int enemyLayer = LayerMask.NameToLayer("Enemy");
+        LayerMask enemyMask = enemyLayer >= 0 ? (1 << enemyLayer) : 0;
 
         while (!isClear && timer < maxSafetyWait)
         {
-            Collider[] hits = Physics.OverlapSphere(transform.position, 0.8f, enemyMask);
+            Collider[] hits = enemyMask != 0
+                ? Physics.OverlapSphere(transform.position, 0.8f, enemyMask)
+                : new Collider[0];
 
             if (hits.Length == 0)
             {
@@ -200,10 +195,10 @@ public class MergulhoTintaLogic : MonoBehaviour
             }
             else
             {
-                foreach (var hit in hits)
+                foreach (Collider hit in hits)
                 {
                     Vector3 pushDir = (hit.transform.position - transform.position).normalized;
-                    pushDir.y = 0;
+                    pushDir.y = 0f;
 
                     NavMeshAgent agent = hit.GetComponent<NavMeshAgent>();
                     if (agent != null)
@@ -214,9 +209,7 @@ public class MergulhoTintaLogic : MonoBehaviour
                     {
                         Rigidbody rb = hit.GetComponent<Rigidbody>();
                         if (rb != null)
-                        {
                             rb.linearVelocity = pushDir * 2f;
-                        }
                     }
                 }
             }
@@ -225,38 +218,90 @@ public class MergulhoTintaLogic : MonoBehaviour
             yield return null;
         }
 
-        SetLayerRecursively(gameObject, _originalLayer);
+        FinalizeServerSurfaceExit(transform.position);
+    }
 
-        int enemyLayer = LayerMask.NameToLayer("Enemy");
-        if (enemyLayer != -1) Physics.IgnoreLayerCollision(GHOST_LAYER, enemyLayer, false);
+    private void FinalizeServerSurfaceExit(Vector3 surfacePosition)
+    {
+        RestoreLocalPresentation(surfacePosition);
+        RefreshEnemyTargets();
+
+        if (_abilityScript != null &&
+            _networkObject != null &&
+            _networkObject.IsSpawned &&
+            !IsLocalOwnerInstance)
+        {
+            _abilityScript.CompleteLocalMergulhoTintaOwnerProxy(surfacePosition);
+        }
 
         Destroy(this);
     }
 
+    public void CompleteOwnerProxySurfaceExit(Vector3 surfacePosition)
+    {
+        RestoreLocalPresentation(surfacePosition);
+        Destroy(this);
+    }
+
+    private void RestoreLocalPresentation(Vector3 surfacePosition)
+    {
+        transform.position = surfacePosition;
+        gameObject.tag = _originalTag;
+        SetLayerRecursively(gameObject, _originalLayer);
+
+        int enemyLayer = LayerMask.NameToLayer("Enemy");
+        if (enemyLayer != -1)
+            Physics.IgnoreLayerCollision(GHOST_LAYER, enemyLayer, false);
+
+        if (_shootingScript != null && IsLocalOwnerInstance) _shootingScript.enabled = true;
+        if (_abilityScript != null && IsLocalOwnerInstance) _abilityScript.enabled = true;
+
+        foreach (Renderer renderer in _renderers)
+            renderer.enabled = true;
+
+        if (_puddleInstance != null)
+            Destroy(_puddleInstance);
+    }
+
     void CausarDanoEmArea()
     {
+        NetworkGameplayResolver.TryResolveAttackerFromPlayer(gameObject, out ulong attackerClientId, out PlayerHealthSystem attackerHealth);
+
         Collider[] hits = Physics.OverlapSphere(transform.position, _radius);
-        foreach (var hit in hits)
+        foreach (Collider hit in hits)
         {
-            if (hit.gameObject == gameObject) continue;
+            if (hit.gameObject == gameObject)
+                continue;
+
             EnemyHealthSystem enemyHealth = hit.GetComponent<EnemyHealthSystem>();
             if (enemyHealth != null)
             {
-                enemyHealth.TakeDamage(_damage, 0f, false);
-                if (_playerHealth != null) _playerHealth.TriggerDamageDealt(_damage);
+                enemyHealth.ApplyAuthoritativeDamage(_damage, 0f, false, attackerClientId, attackerHealth);
             }
+        }
+    }
+
+    private void RefreshEnemyTargets()
+    {
+        EnemyController[] enemies = FindObjectsByType<EnemyController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        foreach (EnemyController enemy in enemies)
+        {
+            if (enemy != null)
+                enemy.RefreshTargetNow();
         }
     }
 
     void SetLayerRecursively(GameObject obj, int newLayer)
     {
         obj.layer = newLayer;
-        foreach (Transform child in obj.transform) SetLayerRecursively(child.gameObject, newLayer);
+        foreach (Transform child in obj.transform)
+            SetLayerRecursively(child.gameObject, newLayer);
     }
 
     void OnDestroy()
     {
         int enemyLayer = LayerMask.NameToLayer("Enemy");
-        if (enemyLayer != -1) Physics.IgnoreLayerCollision(GHOST_LAYER, enemyLayer, false);
+        if (enemyLayer != -1)
+            Physics.IgnoreLayerCollision(GHOST_LAYER, enemyLayer, false);
     }
 }
