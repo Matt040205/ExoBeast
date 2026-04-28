@@ -1,40 +1,34 @@
-using UnityEngine;
 using TMPro;
+using Unity.Netcode;
+using UnityEngine;
 using UnityEngine.UI;
-using System;
-using Unity.Netcode; // <--- Necessário para a HUD achar o boneco
 
-/// <summary>
-/// ── PlayerHUD ───────────────────────────────────────
-/// HUD local do jogador (Singleton, nao eh NetworkBehaviour).
-/// ─────────────────────────────────────────────────────
-/// </summary>
 public class PlayerHUD : MonoBehaviour
 {
-    [Header("Referências de Vida do Jogador")]
+    [Header("Referencias de Vida do Jogador")]
     public Image healthBarFill;
     public TMP_Text healthText;
     public Image healthIcon;
     public GameObject regenEffect;
 
-    [Header("Referências de Vida do Objetivo")]
+    [Header("Referencias de Vida do Objetivo")]
     public Image objectiveHealthBarFill;
     public TMP_Text objectiveHealthText;
-    [Tooltip("A barra de vida que aparece DENTRO do menu de construção")]
+    [Tooltip("A barra de vida que aparece dentro do menu de construcao")]
     public Image BuildModeObjectiveHealthBarFill;
     public TMP_Text BuildModeObjectiveHealthText;
 
-    [Header("Referências de Munição")]
+    [Header("Referencias de Municao")]
     public TMP_Text ammoText;
     public Image ammoIcon;
     public GameObject reloadEffect;
     public Slider reloadSlider;
 
-    [Header("Referências de Moeda")]
+    [Header("Referencias de Moeda")]
     public TMP_Text geoditesText;
     public TMP_Text darkEtherText;
 
-    [Header("Referências de Habilidades")]
+    [Header("Referencias de Habilidades")]
     public Image ability1_Icon;
     public Image ability2_Icon;
     public Image ultimate_Icon;
@@ -42,26 +36,28 @@ public class PlayerHUD : MonoBehaviour
     public Image ability2_CooldownFill;
     public Image ultimate_ChargeFill;
 
-    [Header("Configurações Visuais")]
+    [Header("Configuracoes Visuais")]
     public float healthLerpSpeed = 5f;
     public Color fullHealthColor = Color.green;
     public Color lowHealthColor = Color.red;
     public Color ammoNormalColor = Color.white;
     public Color ammoLowColor = Color.yellow;
-    public Color reloadColor = new Color(1, 0.5f, 0);
+    public Color reloadColor = new Color(1f, 0.5f, 0f);
 
     public static PlayerHUD Instance { get; private set; }
 
     private PlayerHealthSystem playerHealth;
     private PlayerShooting playerShooting;
+    private CommanderAbilityController abilityController;
+
     private float targetHealthPercent = 1f;
     private bool isRegenerating;
+    private bool isSubscribed;
 
-    private ObjectiveHealthSystem objectiveHealth;
     private float targetObjectiveHealthPercent = 1f;
-
-    private CommanderAbilityController abilityController;
-    private bool isSubscribed = false;
+    private float objectiveCurrentHealth;
+    private float objectiveMaxHealth = 1f;
+    private bool hasObjectiveHealthState;
 
     private void Awake()
     {
@@ -70,22 +66,25 @@ public class PlayerHUD : MonoBehaviour
             Destroy(this);
             return;
         }
+
         Instance = this;
     }
 
-    void Start()
+    private void Start()
     {
-        FindObjectiveAndShootingSystems();
+        ObjectiveHealthBus.OnObjectiveHealthChanged += OnObjectiveHealthChanged;
+
+        if (ObjectiveHealthBus.TryGetLastKnown(out float currentHealth, out float maxHealth))
+            OnObjectiveHealthChanged(currentHealth, maxHealth);
     }
 
     public void RegistrarJogador(PlayerHealthSystem health)
     {
-        if (health == null || !health.IsOwner) return;
+        if (health == null || !health.IsOwner)
+            return;
 
         if (playerHealth != null)
-        {
             playerHealth.currentHealth.OnValueChanged -= OnPlayerHealthChanged;
-        }
 
         playerHealth = health;
         playerShooting = health.GetComponent<PlayerShooting>();
@@ -96,9 +95,7 @@ public class PlayerHUD : MonoBehaviour
             playerHealth.currentHealth.OnValueChanged += OnPlayerHealthChanged;
 
             if (abilityController != null && abilityController.characterData != null)
-            {
                 AtualizarIconesHabilidades(abilityController.characterData);
-            }
 
             OnHealthChanged();
         }
@@ -106,67 +103,61 @@ public class PlayerHUD : MonoBehaviour
         isSubscribed = true;
     }
 
-    void Update()
+    private void Update()
     {
-        // =================================================================
-        // O RADAR: Se o jogador nascer antes da HUD, a HUD acha ele sozinha!
-        // =================================================================
         if (!isSubscribed && NetworkManager.Singleton != null && NetworkManager.Singleton.IsConnectedClient)
         {
-            var localPlayer = NetworkManager.Singleton.SpawnManager.GetLocalPlayerObject();
+            NetworkObject localPlayer = NetworkManager.Singleton.SpawnManager.GetLocalPlayerObject();
             if (localPlayer != null)
             {
-                var health = localPlayer.GetComponent<PlayerHealthSystem>();
-                if (health != null) RegistrarJogador(health);
+                PlayerHealthSystem health = localPlayer.GetComponent<PlayerHealthSystem>();
+                if (health != null)
+                    RegistrarJogador(health);
             }
         }
 
-        // Em multiplayer, o ObjectiveHealthSystem pode não ter spawnado quando Start() rodou.
-        if (objectiveHealth == null)
-            FindObjectiveAndShootingSystems();
+        if (playerHealth != null)
+            UpdateHealthDisplay();
 
-        if (playerHealth != null) UpdateHealthDisplay();
-        if (playerShooting != null) UpdateAmmoDisplay();
-        if (objectiveHealth != null) UpdateObjectiveHealthDisplay();
-        if (abilityController != null) AtualizarUICooldowns();
+        if (playerShooting != null)
+            UpdateAmmoDisplay();
+
+        if (hasObjectiveHealthState)
+            UpdateObjectiveHealthDisplay();
+
+        if (abilityController != null)
+            AtualizarUICooldowns();
+
         UpdateCurrencyDisplay();
     }
 
-    private void FindObjectiveAndShootingSystems()
+    private void UpdateCurrencyDisplay()
     {
-        if (ObjectiveHealthSystem.Instance != null)
-        {
-            if (objectiveHealth != null)
-                objectiveHealth.OnHealthChanged -= OnObjectiveHealthChanged;
-            objectiveHealth = ObjectiveHealthSystem.Instance;
-            objectiveHealth.OnHealthChanged += OnObjectiveHealthChanged;
-            OnObjectiveHealthChanged();
-        }
+        if (CurrencyManager.Instance == null)
+            return;
+
+        if (geoditesText != null)
+            geoditesText.text = $"{CurrencyManager.Instance.CurrentGeodites}";
+
+        if (darkEtherText != null)
+            darkEtherText.text = $"{CurrencyManager.Instance.CurrentDarkEther}";
     }
 
-    void UpdateCurrencyDisplay()
-    {
-        if (CurrencyManager.Instance != null)
-        {
-            if (geoditesText != null) geoditesText.text = $"{CurrencyManager.Instance.CurrentGeodites}";
-            if (darkEtherText != null) darkEtherText.text = $"{CurrencyManager.Instance.CurrentDarkEther}";
-        }
-    }
-
-    private void OnPlayerHealthChanged(float oldVal, float newVal)
+    private void OnPlayerHealthChanged(float oldValue, float newValue)
     {
         OnHealthChanged();
     }
 
-    void OnHealthChanged()
+    private void OnHealthChanged()
     {
-        if (playerHealth == null || playerHealth.characterData == null) return;
+        if (playerHealth == null || playerHealth.characterData == null)
+            return;
 
         targetHealthPercent = playerHealth.currentHealth.Value / playerHealth.characterData.maxHealth;
         isRegenerating = playerHealth.isRegenerating;
     }
 
-    void UpdateHealthDisplay()
+    private void UpdateHealthDisplay()
     {
         if (healthBarFill != null)
             healthBarFill.fillAmount = Mathf.Lerp(healthBarFill.fillAmount, targetHealthPercent, healthLerpSpeed * Time.deltaTime);
@@ -174,47 +165,45 @@ public class PlayerHUD : MonoBehaviour
         if (healthText != null && playerHealth.characterData != null)
             healthText.text = $"{Mathf.CeilToInt(playerHealth.currentHealth.Value)}/{playerHealth.characterData.maxHealth}";
 
-        if (regenEffect != null) regenEffect.SetActive(isRegenerating);
+        if (regenEffect != null)
+            regenEffect.SetActive(isRegenerating);
     }
 
-    void OnObjectiveHealthChanged()
+    private void OnObjectiveHealthChanged(float currentHealth, float maxHealth)
     {
-        if (objectiveHealth == null) return;
-        targetObjectiveHealthPercent = objectiveHealth.currentHealth.Value / objectiveHealth.maxHealth;
+        objectiveCurrentHealth = currentHealth;
+        objectiveMaxHealth = Mathf.Max(maxHealth, 1f);
+        targetObjectiveHealthPercent = objectiveCurrentHealth / objectiveMaxHealth;
+        hasObjectiveHealthState = true;
     }
 
-    void UpdateObjectiveHealthDisplay()
+    private void UpdateObjectiveHealthDisplay()
     {
-        if (objectiveHealth == null) return;
-
-        // Leitura direta toda frame — mais resiliente que depender exclusivamente do callback
-        targetObjectiveHealthPercent = objectiveHealth.currentHealth.Value / objectiveHealth.maxHealth;
-
         if (objectiveHealthBarFill != null)
         {
-            objectiveHealthBarFill.fillAmount = Mathf.Lerp(objectiveHealthBarFill.fillAmount, targetObjectiveHealthPercent, healthLerpSpeed * Time.deltaTime);
+            objectiveHealthBarFill.fillAmount = Mathf.Lerp(
+                objectiveHealthBarFill.fillAmount,
+                targetObjectiveHealthPercent,
+                healthLerpSpeed * Time.deltaTime);
         }
+
         if (objectiveHealthText != null)
-        {
-            objectiveHealthText.text = $"{Mathf.CeilToInt(objectiveHealth.currentHealth.Value)}/{objectiveHealth.maxHealth}";
-        }
+            objectiveHealthText.text = $"{Mathf.CeilToInt(objectiveCurrentHealth)}/{Mathf.CeilToInt(objectiveMaxHealth)}";
 
         if (BuildModeObjectiveHealthBarFill != null)
         {
-            float novoValor = Mathf.Lerp(BuildModeObjectiveHealthBarFill.fillAmount, targetObjectiveHealthPercent, healthLerpSpeed * Time.deltaTime);
-            BuildModeObjectiveHealthBarFill.fillAmount = novoValor;
+            BuildModeObjectiveHealthBarFill.fillAmount = Mathf.Lerp(
+                BuildModeObjectiveHealthBarFill.fillAmount,
+                targetObjectiveHealthPercent,
+                healthLerpSpeed * Time.deltaTime);
         }
 
         if (BuildModeObjectiveHealthText != null)
-        {
-            BuildModeObjectiveHealthText.text = $"{Mathf.CeilToInt(objectiveHealth.currentHealth.Value)}/{objectiveHealth.maxHealth}";
-        }
+            BuildModeObjectiveHealthText.text = $"{Mathf.CeilToInt(objectiveCurrentHealth)}/{Mathf.CeilToInt(objectiveMaxHealth)}";
     }
 
-    void UpdateAmmoDisplay()
+    private void UpdateAmmoDisplay()
     {
-        if (playerShooting == null) return;
-
         if (ammoText != null)
         {
             ammoText.text = $"{playerShooting.currentAmmo} / {playerShooting.maxAmmo}";
@@ -224,35 +213,35 @@ public class PlayerHUD : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("<b>[PlayerHUD AVISO]</b> Você esqueceu de arrastar o 'Ammo Text' no Inspector da cena!");
+            Debug.LogWarning("<b>[PlayerHUD AVISO]</b> O campo 'Ammo Text' nao foi preenchido.");
         }
 
-        if (reloadEffect != null) reloadEffect.SetActive(playerShooting.isReloading);
+        if (reloadEffect != null)
+            reloadEffect.SetActive(playerShooting.isReloading);
 
-        if (reloadSlider != null)
-        {
-            reloadSlider.gameObject.SetActive(playerShooting.isReloading);
+        if (reloadSlider == null)
+            return;
 
-            if (playerShooting.isReloading && playerShooting.characterData != null)
-            {
-                float reloadProgress = 1f - (playerShooting.GetRemainingReloadTime() / playerShooting.characterData.reloadSpeed);
-                reloadSlider.value = reloadProgress;
+        reloadSlider.gameObject.SetActive(playerShooting.isReloading);
 
-                if (reloadSlider.fillRect != null)
-                {
-                    Image sliderFillImage = reloadSlider.fillRect.GetComponent<Image>();
-                    if (sliderFillImage != null)
-                    {
-                        sliderFillImage.color = Color.Lerp(reloadColor, Color.green, reloadProgress);
-                    }
-                }
-            }
-        }
+        if (!playerShooting.isReloading || playerShooting.characterData == null)
+            return;
+
+        float reloadProgress = 1f - (playerShooting.GetRemainingReloadTime() / playerShooting.characterData.reloadSpeed);
+        reloadSlider.value = reloadProgress;
+
+        if (reloadSlider.fillRect == null)
+            return;
+
+        Image sliderFillImage = reloadSlider.fillRect.GetComponent<Image>();
+        if (sliderFillImage != null)
+            sliderFillImage.color = Color.Lerp(reloadColor, Color.green, reloadProgress);
     }
 
-    void AtualizarIconesHabilidades(CharacterBase data)
+    private void AtualizarIconesHabilidades(CharacterBase data)
     {
-        if (data == null) return;
+        if (data == null)
+            return;
 
         if (ability1_Icon != null)
         {
@@ -261,7 +250,10 @@ public class PlayerHUD : MonoBehaviour
                 ability1_Icon.sprite = data.ability1.icon;
                 ability1_Icon.enabled = true;
             }
-            else ability1_Icon.enabled = false;
+            else
+            {
+                ability1_Icon.enabled = false;
+            }
         }
 
         if (ability2_Icon != null)
@@ -271,7 +263,10 @@ public class PlayerHUD : MonoBehaviour
                 ability2_Icon.sprite = data.ability2.icon;
                 ability2_Icon.enabled = true;
             }
-            else ability2_Icon.enabled = false;
+            else
+            {
+                ability2_Icon.enabled = false;
+            }
         }
 
         if (ultimate_Icon != null)
@@ -281,27 +276,35 @@ public class PlayerHUD : MonoBehaviour
                 ultimate_Icon.sprite = data.ultimate.icon;
                 ultimate_Icon.enabled = true;
             }
-            else ultimate_Icon.enabled = false;
+            else
+            {
+                ultimate_Icon.enabled = false;
+            }
         }
     }
 
-    void AtualizarUICooldowns()
+    private void AtualizarUICooldowns()
     {
-        if (abilityController == null) return;
+        if (abilityController.characterData != null)
+        {
+            if (ability1_CooldownFill != null)
+                ability1_CooldownFill.fillAmount =
+                    abilityController.GetRemainingCooldownPercent(abilityController.characterData.ability1);
 
-        if (ability1_CooldownFill != null && abilityController.characterData != null)
-            ability1_CooldownFill.fillAmount = abilityController.GetRemainingCooldownPercent(abilityController.characterData.ability1);
-
-        if (ability2_CooldownFill != null && abilityController.characterData != null)
-            ability2_CooldownFill.fillAmount = abilityController.GetRemainingCooldownPercent(abilityController.characterData.ability2);
+            if (ability2_CooldownFill != null)
+                ability2_CooldownFill.fillAmount =
+                    abilityController.GetRemainingCooldownPercent(abilityController.characterData.ability2);
+        }
 
         if (ultimate_ChargeFill != null)
             ultimate_ChargeFill.fillAmount = 1f - abilityController.CurrentUltimateCharge;
     }
 
-    void OnDestroy()
+    private void OnDestroy()
     {
-        if (playerHealth != null) playerHealth.currentHealth.OnValueChanged -= OnPlayerHealthChanged;
-        if (objectiveHealth != null) objectiveHealth.OnHealthChanged -= OnObjectiveHealthChanged;
+        if (playerHealth != null)
+            playerHealth.currentHealth.OnValueChanged -= OnPlayerHealthChanged;
+
+        ObjectiveHealthBus.OnObjectiveHealthChanged -= OnObjectiveHealthChanged;
     }
 }

@@ -86,7 +86,13 @@ public class EnemyHealthSystem : MonoBehaviour
 
     public bool TakeDamage(float damage, float armorPenetration = 0f, bool isCritical = false, ulong attackerId = 0)
     {
-        return TakeDamageDetailed(damage, armorPenetration, isCritical, attackerId, out _);
+        DamageContext damageContext = new DamageContext(attackerId, isCritical, DamageFeedbackMode.InstigatorOnly);
+        return TakeDamageDetailed(damage, armorPenetration, damageContext, out _);
+    }
+
+    public bool TakeDamage(float damage, DamageContext damageContext, float armorPenetration = 0f)
+    {
+        return TakeDamageDetailed(damage, armorPenetration, damageContext, out _);
     }
 
     public bool ApplyAuthoritativeDamage(
@@ -96,24 +102,27 @@ public class EnemyHealthSystem : MonoBehaviour
         ulong attackerId,
         PlayerHealthSystem attackerHealth = null)
     {
-        return ApplyAuthoritativeDamageDetailed(
-            damage,
-            armorPenetration,
-            isCritical,
-            attackerId,
-            attackerHealth,
-            out _);
+        DamageContext damageContext = new DamageContext(attackerId, isCritical, DamageFeedbackMode.InstigatorOnly);
+        return ApplyAuthoritativeDamage(damage, armorPenetration, damageContext, attackerHealth);
+    }
+
+    public bool ApplyAuthoritativeDamage(
+        float damage,
+        float armorPenetration,
+        DamageContext damageContext,
+        PlayerHealthSystem attackerHealth = null)
+    {
+        return ApplyAuthoritativeDamageDetailed(damage, armorPenetration, damageContext, attackerHealth, out _);
     }
 
     public bool ApplyAuthoritativeDamageDetailed(
         float damage,
         float armorPenetration,
-        bool isCritical,
-        ulong attackerId,
+        DamageContext damageContext,
         PlayerHealthSystem attackerHealth,
         out float finalDamageApplied)
     {
-        bool result = TakeDamageDetailed(damage, armorPenetration, isCritical, attackerId, out finalDamageApplied);
+        bool result = TakeDamageDetailed(damage, armorPenetration, damageContext, out finalDamageApplied);
 
         if (finalDamageApplied > 0f && attackerHealth != null)
             attackerHealth.TriggerDamageDealt(finalDamageApplied);
@@ -122,6 +131,12 @@ public class EnemyHealthSystem : MonoBehaviour
     }
 
     public bool TakeDamageDetailed(float damage, float armorPenetration, bool isCritical, ulong attackerId, out float finalDamageApplied)
+    {
+        DamageContext damageContext = new DamageContext(attackerId, isCritical, DamageFeedbackMode.InstigatorOnly);
+        return TakeDamageDetailed(damage, armorPenetration, damageContext, out finalDamageApplied);
+    }
+
+    public bool TakeDamageDetailed(float damage, float armorPenetration, DamageContext damageContext, out float finalDamageApplied)
     {
         finalDamageApplied = 0f;
 
@@ -141,7 +156,7 @@ public class EnemyHealthSystem : MonoBehaviour
         {
             networkedEnemy.NetworkHealth.Value = currentHealth;
             if (finalDamage > 0)
-                networkedEnemy.TriggerHitVisual(finalDamage, isCritical, attackerId);
+                networkedEnemy.TriggerHitVisual(finalDamage, damageContext);
         }
 
         if (currentHealth <= 0)

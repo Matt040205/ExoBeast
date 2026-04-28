@@ -1,24 +1,21 @@
-using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
+using UnityEngine;
 
-/// <summary>
-/// Teleportador: Transporta jogadores entre dois portais.
-/// O logicPrefab deve ter NetworkObject para que ClientRpc funcione no multiplayer.
-/// No modo offline/host, teleporta diretamente ao detectar o trigger.
-/// </summary>
 [RequireComponent(typeof(BoxCollider))]
 public class Teleportador : TrapLogicBase
 {
-    private static List<Teleportador> portais = new List<Teleportador>();
-    private const int MAX_PORTAIS = 2;
+    private static readonly List<Teleportador> portais = new List<Teleportador>();
+    private const int MaxPortais = 2;
+
+    private readonly HashSet<ulong> playersOnCooldown = new HashSet<ulong>();
 
     private Teleportador portalLigado;
-    private bool podeTeleportar = true;
     private float cooldownTeleporte = 1f;
     private float entradaOffset = 1.5f;
-    private bool isServerMode = false;
+    private bool isServerMode;
+    private bool isSetup;
 
     public override void OnNetworkSpawn()
     {
@@ -27,129 +24,110 @@ public class Teleportador : TrapLogicBase
         SetupPortal();
     }
 
-    void Start()
+    private void Start()
     {
-        // Funciona offline E como host (IsServer = true em ambos)
         isServerMode = NetworkManager.Singleton == null || NetworkManager.Singleton.IsServer;
         SetupPortal();
     }
 
-    private bool isSetup = false;
+    private new void OnDestroy()
+    {
+        portais.Remove(this);
+        if (portalLigado != null)
+            portalLigado.portalLigado = null;
+
+        LigarPortais();
+    }
+
+    public static int GetPortalCount() => portais.Count;
 
     private void SetupPortal()
     {
-        if (isSetup) return;
-        isSetup = true;
+        if (isSetup)
+            return;
 
+        isSetup = true;
         GetComponent<Collider>().isTrigger = true;
 
-        portais.RemoveAll(p => p == null);
+        portais.RemoveAll(portal => portal == null);
 
-        if (portais.Count >= MAX_PORTAIS)
+        if (portais.Count >= MaxPortais)
         {
             if (isServerMode)
             {
                 Teleportador antigo = portais[0];
                 portais.RemoveAt(0);
-                if (antigo != null && antigo.TryGetComponent<NetworkObject>(out var no) && no.IsSpawned)
-                    no.Despawn();
+
+                if (antigo != null && antigo.TryGetComponent(out NetworkObject networkObject) && networkObject.IsSpawned)
+                    networkObject.Despawn();
                 else if (antigo != null)
                     Destroy(antigo.gameObject);
             }
-            else return;
+            else
+            {
+                return;
+            }
         }
 
         portais.Add(this);
         LigarPortais();
     }
 
-    void OnDestroy()
+    private void OnTriggerEnter(Collider other)
     {
-        portais.Remove(this);
-        if (portalLigado != null) portalLigado.portalLigado = null;
-        LigarPortais();
+        if (!isServerMode || portalLigado == null || !other.CompareTag("Player"))
+            return;
+
+        if (!TryResolvePlayer(other, out NetworkObject playerObject, out GameObject localPlayerObject, out ulong playerKey))
+            return;
+
+        if (playersOnCooldown.Contains(playerKey) || portalLigado.playersOnCooldown.Contains(playerKey))
+            return;
+
+        Vector3 destination = portalLigado.transform.position + (portalLigado.transform.forward * entradaOffset);
+        Quaternion destinationRotation = Quaternion.LookRotation(portalLigado.transform.forward, Vector3.up);
+
+        if (playerObject != null && playerObject.IsSpawned)
+            PlayerTeleportService.TeleportServerValidated(playerObject, destination, destinationRotation);
+        else
+            PlayerTeleportService.TeleportLocal(localPlayerObject, destination, destinationRotation);
+
+        StartCoroutine(StartCooldown(playerKey));
+        StartCoroutine(portalLigado.StartCooldown(playerKey));
     }
 
-    public static int GetPortalCount() => portais.Count;
+    private IEnumerator StartCooldown(ulong playerKey)
+    {
+        playersOnCooldown.Add(playerKey);
+        yield return new WaitForSeconds(cooldownTeleporte);
+        playersOnCooldown.Remove(playerKey);
+    }
+
+    private bool TryResolvePlayer(Collider other, out NetworkObject playerObject, out GameObject localPlayerObject, out ulong playerKey)
+    {
+        playerObject = other.GetComponent<NetworkObject>();
+        localPlayerObject = other.gameObject;
+
+        if (playerObject != null)
+        {
+            playerKey = playerObject.NetworkObjectId;
+            return true;
+        }
+
+        playerKey = 0;
+        return localPlayerObject != null;
+    }
 
     private static void LigarPortais()
     {
-        if (portais.Count == 1) portais[0].portalLigado = null;
+        if (portais.Count == 1)
+        {
+            portais[0].portalLigado = null;
+        }
         else if (portais.Count >= 2)
         {
             portais[0].portalLigado = portais[1];
             portais[1].portalLigado = portais[0];
         }
-    }
-
-    private void OnTriggerEnter(Collider other)
-    {
-        if (!isServerMode) return;
-        if (!podeTeleportar || portalLigado == null) return;
-        if (!other.CompareTag("Player")) return;
-
-        Vector3 destino = portalLigado.transform.position + (portalLigado.transform.forward * entradaOffset);
-
-        // Tenta usar ClientRpc se este objeto estiver spawnado na rede
-        NetworkObject meuNetObj = GetComponent<NetworkObject>();
-        if (meuNetObj != null && meuNetObj.IsSpawned)
-        {
-            NetworkObject jogadorNet = other.GetComponent<NetworkObject>();
-            if (jogadorNet != null)
-                TeleportarJogadorClientRpc(jogadorNet.NetworkObjectId, destino);
-        }
-        else
-        {
-            // Modo offline: teleporta localmente
-            TeleportarLocal(other.gameObject, destino);
-        }
-
-        StartCoroutine(IniciarCooldown());
-        StartCoroutine(portalLigado.IniciarCooldown());
-    }
-
-    [ClientRpc]
-    private void TeleportarJogadorClientRpc(ulong jogadorNetId, Vector3 destino)
-    {
-        if (NetworkManager.Singleton != null &&
-            NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(jogadorNetId, out var netObj))
-        {
-            TeleportarLocal(netObj.gameObject, destino);
-
-            // Para o jogador local: garantir que build mode não ficou preso e cursor está correto
-            if (netObj.IsOwner)
-            {
-                if (BuildManager.Instance != null)
-                    BuildManager.Instance.ForceBuildMode(false);
-                else
-                    BuildManager.isBuildingMode = false;
-
-                Cursor.lockState = CursorLockMode.Locked;
-                Cursor.visible = false;
-            }
-        }
-    }
-
-    private void TeleportarLocal(GameObject jogador, Vector3 destino)
-    {
-        CharacterController cc = jogador.GetComponent<CharacterController>();
-        if (cc != null)
-        {
-            bool ccEraHabilitado = cc.enabled;
-            cc.enabled = false;
-            jogador.transform.position = destino;
-            if (ccEraHabilitado) cc.enabled = true;
-        }
-        else
-        {
-            jogador.transform.position = destino;
-        }
-    }
-
-    private IEnumerator IniciarCooldown()
-    {
-        podeTeleportar = false;
-        yield return new WaitForSeconds(cooldownTeleporte);
-        podeTeleportar = true;
     }
 }

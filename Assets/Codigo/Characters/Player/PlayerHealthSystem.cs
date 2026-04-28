@@ -1,49 +1,52 @@
-using UnityEngine;
 using System;
 using System.Collections;
 using Unity.Netcode;
+using UnityEngine;
 using ExoBeasts.Multiplayer.Sync;
 
-/// <summary>
-/// ── PlayerHealthSystem ─────────────────────────────────
-/// Sistema de vida do jogador com autoridade no servidor.
-///
-///  ▸ NetworkVariables: currentHealth, damageMultiplier, speedMultiplier, damageResistance
-///  ▸ Server: aplica dano, cura, buffs, regeneracao e respawn
-///  ▸ Client: recebe RespawnClientRpc para teleporte e efeito visual
-///  ▸ Suporta counter (dano refletido) e buffs temporarios
-/// ─────────────────────────────────────────────────────
-/// </summary>
 public class PlayerHealthSystem : NetworkBehaviour
 {
     public CharacterBase characterData;
-    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    
+    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(
+        0f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
     [Header("Networked Buffs")]
-    public NetworkVariable<float> damageMultiplier = new NetworkVariable<float>(1f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    public NetworkVariable<float> speedMultiplier = new NetworkVariable<float>(1f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    public NetworkVariable<float> damageResistance = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> damageMultiplier = new NetworkVariable<float>(
+        1f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    public NetworkVariable<float> speedMultiplier = new NetworkVariable<float>(
+        1f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    public NetworkVariable<float> damageResistance = new NetworkVariable<float>(
+        0f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
     public bool isRegenerating;
-    public bool isBuffed = false;
+    public bool isBuffed;
 
     [Header("Status de Defesa")]
-    public bool isCountering = false;
+    public bool isCountering;
 
     private float timeSinceLastDamage;
     private Transform respawnPoint;
     private Coroutine buffCoroutine;
     private Coroutine spawnMaterializationCoroutine;
 
-    [Header("Configuração de Respawn")]
+    [Header("Configuracao de Respawn")]
     public string respawnPointNameOrTag = "RespawnPoint";
 
-    [Header("Materialização (Spawn)")]
+    [Header("Materializacao (Spawn)")]
     [SerializeField] private float tempoDeSpawn = 2f;
     [SerializeField] private Material materialHolograma;
     [SerializeField] private Material materialToon;
     [SerializeField] private Material materialOutline;
-
 
     public event Action OnHealthChanged;
     public event Action<float> OnDamageDealt;
@@ -58,52 +61,97 @@ public class PlayerHealthSystem : NetworkBehaviour
             if (characterData != null)
                 currentHealth.Value = characterData.maxHealth;
             else
-                Debug.LogWarning("[PlayerHealthSystem] characterData não atribuído!");
+                Debug.LogWarning("[PlayerHealthSystem] characterData nao atribuido.");
         }
 
-        currentHealth.OnValueChanged += (oldValue, newValue) => NotifyHealthChanged();
-        
-        // Inicializar UI local
+        currentHealth.OnValueChanged += OnCurrentHealthValueChanged;
         NotifyHealthChanged();
-        
         FindRespawnPoint();
 
-        // Registrar no HUD se for o dono
         if (IsOwner)
-        {
             StartCoroutine(WaitAndRegisterHUD());
-        }
 
-        // Inicia o fluxo de materialização ao spawnar pela primeira vez
         RestartSpawnMaterializationFlow();
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        currentHealth.OnValueChanged -= OnCurrentHealthValueChanged;
+        base.OnNetworkDespawn();
     }
 
     private IEnumerator WaitAndRegisterHUD()
     {
-        Debug.Log("[PlayerHealthSystem] Aguardando PlayerHUD ligar na cena...");
         yield return new WaitUntil(() => PlayerHUD.Instance != null);
-        Debug.Log("[PlayerHealthSystem] PlayerHUD encontrado! Registrando referências de Vida e Munição...");
         PlayerHUD.Instance.RegistrarJogador(this);
     }
 
-    void Update()
+    private void Update()
     {
         TryResolveCharacterData();
-        if (!IsServer) return;
+        if (!IsServer)
+            return;
+
         HandleRegeneration();
     }
 
     public void ApplyBuffs(float newDamageMult, float newSpeedMult, float duration)
     {
-        if (!IsServer) return;
+        if (!IsServer)
+            return;
 
-        if (buffCoroutine != null) StopCoroutine(buffCoroutine);
+        if (buffCoroutine != null)
+            StopCoroutine(buffCoroutine);
 
         damageMultiplier.Value = newDamageMult;
         speedMultiplier.Value = newSpeedMult;
         isBuffed = true;
-
         buffCoroutine = StartCoroutine(RemoveBuffsAfterTime(duration));
+    }
+
+    public void TriggerDamageDealt(float damageAmount)
+    {
+        OnDamageDealt?.Invoke(damageAmount);
+    }
+
+    public void TakeDamage(float damage, Transform attacker = null, bool isMelee = false, ulong attackerClientId = ulong.MaxValue)
+    {
+        if (!IsServer)
+            return;
+
+        DamageRequest request = new DamageRequest(damage, attacker, isMelee, attackerClientId);
+        DamageResponse response = DamageResponse.PassThrough(damage);
+        ResolveDamageInterceptors(ref request, ref response);
+
+        if (response.WasBlocked)
+            return;
+
+        float finalDamage = response.ModifiedDamage * (1f - damageResistance.Value);
+
+        AllyShield shield = GetComponent<AllyShield>();
+        if (shield != null && shield.IsActive)
+            finalDamage = shield.AbsorbDamage(finalDamage);
+
+        DragonAuraBuff auraBuff = GetComponent<DragonAuraBuff>();
+        if (auraBuff != null && auraBuff.DamageReduction > 0f)
+            finalDamage *= (1f - auraBuff.DamageReduction);
+
+        finalDamage = Mathf.Max(0f, finalDamage);
+        currentHealth.Value -= finalDamage;
+        timeSinceLastDamage = 0f;
+        isRegenerating = false;
+
+        if (currentHealth.Value <= 0f)
+            Die();
+    }
+
+    public void Heal(float amount)
+    {
+        if (!IsServer)
+            return;
+
+        if (characterData != null)
+            currentHealth.Value = Mathf.Min(currentHealth.Value + amount, characterData.maxHealth);
     }
 
     private IEnumerator RemoveBuffsAfterTime(float duration)
@@ -116,28 +164,24 @@ public class PlayerHealthSystem : NetworkBehaviour
             speedMultiplier.Value = 1f;
             isBuffed = false;
         }
+
         buffCoroutine = null;
     }
 
-    public void TriggerDamageDealt(float damageAmount)
-    {
-        OnDamageDealt?.Invoke(damageAmount);
-    }
-
-    void FindRespawnPoint()
+    private void FindRespawnPoint()
     {
         GameObject respawnObject = GameObject.FindWithTag(respawnPointNameOrTag);
-        if (respawnObject == null) respawnObject = GameObject.Find(respawnPointNameOrTag);
+        if (respawnObject == null)
+            respawnObject = GameObject.Find(respawnPointNameOrTag);
 
         if (respawnObject != null)
-        {
             respawnPoint = respawnObject.transform;
-        }
     }
 
-    void HandleRegeneration()
+    private void HandleRegeneration()
     {
-        if (characterData == null) return;
+        if (characterData == null)
+            return;
 
         if (currentHealth.Value >= characterData.maxHealth)
         {
@@ -146,103 +190,29 @@ public class PlayerHealthSystem : NetworkBehaviour
         }
 
         timeSinceLastDamage += Time.deltaTime;
-
-        if (timeSinceLastDamage >= 3f)
-        {
-            isRegenerating = true;
-            float previousHealth = currentHealth.Value;
-            
-            currentHealth.Value += characterData.maxHealth * 0.01f * Time.deltaTime;
-            currentHealth.Value = Mathf.Min(currentHealth.Value, characterData.maxHealth);
-
-            // VFX de cura passiva é acionado automaticamente pelo HealVFXReactor
-            // via currentHealth.OnValueChanged, que propaga para todos os clientes.
-        }
-    }
-
-    public void TakeDamage(float damage, Transform attacker = null)
-    {
-        if (!IsServer) return;
-
-        if (isCountering)
-        {
-            if (attacker != null)
-            {
-                EnemyHealthSystem enemyHealth = attacker.GetComponent<EnemyHealthSystem>();
-                if (enemyHealth != null)
-                {
-                    enemyHealth.TakeDamage(damage);
-                }
-
-                EnemyController enemyController = attacker.GetComponent<EnemyController>();
-                if (enemyController != null)
-                {
-                    enemyController.ApplySlip();
-                }
-            }
+        if (timeSinceLastDamage < 3f)
             return;
-        }
 
-        float finalDamage = damage * (1f - damageResistance.Value);
-
-        AllyShield shield = GetComponent<AllyShield>();
-        if (shield != null && shield.IsActive)
-        {
-            finalDamage = shield.AbsorbDamage(finalDamage);
-        }
-
-        DragonAuraBuff auraBuff = GetComponent<DragonAuraBuff>();
-        if (auraBuff != null && auraBuff.DamageReduction > 0)
-        {
-            finalDamage *= (1f - auraBuff.DamageReduction);
-        }
-
-        if (finalDamage < 0) finalDamage = 0;
-
-        currentHealth.Value -= finalDamage;
-        // Zera o tempo para não curar o efeito visual de uma vez e interrompe regen normal
-        timeSinceLastDamage = 0f;
-        isRegenerating = false;
-
-        // Visual de hit ClientRpc aqui se necessário
-        // TakeDamageVisualClientRpc();
-
-        if (currentHealth.Value <= 0) Die();
+        isRegenerating = true;
+        currentHealth.Value += characterData.maxHealth * 0.01f * Time.deltaTime;
+        currentHealth.Value = Mathf.Min(currentHealth.Value, characterData.maxHealth);
     }
 
-    public void Heal(float amount)
+    private void Die()
     {
-        if (!IsServer) return;
-        if (characterData != null)
-        {
-            float previousHealth = currentHealth.Value;
-            currentHealth.Value = Mathf.Min(currentHealth.Value + amount, characterData.maxHealth);
+        if (!IsServer)
+            return;
 
-            // VFX de cura é acionado automaticamente pelo HealVFXReactor
-            // via currentHealth.OnValueChanged, que propaga para todos os clientes.
-        }
-    }
+        if (respawnPoint == null)
+            FindRespawnPoint();
 
+        Vector3 spawnPos = respawnPoint != null ? respawnPoint.position : Vector3.zero;
 
-    void Die()
-    {
-        if (!IsServer) return;
-
-        if (respawnPoint == null) FindRespawnPoint();
-
-        Vector3 spawnPos = Vector3.zero;
-        if (respawnPoint != null)
-        {
-            spawnPos = respawnPoint.position;
-        }
-
-        // Resetar status no servidor
-        currentHealth.Value = (characterData != null) ? characterData.maxHealth : 100f;
+        currentHealth.Value = characterData != null ? characterData.maxHealth : 100f;
         damageMultiplier.Value = 1f;
         speedMultiplier.Value = 1f;
         isCountering = false;
 
-        // Chamar respawn em todos os clientes, especialmente no dono para teleporte
         RespawnClientRpc(spawnPos);
     }
 
@@ -250,10 +220,7 @@ public class PlayerHealthSystem : NetworkBehaviour
     private void RespawnClientRpc(Vector3 spawnPosition)
     {
         if (IsOwner)
-        {
-            transform.position = spawnPosition;
-            Physics.SyncTransforms(); // Sincroniza a física imediatamente para o teleporte
-        }
+            PlayerTeleportService.TeleportLocal(gameObject, spawnPosition, transform.rotation);
 
         RestartSpawnMaterializationFlow();
     }
@@ -294,7 +261,6 @@ public class PlayerHealthSystem : NetworkBehaviour
 
     private IEnumerator SpawnMaterializationFlow()
     {
-        // Passo A: Bloqueio
         CharacterController controller = null;
         PlayerMovement movementScript = null;
         PlayerShooting shootingScript = null;
@@ -324,81 +290,67 @@ public class PlayerHealthSystem : NetworkBehaviour
 
         try
         {
-        Renderer[] allRenderers = GetComponentsInChildren<Renderer>(true);
-        System.Collections.Generic.List<Renderer> targetRenderers = new System.Collections.Generic.List<Renderer>();
-        
-        // Dicionário para guardar as texturas originais
-        System.Collections.Generic.Dictionary<Renderer, Texture> texturasOriginais = new System.Collections.Generic.Dictionary<Renderer, Texture>();
+            Renderer[] allRenderers = GetComponentsInChildren<Renderer>(true);
+            System.Collections.Generic.List<Renderer> targetRenderers = new System.Collections.Generic.List<Renderer>();
+            System.Collections.Generic.Dictionary<Renderer, Texture> originalTextures = new System.Collections.Generic.Dictionary<Renderer, Texture>();
 
-        foreach (Renderer r in allRenderers)
-        {
-            if (r is MeshRenderer || r is SkinnedMeshRenderer)
+            foreach (Renderer renderer in allRenderers)
             {
-                targetRenderers.Add(r);
+                if (!(renderer is MeshRenderer) && !(renderer is SkinnedMeshRenderer))
+                    continue;
 
-                // Tenta extrair a textura original antes de trocar pelo holograma
-                if (r.sharedMaterial != null)
-                {
-                    if (r.sharedMaterial.HasProperty("_BaseMap"))
-                        texturasOriginais[r] = r.sharedMaterial.GetTexture("_BaseMap");
-                    else if (r.sharedMaterial.HasProperty("_MainTex"))
-                        texturasOriginais[r] = r.sharedMaterial.GetTexture("_MainTex");
-                }
+                targetRenderers.Add(renderer);
+
+                if (renderer.sharedMaterial == null)
+                    continue;
+
+                if (renderer.sharedMaterial.HasProperty("_BaseMap"))
+                    originalTextures[renderer] = renderer.sharedMaterial.GetTexture("_BaseMap");
+                else if (renderer.sharedMaterial.HasProperty("_MainTex"))
+                    originalTextures[renderer] = renderer.sharedMaterial.GetTexture("_MainTex");
             }
-        }
 
-        // Passo B: Textura Inicial (Holograma)
-        if (materialHolograma != null)
-        {
-            foreach (Renderer r in targetRenderers)
-            {
-                r.material = materialHolograma;
-            }
-        }
-
-        // Passo C e D: Animação do Shader pelo tempoDeSpawn
-        float elapsedTime = 0f;
-        while (elapsedTime < tempoDeSpawn)
-        {
-            elapsedTime += Time.deltaTime;
-            float progress = Mathf.Clamp01(elapsedTime / tempoDeSpawn);
-            
             if (materialHolograma != null)
             {
-                foreach (Renderer r in targetRenderers)
+                foreach (Renderer renderer in targetRenderers)
+                    renderer.material = materialHolograma;
+            }
+
+            float elapsedTime = 0f;
+            while (elapsedTime < tempoDeSpawn)
+            {
+                elapsedTime += Time.deltaTime;
+                float progress = Mathf.Clamp01(elapsedTime / tempoDeSpawn);
+
+                if (materialHolograma != null)
                 {
-                    if (r.material.HasProperty("Proguesso_Holograma"))
+                    foreach (Renderer renderer in targetRenderers)
                     {
-                        r.material.SetFloat("Proguesso_Holograma", progress);
+                        if (renderer.material.HasProperty("Proguesso_Holograma"))
+                            renderer.material.SetFloat("Proguesso_Holograma", progress);
                     }
                 }
-            }
-            yield return null;
-        }
 
-        // Passo E: Materiais Finais
-        if (materialToon != null && materialOutline != null)
-        {
-            foreach (Renderer r in targetRenderers)
+                yield return null;
+            }
+
+            if (materialToon != null && materialOutline != null)
             {
-                // Cria uma instância do material toon para não alterar o original
-                Material matToonInstance = new Material(materialToon);
-
-                // Restaura a textura original salva
-                if (texturasOriginais.TryGetValue(r, out Texture texOriginal) && texOriginal != null)
+                foreach (Renderer renderer in targetRenderers)
                 {
-                    if (matToonInstance.HasProperty("_BaseMap"))
-                        matToonInstance.SetTexture("_BaseMap", texOriginal);
-                    else if (matToonInstance.HasProperty("_MainTex"))
-                        matToonInstance.SetTexture("_MainTex", texOriginal);
+                    Material toonInstance = new Material(materialToon);
+
+                    if (originalTextures.TryGetValue(renderer, out Texture originalTexture) && originalTexture != null)
+                    {
+                        if (toonInstance.HasProperty("_BaseMap"))
+                            toonInstance.SetTexture("_BaseMap", originalTexture);
+                        else if (toonInstance.HasProperty("_MainTex"))
+                            toonInstance.SetTexture("_MainTex", originalTexture);
+                    }
+
+                    renderer.materials = new[] { toonInstance, materialOutline };
                 }
-
-                Material[] finalMaterials = new Material[] { matToonInstance, materialOutline };
-                r.materials = finalMaterials;
             }
-        }
-
-        // Passo F: Liberação
         }
         finally
         {
@@ -416,7 +368,12 @@ public class PlayerHealthSystem : NetworkBehaviour
         }
     }
 
-    void NotifyHealthChanged()
+    private void OnCurrentHealthValueChanged(float oldValue, float newValue)
+    {
+        NotifyHealthChanged();
+    }
+
+    private void NotifyHealthChanged()
     {
         OnHealthChanged?.Invoke();
     }
@@ -425,5 +382,18 @@ public class PlayerHealthSystem : NetworkBehaviour
     {
         if (characterData == null)
             NetworkGameplayResolver.TryResolveCharacterData(this, out characterData, allowOwnerLocalFallback: IsOwner);
+    }
+
+    private void ResolveDamageInterceptors(ref DamageRequest request, ref DamageResponse response)
+    {
+        MonoBehaviour[] behaviours = GetComponents<MonoBehaviour>();
+        foreach (MonoBehaviour behaviour in behaviours)
+        {
+            if (behaviour is IDamageInterceptor interceptor &&
+                interceptor.TryIntercept(this, ref request, ref response))
+            {
+                return;
+            }
+        }
     }
 }

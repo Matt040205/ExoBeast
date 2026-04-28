@@ -1,19 +1,18 @@
-using UnityEngine;
-using UnityEngine.UI;
 using System.Collections.Generic;
 using TMPro;
+using UnityEngine;
+using UnityEngine.UI;
 
 public class UIManager : MonoBehaviour
 {
     public static UIManager Instance;
+
     public GameObject hudPanel;
     public GameObject pausePanel;
     public GameObject buildPanel;
-    public BuildButtonUI buildButtonUI; // TEM QUE ESTAR PREENCHIDO!
+    public BuildButtonUI buildButtonUI;
 
     public TextMeshProUGUI timerText;
-
-    public ObjectiveHealthSystem objectiveHealthSystem;
     public TextMeshProUGUI objectiveHealthText;
     public Image objectiveHealthBar;
 
@@ -22,9 +21,11 @@ public class UIManager : MonoBehaviour
     public GameObject towerShopPanel;
     public GameObject trapShopPanel;
 
-    private float gameTime = 0f;
-    private bool matchManagerFound = false;
+    private float gameTime;
+    private bool matchManagerFound;
     private float lastServerTime = -1f;
+    private float objectiveCurrentHealth;
+    private float objectiveMaxHealth = 1f;
 
     private void Awake()
     {
@@ -33,107 +34,89 @@ public class UIManager : MonoBehaviour
             Destroy(this);
             return;
         }
+
         Instance = this;
     }
 
-    void Start()
+    private void Start()
     {
         ShowHUD();
 
-        if (objectiveHealthSystem != null)
-        {
-            objectiveHealthSystem.OnHealthChanged += UpdateObjectiveHealthUI;
-            UpdateObjectiveHealthUI();
-        }
+        ObjectiveHealthBus.OnObjectiveHealthChanged += OnObjectiveHealthChanged;
+        if (ObjectiveHealthBus.TryGetLastKnown(out float currentHealth, out float maxHealth))
+            OnObjectiveHealthChanged(currentHealth, maxHealth);
 
-        if (towerShopButton != null) towerShopButton.onClick.AddListener(ShowTowerShop);
-        if (trapShopButton != null) trapShopButton.onClick.AddListener(ShowTrapShop);
+        if (towerShopButton != null)
+            towerShopButton.onClick.AddListener(ShowTowerShop);
+
+        if (trapShopButton != null)
+            trapShopButton.onClick.AddListener(ShowTrapShop);
 
         if (buildPanel != null && buildPanel.activeInHierarchy)
-        {
             ShowTowerShop();
-        }
     }
 
-    void Update()
+    private void Update()
     {
         if (HordeManager.Instance != null && !HordeManager.Instance.IsLocalMode)
         {
-            var hm = HordeManager.Instance;
+            HordeManager hordeManager = HordeManager.Instance;
 
             if (!matchManagerFound)
             {
                 matchManagerFound = true;
-                // Registrar callback para quando o servidor manda um valor novos
-                hm.currentMatchTime.OnValueChanged += OnServerTimeSynced;
-                Debug.Log($"[UIManager] HordeManager encontrado! MatchTime={hm.currentMatchTime.Value:F1}s. Registrando callback de sync.");
+                hordeManager.currentMatchTime.OnValueChanged += OnServerTimeSynced;
             }
 
-            float serverTime = hm.currentMatchTime.Value;
-
+            float serverTime = hordeManager.currentMatchTime.Value;
             if (serverTime != lastServerTime)
             {
-                // Servidor mandou um valor novo — resincronizar
                 gameTime = serverTime;
                 lastServerTime = serverTime;
             }
             else
             {
-                // Entre ticks de rede: predição local para manter o timer suave
                 gameTime += Time.deltaTime;
             }
         }
         else
         {
-            // Fallback local (singleplayer ou antes do HordeManager spawnar)
             gameTime += Time.deltaTime;
         }
 
         UpdateTimerDisplay(gameTime);
     }
 
-    private void OnServerTimeSynced(float oldVal, float newVal)
+    private void OnDestroy()
     {
-        // Quando chega valor novo do servidor, forçar resync
-        gameTime = newVal;
-        lastServerTime = newVal;
+        ObjectiveHealthBus.OnObjectiveHealthChanged -= OnObjectiveHealthChanged;
+
+        if (matchManagerFound && HordeManager.Instance != null)
+            HordeManager.Instance.currentMatchTime.OnValueChanged -= OnServerTimeSynced;
     }
 
-    /// <summary>
-    /// Chamado externamente (ex: MatchManager.OnNetworkSpawn) para forçar sync imediato.
-    /// </summary>
     public void ForceTimerSync(float serverTime)
     {
-        Debug.Log($"[UIManager] ForceTimerSync chamado! serverTime={serverTime:F1}s, gameTime anterior={gameTime:F1}s");
         gameTime = serverTime;
         lastServerTime = serverTime;
         matchManagerFound = true;
         UpdateTimerDisplay(gameTime);
     }
 
-    private void OnDestroy()
-    {
-        if (objectiveHealthSystem != null) objectiveHealthSystem.OnHealthChanged -= UpdateObjectiveHealthUI;
-    }
-
     public void UpdateObjectiveHealthUI()
     {
-        if (objectiveHealthSystem == null) return;
-        float currentHealth = objectiveHealthSystem.currentHealth.Value;
-        float maxHealth = objectiveHealthSystem.maxHealth;
-
-        if (objectiveHealthText != null) objectiveHealthText.text = $"{currentHealth:F0} / {maxHealth:F0}";
+        if (objectiveHealthText != null)
+            objectiveHealthText.text = $"{objectiveCurrentHealth:F0} / {objectiveMaxHealth:F0}";
 
         if (objectiveHealthBar != null)
-            objectiveHealthBar.fillAmount = maxHealth > 0 ? currentHealth / maxHealth : 0;
+            objectiveHealthBar.fillAmount = objectiveMaxHealth > 0f ? objectiveCurrentHealth / objectiveMaxHealth : 0f;
     }
 
     public void UpdateBuildUI(List<CharacterBase> towers, List<TrapDataSO> traps)
     {
-        // O ALARME SE FALTAR A REFERÊNCIA NO UIMANAGER
         if (buildButtonUI == null)
         {
-            Debug.LogError("<b>[UIManager]</b> ERRO CRÍTICO: O campo 'Build Button UI' está VAZIO no Inspector do UI Manager! Arraste a script pra lá!");
+            Debug.LogError("<b>[UIManager]</b> O campo 'Build Button UI' nao foi preenchido no Inspector.");
             return;
         }
 
@@ -148,61 +131,104 @@ public class UIManager : MonoBehaviour
 
     public void ShowHUD()
     {
-        if (hudPanel != null) hudPanel.SetActive(true);
-        if (pausePanel != null) pausePanel.SetActive(false);
-        if (buildPanel != null) buildPanel.SetActive(false);
+        if (hudPanel != null)
+            hudPanel.SetActive(true);
+
+        if (pausePanel != null)
+            pausePanel.SetActive(false);
+
+        if (buildPanel != null)
+            buildPanel.SetActive(false);
     }
 
     public void ShowPauseMenu(bool show)
     {
-        if (pausePanel != null) pausePanel.SetActive(show);
+        if (pausePanel != null)
+            pausePanel.SetActive(show);
 
         if (show)
         {
-            if (hudPanel != null) hudPanel.SetActive(false);
+            if (hudPanel != null)
+                hudPanel.SetActive(false);
         }
         else
         {
-            if (BuildManager.isBuildingMode) ShowBuildUI(true);
-            else ShowHUD();
+            if (BuildManager.isBuildingMode)
+                ShowBuildUI(true);
+            else
+                ShowHUD();
         }
     }
 
     public void ShowBuildUI(bool show)
     {
-        if (buildPanel != null) buildPanel.SetActive(show);
+        if (buildPanel != null)
+            buildPanel.SetActive(show);
+
         if (show)
         {
-            if (hudPanel != null) hudPanel.SetActive(false);
+            if (hudPanel != null)
+                hudPanel.SetActive(false);
+
             ShowTowerShop();
         }
-        else ShowHUD();
+        else
+        {
+            ShowHUD();
+        }
     }
 
     public void ShowTowerShop()
     {
-        if (towerShopPanel != null) towerShopPanel.SetActive(true);
-        if (trapShopPanel != null) trapShopPanel.SetActive(false);
+        if (towerShopPanel != null)
+            towerShopPanel.SetActive(true);
 
-        if (towerShopButton != null) towerShopButton.interactable = false;
-        if (trapShopButton != null) trapShopButton.interactable = true;
+        if (trapShopPanel != null)
+            trapShopPanel.SetActive(false);
+
+        if (towerShopButton != null)
+            towerShopButton.interactable = false;
+
+        if (trapShopButton != null)
+            trapShopButton.interactable = true;
     }
 
     public void ShowTrapShop()
     {
-        if (towerShopPanel != null) towerShopPanel.SetActive(false);
-        if (trapShopPanel != null) trapShopPanel.SetActive(true);
+        if (towerShopPanel != null)
+            towerShopPanel.SetActive(false);
 
-        if (towerShopButton != null) towerShopButton.interactable = true;
-        if (trapShopButton != null) trapShopButton.interactable = false;
+        if (trapShopPanel != null)
+            trapShopPanel.SetActive(true);
+
+        if (towerShopButton != null)
+            towerShopButton.interactable = true;
+
+        if (trapShopButton != null)
+            trapShopButton.interactable = false;
     }
 
     public void UpdateTimerDisplay(float timeInSeconds)
     {
-        if (timerText == null) return;
-        int minutes = Mathf.FloorToInt(timeInSeconds / 60);
-        int seconds = Mathf.FloorToInt(timeInSeconds % 60);
+        if (timerText == null)
+            return;
+
+        int minutes = Mathf.FloorToInt(timeInSeconds / 60f);
+        int seconds = Mathf.FloorToInt(timeInSeconds % 60f);
         timerText.text = string.Format("{0:00}:{1:00}", minutes, seconds);
+    }
+
+    private void OnServerTimeSynced(float oldValue, float newValue)
+    {
+        gameTime = newValue;
+        lastServerTime = newValue;
+    }
+
+    private void OnObjectiveHealthChanged(float currentHealth, float maxHealth)
+    {
+        objectiveCurrentHealth = currentHealth;
+        objectiveMaxHealth = Mathf.Max(maxHealth, 1f);
+        UpdateObjectiveHealthUI();
     }
 
     private void WireBuildTooltips()
@@ -217,7 +243,8 @@ public class UIManager : MonoBehaviour
 
         foreach (BuildTooltipTrigger tooltipTrigger in tooltipTriggers)
         {
-            if (tooltipTrigger == null) continue;
+            if (tooltipTrigger == null)
+                continue;
 
             if (tooltipTrigger.tooltipPanel == null && tooltipPanelTransform != null)
                 tooltipTrigger.tooltipPanel = tooltipPanelTransform.gameObject;
@@ -256,6 +283,6 @@ public class UIManager : MonoBehaviour
     {
         return string.IsNullOrEmpty(value)
             ? string.Empty
-            : value.Replace(" ", "").Trim().ToLowerInvariant();
+            : value.Replace(" ", string.Empty).Trim().ToLowerInvariant();
     }
 }

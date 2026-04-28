@@ -26,6 +26,7 @@ GameObject:
   - component: {fileID: 5368575251387239503}
   - component: {fileID: 5114964455031224855}
   - component: {fileID: 7517247059157535488}
+  - component: {fileID: -6223414218303703111}
   m_Layer: 6
   m_Name: Dragao
   m_TagString: Player
@@ -1035,3 +1036,18 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 412044681694345357, guid: 757a95b4422eb104491b30f3b53f3984, type: 3}
   m_PrefabInstance: {fileID: 1362177637827946169}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &-6223414218303703111
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 15912487291283997}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97b8766a9f6744f48ec35cd775daaa15, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  frontalBlockDot: 0.15
+  IsActive:
+    m_InternalValue: 0

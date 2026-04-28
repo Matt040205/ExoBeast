@@ -15,7 +15,21 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - `Assets/Codigo/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
 - `Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
 
-## Ultima atualizacao: correcoes Host/Client Dragao e Polvo (2026-04-27)
+## Ultima atualizacao: refactor de autoridade, HUD, traps, habilidades e IA (2026-04-28)
+
+- `ObjectiveHealthSystem` virou a fonte autoritativa da vida da Base e agora publica atualizacoes via `ObjectiveHealthBus`; `PlayerHUD` e `UIManager` apenas escutam eventos.
+- `Prefeitura.prefab` agora e um `NetworkObject` de cena para a Base sincronizar vida e derrota corretamente entre host e clientes.
+- Foi criada a pasta `Assets/Codigo/Combat/` com `DamageContext`, `DamageFeedbackMode`, `DamageRequest`, `DamageResponse` e `IDamageInterceptor` para padronizar validacao, bloqueio e feedback de dano.
+- `EnemyHealthSystem` e `NetworkedEnemy` passaram a usar contexto de dano autoritativo; popups e hit flash agora podem ser exibidos para todos os observadores.
+- `TrapLogicBase` ganhou `InitializeServer(...)` e `NetworkedTrapVisual` passou a concentrar a ativacao visual; `BuildManager` inicializa estado antes de `NetworkObject.Spawn()`.
+- `Espinhos.cs` agora usa o caminho autoritativo de dano com feedback sincronizado; `Teleportador.cs` delega o deslocamento para `PlayerTeleportService`.
+- `DragonDefensiveStanceController` concentra a postura defensiva e o counter do Dragao; `PlayerHealthSystem` consulta interceptores de dano em vez de depender de um flag global.
+- `TemorSismico.prefab` agora e um prefab de rede real; `TemorSismicoLogic` aplica knock-up de 2s via `EnemyStatusController`.
+- `FumacaTinta.prefab`, `BombaSprayProjectile` e `NuvemDeTintaLogic` passaram a spawnar a nuvem do Polvo via servidor; o prefab foi registrado em `DefaultNetworkPrefabs.asset`.
+- `EnemyController` ficou focado em alvo e chase; `EnemyCombatSystem` virou a maquina autoritativa de ataque para destravar a transicao `Chase -> Attack`.
+- Validacao local: `dotnet build PI3D.sln` compilou com sucesso. Fora do Unity pode ser necessario regenerar os `.csproj` antes do build, porque essas inclusoes sao mantidas pelo editor.
+
+## Atualizacao anterior: correcoes Host/Client Dragao e Polvo (2026-04-27)
 
 - `NetworkGameplayResolver.cs` foi adicionado para centralizar resolucao de `CharacterIndex`, atacante e `PlayerHealthSystem`.
 - `GameSetupManager` agora define `NetworkedPlayerController.CharacterIndex` no spawn e injeta `characterData` nos sistemas do player.

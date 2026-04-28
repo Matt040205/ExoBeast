@@ -1,84 +1,158 @@
-using UnityEngine;
+ï»¿using System.Collections;
 using System.Collections.Generic;
+using Unity.Netcode;
+using UnityEngine;
 
-public class NuvemDeTintaLogic : MonoBehaviour
+[RequireComponent(typeof(SphereCollider))]
+[RequireComponent(typeof(NetworkObject))]
+public class NuvemDeTintaLogic : NetworkBehaviour
 {
-    public GameObject vfxFumacaPrefab;
-
-    [Tooltip("Quanto da velocidade original vai SOBRAR. Ex: 0.6 mantém 60% da velocidade.")]
+    [Tooltip("Quanto da velocidade original vai SOBRAR. Ex: 0.6 mantem 60% da velocidade.")]
     public float slowFactor = 0.6f;
 
-    private float _duration;
-    private List<EnemyController> affectedEnemies = new List<EnemyController>();
+    private readonly Dictionary<EnemyController, int> affectedEnemies = new Dictionary<EnemyController, int>();
 
-    public void Setup(float duration)
+    private readonly NetworkVariable<float> cloudRadius = new NetworkVariable<float>(
+        1f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    private readonly NetworkVariable<float> lifetimeSeconds = new NetworkVariable<float>(
+        4f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
+
+    private float pendingDuration = 4f;
+    private float pendingRadius = 1f;
+    private bool lifetimeStarted;
+
+    public void Setup(float duration, float radius)
     {
-        _duration = duration;
+        pendingDuration = duration;
+        pendingRadius = radius;
+        ApplyRadius(radius);
 
-        if (vfxFumacaPrefab != null)
+        bool isNetworkSession = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        if (!isNetworkSession)
+            StartLifetimeCountdown(duration, networked: false);
+    }
+
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
+
+        cloudRadius.OnValueChanged += OnRadiusChanged;
+        lifetimeSeconds.OnValueChanged += OnLifetimeChanged;
+
+        if (IsServer)
         {
-            Instantiate(vfxFumacaPrefab, transform.position, Quaternion.identity, transform);
+            cloudRadius.Value = pendingRadius;
+            lifetimeSeconds.Value = pendingDuration;
+            StartLifetimeCountdown(lifetimeSeconds.Value, networked: true);
         }
 
-        Destroy(gameObject, _duration);
+        ApplyRadius(cloudRadius.Value > 0f ? cloudRadius.Value : pendingRadius);
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        cloudRadius.OnValueChanged -= OnRadiusChanged;
+        lifetimeSeconds.OnValueChanged -= OnLifetimeChanged;
+        base.OnNetworkDespawn();
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Enemy"))
-        {
-            EnemyController enemy = other.GetComponent<EnemyController>();
+        if (!ShouldProcessGameplay() || !other.CompareTag("Enemy"))
+            return;
 
-            if (enemy != null)
-            {
-                if (!affectedEnemies.Contains(enemy))
-                {
-                    affectedEnemies.Add(enemy);
+        EnemyController enemy = other.GetComponent<EnemyController>();
+        if (enemy == null)
+            return;
 
-                    // O EnemyController usa "Percentual de Redução".
-                    // Se slowFactor é 0.6 (60% de sobra), a redução é 0.4 (40%).
-                    float reducao = 1f - slowFactor;
-                    enemy.AplicarDesaceleracao(reducao);
+        if (!affectedEnemies.ContainsKey(enemy))
+            affectedEnemies[enemy] = 0;
 
-                    other.SendMessage("SetBlinded", true, SendMessageOptions.DontRequireReceiver);
+        affectedEnemies[enemy]++;
+        if (affectedEnemies[enemy] > 1)
+            return;
 
-                    Debug.Log("Inimigo entrou na fumaça (Slow aplicado): " + other.name);
-                }
-            }
-        }
+        enemy.AplicarDesaceleracao(1f - slowFactor);
+        enemy.SetBlinded(true);
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag("Enemy"))
-        {
-            EnemyController enemy = other.GetComponent<EnemyController>();
+        if (!ShouldProcessGameplay() || !other.CompareTag("Enemy"))
+            return;
 
-            if (enemy != null)
-            {
-                if (affectedEnemies.Contains(enemy))
-                {
-                    enemy.RemoverDesaceleracao();
+        EnemyController enemy = other.GetComponent<EnemyController>();
+        if (enemy == null || !affectedEnemies.ContainsKey(enemy))
+            return;
 
-                    other.SendMessage("SetBlinded", false, SendMessageOptions.DontRequireReceiver);
+        affectedEnemies[enemy]--;
+        if (affectedEnemies[enemy] > 0)
+            return;
 
-                    affectedEnemies.Remove(enemy);
-                    Debug.Log("Inimigo saiu da fumaça (Normal): " + other.name);
-                }
-            }
-        }
+        ClearEnemyStatus(enemy);
+        affectedEnemies.Remove(enemy);
     }
 
-    private void OnDestroy()
+    private new void OnDestroy()
     {
-        foreach (EnemyController enemy in affectedEnemies)
+        foreach (EnemyController enemy in affectedEnemies.Keys)
         {
             if (enemy != null)
-            {
-                enemy.RemoverDesaceleracao();
-                enemy.SendMessage("SetBlinded", false, SendMessageOptions.DontRequireReceiver);
-            }
+                ClearEnemyStatus(enemy);
         }
+
         affectedEnemies.Clear();
+    }
+
+    private void StartLifetimeCountdown(float duration, bool networked)
+    {
+        if (lifetimeStarted)
+            return;
+
+        lifetimeStarted = true;
+        StartCoroutine(LifetimeRoutine(duration, networked));
+    }
+
+    private IEnumerator LifetimeRoutine(float duration, bool networked)
+    {
+        yield return new WaitForSeconds(duration);
+
+        if (networked && IsServer && NetworkObject != null && NetworkObject.IsSpawned)
+            NetworkObject.Despawn(true);
+        else
+            Destroy(gameObject);
+    }
+
+    private bool ShouldProcessGameplay()
+    {
+        bool isNetworkSession = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        return !isNetworkSession || IsServer;
+    }
+
+    private void ApplyRadius(float radius)
+    {
+        transform.localScale = Vector3.one * radius;
+    }
+
+    private void ClearEnemyStatus(EnemyController enemy)
+    {
+        enemy.RemoverDesaceleracao();
+        enemy.SetBlinded(false);
+    }
+
+    private void OnRadiusChanged(float oldValue, float newValue)
+    {
+        ApplyRadius(newValue);
+    }
+
+    private void OnLifetimeChanged(float oldValue, float newValue)
+    {
+        if (IsServer)
+            StartLifetimeCountdown(newValue, networked: true);
     }
 }

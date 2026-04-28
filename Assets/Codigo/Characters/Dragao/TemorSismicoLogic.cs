@@ -1,41 +1,42 @@
-using UnityEngine;
 using Unity.Netcode;
+using UnityEngine;
 using ExoBeasts.Multiplayer.Sync;
 
 [RequireComponent(typeof(NetworkObject))]
 public class TemorSismicoLogic : NetworkBehaviour
 {
-    private float _range;
-    private float _angle;
-    private float _damage;
-    private float _knockUpDuration;
-    private float _knockUpForce;
-    private float _vulnMultiplier;
-    private float _vulnDuration;
-    private bool _setupReady;
-    private ulong _attackerClientId;
-    private PlayerHealthSystem _attackerHealth;
+    private float range;
+    private float angle;
+    private float damage;
+    private float knockUpDuration;
+    private float knockUpForce;
+    private float vulnerabilityMultiplier;
+    private float vulnerabilityDuration;
+    private bool isConfigured;
+    private bool hasAppliedEffects;
+    private ulong attackerClientId;
+    private PlayerHealthSystem attackerHealth;
 
     public void Setup(
         GameObject owner,
-        float range,
-        float angle,
-        float damage,
-        float knockUpDuration,
-        float knockUpForce,
-        float vulnMultiplier,
-        float vulnDuration)
+        float newRange,
+        float newAngle,
+        float newDamage,
+        float newKnockUpDuration,
+        float newKnockUpForce,
+        float newVulnerabilityMultiplier,
+        float newVulnerabilityDuration)
     {
-        _range = range;
-        _angle = angle;
-        _damage = damage;
-        _knockUpDuration = knockUpDuration;
-        _knockUpForce = knockUpForce;
-        _vulnMultiplier = vulnMultiplier;
-        _vulnDuration = vulnDuration;
-        _setupReady = true;
-        NetworkGameplayResolver.TryResolveAttackerFromPlayer(owner, out _attackerClientId, out _attackerHealth);
+        range = newRange;
+        angle = newAngle;
+        damage = newDamage;
+        knockUpDuration = newKnockUpDuration;
+        knockUpForce = newKnockUpForce;
+        vulnerabilityMultiplier = newVulnerabilityMultiplier;
+        vulnerabilityDuration = newVulnerabilityDuration;
+        isConfigured = true;
 
+        NetworkGameplayResolver.TryResolveAttackerFromPlayer(owner, out attackerClientId, out attackerHealth);
         transform.position = owner.transform.position;
         transform.rotation = AbilityAimUtility.ResolveAimRotation(owner);
     }
@@ -44,43 +45,53 @@ public class TemorSismicoLogic : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        if (!IsServer)
-            return;
-
-        if (_setupReady)
-            ApplyEffects();
-
-        Invoke(nameof(DespawnSelf), 2f);
+        if (IsServer)
+        {
+            ApplyEffectsIfReady();
+            Invoke(nameof(DespawnSelf), 2f);
+        }
     }
 
-    private void ApplyEffects()
+    private void Start()
     {
-        Collider[] hits = Physics.OverlapSphere(transform.position, _range);
+        bool isNetworkSession = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        if (!isNetworkSession)
+        {
+            ApplyEffectsIfReady();
+            Destroy(gameObject, 2f);
+        }
+    }
 
+    private void ApplyEffectsIfReady()
+    {
+        if (!isConfigured || hasAppliedEffects)
+            return;
+
+        hasAppliedEffects = true;
+
+        Collider[] hits = Physics.OverlapSphere(transform.position, range);
         foreach (Collider hit in hits)
         {
             if (!hit.CompareTag("Enemy"))
                 continue;
 
-            Vector3 dirToEnemy = (hit.transform.position - transform.position).normalized;
-            if (Vector3.Angle(transform.forward, dirToEnemy) >= _angle / 2f)
+            Vector3 directionToEnemy = (hit.transform.position - transform.position).normalized;
+            if (Vector3.Angle(transform.forward, directionToEnemy) >= angle * 0.5f)
                 continue;
 
-            EnemyHealthSystem hp = hit.GetComponent<EnemyHealthSystem>();
-            if (hp != null)
+            EnemyHealthSystem enemyHealth = hit.GetComponent<EnemyHealthSystem>();
+            if (enemyHealth != null)
             {
-                hp.ApplyAuthoritativeDamage(_damage, 0f, false, _attackerClientId, _attackerHealth);
+                DamageContext damageContext = new DamageContext(attackerClientId, false, DamageFeedbackMode.AllObservers);
+                enemyHealth.ApplyAuthoritativeDamage(damage, 0f, damageContext, attackerHealth);
 
-                if (_vulnMultiplier > 1f)
-                    hp.AplicarVulnerabilidadeTemporaria(_vulnMultiplier, _vulnDuration);
+                if (vulnerabilityMultiplier > 1f)
+                    enemyHealth.AplicarVulnerabilidadeTemporaria(vulnerabilityMultiplier, vulnerabilityDuration);
             }
 
-            EnemyController ai = hit.GetComponent<EnemyController>();
-            if (ai != null)
-            {
-                ai.ApplyKnockback(Vector3.up, _knockUpForce);
-                ai.ApplySlow(1f, _knockUpDuration);
-            }
+            EnemyController enemyController = hit.GetComponent<EnemyController>();
+            if (enemyController != null)
+                enemyController.ApplyKnockUp(knockUpDuration, knockUpForce);
         }
     }
 
@@ -90,7 +101,7 @@ public class TemorSismicoLogic : NetworkBehaviour
             NetworkObject.Despawn();
     }
 
-    void OnDrawGizmosSelected()
+    private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, 5f);

@@ -1,68 +1,62 @@
-using UnityEngine;
 using System;
-using UnityEngine.SceneManagement;
 using Unity.Netcode;
+using UnityEngine;
+using UnityEngine.SceneManagement;
 
-/// <summary>
-/// ── ObjectiveHealthSystem ──────────────────────────────
-/// Vida do objetivo (cristal/base) com autoridade no servidor.
-///
-///  ▸ NetworkVariable currentHealth: sincroniza vida para todos (modo rede)
-///  ▸ localHealth: fallback para modo local/singleplayer
-///  ▸ Server/Local: TakeDamage, Die → carrega cena Lose
-///  ▸ Client: OnHealthChanged atualiza UI local
-/// ─────────────────────────────────────────────────────
-/// </summary>
 public class ObjectiveHealthSystem : NetworkBehaviour
 {
     public static ObjectiveHealthSystem Instance { get; private set; }
 
     [Header("Configuracoes de Vida (Sincronizada)")]
     public float maxHealth = 100f;
-    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<float> currentHealth = new NetworkVariable<float>(
+        100f,
+        NetworkVariableReadPermission.Everyone,
+        NetworkVariableWritePermission.Server);
 
     public event Action OnHealthChanged;
-    private bool isDead = false;
 
-    // Fallback local para quando NGO não está ativo
+    private bool isDead;
     private float localHealth;
-    private bool isNGOSpawned = false;
+    private bool isNetworkDriven;
 
-    /// <summary>Vida atual (funciona em local e rede)</summary>
-    public float CurrentHealth => isNGOSpawned ? currentHealth.Value : localHealth;
+    public float CurrentHealth => isNetworkDriven ? currentHealth.Value : localHealth;
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else if (Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
 
         localHealth = maxHealth;
     }
 
-    void Start()
+    private void Start()
     {
-        // Se NGO não estiver ativo, inicializa em modo local
         bool ngoActive = NetworkManager.Singleton != null &&
                          (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient);
+
         if (!ngoActive)
         {
-            isNGOSpawned = false;
+            isNetworkDriven = false;
             localHealth = maxHealth;
-            Debug.Log($"[ObjectiveHealthSystem] Modo LOCAL. Vida: {localHealth}");
+            NotifyHealthChanged();
         }
     }
-
-    private void OnCurrentHealthChanged(float oldVal, float newVal) => OnHealthChanged?.Invoke();
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        isNGOSpawned = true;
 
+        isNetworkDriven = true;
         if (IsServer)
-        {
             currentHealth.Value = maxHealth;
-        }
 
         currentHealth.OnValueChanged += OnCurrentHealthChanged;
         NotifyHealthChanged();
@@ -71,46 +65,48 @@ public class ObjectiveHealthSystem : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         currentHealth.OnValueChanged -= OnCurrentHealthChanged;
-        isNGOSpawned = false;
+        isNetworkDriven = false;
         base.OnNetworkDespawn();
     }
 
     public void TakeDamage(float damage)
     {
-        if (isDead) return;
+        if (isDead)
+            return;
 
-        if (isNGOSpawned)
+        if (isNetworkDriven)
         {
-            // Modo rede: só o servidor processa dano
-            if (!IsServer) return;
+            if (!IsServer)
+                return;
 
-            currentHealth.Value = Mathf.Max(currentHealth.Value - damage, 0);
-            NotifyHealthChanged();
+            currentHealth.Value = Mathf.Max(currentHealth.Value - damage, 0f);
 
-            if (currentHealth.Value <= 0)
+            if (currentHealth.Value <= 0f)
                 Die();
         }
         else
         {
-            // Modo local: processa dano direto
-            localHealth = Mathf.Max(localHealth - damage, 0);
-            Debug.Log($"[ObjectiveHealthSystem] Dano local: -{damage}. Vida restante: {localHealth}");
+            localHealth = Mathf.Max(localHealth - damage, 0f);
             NotifyHealthChanged();
 
-            if (localHealth <= 0)
+            if (localHealth <= 0f)
                 Die();
         }
     }
 
+    private void OnCurrentHealthChanged(float oldValue, float newValue)
+    {
+        NotifyHealthChanged();
+    }
+
     private void Die()
     {
-        if (isDead) return;
+        if (isDead)
+            return;
+
         isDead = true;
 
-        Debug.Log("[ObjectiveHealthSystem] Objetivo destruído! Derrota.");
-
-        // Derrota! Carregamento de cena
-        if (isNGOSpawned && IsServer)
+        if (isNetworkDriven && IsServer)
             NetworkManager.Singleton.SceneManager.LoadScene("Lose", LoadSceneMode.Single);
         else
             SceneManager.LoadScene("Lose");
@@ -119,5 +115,6 @@ public class ObjectiveHealthSystem : NetworkBehaviour
     private void NotifyHealthChanged()
     {
         OnHealthChanged?.Invoke();
+        ObjectiveHealthBus.Publish(CurrentHealth, maxHealth);
     }
 }

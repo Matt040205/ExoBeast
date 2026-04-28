@@ -1,20 +1,17 @@
-using UnityEngine;
 using System.Collections;
-using System.Collections.Generic;
 using Unity.Netcode;
+using UnityEngine;
 
-/// <summary>
-/// ── EnemyCombatSystem ──────────────────────────────────
-/// Sistema de combate do inimigo (server-only).
-///
-///  ▸ Server: detecta jogadores via trigger, aplica dano ciclico
-///  ▸ Server: aura de dano em torres via OverlapSphere periodico
-///  ▸ Remotos: script desativado (IA roda apenas no servidor)
-/// ─────────────────────────────────────────────────────
-/// </summary>
 public class EnemyCombatSystem : NetworkBehaviour
 {
-    [Header("Configurações de Combate (Player)")]
+    private enum AttackState
+    {
+        Idle,
+        Windup,
+        Recover
+    }
+
+    [Header("Configuracoes de Combate (Player)")]
     public float attackRange = 2f;
     public float timeToDamage = 2f;
 
@@ -26,7 +23,7 @@ public class EnemyCombatSystem : NetworkBehaviour
     [Header("Efeitos Visuais")]
     public GameObject attackVfxPrefab;
 
-    [Header("Referências")]
+    [Header("Referencias")]
     public Transform attackPoint;
     public LayerMask playerLayer;
     public LayerMask towerLayer;
@@ -34,112 +31,125 @@ public class EnemyCombatSystem : NetworkBehaviour
     private EnemyController enemyController;
     private EnemyDataSO enemyData;
     private float currentDamage;
-
-    private bool playerIsInside = false;
     private Coroutine attackCoroutine;
     private Coroutine towerAuraCoroutine;
+    private AttackState attackState = AttackState.Idle;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        
+
         enemyController = GetComponent<EnemyController>();
-        
-        // APENAS o servidor deve processar a IA de combate em rede
         if (!IsServer)
         {
-            this.enabled = false;
+            enabled = false;
             return;
         }
     }
 
     public void InitializeCombat(EnemyDataSO data, int nivel)
     {
-        if (!IsServer) return;
+        if (!IsServer)
+            return;
 
-        this.enemyData = data;
-        if (enemyData != null)
-        {
-            currentDamage = enemyData.GetDamage(nivel);
+        enemyData = data;
+        if (enemyData == null)
+            return;
 
-            if (towerAuraCoroutine != null) StopCoroutine(towerAuraCoroutine);
-            towerAuraCoroutine = StartCoroutine(TowerAuraCycle());
-        }
+        currentDamage = enemyData.GetDamage(nivel);
+
+        if (towerAuraCoroutine != null)
+            StopCoroutine(towerAuraCoroutine);
+
+        towerAuraCoroutine = StartCoroutine(TowerAuraCycle());
+        ResetAttackState();
     }
 
-    void Update()
+    private void Update()
     {
-        if (!IsServer || enemyController == null || enemyController.IsDead || enemyData == null) return;
+        if (!IsServer || enemyController == null || enemyController.IsDead || enemyData == null)
+            return;
 
-        // Recupera o alvo do controlador
         Transform currentTarget = enemyController.Target;
-        
-        if (currentTarget != null && currentTarget.CompareTag("Player"))
+        bool hasValidPlayerTarget = currentTarget != null && currentTarget.CompareTag("Player");
+
+        if (!hasValidPlayerTarget || !enemyController.IsTargetInAttackRange(currentTarget))
         {
-            float dist = Vector3.Distance(transform.position, currentTarget.position);
-            
-            // Se está no range de atacar
-            if (dist <= enemyController.attackDistance)
-            {
-                if (attackCoroutine == null)
-                {
-                    attackCoroutine = StartCoroutine(PlayerAttackCycleStateDriven());
-                }
-            }
-            else
-            {
-                if (attackCoroutine != null)
-                {
-                    StopCoroutine(attackCoroutine);
-                    attackCoroutine = null;
-                }
-            }
+            ResetAttackState();
+            return;
         }
-        else
-        {
-            if (attackCoroutine != null)
-            {
-                StopCoroutine(attackCoroutine);
-                attackCoroutine = null;
-            }
-        }
+
+        enemyController.HoldAttackPosition();
+
+        if (attackCoroutine == null)
+            attackCoroutine = StartCoroutine(AttackCycle(currentTarget));
     }
 
-    private IEnumerator PlayerAttackCycleStateDriven()
+    private IEnumerator AttackCycle(Transform initialTarget)
     {
-        yield return new WaitForSeconds(timeToDamage);
+        Transform trackedTarget = initialTarget;
 
-        while (enemyController != null && !enemyController.IsDead && enemyController.Target != null)
+        while (CanContinueAttacking(trackedTarget))
         {
-            float dist = Vector3.Distance(transform.position, enemyController.Target.position);
-            if (dist > enemyController.attackDistance) break;
+            attackState = AttackState.Windup;
 
-            TriggerAttackVfx(enemyController.Target.position);
-            ProcessAttack(enemyController.Target);
+            Animator animator = GetComponentInChildren<Animator>();
+            if (animator != null)
+                animator.SetTrigger("doAttack");
 
-            float cooldown = (enemyData != null && enemyData.attackSpeed > 0) ? (1f / enemyData.attackSpeed) : 1f;
+            yield return new WaitForSeconds(timeToDamage);
+
+            if (!CanContinueAttacking(trackedTarget))
+                break;
+
+            TriggerAttackVfx(trackedTarget.position);
+            ProcessAttack(trackedTarget);
+
+            attackState = AttackState.Recover;
+            float cooldown = enemyData.attackSpeed > 0f ? 1f / enemyData.attackSpeed : 1f;
             yield return new WaitForSeconds(cooldown);
+
+            trackedTarget = enemyController.Target;
         }
-        
+
+        attackState = AttackState.Idle;
         attackCoroutine = null;
+        enemyController.ResumeMovement();
+    }
+
+    private bool CanContinueAttacking(Transform trackedTarget)
+    {
+        if (enemyController == null || enemyController.IsDead)
+            return false;
+
+        Transform currentTarget = enemyController.Target;
+        if (currentTarget == null || currentTarget != trackedTarget)
+            return false;
+
+        if (!currentTarget.CompareTag("Player"))
+            return false;
+
+        return enemyController.IsTargetInAttackRange(currentTarget);
     }
 
     private void TriggerAttackVfx(Vector3 targetPos)
     {
-        if (attackVfxPrefab == null) return;
-        
+        if (attackVfxPrefab == null)
+            return;
+
         Vector3 origin = attackPoint != null ? attackPoint.position : transform.position;
-        Vector3 dir = (targetPos - origin).normalized;
-        if (dir == Vector3.zero) dir = transform.forward;
-        
-        // Em rede, invoca o ClientRpc para exibir o VFX em todos
-        var nwEnemy = GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedEnemy>();
-        if (nwEnemy != null && nwEnemy.IsSpawned)
-            nwEnemy.PlayAttackVfxClientRpc(origin, Quaternion.LookRotation(dir));
+        Vector3 direction = (targetPos - origin).normalized;
+        if (direction == Vector3.zero)
+            direction = transform.forward;
+
+        ExoBeasts.Multiplayer.Sync.NetworkedEnemy networkedEnemy = GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedEnemy>();
+        if (networkedEnemy != null && networkedEnemy.IsSpawned)
+        {
+            networkedEnemy.PlayAttackVfxClientRpc(origin, Quaternion.LookRotation(direction));
+        }
         else
         {
-            // Offline ou teste local
-            GlobalVFXPool.GetVFX(attackVfxPrefab, origin, Quaternion.LookRotation(dir), 2f);
+            GlobalVFXPool.GetVFX(attackVfxPrefab, origin, Quaternion.LookRotation(direction), 2f);
         }
     }
 
@@ -147,52 +157,38 @@ public class EnemyCombatSystem : NetworkBehaviour
     {
         if (enemyData.enemyType == EnemyType.Voador)
         {
-            // ATAQUE RANGED (Hitscan)
             Vector3 origin = attackPoint != null ? attackPoint.position : transform.position;
-            Vector3 dir = (targetTransform.position - origin).normalized;
-            
-            // Atira o raycast até a distância máxima que ele conseguiria ver
-            if (Physics.Raycast(origin, dir, out RaycastHit hit, enemyController.loseSightDistance, playerLayer))
+            Vector3 direction = (targetTransform.position - origin).normalized;
+
+            if (Physics.Raycast(origin, direction, out RaycastHit hit, enemyController.loseSightDistance, playerLayer))
             {
                 PlayerHealthSystem playerHealth = hit.collider.GetComponent<PlayerHealthSystem>();
                 if (playerHealth != null)
-                {
-                    // No futuro: se você criar efeitos, chame um ClientRpc(origin, hit.point) aqui
-                    playerHealth.TakeDamage(currentDamage, transform);
-                }
+                    playerHealth.TakeDamage(currentDamage, transform, false);
             }
+
+            return;
         }
-        else
-        {
-            // ATAQUE CORPO A CORPO (Área)
-            ApplyDamageInArea();
-        }
+
+        ApplyDamageInArea();
     }
 
-    void ApplyDamageInArea()
+    private void ApplyDamageInArea()
     {
-        if (!IsServer || enemyData == null) return;
+        if (!IsServer || enemyData == null)
+            return;
 
-        if (enemyController != null && enemyController.IsBlinded)
-        {
-            if (Random.value < 0.8f) return;
-        }
+        if (enemyController.IsBlinded && Random.value < 0.8f)
+            return;
 
         Vector3 origin = attackPoint != null ? attackPoint.position : transform.position;
         Collider[] hitPlayers = Physics.OverlapSphere(origin, attackRange, playerLayer);
 
-        if (hitPlayers.Length > 0)
+        foreach (Collider col in hitPlayers)
         {
-            // Aplica dano em TODOS os jogadores na area (nao apenas o primeiro)
-            bool acertouAlguem = false;
-            foreach (Collider col in hitPlayers)
-            {
-                PlayerHealthSystem playerHealth = col.GetComponent<PlayerHealthSystem>();
-                if (playerHealth != null)
-                {
-                    playerHealth.TakeDamage(currentDamage, transform);
-                }
-            }
+            PlayerHealthSystem playerHealth = col.GetComponent<PlayerHealthSystem>();
+            if (playerHealth != null)
+                playerHealth.TakeDamage(currentDamage, transform, true);
         }
     }
 
@@ -209,21 +205,39 @@ public class EnemyCombatSystem : NetworkBehaviour
 
     private void ApplyAuraDamageToTowers()
     {
-        if (!IsServer) return;
-        
+        if (!IsServer)
+            return;
+
         Collider[] hitTowers = Physics.OverlapSphere(transform.position, towerAuraRadius, towerLayer);
         foreach (Collider towerCollider in hitTowers)
         {
-            // No modo multiplayer, as torres também devem ser protegidas por IsServer em seus sistemas de vida
             TowerController tower = towerCollider.GetComponent<TowerController>();
             if (tower != null)
-            {
                 tower.TakeDamage(towerAuraDamage);
-            }
         }
     }
 
-    void OnDrawGizmosSelected()
+    private void ResetAttackState()
+    {
+        if (attackCoroutine != null)
+            StopCoroutine(attackCoroutine);
+
+        attackCoroutine = null;
+        attackState = AttackState.Idle;
+
+        if (enemyController != null)
+            enemyController.ResumeMovement();
+    }
+
+    private void OnDisable()
+    {
+        if (towerAuraCoroutine != null)
+            StopCoroutine(towerAuraCoroutine);
+
+        ResetAttackState();
+    }
+
+    private void OnDrawGizmosSelected()
     {
         if (attackPoint != null)
         {

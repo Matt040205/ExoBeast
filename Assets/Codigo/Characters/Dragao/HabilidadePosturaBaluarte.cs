@@ -11,17 +11,17 @@ public class HabilidadePosturaBaluarte : Ability
 
     public override bool Activate(GameObject quemUsou)
     {
-        if (logicPrefab == null) return true;
+        if (quemUsou == null)
+            return false;
+
+        DragonDefensiveStanceController defensiveStance = quemUsou.GetComponent<DragonDefensiveStanceController>();
+        if (defensiveStance == null)
+        {
+            Debug.LogError("[HabilidadePosturaBaluarte] DragonDefensiveStanceController ausente no prefab do Dragao.");
+            return false;
+        }
 
         CommanderAbilityController controller = quemUsou.GetComponent<CommanderAbilityController>();
-
-        // Lógica de counter roda no servidor
-        PosturaBaluarteLogic logic = Instantiate(logicPrefab, quemUsou.transform);
-        logic.Setup(quemUsou, duration, counterDamage, counterKnockback, controller, this);
-
-        // Proxy para o owner-cliente receber feedback visual e isCountering local
-        controller?.StartLocalPosturaBaluarteOwnerProxy(duration);
-
-        return true;
+        return defensiveStance.ActivateServer(duration, counterDamage, counterKnockback, controller, this);
     }
 }

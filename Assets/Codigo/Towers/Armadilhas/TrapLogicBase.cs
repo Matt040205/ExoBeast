@@ -1,32 +1,57 @@
-using UnityEngine;
 using Unity.Netcode;
+using UnityEngine;
 
-/// <summary>
-/// ── TrapLogicBase ──────────────────────────────────────
-/// Base abstrata para logica de armadilhas com venda sincronizada.
-///
-///  ▸ RequestSellServerRpc: servidor reembolsa custo e faz Despawn do NetworkObject
-///  ▸ Classes derivadas implementam trigger de dano protegido por IsServer
-/// ─────────────────────────────────────────────────────
-/// </summary>
 public abstract class TrapLogicBase : NetworkBehaviour
 {
     public TrapDataSO trapData;
     public float sellRefundPercentage = 0.6f;
-    protected bool iSBeingSoldOrDestroyed = false;
+
+    protected bool iSBeingSoldOrDestroyed;
+
+    public ulong BuilderClientId { get; private set; }
+    public ulong VisualObjectId { get; private set; }
+
+    public virtual void InitializeServer(TrapDataSO newTrapData, ulong builderClientId, ulong visualObjectId)
+    {
+        trapData = newTrapData;
+        BuilderClientId = builderClientId;
+        VisualObjectId = visualObjectId;
+    }
+
+    public virtual void BindVisualServer(ulong visualObjectId)
+    {
+        VisualObjectId = visualObjectId;
+    }
 
     public virtual void SellTrap()
     {
-        if (iSBeingSoldOrDestroyed) return;
-        
-        // Solicitar ao servidor a venda do objeto
+        if (iSBeingSoldOrDestroyed)
+            return;
+
         RequestSellServerRpc();
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void RequestSellServerRpc()
+    protected bool TryResolveVisual(out ExoBeasts.Multiplayer.Sync.NetworkedTrapVisual trapVisual)
     {
-        if (iSBeingSoldOrDestroyed) return;
+        trapVisual = null;
+
+        if (VisualObjectId == 0 ||
+            NetworkManager.Singleton == null ||
+            !NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(VisualObjectId, out NetworkObject visualObject))
+        {
+            return false;
+        }
+
+        trapVisual = visualObject.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedTrapVisual>();
+        return trapVisual != null;
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void RequestSellServerRpc(ServerRpcParams rpcParams = default)
+    {
+        if (iSBeingSoldOrDestroyed || !CanRequesterModify(rpcParams.Receive.SenderClientId))
+            return;
+
         iSBeingSoldOrDestroyed = true;
 
         if (trapData != null && CurrencyManager.Instance != null)
@@ -35,30 +60,30 @@ public abstract class TrapLogicBase : NetworkBehaviour
             int etherRefund = Mathf.FloorToInt(trapData.darkEtherCost * sellRefundPercentage);
 
             if (geoditeRefund > 0)
-            {
                 CurrencyManager.Instance.AddCurrency(geoditeRefund, CurrencyType.Geodites);
-            }
+
             if (etherRefund > 0)
-            {
                 CurrencyManager.Instance.AddCurrency(etherRefund, CurrencyType.DarkEther);
-            }
         }
 
-        // Remover da rede (destrói o objeto em todos os clientes sincronizadamente)
-        if (TryGetComponent<NetworkObject>(out var netObj))
+        if (TryResolveVisual(out ExoBeasts.Multiplayer.Sync.NetworkedTrapVisual trapVisual) &&
+            trapVisual.NetworkObject != null &&
+            trapVisual.NetworkObject.IsSpawned)
         {
-            if (netObj.IsSpawned) netObj.Despawn();
+            trapVisual.NetworkObject.Despawn(true);
         }
+
+        if (TryGetComponent(out NetworkObject netObj) && netObj.IsSpawned)
+            netObj.Despawn(true);
         else
-        {
             Destroy(gameObject);
-        }
     }
 
-    public override void OnNetworkDespawn()
+    private bool CanRequesterModify(ulong senderClientId)
     {
-        // Limpeza local se necessário quando o objeto sumir da rede
-        base.OnNetworkDespawn();
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+            return true;
+
+        return senderClientId == BuilderClientId;
     }
 }
-

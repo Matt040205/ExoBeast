@@ -1,87 +1,73 @@
+using Unity.Netcode;
 using UnityEngine;
 
 public class BombaSprayProjectile : MonoBehaviour
 {
-    private float _radius;
-    private float _duration; // Duracao da nuvem
+    private float radius;
+    private float duration;
+    private bool isVisualProxy;
+    private bool jaBateu;
+    private bool jaExplodiu;
 
     [Header("Configuracoes da Explosao")]
-    [Tooltip("Prefab da nuvem de gas que aparece quando explode")]
+    [Tooltip("Prefab da nuvem de tinta")]
     public GameObject gasCloudPrefab;
 
     [Header("Configuracoes de Tempo")]
-    [Tooltip("Tempo maximo ate explodir sozinho (se nunca bater em nada)")]
     public float tempoMaximoVida = 7f;
-
-    [Tooltip("Tempo para explodir APOS bater na primeira coisa")]
     public float tempoAposImpacto = 3f;
 
-    private bool jaBateu = false;
-    private bool jaExplodiu = false;
-
-    // Flag para cópias visuais no owner-cliente: aplicam VFX mas não dano/slow (servidor-only)
-    private bool _isVisualProxy = false;
-
-    // Configura os dados quando e lancada (chamado pela Habilidade)
-    public void Launch(Vector3 velocity, float radius, float cloudDuration)
+    public void Launch(Vector3 velocity, float newRadius, float cloudDuration)
     {
-        GetComponent<Rigidbody>().linearVelocity = velocity;
-        _radius = radius;
-        _duration = cloudDuration;
+        Rigidbody rigidbody = GetComponent<Rigidbody>();
+        if (rigidbody != null)
+            rigidbody.linearVelocity = velocity;
 
-        // 1. Inicia o timer de seguranca (7s)
+        radius = newRadius;
+        duration = cloudDuration;
         Invoke(nameof(Explode), tempoMaximoVida);
     }
 
-    /// <summary>
-    /// Versão visual-only para o owner-cliente: a bomba voa e mostra VFX, mas não aplica
-    /// slow/cegueira (lógica de gameplay roda apenas no servidor).
-    /// </summary>
-    public void LaunchVisualProxy(Vector3 velocity, float radius, float cloudDuration)
+    public void LaunchVisualProxy(Vector3 velocity, float newRadius, float cloudDuration)
     {
-        _isVisualProxy = true;
-        Launch(velocity, radius, cloudDuration);
+        isVisualProxy = true;
+        Launch(velocity, newRadius, cloudDuration);
     }
 
-    void OnCollisionEnter(Collision collision)
+    private void OnCollisionEnter(Collision collision)
     {
-        // Se ja bateu ou ja explodiu, ignora batidas subsequentes (quicar no chao)
-        if (jaBateu || jaExplodiu) return;
+        if (jaBateu || jaExplodiu)
+            return;
 
         jaBateu = true;
-
-        // 2. Cancela o timer de 7s, porque agora vale o timer do impacto
         CancelInvoke(nameof(Explode));
-
-        // 3. Inicia o timer de impacto (3s)
         Invoke(nameof(Explode), tempoAposImpacto);
     }
 
-    void Explode()
+    private void Explode()
     {
-        // Garante que nao exploda duas vezes
-        if (jaExplodiu) return;
+        if (jaExplodiu)
+            return;
+
         jaExplodiu = true;
 
-        if (gasCloudPrefab != null)
-        {
-            GameObject cloud = Instantiate(gasCloudPrefab, transform.position, Quaternion.identity);
-            cloud.transform.localScale = Vector3.one * _radius;
-
-            // Proxies visuais instanciam a nuvem mas sem lógica de slow/cegueira
-            // (lógica de gameplay é servidor-only e roda na instância real)
-            if (!_isVisualProxy)
-            {
-                NuvemDeTintaLogic logic = cloud.GetComponent<NuvemDeTintaLogic>();
-                if (logic == null) logic = cloud.AddComponent<NuvemDeTintaLogic>();
-                logic.Setup(_duration);
-            }
-            else
-            {
-                Destroy(cloud, _duration);
-            }
-        }
+        bool isNetworkSession = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        if (gasCloudPrefab != null && (!isVisualProxy || !isNetworkSession))
+            SpawnInkCloud(isNetworkSession);
 
         Destroy(gameObject);
+    }
+
+    private void SpawnInkCloud(bool isNetworkSession)
+    {
+        GameObject cloud = Instantiate(gasCloudPrefab, transform.position, Quaternion.identity);
+        NuvemDeTintaLogic cloudLogic = cloud.GetComponent<NuvemDeTintaLogic>();
+        if (cloudLogic != null)
+            cloudLogic.Setup(duration, radius);
+
+        if (isNetworkSession && !isVisualProxy && cloud.TryGetComponent(out NetworkObject networkObject))
+        {
+            networkObject.Spawn();
+        }
     }
 }

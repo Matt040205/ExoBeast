@@ -392,18 +392,30 @@ public class BuildManager : NetworkBehaviour
         yield return new WaitForSeconds(0.05f); // Micro-delay
 
         NetworkObject logicNetObj = null;
+        TrapLogicBase logicBase = null;
         if (trapData.logicPrefab != null)
         {
+            if (!ValidateNetworkSpawnable(trapData.logicPrefab, $"{trapData.name} logic"))
+                yield break;
+
             GameObject logicObj = Instantiate(trapData.logicPrefab, pos, Quaternion.identity);
 
-            TrapLogicBase logicBase = logicObj.GetComponent<TrapLogicBase>();
-            if (logicBase != null) logicBase.trapData = trapData;
+            logicBase = logicObj.GetComponent<TrapLogicBase>();
+            if (logicBase != null)
+                logicBase.InitializeServer(trapData, builderClientId, 0);
 
             if (logicObj.TryGetComponent<NetworkObject>(out var spawnedLogicNetObj))
             {
                 spawnedLogicNetObj.Spawn();
                 logicNetObj = spawnedLogicNetObj;
             }
+        }
+
+        if (!ValidateNetworkSpawnable(trapData.prefab, trapData.name))
+        {
+            if (logicNetObj != null && logicNetObj.IsSpawned)
+                logicNetObj.Despawn(true);
+            yield break;
         }
 
         GameObject newTrap = Instantiate(trapData.prefab, pos, Quaternion.identity);
@@ -417,6 +429,9 @@ public class BuildManager : NetworkBehaviour
             }
 
             netObj.Spawn();
+
+            if (logicBase != null)
+                logicBase.BindVisualServer(netObj.NetworkObjectId);
         }
 
         NotifyBuildingPlacedClientRpc(pos);
@@ -451,6 +466,9 @@ public class BuildManager : NetworkBehaviour
     private IEnumerator SpawnBuildingWithDelay(GameObject prefabToSpawn, int characterIndex, int cost, Vector3 pos, ulong builderClientId)
     {
         yield return new WaitForSeconds(0.05f); // Micro-delay
+
+        if (!ValidateNetworkSpawnable(prefabToSpawn, prefabToSpawn.name))
+            yield break;
 
         GameObject newBuildObject = Instantiate(prefabToSpawn, pos, Quaternion.identity);
         SanitizeRuntimeBuildable(newBuildObject, false);
@@ -597,6 +615,29 @@ public class BuildManager : NetworkBehaviour
     private void SanitizeGhostPreview(GameObject buildGhost)
     {
         SanitizeRuntimeBuildable(buildGhost, true);
+    }
+
+    private bool ValidateNetworkSpawnable(GameObject prefab, string context)
+    {
+        if (prefab == null)
+            return false;
+
+        if (!prefab.TryGetComponent<NetworkObject>(out _))
+        {
+            Debug.LogError($"[BuildManager] '{context}' precisa de NetworkObject para spawn autoritativo.");
+            return false;
+        }
+
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+            return true;
+
+        if (!NetworkManager.Singleton.NetworkConfig.Prefabs.Contains(prefab))
+        {
+            Debug.LogError($"[BuildManager] '{context}' nao esta registrado em DefaultNetworkPrefabs.");
+            return false;
+        }
+
+        return true;
     }
 
     private void SanitizeRuntimeBuildable(GameObject buildableInstance, bool isPreview)

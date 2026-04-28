@@ -1,5 +1,5 @@
-using UnityEngine;
 using Unity.Netcode;
+using UnityEngine;
 
 namespace ExoBeasts.Multiplayer.Sync
 {
@@ -7,6 +7,8 @@ namespace ExoBeasts.Multiplayer.Sync
     public class NetworkedTrapVisual : NetworkBehaviour
     {
         [SerializeField] private float sellRefundPercentage = 0.6f;
+        [SerializeField] private string activationTrigger = "Ativar";
+        [SerializeField] private string deactivationTrigger = "Desativar";
 
         public NetworkVariable<ulong> BuilderClientId = new NetworkVariable<ulong>(
             0,
@@ -23,7 +25,13 @@ namespace ExoBeasts.Multiplayer.Sync
             NetworkVariableReadPermission.Everyone,
             NetworkVariableWritePermission.Server);
 
+        public NetworkVariable<bool> IsActivated = new NetworkVariable<bool>(
+            false,
+            NetworkVariableReadPermission.Everyone,
+            NetworkVariableWritePermission.Server);
+
         private TrapDataSO trapData;
+        private Animator cachedAnimator;
 
         public TrapDataSO TrapData
         {
@@ -35,22 +43,42 @@ namespace ExoBeasts.Multiplayer.Sync
                 return trapData;
             }
         }
+
         public float SellRefundPercentage => sellRefundPercentage;
 
         public override void OnNetworkSpawn()
         {
             TrapIndex.OnValueChanged += OnTrapIndexChanged;
+            IsActivated.OnValueChanged += OnActivationChanged;
             ResolveTrapData();
+            ResolveAnimator();
+            ApplyActivationState(IsActivated.Value);
+        }
+
+        public override void OnNetworkDespawn()
+        {
+            TrapIndex.OnValueChanged -= OnTrapIndexChanged;
+            IsActivated.OnValueChanged -= OnActivationChanged;
+            base.OnNetworkDespawn();
         }
 
         public void InitializeServer(ulong builderClientId, int trapIndex, ulong logicObjectId)
         {
-            if (!IsServer) return;
+            if (!IsServer)
+                return;
 
             BuilderClientId.Value = builderClientId;
             TrapIndex.Value = trapIndex;
             LogicObjectId.Value = logicObjectId;
             ResolveTrapData();
+        }
+
+        public void SetActivationStateServer(bool isActivated)
+        {
+            if (!IsServer)
+                return;
+
+            IsActivated.Value = isActivated;
         }
 
         public bool CanInteractLocally()
@@ -103,6 +131,26 @@ namespace ExoBeasts.Multiplayer.Sync
             ResolveTrapData();
         }
 
+        private void OnActivationChanged(bool oldValue, bool newValue)
+        {
+            ApplyActivationState(newValue);
+        }
+
+        private void ApplyActivationState(bool isActivated)
+        {
+            ResolveAnimator();
+            if (cachedAnimator == null)
+                return;
+
+            cachedAnimator.SetTrigger(isActivated ? activationTrigger : deactivationTrigger);
+        }
+
+        private void ResolveAnimator()
+        {
+            if (cachedAnimator == null)
+                cachedAnimator = GetComponentInChildren<Animator>(true);
+        }
+
         private void ResolveTrapData()
         {
             trapData = BuildManager.Instance?.GetTrapDataByIndex(TrapIndex.Value);
@@ -114,11 +162,6 @@ namespace ExoBeasts.Multiplayer.Sync
                 return true;
 
             return senderClientId == BuilderClientId.Value;
-        }
-
-        public override void OnNetworkDespawn()
-        {
-            TrapIndex.OnValueChanged -= OnTrapIndexChanged;
         }
     }
 }

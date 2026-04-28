@@ -1,6 +1,6 @@
-using UnityEngine;
 using FMODUnity;
 using Unity.Netcode;
+using UnityEngine;
 
 [CreateAssetMenu(fileName = "Temor Sismico", menuName = "ExoBeasts/Personagens/Dragao/Habilidade/Temor Sismico")]
 public class HabilidadeTemorSismico : Ability
@@ -30,7 +30,7 @@ public class HabilidadeTemorSismico : Ability
     {
         if (logicPrefab == null)
         {
-            Debug.LogError("[TemorSismico] Prefab nao configurado na Habilidade!");
+            Debug.LogError("[TemorSismico] Prefab nao configurado na habilidade.");
             return false;
         }
 
@@ -41,23 +41,24 @@ public class HabilidadeTemorSismico : Ability
         if (!string.IsNullOrEmpty(sfxSlam))
             RuntimeManager.PlayOneShot(sfxSlam, quemUsou.transform.position);
 
-        // Instancia, configura e spawna em rede â€” todos os clientes veem o VFX.
         TemorSismicoLogic logic = Object.Instantiate(
             logicPrefab,
             quemUsou.transform.position,
             AbilityAimUtility.ResolveAimRotation(quemUsou));
 
-        logic.Setup(quemUsou, range, angle, damage, knockUpDuration, knockUpForce,
-            vulnerabilityMultiplier, vulnerabilityDuration);
+        logic.Setup(
+            quemUsou,
+            range,
+            angle,
+            damage,
+            knockUpDuration,
+            knockUpForce,
+            vulnerabilityMultiplier,
+            vulnerabilityDuration);
 
-        if (logic.TryGetComponent<NetworkObject>(out var netObj))
-        {
+        bool isNetworkSession = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        if (isNetworkSession && logic.TryGetComponent(out NetworkObject netObj))
             netObj.Spawn();
-        }
-        else
-        {
-            Debug.LogWarning("[TemorSismico] Prefab sem NetworkObject â€” VFX visivel apenas no servidor. Adicione NetworkObject ao prefab.");
-        }
 
         return true;
     }

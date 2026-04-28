@@ -32,19 +32,20 @@ namespace ExoBeasts.Multiplayer.Sync
         {
             ulong attackerId = rpcParams.Receive.SenderClientId;
             PlayerHealthSystem attackerHealth = NetworkGameplayResolver.ResolvePlayerHealth(attackerId);
-            ApplyDamageServer(damage, armorPen, isCrit, attackerId, attackerHealth, out _);
+            DamageContext damageContext = new DamageContext(attackerId, isCrit, DamageFeedbackMode.InstigatorOnly);
+            ApplyDamageServer(damage, armorPen, damageContext, attackerHealth, out _);
         }
 
         public bool ApplyDamageServer(float damage, float armorPen, bool isCrit, ulong attackerId, out float finalDamage)
         {
-            return ApplyDamageServer(damage, armorPen, isCrit, attackerId, null, out finalDamage);
+            DamageContext damageContext = new DamageContext(attackerId, isCrit, DamageFeedbackMode.InstigatorOnly);
+            return ApplyDamageServer(damage, armorPen, damageContext, null, out finalDamage);
         }
 
         public bool ApplyDamageServer(
             float damage,
             float armorPen,
-            bool isCrit,
-            ulong attackerId,
+            DamageContext damageContext,
             PlayerHealthSystem attackerHealth,
             out float finalDamage)
         {
@@ -56,28 +57,33 @@ namespace ExoBeasts.Multiplayer.Sync
             localHealth.ApplyAuthoritativeDamageDetailed(
                 damage,
                 armorPen,
-                isCrit,
-                attackerId,
+                damageContext,
                 attackerHealth,
                 out finalDamage);
             return finalDamage > 0f;
         }
 
-        public void TriggerHitVisual(float finalDamage, bool isCritical, ulong attackerId)
+        public void TriggerHitVisual(float finalDamage, DamageContext damageContext)
         {
             if (!IsServer) return;
 
             ShowHitFlashClientRpc();
 
+            if (damageContext.FeedbackMode == DamageFeedbackMode.AllObservers)
+            {
+                ShowDamagePopupClientRpc(finalDamage, damageContext.IsCritical);
+                return;
+            }
+
             ClientRpcParams popupParams = new ClientRpcParams
             {
                 Send = new ClientRpcSendParams
                 {
-                    TargetClientIds = new ulong[] { attackerId }
+                    TargetClientIds = new ulong[] { damageContext.AttackerClientId }
                 }
             };
 
-            ShowDamagePopupClientRpc(finalDamage, isCritical, popupParams);
+            ShowDamagePopupClientRpc(finalDamage, damageContext.IsCritical, popupParams);
         }
 
         [ClientRpc]
