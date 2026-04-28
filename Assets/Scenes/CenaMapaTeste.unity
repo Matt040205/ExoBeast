@@ -2814,7 +2814,7 @@ MonoBehaviour:
   m_OverrideTileSize: 0
   m_TileSize: 256
   m_OverrideVoxelSize: 0
-  m_VoxelSize: 0.26666668
+  m_VoxelSize: 0.1
   m_MinRegionArea: 2
   m_NavMeshData: {fileID: 23800000, guid: 0b94893fc5f4bf44db08b2e9df8f41b3, type: 2}
   m_BuildHeightMesh: 0
@@ -68102,6 +68102,63 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 4684516730059878303, guid: 3b52ff8f8a8e4ea478a4d00b4a5171c1, type: 3}
   m_PrefabInstance: {fileID: 2090037091984510042}
   m_PrefabAsset: {fileID: 0}
+--- !u!1001 &2714111503293207811
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4586766645871454519, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
+      propertyPath: m_Name
+      value: Arvore_Anime_01teste
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
 --- !u!1001 &3762315388999296538
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -70128,3 +70185,4 @@ SceneRoots:
   - {fileID: 1381360978}
   - {fileID: 1978727695}
   - {fileID: 896842512}
+  - {fileID: 2714111503293207811}
