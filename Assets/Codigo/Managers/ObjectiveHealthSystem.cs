@@ -50,11 +50,24 @@ public class ObjectiveHealthSystem : NetworkBehaviour
             localHealth = Mathf.Max(maxHealth, 1f);
             PublishHealthSnapshot();
         }
+        else if (NetworkObject != null && NetworkObject.IsSpawned)
+        {
+            // Adicionado via AddComponent em runtime após o NetworkObject ja ter spawnado.
+            // NGO nao chama OnNetworkSpawn() nesse caso — inicializamos manualmente.
+            InitializeNetworkState();
+        }
     }
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        InitializeNetworkState();
+    }
+
+    private void InitializeNetworkState()
+    {
+        if (isNetworkDriven)
+            return;
 
         isDead = false;
         isNetworkDriven = true;

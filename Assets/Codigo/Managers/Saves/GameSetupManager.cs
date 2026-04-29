@@ -190,21 +190,10 @@ public class GameSetupManager : NetworkBehaviour
     {
         if (ObjectiveHealthSystem.Instance != null) return;
 
-        GameObject prefab = new GameObject("ObjectiveHealthPrefab");
-        prefab.AddComponent<NetworkObject>();
-        prefab.AddComponent<ObjectiveHealthSystem>();
-        prefab.SetActive(false);
-        DontDestroyOnLoad(prefab);
-
-        if (!NetworkManager.Singleton.NetworkConfig.Prefabs.Contains(prefab))
-            NetworkManager.Singleton.NetworkConfig.Prefabs.Add(prefab);
-
-        GameObject instance = Instantiate(prefab);
-        instance.SetActive(true);
-        instance.name = "ObjectiveHealth";
-
-        if (instance.TryGetComponent<NetworkObject>(out NetworkObject netObj))
-            netObj.Spawn();
+        // Adiciona ObjectiveHealthSystem diretamente ao GameObject do GameSetupManager,
+        // que ja possui NetworkObject funcional. O NetworkVariable.currentHealth
+        // sincroniza automaticamente para todos os clientes.
+        gameObject.AddComponent<ObjectiveHealthSystem>();
     }
 
     public override void OnNetworkDespawn()
