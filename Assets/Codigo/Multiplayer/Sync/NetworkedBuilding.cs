@@ -226,6 +226,16 @@ namespace ExoBeasts.Multiplayer.Sync
             else if (pathIndex == 2) SupportLevel.Value = level;
         }
 
+        [ClientRpc]
+        public void BroadcastShieldVisualStateClientRpc(ulong targetNetId, bool isActive)
+        {
+            var shieldBehavior = GetComponent<DragonShieldGeneratorBehavior>();
+            if (shieldBehavior != null)
+            {
+                shieldBehavior.ApplyShieldVisualStateLocal(targetNetId, isActive);
+            }
+        }
+
         public override void OnNetworkDespawn()
         {
             DpsLevel.OnValueChanged -= OnAnyStateChanged;

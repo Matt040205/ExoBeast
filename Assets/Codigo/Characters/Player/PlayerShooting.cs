@@ -643,6 +643,13 @@ public class PlayerShooting : NetworkBehaviour
 
     private void PlayExplosionLocal(Vector3 position, float radius)
     {
+        // Se este cliente foi quem atirou (owner), aplica o ScreenShake baseado na força da explosão
+        if (IsOwner)
+        {
+            float shakeAmp = Mathf.Clamp(radius * 0.4f, 1f, 4f);
+            JuiceEvents.OnCameraShake?.Invoke(Vector3.down, shakeAmp, 12f, 0.25f);
+        }
+
         if (explosionVfxPrefab == null)
             return;
 

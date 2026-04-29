@@ -150,7 +150,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 0
+  GlobalObjectIdHash: 2606299847
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -173,4 +173,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   speed: 30
   maxLifetime: 2
-  impactEffectPrefab: {fileID: 0}
+  defaultImpactEffectPrefab: {fileID: 0}
+  characterImpactEffects:
+  - characterName: Coruja
+    impactPrefab: {fileID: 6306164957944565938, guid: b7dda20ef3905f244a40caa9995854f5, type: 3}

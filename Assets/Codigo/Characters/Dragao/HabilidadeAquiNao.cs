@@ -13,6 +13,10 @@ public class HabilidadeAquiNao : Ability
     [Header("Lógica")]
     public AquiNaoLogic logicPrefab;
 
+    [Header("VFX")]
+    [Tooltip("Efeito de corte/impacto ao usar a habilidade.")]
+    public GameObject slashVfxPrefab;
+
     [Header("FMOD")]
     [EventRef]
     public string sfxSwing = "event:/SFX/HammerSwing";

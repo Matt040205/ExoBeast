@@ -11,6 +11,9 @@ public class HabilidadePosturaBaluarte : Ability
     public float counterDamage = 50f;
     public float counterKnockback = 10f;
 
+    [Header("Visual")]
+    public GameObject shieldVfxPrefab;
+
     public PosturaBaluarteLogic logicPrefab;
 
     public override bool Activate(GameObject quemUsou)

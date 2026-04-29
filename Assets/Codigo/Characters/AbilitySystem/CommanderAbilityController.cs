@@ -197,6 +197,13 @@ public class CommanderAbilityController : NetworkBehaviour
             return;
 
         abilityCooldowns[ability] = ability.cooldown;
+
+        // VFX Global para a habilidade Aqui Não (todos os clientes veem)
+        if (ability is HabilidadeAquiNao aquiNaoAbility && aquiNaoAbility.slashVfxPrefab != null)
+        {
+            Quaternion rot = AbilityAimUtility.ResolveAimRotation(gameObject);
+            GlobalVFXPool.GetVFX(aquiNaoAbility.slashVfxPrefab, transform.position, rot, 1.5f);
+        }
     }
 
     public void StartLocalMergulhoTintaOwnerProxy(

@@ -18,6 +18,25 @@ public class TemorSismicoLogic : NetworkBehaviour
     private ulong attackerClientId;
     private PlayerHealthSystem attackerHealth;
 
+    // --- Efeitos Visuais ---
+    private GameObject groundSlashPrefab;
+    private int numberOfSlashes;
+    private float travelSpeed;
+    private float travelTime;
+    private float slowDownRate;
+    private float fadeOutGracePeriod;
+    private float totalLifeTime;
+
+    private class VisualSlash
+    {
+        public GameObject obj;
+        public UnityEngine.VFX.VisualEffect vfx;
+        public float timer;
+        public int state; // 0=traveling, 1=slowing, 2=fading
+        public float currentSpeed;
+    }
+    private System.Collections.Generic.List<VisualSlash> visualSlashes = new System.Collections.Generic.List<VisualSlash>();
+
     public void Setup(
         GameObject owner,
         float newRange,
@@ -27,7 +46,13 @@ public class TemorSismicoLogic : NetworkBehaviour
         float newKnockUpDuration,
         float newKnockUpForce,
         float newVulnerabilityMultiplier,
-        float newVulnerabilityDuration)
+        float newVulnerabilityDuration,
+        GameObject vfxPrefab,
+        int slashesCount,
+        float vfxSpeed,
+        float vfxTravelTime,
+        float vfxSlowRate,
+        float vfxFadeTime)
     {
         range = Mathf.Max(0f, newRange);
         angle = Mathf.Clamp(newAngle, 0f, 360f);
@@ -37,6 +62,15 @@ public class TemorSismicoLogic : NetworkBehaviour
         knockUpForce = Mathf.Max(0f, newKnockUpForce);
         vulnerabilityMultiplier = Mathf.Max(1f, newVulnerabilityMultiplier);
         vulnerabilityDuration = Mathf.Max(0f, newVulnerabilityDuration);
+        
+        groundSlashPrefab = vfxPrefab;
+        numberOfSlashes = Mathf.Max(1, slashesCount);
+        travelSpeed = vfxSpeed;
+        travelTime = vfxTravelTime;
+        slowDownRate = vfxSlowRate;
+        fadeOutGracePeriod = vfxFadeTime;
+        totalLifeTime = Mathf.Max(2f, travelTime + fadeOutGracePeriod + 0.5f);
+
         isConfigured = true;
 
         NetworkGameplayResolver.TryResolveAttackerFromPlayer(owner, out attackerClientId, out attackerHealth);
@@ -51,8 +85,9 @@ public class TemorSismicoLogic : NetworkBehaviour
         if (IsServer)
         {
             ApplyEffectsIfReady();
-            Invoke(nameof(DespawnSelf), 2f);
+            Invoke(nameof(DespawnSelf), totalLifeTime);
         }
+        SpawnVisualSlashes();
     }
 
     private void Start()
@@ -61,7 +96,8 @@ public class TemorSismicoLogic : NetworkBehaviour
         if (!isNetworkSession)
         {
             ApplyEffectsIfReady();
-            Destroy(gameObject, 2f);
+            SpawnVisualSlashes();
+            Destroy(gameObject, totalLifeTime);
         }
     }
 
@@ -113,6 +149,101 @@ public class TemorSismicoLogic : NetworkBehaviour
     {
         if (IsServer && NetworkObject.IsSpawned)
             NetworkObject.Despawn();
+    }
+
+    private void SpawnVisualSlashes()
+    {
+        if (groundSlashPrefab == null) return;
+        
+        float startingAngle = numberOfSlashes > 1 ? -angle / 2f : 0f;
+        float angleStep = numberOfSlashes > 1 ? angle / (numberOfSlashes - 1) : 0f;
+
+        for (int i = 0; i < numberOfSlashes; i++)
+        {
+            float currentAngle = startingAngle + (angleStep * i);
+            Quaternion rotationOffset = Quaternion.Euler(0f, currentAngle, 0f);
+            Quaternion finalRotation = transform.rotation * rotationOffset;
+
+            GameObject slashObj = Instantiate(groundSlashPrefab, transform.position, finalRotation);
+            
+            // Remove scripts antigos se existirem no prefab para evitar conflitos
+            var oldScript = slashObj.GetComponent("GroundSlash");
+            if (oldScript != null) Destroy(oldScript);
+            var oldShooter = slashObj.GetComponent("GroundSlashShooter");
+            if (oldShooter != null) Destroy(oldShooter);
+            var rb = slashObj.GetComponent<Rigidbody>();
+            if (rb != null) Destroy(rb); // Movimentação será feita via Transform
+
+            VisualSlash vs = new VisualSlash
+            {
+                obj = slashObj,
+                vfx = slashObj.GetComponent<UnityEngine.VFX.VisualEffect>(),
+                timer = 0f,
+                state = 0,
+                currentSpeed = travelSpeed
+            };
+            visualSlashes.Add(vs);
+        }
+    }
+
+    private void Update()
+    {
+        for (int i = visualSlashes.Count - 1; i >= 0; i--)
+        {
+            var vs = visualSlashes[i];
+            if (vs.obj == null)
+            {
+                visualSlashes.RemoveAt(i);
+                continue;
+            }
+
+            vs.timer += Time.deltaTime;
+
+            if (vs.state == 0) // Traveling
+            {
+                MoveSlash(vs);
+                if (vs.timer >= travelTime)
+                {
+                    vs.state = 1; // Slowing
+                    vs.timer = 0f;
+                }
+            }
+            else if (vs.state == 1) // Slowing down
+            {
+                vs.currentSpeed -= slowDownRate * travelSpeed * Time.deltaTime;
+                if (vs.currentSpeed <= 0)
+                {
+                    vs.currentSpeed = 0;
+                    vs.state = 2; // Fading
+                    vs.timer = 0f;
+                    if (vs.vfx != null) vs.vfx.Stop();
+                }
+                else
+                {
+                    MoveSlash(vs);
+                }
+            }
+            else if (vs.state == 2) // Fading
+            {
+                if (vs.timer >= fadeOutGracePeriod)
+                {
+                    Destroy(vs.obj);
+                    visualSlashes.RemoveAt(i);
+                }
+            }
+        }
+    }
+
+    private void MoveSlash(VisualSlash vs)
+    {
+        Transform t = vs.obj.transform;
+        t.position += t.forward * vs.currentSpeed * Time.deltaTime;
+
+        Vector3 rayStart = t.position + Vector3.up * 1f;
+        if (Physics.Raycast(rayStart, Vector3.down, out RaycastHit hit, 3f))
+        {
+            t.position = new Vector3(t.position.x, hit.point.y, t.position.z);
+        }
     }
 
     private void OnDrawGizmosSelected()

@@ -45,8 +45,6 @@ public class PlayerHealthSystem : NetworkBehaviour
     [Header("Materializacao (Spawn)")]
     [SerializeField] private float tempoDeSpawn = 2f;
     [SerializeField] private Material materialHolograma;
-    [SerializeField] private Material materialToon;
-    [SerializeField] private Material materialOutline;
 
     public event Action OnHealthChanged;
     public event Action<float> OnDamageDealt;
@@ -303,7 +301,7 @@ public class PlayerHealthSystem : NetworkBehaviour
         {
             Renderer[] allRenderers = GetComponentsInChildren<Renderer>(true);
             System.Collections.Generic.List<Renderer> targetRenderers = new System.Collections.Generic.List<Renderer>();
-            System.Collections.Generic.Dictionary<Renderer, Texture> originalTextures = new System.Collections.Generic.Dictionary<Renderer, Texture>();
+            System.Collections.Generic.Dictionary<Renderer, Material[]> originalMaterials = new System.Collections.Generic.Dictionary<Renderer, Material[]>();
 
             foreach (Renderer renderer in allRenderers)
             {
@@ -311,20 +309,19 @@ public class PlayerHealthSystem : NetworkBehaviour
                     continue;
 
                 targetRenderers.Add(renderer);
-
-                if (renderer.sharedMaterial == null)
-                    continue;
-
-                if (renderer.sharedMaterial.HasProperty("_BaseMap"))
-                    originalTextures[renderer] = renderer.sharedMaterial.GetTexture("_BaseMap");
-                else if (renderer.sharedMaterial.HasProperty("_MainTex"))
-                    originalTextures[renderer] = renderer.sharedMaterial.GetTexture("_MainTex");
+                originalMaterials[renderer] = renderer.materials; // Salva o array de materiais original
             }
 
             if (materialHolograma != null)
             {
                 foreach (Renderer renderer in targetRenderers)
-                    renderer.material = materialHolograma;
+                {
+                    // Se o mesh tem múltiplos materiais (ex: corpo, roupa), preenche todos com o holograma
+                    Material[] holoMaterials = new Material[renderer.materials.Length];
+                    for (int i = 0; i < holoMaterials.Length; i++)
+                        holoMaterials[i] = materialHolograma;
+                    renderer.materials = holoMaterials;
+                }
             }
 
             float elapsedTime = 0f;
@@ -337,29 +334,25 @@ public class PlayerHealthSystem : NetworkBehaviour
                 {
                     foreach (Renderer renderer in targetRenderers)
                     {
-                        if (renderer.material.HasProperty("Proguesso_Holograma"))
-                            renderer.material.SetFloat("Proguesso_Holograma", progress);
+                        foreach (Material mat in renderer.materials)
+                        {
+                            if (mat.HasProperty("Progresso_Holograma"))
+                                mat.SetFloat("Progresso_Holograma", progress);
+                            else if (mat.HasProperty("_Progresso_Holograma"))
+                                mat.SetFloat("_Progresso_Holograma", progress);
+                        }
                     }
                 }
 
                 yield return null;
             }
 
-            if (materialToon != null && materialOutline != null)
+            // Restaura os materiais originais exatamente como eram
+            foreach (Renderer renderer in targetRenderers)
             {
-                foreach (Renderer renderer in targetRenderers)
+                if (originalMaterials.TryGetValue(renderer, out Material[] origMats))
                 {
-                    Material toonInstance = new Material(materialToon);
-
-                    if (originalTextures.TryGetValue(renderer, out Texture originalTexture) && originalTexture != null)
-                    {
-                        if (toonInstance.HasProperty("_BaseMap"))
-                            toonInstance.SetTexture("_BaseMap", originalTexture);
-                        else if (toonInstance.HasProperty("_MainTex"))
-                            toonInstance.SetTexture("_MainTex", originalTexture);
-                    }
-
-                    renderer.materials = new[] { toonInstance, materialOutline };
+                    renderer.materials = origMats;
                 }
             }
         }

@@ -8,6 +8,9 @@ public class DragonShieldGeneratorBehavior : TowerBehavior
     public float auraRange = 10f;
     public LayerMask allyLayer;
 
+    [Header("Visual")]
+    public GameObject shieldVfxPrefab;
+
     public override void Initialize(TowerController owner)
     {
         base.Initialize(owner);
@@ -34,9 +37,62 @@ public class DragonShieldGeneratorBehavior : TowerBehavior
                     AllyShield shield = ally.GetComponent<AllyShield>();
                     if (shield == null) shield = ally.gameObject.AddComponent<AllyShield>();
                     
-                    shield.ApplyShield(shieldAmount, towerController, canExplode);
+                    if (ally.TryGetComponent<NetworkObject>(out NetworkObject netObj))
+                    {
+                        shield.ApplyShield(shieldAmount, towerController, canExplode, netObj.NetworkObjectId, SendShieldBrokenRPC);
+                        SetShieldVisualState(netObj.NetworkObjectId, true);
+                    }
+                    else
+                    {
+                        shield.ApplyShield(shieldAmount, towerController, canExplode);
+                    }
                 }
             }
+        }
+    }
+
+    private void SendShieldBrokenRPC(ulong targetNetId)
+    {
+        if (towerController != null && towerController.GetComponent<NetworkObject>() != null && towerController.GetComponent<NetworkObject>().IsSpawned)
+        {
+            SetShieldVisualState(targetNetId, false);
+        }
+        else
+        {
+            // Fallback seguro caso essa torre tenha sido destruída, mas o escudo do alvo acabou de quebrar
+            DragonShieldGeneratorBehavior anyTower = FindFirstObjectByType<DragonShieldGeneratorBehavior>();
+            if (anyTower != null && anyTower.towerController != null && anyTower.towerController.GetComponent<NetworkObject>() != null && anyTower.towerController.GetComponent<NetworkObject>().IsSpawned)
+            {
+                anyTower.SetShieldVisualState(targetNetId, false);
+            }
+        }
+    }
+
+    private void SetShieldVisualState(ulong targetNetId, bool isActive)
+    {
+        if (towerController != null)
+        {
+            var networkedBuilding = towerController.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>();
+            if (networkedBuilding != null && networkedBuilding.IsSpawned)
+            {
+                networkedBuilding.BroadcastShieldVisualStateClientRpc(targetNetId, isActive);
+            }
+        }
+    }
+
+    public void ApplyShieldVisualStateLocal(ulong targetNetId, bool isActive)
+    {
+        if (shieldVfxPrefab == null || NetworkManager.Singleton == null) return;
+        
+        if (NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(targetNetId, out NetworkObject targetNetObj))
+        {
+            AllyShieldVisual visual = targetNetObj.GetComponent<AllyShieldVisual>();
+            if (visual == null)
+            {
+                visual = targetNetObj.gameObject.AddComponent<AllyShieldVisual>();
+                visual.shieldPrefab = shieldVfxPrefab;
+            }
+            visual.SetActive(isActive);
         }
     }
 }

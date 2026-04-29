@@ -22,6 +22,14 @@ public class HabilidadeTemorSismico : Ability
 
     [Header("Visual e Logica")]
     public TemorSismicoLogic logicPrefab;
+    
+    [Header("Efeito Visual (Ground Slash)")]
+    public GameObject groundSlashPrefab;
+    public int numberOfSlashes = 3;
+    public float travelSpeed = 14f;
+    public float travelTime = 1.5f;
+    public float slowDownRate = 0.5f;
+    public float fadeOutGracePeriod = 2.0f;
 
     [Header("FMOD")]
     [EventRef]
@@ -56,7 +64,13 @@ public class HabilidadeTemorSismico : Ability
             knockUpDuration,
             knockUpForce,
             vulnerabilityMultiplier,
-            vulnerabilityDuration);
+            vulnerabilityDuration,
+            groundSlashPrefab,
+            numberOfSlashes,
+            travelSpeed,
+            travelTime,
+            slowDownRate,
+            fadeOutGracePeriod);
 
         bool isNetworkSession = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
         if (isNetworkSession && logic.TryGetComponent(out NetworkObject netObj))

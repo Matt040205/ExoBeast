@@ -18,7 +18,19 @@ public class ProjectileVisual : MonoBehaviour
     [Header("Configurações")]
     public float speed = 80f;
     public float maxLifetime = 2f;
-    public GameObject impactEffectPrefab;
+    
+    [System.Serializable]
+    public struct CharacterImpact
+    {
+        [Tooltip("Parte do nome do personagem (ex: 'Coruja', 'Raposa', 'Polvo')")]
+        public string characterName;
+        public GameObject impactPrefab;
+    }
+
+    [Header("Efeitos de Impacto")]
+    [Tooltip("Efeito padrão caso o personagem não tenha um específico na lista.")]
+    public GameObject defaultImpactEffectPrefab;
+    public CharacterImpact[] characterImpactEffects;
 
     private float damage;
     private bool isCritical;
@@ -106,9 +118,31 @@ public class ProjectileVisual : MonoBehaviour
         hasHit = true;
         rb.linearVelocity = Vector3.zero;
 
-        if (impactEffectPrefab != null)
+        GameObject effectToSpawn = defaultImpactEffectPrefab;
+
+        if (characterImpactEffects != null && characterImpactEffects.Length > 0 && playerHealth != null)
         {
-            Instantiate(impactEffectPrefab, transform.position, Quaternion.LookRotation(other.transform.position - transform.position));
+            PlayerShooting shooting = playerHealth.GetComponent<PlayerShooting>();
+            if (shooting != null && shooting.characterData != null)
+            {
+                string charName = shooting.characterData.name.ToLower();
+                foreach (var impactDef in characterImpactEffects)
+                {
+                    if (!string.IsNullOrEmpty(impactDef.characterName) && charName.Contains(impactDef.characterName.ToLower()))
+                    {
+                        if (impactDef.impactPrefab != null)
+                        {
+                            effectToSpawn = impactDef.impactPrefab;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (effectToSpawn != null)
+        {
+            Instantiate(effectToSpawn, transform.position, Quaternion.LookRotation(other.transform.position - transform.position));
         }
 
         // Dano apenas para o owner (damage > 0 = projetil do jogador local)

@@ -572,7 +572,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 1429348622
+  GlobalObjectIdHash: 983681037
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -600,6 +600,7 @@ MonoBehaviour:
   rotationSpeed: 15
   cameraController: {fileID: 0}
   modelPivot: {fileID: 4237064630503924919}
+  doubleJumpVfxPrefab: {fileID: 0}
   aimRig: {fileID: 2734900487233724365}
   aimConstraint: {fileID: 143155106745808703}
   aimLayerMask:
@@ -635,6 +636,12 @@ MonoBehaviour:
   projectileVisualPrefab: {fileID: 2027974582639016208, guid: e3fa2040e19007744b3937f9244f4c9f, type: 3}
   impactEffectPrefab: {fileID: 0}
   muzzleFlashPrefab: {fileID: 0}
+  explosionVfxPrefab: {fileID: 0}
+  explosionVfxRadiusParam: Radius
+  empoweredShotShake:
+    amplitude: 3
+    frequency: 0.5
+    duration: 0.3
   aimTarget: {fileID: 0}
   aimTargetDistance: 20
   tipoDeSom: Arma
@@ -697,6 +704,8 @@ MonoBehaviour:
   isBuffed: 0
   isCountering: 0
   respawnPointNameOrTag: RespawnPoint
+  tempoDeSpawn: 2
+  materialHolograma: {fileID: 2100000, guid: 1887a21d31dc40a45b3ccb1841ba2a58, type: 2}
 --- !u!114 &6853114845528409664
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -739,6 +748,11 @@ MonoBehaviour:
     sfxHit2: 
     sfxHit3: 
     sfxHit4: 
+  slashVfxPrefab: {fileID: 0}
+  ultimateHitShake:
+    amplitude: 0.8
+    frequency: 15
+    duration: 0.1
 --- !u!114 &4810200277711100742
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -807,6 +821,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dde71cdb55b1ac14895f5f0b20cdc898, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverVfxPrefab: {fileID: 0}
 --- !u!114 &1514725371722067090
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -822,6 +837,10 @@ MonoBehaviour:
   effectParticles: {fileID: 0}
   beamVisualPrefab: {fileID: 0}
   visualDuration: 0.5
+  ultimateShake:
+    amplitude: 5
+    frequency: 5
+    duration: 0.6
 --- !u!114 &5783181433193836938
 MonoBehaviour:
   m_ObjectHideFlags: 0

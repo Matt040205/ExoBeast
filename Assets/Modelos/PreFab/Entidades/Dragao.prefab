@@ -169,7 +169,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 2725242546
+  GlobalObjectIdHash: 4263055735
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -242,9 +242,7 @@ MonoBehaviour:
   isCountering: 0
   respawnPointNameOrTag: RespawnPoint
   tempoDeSpawn: 2
-  materialHolograma: {fileID: 0}
-  materialToon: {fileID: 0}
-  materialOutline: {fileID: 0}
+  materialHolograma: {fileID: 2100000, guid: 1887a21d31dc40a45b3ccb1841ba2a58, type: 2}
 --- !u!114 &3604938808364530052
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -287,6 +285,7 @@ MonoBehaviour:
     sfxHit2: event:/SFX/
     sfxHit3: event:/SFX/
     sfxHit4: event:/SFX/
+  slashVfxPrefab: {fileID: 0}
   ultimateHitShake:
     amplitude: 0.8
     frequency: 15
@@ -552,6 +551,18 @@ MonoBehaviour:
         m_CallState: 2
     m_ActionId: 5122d884-93dc-4d01-b917-87e27b63dafa
     m_ActionName: 'Player/Pause[/Keyboard/p]'
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 2e6f5a43-1f4b-4421-9aef-0dfce17d1c01
+    m_ActionName: 'Player/Ability1[/Keyboard/q]'
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: a8bc8d5a-38a4-4a9b-a270-998ad8cfae14
+    m_ActionName: 'Player/Ability2[/Keyboard/e]'
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 4dfce0f4-5bf9-4be0-b17d-19c9a0550d92
+    m_ActionName: 'Player/Ultimate[/Keyboard/x]'
   m_NeverAutoSwitchControlSchemes: 0
   m_DefaultControlScheme: 
   m_DefaultActionMap: Player
@@ -620,6 +631,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b79657e49eccd0f4ebae13d0c0d67bb9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &-6223414218303703111
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 15912487291283997}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97b8766a9f6744f48ec35cd775daaa15, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  IsActive:
+    m_InternalValue: 0
 --- !u!1 &2229213434603997921
 GameObject:
   m_ObjectHideFlags: 0
@@ -1036,18 +1061,3 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 412044681694345357, guid: 757a95b4422eb104491b30f3b53f3984, type: 3}
   m_PrefabInstance: {fileID: 1362177637827946169}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &-6223414218303703111
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 15912487291283997}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 97b8766a9f6744f48ec35cd775daaa15, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  frontalBlockDot: 0.15
-  IsActive:
-    m_InternalValue: 0

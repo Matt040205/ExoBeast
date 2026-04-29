@@ -6,10 +6,15 @@ public class AllyShield : MonoBehaviour
     public bool IsActive => CurrentShield > 0;
     private bool explodeOnBreak = false;
 
-    public void ApplyShield(float amount, TowerController source, bool canExplode)
+    private System.Action<ulong> onShieldBrokenRPC;
+    private ulong targetNetId;
+
+    public void ApplyShield(float amount, TowerController source, bool canExplode, ulong netId = 0, System.Action<ulong> rpcCallback = null)
     {
         CurrentShield = amount;
         explodeOnBreak = canExplode;
+        targetNetId = netId;
+        onShieldBrokenRPC = rpcCallback;
     }
 
     public float AbsorbDamage(float damage)
@@ -25,6 +30,10 @@ public class AllyShield : MonoBehaviour
             CurrentShield = 0;
             // Shield quebrou!
             if (explodeOnBreak) TriggerBreakExplosion();
+            
+            if (onShieldBrokenRPC != null && targetNetId != 0)
+                onShieldBrokenRPC.Invoke(targetNetId);
+
             return remainder;
         }
     }

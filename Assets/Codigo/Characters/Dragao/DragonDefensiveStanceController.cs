@@ -19,6 +19,7 @@ public class DragonDefensiveStanceController : NetworkBehaviour
     private PlayerCombatManager combatManager;
     private LocalPlayerInputBridge inputBridge;
     private PlayerInput playerInput;
+    private CommanderAbilityController abilityController;
 
     private Coroutine activeRoutine;
     private Coroutine tauntRoutine;
@@ -30,6 +31,8 @@ public class DragonDefensiveStanceController : NetworkBehaviour
     private float tauntTickInterval;
     private ulong ownerClientId;
     private PlayerHealthSystem ownerHealth;
+
+    private GameObject currentShieldVfx;
 
     private bool movementWasEnabled;
     private bool shootingWasEnabled;
@@ -215,6 +218,40 @@ public class DragonDefensiveStanceController : NetworkBehaviour
             playerHealth.isCountering = isActive;
 
         ApplyOwnerGameplaySuppression(isActive);
+
+        // Lógica Visual do Escudo
+        if (isActive)
+        {
+            if (currentShieldVfx == null)
+            {
+                GameObject shieldPrefab = GetShieldPrefab();
+                if (shieldPrefab != null)
+                {
+                    // Spawna na frente do personagem e parenteado nele para acompanhar o movimento
+                    Vector3 spawnPos = transform.position + transform.forward * 1.0f + Vector3.up * 1f;
+                    currentShieldVfx = Instantiate(shieldPrefab, spawnPos, transform.rotation, transform);
+                }
+            }
+        }
+        else
+        {
+            if (currentShieldVfx != null)
+            {
+                Destroy(currentShieldVfx);
+                currentShieldVfx = null;
+            }
+        }
+    }
+
+    private GameObject GetShieldPrefab()
+    {
+        if (abilityController != null && abilityController.characterData != null)
+        {
+            if (abilityController.characterData.ability1 is HabilidadePosturaBaluarte b1) return b1.shieldVfxPrefab;
+            if (abilityController.characterData.ability2 is HabilidadePosturaBaluarte b2) return b2.shieldVfxPrefab;
+            if (abilityController.characterData.ultimate is HabilidadePosturaBaluarte u) return u.shieldVfxPrefab;
+        }
+        return null;
     }
 
     private void ApplyOwnerGameplaySuppression(bool isActive)
@@ -294,5 +331,8 @@ public class DragonDefensiveStanceController : NetworkBehaviour
 
         if (playerInput == null)
             playerInput = GetComponent<PlayerInput>();
+
+        if (abilityController == null)
+            abilityController = GetComponent<CommanderAbilityController>();
     }
 }
