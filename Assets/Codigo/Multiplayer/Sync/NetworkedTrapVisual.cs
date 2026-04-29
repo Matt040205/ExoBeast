@@ -32,7 +32,9 @@ namespace ExoBeasts.Multiplayer.Sync
 
         private TrapDataSO trapData;
         private Animator cachedAnimator;
-        private bool isBeingSold;
+        private bool isBeingRemoved;
+        private bool isRegisteredWithBuildManager;
+        private int registeredTrapIndex = -1;
 
         public TrapDataSO TrapData
         {
@@ -54,12 +56,12 @@ namespace ExoBeasts.Multiplayer.Sync
             ResolveTrapData();
             ResolveAnimator();
             ApplyActivationState(IsActivated.Value);
+            ReconcileTrapRegistrationServer();
         }
 
         public override void OnNetworkDespawn()
         {
-            if (IsServer && !isBeingSold && BuildManager.Instance != null)
-                BuildManager.Instance.DecrementTrapCount(TrapIndex.Value);
+            UnregisterFromBuildManagerServer();
 
             TrapIndex.OnValueChanged -= OnTrapIndexChanged;
             IsActivated.OnValueChanged -= OnActivationChanged;
@@ -75,6 +77,12 @@ namespace ExoBeasts.Multiplayer.Sync
             TrapIndex.Value = trapIndex;
             LogicObjectId.Value = logicObjectId;
             ResolveTrapData();
+            ReconcileTrapRegistrationServer();
+        }
+
+        public void EnsureRegisteredServer()
+        {
+            ReconcileTrapRegistrationServer();
         }
 
         public void SetActivationStateServer(bool isActivated)
@@ -98,35 +106,32 @@ namespace ExoBeasts.Multiplayer.Sync
             RequestSellServerRpc();
         }
 
+        public void MarkBeingRemovedServer()
+        {
+            if (!IsServer)
+                return;
+
+            isBeingRemoved = true;
+        }
+
         [ServerRpc(RequireOwnership = false)]
         private void RequestSellServerRpc(ServerRpcParams rpcParams = default)
         {
-            if (!IsServer || !CanRequesterModify(rpcParams.Receive.SenderClientId))
+            if (!IsServer || isBeingRemoved || !CanRequesterModify(rpcParams.Receive.SenderClientId))
                 return;
 
+            isBeingRemoved = true;
+
+            if (TryResolveLinkedLogic(out TrapLogicBase trapLogic))
+            {
+                trapLogic.DestroyTrapServer(true);
+                return;
+            }
+
             ResolveTrapData();
-            if (trapData != null && CurrencyManager.Instance != null)
-            {
-                int geoditeRefund = Mathf.FloorToInt(trapData.geoditeCost * sellRefundPercentage);
-                int etherRefund = Mathf.FloorToInt(trapData.darkEtherCost * sellRefundPercentage);
+            GrantRefundServer();
 
-                if (geoditeRefund > 0)
-                    CurrencyManager.Instance.AddCurrency(geoditeRefund, CurrencyType.Geodites);
-
-                if (etherRefund > 0)
-                    CurrencyManager.Instance.AddCurrency(etherRefund, CurrencyType.DarkEther);
-            }
-
-            if (BuildManager.Instance != null)
-                BuildManager.Instance.DecrementTrapCount(TrapIndex.Value);
-            isBeingSold = true;
-
-            if (LogicObjectId.Value != 0 &&
-                NetworkManager.Singleton != null &&
-                NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(LogicObjectId.Value, out NetworkObject logicObject))
-            {
-                logicObject.Despawn(true);
-            }
+            DespawnLinkedLogicIfPresent();
 
             if (NetworkObject != null && NetworkObject.IsSpawned)
                 NetworkObject.Despawn(true);
@@ -137,6 +142,7 @@ namespace ExoBeasts.Multiplayer.Sync
         private void OnTrapIndexChanged(int oldValue, int newValue)
         {
             ResolveTrapData();
+            ReconcileTrapRegistrationServer();
         }
 
         private void OnActivationChanged(bool oldValue, bool newValue)
@@ -162,6 +168,93 @@ namespace ExoBeasts.Multiplayer.Sync
         private void ResolveTrapData()
         {
             trapData = BuildManager.Instance?.GetTrapDataByIndex(TrapIndex.Value);
+        }
+
+        private void ReconcileTrapRegistrationServer()
+        {
+            if (!IsServer)
+                return;
+
+            BuildManager buildManager = BuildManager.Instance;
+            if (buildManager == null)
+                return;
+
+            int desiredTrapIndex = TrapIndex.Value;
+            if (isRegisteredWithBuildManager && registeredTrapIndex == desiredTrapIndex)
+                return;
+
+            if (isRegisteredWithBuildManager)
+            {
+                buildManager.UnregisterTrapInstance(registeredTrapIndex, NetworkObjectId);
+                isRegisteredWithBuildManager = false;
+                registeredTrapIndex = -1;
+            }
+
+            if (!IsSpawned || desiredTrapIndex < 0)
+                return;
+
+            buildManager.RegisterTrapInstance(desiredTrapIndex, NetworkObjectId);
+            isRegisteredWithBuildManager = true;
+            registeredTrapIndex = desiredTrapIndex;
+        }
+
+        private void UnregisterFromBuildManagerServer()
+        {
+            if (!IsServer || !isRegisteredWithBuildManager)
+                return;
+
+            if (BuildManager.Instance != null)
+                BuildManager.Instance.UnregisterTrapInstance(registeredTrapIndex, NetworkObjectId);
+
+            isRegisteredWithBuildManager = false;
+            registeredTrapIndex = -1;
+        }
+
+        private bool TryResolveLinkedLogic(out TrapLogicBase trapLogic)
+        {
+            trapLogic = null;
+
+            if (LogicObjectId.Value == 0 ||
+                NetworkManager.Singleton == null ||
+                !NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(LogicObjectId.Value, out NetworkObject logicObject))
+            {
+                return false;
+            }
+
+            trapLogic = logicObject.GetComponent<TrapLogicBase>();
+            return trapLogic != null;
+        }
+
+        private void DespawnLinkedLogicIfPresent()
+        {
+            if (LogicObjectId.Value == 0 ||
+                NetworkManager.Singleton == null ||
+                !NetworkManager.Singleton.SpawnManager.SpawnedObjects.TryGetValue(LogicObjectId.Value, out NetworkObject logicObject))
+            {
+                return;
+            }
+
+            if (logicObject.TryGetComponent(out TrapLogicBase trapLogic))
+                trapLogic.DestroyTrapServer(false);
+            else if (logicObject.IsSpawned)
+                logicObject.Despawn(true);
+            else
+                Destroy(logicObject.gameObject);
+        }
+
+        private void GrantRefundServer()
+        {
+            if (trapData == null || CurrencyManager.Instance == null)
+                return;
+
+            int geoditeRefund = Mathf.FloorToInt(trapData.geoditeCost * sellRefundPercentage);
+            int etherRefund = Mathf.FloorToInt(trapData.darkEtherCost * sellRefundPercentage);
+
+            if (geoditeRefund > 0)
+                CurrencyManager.Instance.AddCurrency(geoditeRefund, CurrencyType.Geodites);
+
+            if (etherRefund > 0)
+                CurrencyManager.Instance.AddCurrency(etherRefund, CurrencyType.DarkEther);
         }
 
         private bool CanRequesterModify(ulong senderClientId)

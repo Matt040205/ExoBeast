@@ -31,6 +31,30 @@ public abstract class TrapLogicBase : NetworkBehaviour
         RequestSellServerRpc();
     }
 
+    public void DestroyTrapServer(bool grantRefund)
+    {
+        if (!IsServer || iSBeingSoldOrDestroyed)
+            return;
+
+        iSBeingSoldOrDestroyed = true;
+
+        if (grantRefund)
+            GrantRefundServer();
+
+        if (TryResolveVisual(out ExoBeasts.Multiplayer.Sync.NetworkedTrapVisual trapVisual) &&
+            trapVisual.NetworkObject != null &&
+            trapVisual.NetworkObject.IsSpawned)
+        {
+            trapVisual.MarkBeingRemovedServer();
+            trapVisual.NetworkObject.Despawn(true);
+        }
+
+        if (TryGetComponent(out NetworkObject netObj) && netObj.IsSpawned)
+            netObj.Despawn(true);
+        else
+            Destroy(gameObject);
+    }
+
     protected bool TryResolveVisual(out ExoBeasts.Multiplayer.Sync.NetworkedTrapVisual trapVisual)
     {
         trapVisual = null;
@@ -52,31 +76,22 @@ public abstract class TrapLogicBase : NetworkBehaviour
         if (iSBeingSoldOrDestroyed || !CanRequesterModify(rpcParams.Receive.SenderClientId))
             return;
 
-        iSBeingSoldOrDestroyed = true;
+        DestroyTrapServer(true);
+    }
 
-        if (trapData != null && CurrencyManager.Instance != null)
-        {
-            int geoditeRefund = Mathf.FloorToInt(trapData.geoditeCost * sellRefundPercentage);
-            int etherRefund = Mathf.FloorToInt(trapData.darkEtherCost * sellRefundPercentage);
+    private void GrantRefundServer()
+    {
+        if (trapData == null || CurrencyManager.Instance == null)
+            return;
 
-            if (geoditeRefund > 0)
-                CurrencyManager.Instance.AddCurrency(geoditeRefund, CurrencyType.Geodites);
+        int geoditeRefund = Mathf.FloorToInt(trapData.geoditeCost * sellRefundPercentage);
+        int etherRefund = Mathf.FloorToInt(trapData.darkEtherCost * sellRefundPercentage);
 
-            if (etherRefund > 0)
-                CurrencyManager.Instance.AddCurrency(etherRefund, CurrencyType.DarkEther);
-        }
+        if (geoditeRefund > 0)
+            CurrencyManager.Instance.AddCurrency(geoditeRefund, CurrencyType.Geodites);
 
-        if (TryResolveVisual(out ExoBeasts.Multiplayer.Sync.NetworkedTrapVisual trapVisual) &&
-            trapVisual.NetworkObject != null &&
-            trapVisual.NetworkObject.IsSpawned)
-        {
-            trapVisual.NetworkObject.Despawn(true);
-        }
-
-        if (TryGetComponent(out NetworkObject netObj) && netObj.IsSpawned)
-            netObj.Despawn(true);
-        else
-            Destroy(gameObject);
+        if (etherRefund > 0)
+            CurrencyManager.Instance.AddCurrency(etherRefund, CurrencyType.DarkEther);
     }
 
     private bool CanRequesterModify(ulong senderClientId)

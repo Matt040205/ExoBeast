@@ -46,7 +46,7 @@ public class GameSetupManager : NetworkBehaviour
             foreach (var clientId in NetworkManager.Singleton.ConnectedClientsIds)
                 SpawnPlayerServerSide(clientId);
 
-            SpawnObjectiveHealth();
+            ValidateObjectiveHealthSetup();
         }
     }
 
@@ -186,14 +186,20 @@ public class GameSetupManager : NetworkBehaviour
             BuildManager.Instance.SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);
     }
 
-    private void SpawnObjectiveHealth()
+    private void ValidateObjectiveHealthSetup()
     {
-        if (ObjectiveHealthSystem.Instance != null) return;
+        ObjectiveHealthSystem objectiveHealthSystem = GetComponent<ObjectiveHealthSystem>();
+        if (objectiveHealthSystem == null)
+        {
+            Debug.LogError("[GameSetupManager] ObjectiveHealthSystem ausente em 'ManagersDaPartida'. Adicione o componente na cena para sincronizar a vida da base no multiplayer.");
+            return;
+        }
 
-        // Adiciona ObjectiveHealthSystem diretamente ao GameObject do GameSetupManager,
-        // que ja possui NetworkObject funcional. O NetworkVariable.currentHealth
-        // sincroniza automaticamente para todos os clientes.
-        gameObject.AddComponent<ObjectiveHealthSystem>();
+        if (ObjectiveHealthSystem.Instance != objectiveHealthSystem)
+        {
+            Debug.LogError("[GameSetupManager] Objetivo com instancia inconsistente. Verifique duplicatas de ObjectiveHealthSystem na cena.");
+            return;
+        }
     }
 
     public override void OnNetworkDespawn()

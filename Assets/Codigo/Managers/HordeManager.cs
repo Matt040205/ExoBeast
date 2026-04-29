@@ -424,7 +424,11 @@ public class HordeManager : NetworkBehaviour
 
         if (enemyData == null || enemyData.enemyPrefab == null)
         {
-            Debug.LogWarning($"[HordeManager] enemyTypes[{enemyTypeIndex}] é null ou sem prefab! Pulando spawn.");
+            // Prefab null em build significa referência quebrada de prefab variant no ScriptableObject.
+            // Decrementar para não travar a onda (esse slot nunca terá inimigo para matar).
+            Debug.LogError($"[HordeManager] enemyTypes[{enemyTypeIndex}] é null ou sem prefab em runtime! " +
+                           "Re-arraste o prefab no Inspector do ScriptableObject e no DefaultNetworkPrefabs.");
+            ResolveFailedSpawnSlot();
             return;
         }
 
@@ -447,15 +451,27 @@ public class HordeManager : NetworkBehaviour
                 netObj.Spawn(true);
         }
 
-        if (newEnemy != null)
+        if (newEnemy == null)
         {
-            EnemyController enemyController = newEnemy.GetComponent<EnemyController>();
-            if (enemyController != null)
-            {
-                Transform target = GetRandomPlayerTarget();
-                enemyController.InitializeEnemy(target, selectedPath.patrolPoints, enemyData, CurrentHorde, pathIndex >= 0 ? pathIndex : 0);
-            }
+            Debug.LogError($"[HordeManager] Spawn retornou null para tipo '{enemyData.name}' (índice {enemyTypeIndex}). " +
+                           "Verifique o DefaultNetworkPrefabs e o registro do EnemyPoolManager.");
+            ResolveFailedSpawnSlot();
+            return;
         }
+
+        EnemyController enemyController = newEnemy.GetComponent<EnemyController>();
+        if (enemyController != null)
+        {
+            Transform target = GetRandomPlayerTarget();
+            enemyController.InitializeEnemy(target, selectedPath.patrolPoints, enemyData, CurrentHorde, pathIndex);
+        }
+    }
+
+    private void ResolveFailedSpawnSlot()
+    {
+        EnemiesRemaining = Mathf.Max(0, EnemiesRemaining - 1);
+        if (EnemiesRemaining <= 0 && WaveActive && enemiesSpawnedCount >= enemiesToSpawnTotal)
+            OnWaveCompleted();
     }
 
     // ════════════════════════════════════════════════════

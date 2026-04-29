@@ -37,6 +37,8 @@ public class MergulhoTintaLogic : MonoBehaviour
 
     private Material _diveShaderMaterial;
     private float _dissolveDuration;
+    private Sprite _fallbackPuddleSprite;
+    private float _fallbackPuddleWorldSize = 4.5f;
     private readonly Dictionary<SkinnedMeshRenderer, Material[]> originalSkinnedMaterials = new Dictionary<SkinnedMeshRenderer, Material[]>();
     private readonly List<Material> dissolveInstances = new List<Material>();
     private Coroutine dissolveCoroutine;
@@ -84,6 +86,8 @@ public class MergulhoTintaLogic : MonoBehaviour
         {
             _diveShaderMaterial = mta.diveShaderMaterial;
             _dissolveDuration = Mathf.Max(0.1f, mta.dissolveDuration);
+            _fallbackPuddleSprite = mta.fallbackPuddleSprite;
+            _fallbackPuddleWorldSize = Mathf.Max(0.1f, mta.fallbackPuddleWorldSize);
         }
         isLocalProxy = networkObject != null && networkObject.IsSpawned && !HasServerAuthority;
 
@@ -161,11 +165,7 @@ public class MergulhoTintaLogic : MonoBehaviour
                     renderer.enabled = false;
             }
 
-            if (puddlePrefab != null)
-            {
-                Vector3 spawnPos = GetGroundPosition();
-                puddleInstance = Instantiate(puddlePrefab, spawnPos, Quaternion.Euler(90f, 0f, 0f));
-            }
+            SpawnPuddleVisual(puddlePrefab);
         }
 
         stateApplied = true;
@@ -487,12 +487,48 @@ public class MergulhoTintaLogic : MonoBehaviour
         RestoreOriginalSkinnedMaterials();
 
         if (puddlePrefab != null)
+            SpawnPuddleVisual(puddlePrefab);
+
+        dissolveCoroutine = null;
+    }
+
+    private void SpawnPuddleVisual(GameObject puddlePrefab)
+    {
+        if (_fallbackPuddleSprite != null)
+        {
+            puddleInstance = CreateSimplePuddleSprite(_fallbackPuddleSprite, _fallbackPuddleWorldSize);
+            if (puddleInstance != null)
+                return;
+        }
+
+        if (puddlePrefab != null)
         {
             Vector3 spawnPos = GetGroundPosition();
             puddleInstance = Instantiate(puddlePrefab, spawnPos, Quaternion.Euler(90f, 0f, 0f));
         }
+    }
 
-        dissolveCoroutine = null;
+    private GameObject CreateSimplePuddleSprite(Sprite sprite, float worldSize)
+    {
+        if (sprite == null)
+            return null;
+
+        GameObject puddleVisual = new GameObject("PocaSpriteVisual");
+        puddleVisual.transform.SetPositionAndRotation(GetGroundPosition(), Quaternion.Euler(90f, 0f, 0f));
+
+        SpriteRenderer spriteRenderer = puddleVisual.AddComponent<SpriteRenderer>();
+        spriteRenderer.sprite = sprite;
+        spriteRenderer.color = Color.white;
+        spriteRenderer.maskInteraction = SpriteMaskInteraction.None;
+        spriteRenderer.sortingOrder = 0;
+
+        float spriteWidth = sprite.bounds.size.x;
+        float spriteHeight = sprite.bounds.size.y;
+        float largestDimension = Mathf.Max(spriteWidth, spriteHeight, 0.01f);
+        float scaleFactor = Mathf.Max(0.1f, worldSize) / largestDimension;
+        puddleVisual.transform.localScale = new Vector3(scaleFactor, scaleFactor, 1f);
+
+        return puddleVisual;
     }
 
     private IEnumerator DissolveOut()
