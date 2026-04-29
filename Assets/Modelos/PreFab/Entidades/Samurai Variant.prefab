@@ -1521,6 +1521,10 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6853114845528409664, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: slashVfxPrefab
+      value: 
+      objectReference: {fileID: 8867660937560191584, guid: 982ba9855d8d4e74aba613c608f0db8b, type: 3}
+    - target: {fileID: 6853114845528409664, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: swordStats.sfxHit1
       value: event:/SFX/Espada
       objectReference: {fileID: 0}
@@ -1705,7 +1709,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3614457225
+  GlobalObjectIdHash: 1536422954
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1

@@ -36,6 +36,16 @@ public class HordeManager : NetworkBehaviour
     public List<SpawnPath> spawnPaths;
     private int lastPathIndex = -1;
 
+    [Header("VFX de Spawn")]
+    [Tooltip("Prefab do relâmpago que aparece ANTES do inimigo nascer.")]
+    public GameObject lightningVfxPrefab;
+    [Tooltip("Tempo (em segundos) entre o relâmpago e o inimigo aparecer.")]
+    public float lightningDelay = 0.5f;
+    [Tooltip("Altura acima do ponto de spawn onde o relâmpago aparece (o raio cai do céu).")]
+    public float lightningHeightOffset = 15f;
+    [Tooltip("Escala do efeito do relâmpago (1 = tamanho original do prefab).")]
+    public float lightningScale = 3f;
+
     [Header("Interface (UI)")]
     public TextMeshProUGUI hordeText;
     public TextMeshProUGUI hordeTextBuild;
@@ -333,7 +343,31 @@ public class HordeManager : NetworkBehaviour
 
             for (int i = 0; i < batchSize; i++)
             {
-                SpawnSingleEnemy();
+                // Calcula posição de spawn para o relâmpago antes de spawnar o inimigo
+                if (lightningVfxPrefab != null && spawnPaths != null && spawnPaths.Count > 0)
+                {
+                    int previewPath = GetRandomPathIndex();
+                    SpawnPath path = spawnPaths[previewPath];
+                    if (path.spawnPoint != null)
+                    {
+                        Vector3 spawnPos = path.spawnPoint.position;
+
+                        // Mostra o relâmpago em todos os clientes
+                        if (!IsLocalMode)
+                            SpawnLightningClientRpc(spawnPos);
+                        else
+                            SpawnLightningLocal(spawnPos);
+
+                        yield return new WaitForSeconds(lightningDelay);
+
+                        // Spawna o inimigo exatamente onde o relâmpago caiu
+                        SpawnSingleEnemyAt(path);
+                    }
+                }
+                else
+                {
+                    SpawnSingleEnemy();
+                }
             }
 
             enemiesSpawnedCount += batchSize;
@@ -341,14 +375,49 @@ public class HordeManager : NetworkBehaviour
         }
     }
 
+    [ClientRpc]
+    private void SpawnLightningClientRpc(Vector3 position)
+    {
+        SpawnLightningLocal(position);
+    }
+
+    private void SpawnLightningLocal(Vector3 position)
+    {
+        if (lightningVfxPrefab != null)
+        {
+            // Posiciona o raio acima do ponto de spawn para ele "cair do céu"
+            Vector3 spawnPos = position + Vector3.up * lightningHeightOffset;
+            GameObject vfx = GlobalVFXPool.GetVFX(lightningVfxPrefab, spawnPos, Quaternion.identity, 3f);
+            if (vfx != null)
+            {
+                // Estica o Y para o raio alcançar o chão, mantendo X e Z com a escala normal
+                float yStretch = lightningScale * (1f + lightningHeightOffset * 0.3f) + 4f;
+                vfx.transform.localScale = new Vector3(lightningScale, yStretch, lightningScale);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Spawn sem relâmpago (fallback quando o VFX não está configurado).
+    /// </summary>
     private void SpawnSingleEnemy()
     {
         if (spawnPaths == null || spawnPaths.Count == 0 || enemyTypes == null || enemyTypes.Length == 0) return;
 
         int pathIndex = GetRandomPathIndex();
         SpawnPath selectedPath = spawnPaths[pathIndex];
+        SpawnSingleEnemyAt(selectedPath);
+    }
 
+    /// <summary>
+    /// Spawn de um inimigo em um caminho específico (usado pelo sistema de relâmpago).
+    /// </summary>
+    private void SpawnSingleEnemyAt(SpawnPath selectedPath)
+    {
+        if (enemyTypes == null || enemyTypes.Length == 0) return;
         if (selectedPath.spawnPoint == null) return;
+
+        int pathIndex = spawnPaths.IndexOf(selectedPath);
 
         int enemyTypeIndex = Random.Range(0, enemyTypes.Length);
         EnemyDataSO enemyData = enemyTypes[enemyTypeIndex];
@@ -373,8 +442,6 @@ public class HordeManager : NetworkBehaviour
         else if (IsServer)
         {
             // Fallback rede sem pool — instancia e spawna via NGO diretamente.
-            // Sem isso, em builds onde o EnemyPoolManager não inicializou a tempo,
-            // nenhum inimigo era spawnado (o else if IsLocalMode retornava false).
             newEnemy = Instantiate(enemyData.enemyPrefab, selectedPath.spawnPoint.position, selectedPath.spawnPoint.rotation);
             if (newEnemy.TryGetComponent<NetworkObject>(out var netObj))
                 netObj.Spawn(true);
@@ -386,7 +453,7 @@ public class HordeManager : NetworkBehaviour
             if (enemyController != null)
             {
                 Transform target = GetRandomPlayerTarget();
-                enemyController.InitializeEnemy(target, selectedPath.patrolPoints, enemyData, CurrentHorde, pathIndex);
+                enemyController.InitializeEnemy(target, selectedPath.patrolPoints, enemyData, CurrentHorde, pathIndex >= 0 ? pathIndex : 0);
             }
         }
     }

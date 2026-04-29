@@ -53,6 +53,10 @@ public class MeleeCombatSystem : NetworkBehaviour
     public float? overrideAttackSpeed = null;
     public float? overrideAttackAngle = null;
 
+    [Header("VFX de Golpe")]
+    [Tooltip("Prefab do efeito slash (arco de corte) que aparece a cada espadada.")]
+    [SerializeField] private GameObject slashVfxPrefab;
+
     [Header("Juice Configs")]
     [SerializeField] private CameraShakeConfig ultimateHitShake = new CameraShakeConfig(0.8f, 15f, 0.1f);
 
@@ -88,6 +92,7 @@ public class MeleeCombatSystem : NetworkBehaviour
     }
 
     private bool hitProcessedForCurrentAttack = false;
+    private bool isInAttackSequence = false;
 
     public void OnFire(InputAction.CallbackContext ctx)
     {
@@ -103,6 +108,7 @@ public class MeleeCombatSystem : NetworkBehaviour
             if (networkAnimator != null) networkAnimator.SetTrigger("Attack");
 
             hitProcessedForCurrentAttack = false;
+            isInAttackSequence = true;
             StartCoroutine(FallbackHitRoutine());
         }
     }
@@ -141,6 +147,7 @@ public class MeleeCombatSystem : NetworkBehaviour
                 {
                     if (networkAnimator != null) networkAnimator.SetTrigger("Attack");
                     hitProcessedForCurrentAttack = false;
+                    isInAttackSequence = true;
                     StartCoroutine(FallbackHitRoutine());
                 }
             }
@@ -161,6 +168,13 @@ public class MeleeCombatSystem : NetworkBehaviour
     {
         if (!string.IsNullOrEmpty(fmodEvent))
             RuntimeManager.PlayOneShot(fmodEvent, transform.position);
+
+        // VFX de slash: aparece APENAS com a espada (Sword) e durante um ataque real (não ao sacar)
+        if (slashVfxPrefab != null && attackPoint != null && currentWeaponType == WeaponType.Sword && isInAttackSequence)
+        {
+            Quaternion slashRot = attackPoint.rotation * Quaternion.Euler(0f, 0f, Random.Range(-30f, 30f));
+            GlobalVFXPool.GetVFX(slashVfxPrefab, attackPoint.position, slashRot, 1.5f);
+        }
 
         if (!IsOwner) return;
 

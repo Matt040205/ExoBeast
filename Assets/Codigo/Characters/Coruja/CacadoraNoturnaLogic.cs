@@ -129,47 +129,67 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
     {
         Vector3 startPoint = transform.position;
         Vector3 direction = transform.forward;
-        float beamDistance = netRange.Value;
+
+        // Fallback: se netRange ainda não replicou no cliente, usa 100m como padrão
+        float beamDistance = netRange.Value > 0.1f ? netRange.Value : 100f;
+
+        Debug.Log($"[ArrowUlt] ShowBeamVisual INICIO - startPoint:{startPoint}, direction:{direction}, beamDistance:{beamDistance}, visualDuration:{visualDuration}");
 
         RaycastHit groundHit;
-        if (Physics.Raycast(startPoint, direction, out groundHit, netRange.Value, visualRaycastMask))
+        if (Physics.Raycast(startPoint, direction, out groundHit, beamDistance, visualRaycastMask))
         {
             beamDistance = groundHit.distance;
+            Debug.Log($"[ArrowUlt] Raycast bateu em algo a {beamDistance}m: {groundHit.collider.name}");
         }
 
         GameObject visual = Instantiate(beamVisualPrefab, startPoint, transform.rotation);
-        visual.transform.SetParent(this.transform);
 
         LineRenderer line = visual.GetComponent<LineRenderer>();
-        if (line != null)
+        bool isLineRendererMode = (line != null);
+
+        Debug.Log($"[ArrowUlt] isLineRendererMode={isLineRendererMode}, beamDistance final={beamDistance}");
+
+        if (isLineRendererMode)
         {
+            // Modo LineRenderer (beam antigo): prende ao pai e desenha a linha
+            visual.transform.SetParent(this.transform);
             line.SetPosition(0, Vector3.zero);
             line.SetPosition(1, Vector3.forward * beamDistance);
             line.startWidth = netWidth.Value;
             line.endWidth = netWidth.Value;
-        }
 
-        float elapsedTime = 0f;
-        Material lineMaterial = line?.material;
-        Color originalColor = Color.white;
-        if (lineMaterial != null && lineMaterial.HasColor("_Color"))
-        {
-            originalColor = lineMaterial.color;
-        }
+            // Fade out do LineRenderer
+            float elapsedTime = 0f;
+            Material lineMaterial = line.material;
+            Color originalColor = Color.white;
+            if (lineMaterial != null && lineMaterial.HasColor("_Color"))
+                originalColor = lineMaterial.color;
 
-        while (elapsedTime < visualDuration)
-        {
-            elapsedTime += Time.deltaTime;
-            float progress = elapsedTime / visualDuration;
-            if (lineMaterial != null)
+            while (elapsedTime < visualDuration)
             {
-                originalColor.a = 1f - progress;
-                lineMaterial.color = originalColor;
+                elapsedTime += Time.deltaTime;
+                float progress = elapsedTime / visualDuration;
+                if (lineMaterial != null)
+                {
+                    originalColor.a = 1f - progress;
+                    lineMaterial.color = originalColor;
+                }
+                yield return null;
             }
-            yield return null;
-        }
 
-        if (visual != null) Destroy(visual);
+            if (visual != null) Destroy(visual);
+        }
+        else
+        {
+            // Modo VFX (flecha voadora): adiciona componente de voo e deixa ele cuidar do movimento
+            float speed = beamDistance / Mathf.Max(visualDuration, 0.1f);
+            Debug.Log($"[ArrowUlt] Modo VFX - speed={speed} m/s, vai voar por {visualDuration}s");
+
+            ArrowMover mover = visual.AddComponent<ArrowMover>();
+            mover.flyDirection = direction;
+            mover.flySpeed = speed;
+            mover.lifetime = visualDuration;
+        }
     }
 
     private void ApplyBeamDamage()
@@ -190,5 +210,30 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
                 vidaInimigo.TakeDamage(netDamage.Value, 0f, false);
             }
         }
+    }
+}
+
+/// <summary>
+/// Componente simples que faz um GameObject voar em linha reta no Update.
+/// Adicionado em runtime pela CacadoraNoturnaLogic para mover o VFX da flecha.
+/// </summary>
+public class ArrowMover : MonoBehaviour
+{
+    [HideInInspector] public Vector3 flyDirection;
+    [HideInInspector] public float flySpeed;
+    [HideInInspector] public float lifetime = 2f;
+
+    private float timer = 0f;
+
+    void Update()
+    {
+        timer += Time.deltaTime;
+        if (timer >= lifetime)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        transform.position += flyDirection * flySpeed * Time.deltaTime;
     }
 }

@@ -7594,7 +7594,6 @@ MonoBehaviour:
   buildPanel: {fileID: 952988213}
   buildButtonUI: {fileID: 952988215}
   timerText: {fileID: 1996353364}
-  objectiveHealthSystem: {fileID: 0}
   objectiveHealthText: {fileID: 372065045}
   objectiveHealthBar: {fileID: 1593375844}
   towerShopButton: {fileID: 34802618}
@@ -11643,6 +11642,10 @@ MonoBehaviour:
     - {fileID: 1019262622}
     - {fileID: 259904542}
     - {fileID: 444947868}
+  lightningVfxPrefab: {fileID: 1934935032674519079, guid: 3e2e673fbf7584446877ffc0022c38a7, type: 3}
+  lightningDelay: 0.5
+  lightningHeightOffset: 0
+  lightningScale: 10
   hordeText: {fileID: 2087706056}
   hordeTextBuild: {fileID: 1842179471}
   currentHorde:
@@ -64417,7 +64420,6 @@ MonoBehaviour:
   buildPanel: {fileID: 952988213}
   buildButtonUI: {fileID: 952988215}
   timerText: {fileID: 1996353364}
-  objectiveHealthSystem: {fileID: 0}
   objectiveHealthText: {fileID: 372065045}
   objectiveHealthBar: {fileID: 1593375844}
   towerShopButton: {fileID: 34802618}
@@ -68112,15 +68114,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0
+      value: -8.19
       objectReference: {fileID: 0}
     - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0
+      value: 9.754
       objectReference: {fileID: 0}
     - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: 6.77
       objectReference: {fileID: 0}
     - target: {fileID: 300346244699056410, guid: 16299702bd7438949811b060f61a7fa3, type: 3}
       propertyPath: m_LocalRotation.w
