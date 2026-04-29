@@ -51,8 +51,10 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _GlowPower: 2
     - _QueueControl: 0
     - _QueueOffset: 0
-    m_Colors: []
+    m_Colors:
+    - _GlowColor: {r: 8.064901, g: 3.649003, b: 17.87076, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

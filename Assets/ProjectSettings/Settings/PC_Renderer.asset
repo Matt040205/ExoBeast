@@ -21,7 +21,7 @@ MonoBehaviour:
       surfaceData: 2
     screenSpaceSettings:
       normalBlend: 0
---- !u!114 &-4152303511421704968
+--- !u!114 &-8154559995856613778
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -31,31 +31,31 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6b3d386ba5cd94485973aee1479b272e, type: 3}
-  m_Name: Ground
+  m_Name: Inside Hole
   m_EditorClassIdentifier: 
   m_Active: 1
   settings:
-    passTag: Ground
-    Event: 250
+    passTag: Inside Hole
+    Event: 300
     filterSettings:
       RenderQueueType: 0
       LayerMask:
         serializedVersion: 2
-        m_Bits: 1024
+        m_Bits: 32768
       PassNames: []
     overrideMaterial: {fileID: 0}
     overrideMaterialPassIndex: 0
     overrideShader: {fileID: 0}
     overrideShaderPassIndex: 0
     overrideMode: 1
-    overrideDepthState: 0
-    depthCompareFunction: 4
+    overrideDepthState: 1
+    depthCompareFunction: 8
     enableWrite: 1
     stencilSettings:
       overrideStencilState: 1
-      stencilReference: 0
-      stencilCompareFunction: 6
-      passOperation: 2
+      stencilReference: 1
+      stencilCompareFunction: 3
+      passOperation: 0
       failOperation: 0
       zFailOperation: 0
     cameraSettings:
@@ -91,18 +91,18 @@ MonoBehaviour:
   - {fileID: 7833122117494664109}
   - {fileID: -8936838431470692120}
   - {fileID: 7161194143480334775}
-  - {fileID: -4152303511421704968}
-  m_RendererFeatureMap: ad6b866f10d7b46ce85821c5cbf8f983b7c9c0c121ac6163f8241acaf40d60c6
+  - {fileID: -8154559995856613778}
+  m_RendererFeatureMap: ad6b866f10d7b46ce85821c5cbf8f983b7c9c0c121ac61636e0e5b73e32ed58e
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   m_AssetVersion: 2
   m_OpaqueLayerMask:
     serializedVersion: 2
-    m_Bits: 5111
+    m_Bits: 6143
   m_TransparentLayerMask:
     serializedVersion: 2
-    m_Bits: 5111
+    m_Bits: 6143
   m_DefaultStencilState:
     overrideStencilState: 0
     stencilReference: 1
@@ -128,17 +128,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 6b3d386ba5cd94485973aee1479b272e, type: 3}
-  m_Name: CraclesMask
+  m_Name: Mask Hole
   m_EditorClassIdentifier: 
   m_Active: 1
   settings:
-    passTag: CraclesMask
+    passTag: Mask Hole
     Event: 250
     filterSettings:
       RenderQueueType: 0
       LayerMask:
         serializedVersion: 2
-        m_Bits: 1024
+        m_Bits: 18432
       PassNames: []
     overrideMaterial: {fileID: 0}
     overrideMaterialPassIndex: 0
