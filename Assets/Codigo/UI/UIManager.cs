@@ -125,8 +125,17 @@ public class UIManager : MonoBehaviour
 
         buildButtonUI.ClearTrapButtons();
         buildButtonUI.CreateTrapBuildButtons(traps);
+        buildButtonUI.RefreshTrapAvailability(traps);
 
         WireBuildTooltips();
+    }
+
+    public void RefreshTrapBuildUI(List<TrapDataSO> traps)
+    {
+        if (buildButtonUI == null)
+            return;
+
+        buildButtonUI.RefreshTrapAvailability(traps);
     }
 
     public void ShowHUD()
@@ -171,6 +180,9 @@ public class UIManager : MonoBehaviour
                 hudPanel.SetActive(false);
 
             ShowTowerShop();
+
+            if (BuildManager.Instance != null)
+                RefreshTrapBuildUI(BuildManager.Instance.availableTraps);
         }
         else
         {

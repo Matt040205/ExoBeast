@@ -17,6 +17,17 @@ using ExoBeasts.Multiplayer.Sync;
 /// </summary>
 public class BuildManager : NetworkBehaviour
 {
+    private enum TrapPlacementFailureReason
+    {
+        None = 0,
+        InvalidTrapIndex = 1,
+        InvalidTrapData = 2,
+        NotEnoughCurrency = 3,
+        LimitReached = 4,
+        SpawnSetupInvalid = 5,
+        SpawnFailed = 6
+    }
+
     public static BuildManager Instance { get; private set; }
 
     [Header("Configurações do Grid")]
@@ -50,8 +61,10 @@ public class BuildManager : NetworkBehaviour
     private bool isCurrentPlacementValid = false;
     private PlayerInput scenePlayerInput;
     private LocalPlayerInputBridge localOwnerInputBridge;
+    private int lastBuildToggleFrame = -1;
 
-    private Dictionary<int, int> activeTrapCounts = new Dictionary<int, int>();
+    private readonly Dictionary<int, HashSet<ulong>> authoritativeTrapInstances = new Dictionary<int, HashSet<ulong>>();
+    private readonly Dictionary<int, int> pendingTrapPlacements = new Dictionary<int, int>();
     private Dictionary<int, int> syncedTrapCounts;
 
     private void Awake()
@@ -70,10 +83,22 @@ public class BuildManager : NetworkBehaviour
     {
         base.OnNetworkSpawn();
         ForceBuildMode(false);
+        InitializeTrapCountSnapshot();
+        if (IsServer && NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnectedSyncTrapCounts;
         // Inicializa o UI de build em todos os clientes ao entrar na cena.
         // Sem isso, clientes remotos só recebem SetAvailableTowers após a primeira
         // construção (via NotifyBuildingPlacedClientRpc), deixando os tooltips vazios.
         StartCoroutine(InitBuildUIWhenReady());
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (IsServer && NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnectedSyncTrapCounts;
+
+        syncedTrapCounts = null;
+        base.OnNetworkDespawn();
     }
 
     private IEnumerator InitBuildUIWhenReady()
@@ -127,8 +152,16 @@ public class BuildManager : NetworkBehaviour
 
     public void OnBuild(InputAction.CallbackContext ctx)
     {
-        if (!ctx.performed) return;
-        ForceBuildMode(!isBuildingMode);
+        if (!ctx.performed)
+            return;
+
+        // Callback legado do PlayerInput de cena. Quando o bridge do owner esta ativo,
+        // ele ja e a fonte oficial do input de build e este caminho so serve para evitar
+        // regressao em setups antigos sem o bridge local pronto.
+        if (HasActiveLocalOwnerInputBridge())
+            return;
+
+        RequestBuildModeToggle();
     }
 
     void Update()
@@ -167,23 +200,35 @@ public class BuildManager : NetworkBehaviour
         if (PauseControl.isPaused)
             return;
 
-        bool togglePressed = TryConsumeBuildPressedFromOwnerBridge();
-
-        if (!togglePressed && Keyboard.current != null && Keyboard.current.bKey.wasPressedThisFrame)
-            togglePressed = true;
+        bool hasOwnerBridge = HasActiveLocalOwnerInputBridge();
+        bool togglePressed = hasOwnerBridge
+            ? localOwnerInputBridge.ConsumeBuildPressed()
+            : Keyboard.current != null && Keyboard.current.bKey.wasPressedThisFrame;
 
         if (!togglePressed)
             return;
 
-        ForceBuildMode(!isBuildingMode);
+        RequestBuildModeToggle();
     }
 
-    private bool TryConsumeBuildPressedFromOwnerBridge()
+    private bool HasActiveLocalOwnerInputBridge()
     {
         if (localOwnerInputBridge == null || !localOwnerInputBridge.isActiveAndEnabled)
             localOwnerInputBridge = FindLocalOwnerInputBridge();
 
-        return localOwnerInputBridge != null && localOwnerInputBridge.ConsumeBuildPressed();
+        return localOwnerInputBridge != null && localOwnerInputBridge.isActiveAndEnabled;
+    }
+
+    private void RequestBuildModeToggle()
+    {
+        if (PauseControl.isPaused)
+            return;
+
+        if (lastBuildToggleFrame == Time.frameCount)
+            return;
+
+        lastBuildToggleFrame = Time.frameCount;
+        ForceBuildMode(!isBuildingMode);
     }
 
     private LocalPlayerInputBridge FindLocalOwnerInputBridge()
@@ -346,13 +391,13 @@ public class BuildManager : NetworkBehaviour
 
         int trapIndex = availableTraps.IndexOf(trapData);
 
-        if (IsServer && activeTrapCounts != null && trapIndex >= 0
-            && activeTrapCounts.TryGetValue(trapIndex, out int authoritativeCount))
-            return authoritativeCount;
-
-        if (!IsServer && syncedTrapCounts != null && trapIndex >= 0
-            && syncedTrapCounts.TryGetValue(trapIndex, out int syncedCount))
-            return syncedCount;
+        if (trapIndex >= 0 && IsNetworkTrapSyncActive())
+        {
+            EnsureTrapCountSnapshotInitialized();
+            return syncedTrapCounts != null && syncedTrapCounts.TryGetValue(trapIndex, out int syncedCount)
+                ? syncedCount
+                : 0;
+        }
 
         NetworkedTrapVisual[] networkedTraps = FindObjectsByType<NetworkedTrapVisual>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         if (networkedTraps != null && networkedTraps.Length > 0)
@@ -438,47 +483,49 @@ public class BuildManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void RequestPlaceTrapServerRpc(int trapIndex, Vector3 pos, int cost, ServerRpcParams rpcParams = default)
     {
-        if (trapIndex < 0 || trapIndex >= availableTraps.Count) return;
+        ulong senderClientId = rpcParams.Receive.SenderClientId;
 
-        TrapDataSO trapData = availableTraps[trapIndex];
-        if (trapData == null || trapData.prefab == null) return;
-        if (!CurrencyManager.Instance.HasEnoughCurrency(trapData.geoditeCost, CurrencyType.Geodites)) return;
-        if (!CurrencyManager.Instance.HasEnoughCurrency(trapData.darkEtherCost, CurrencyType.DarkEther)) return;
-
-        if (trapData.buildLimit > 0)
+        if (!TryValidateTrapPlacementRequest(
+                trapIndex,
+                out TrapDataSO trapData,
+                out TrapPlacementFailureReason failureReason,
+                out int authoritativeCount))
         {
-            int currentCount = activeTrapCounts.ContainsKey(trapIndex) ? activeTrapCounts[trapIndex] : 0;
-            if (currentCount >= trapData.buildLimit)
-                return;
-            activeTrapCounts[trapIndex] = currentCount + 1;
+            NotifyTrapPlacementRejected(senderClientId, trapIndex, authoritativeCount, failureReason);
+            return;
         }
 
-        if (trapData.geoditeCost > 0)
-            CurrencyManager.Instance.SpendCurrency(trapData.geoditeCost, CurrencyType.Geodites);
+        ReservePendingTrapPlacement(trapIndex);
 
-        if (trapData.darkEtherCost > 0)
-            CurrencyManager.Instance.SpendCurrency(trapData.darkEtherCost, CurrencyType.DarkEther);
+        if (!TrySpendTrapCost(trapData))
+        {
+            ReleasePendingTrapPlacement(trapIndex);
+            NotifyTrapPlacementRejected(senderClientId, trapIndex, GetAuthoritativeTrapCountServer(trapIndex), TrapPlacementFailureReason.NotEnoughCurrency);
+            return;
+        }
 
         // Dispara o ClientRpc para os outros jogadores verem o feixe antes da torre spawnar
-        PlaySpawnBeamClientRpc(pos, rpcParams.Receive.SenderClientId);
+        PlaySpawnBeamClientRpc(pos, senderClientId);
 
-        UpdateTrapCountsClientRpc(trapIndex, activeTrapCounts[trapIndex]);
-
-        StartCoroutine(SpawnTrapWithDelay(trapData, trapIndex, pos, rpcParams.Receive.SenderClientId));
+        StartCoroutine(SpawnTrapWithDelay(trapData, trapIndex, pos, senderClientId));
     }
 
     private IEnumerator SpawnTrapWithDelay(TrapDataSO trapData, int trapIndex, Vector3 pos, ulong builderClientId)
     {
         yield return new WaitForSeconds(0.05f); // Micro-delay
 
+        GameObject logicObj = null;
         NetworkObject logicNetObj = null;
         TrapLogicBase logicBase = null;
         if (trapData.logicPrefab != null)
         {
             if (!ValidateNetworkSpawnable(trapData.logicPrefab, $"{trapData.name} logic"))
+            {
+                HandleTrapSpawnFailure(trapData, trapIndex, builderClientId, TrapPlacementFailureReason.SpawnSetupInvalid);
                 yield break;
+            }
 
-            GameObject logicObj = Instantiate(trapData.logicPrefab, pos, Quaternion.identity);
+            logicObj = Instantiate(trapData.logicPrefab, pos, Quaternion.identity);
 
             logicBase = logicObj.GetComponent<TrapLogicBase>();
             if (logicBase != null)
@@ -489,30 +536,43 @@ public class BuildManager : NetworkBehaviour
                 spawnedLogicNetObj.Spawn();
                 logicNetObj = spawnedLogicNetObj;
             }
+            else
+            {
+                HandleTrapSpawnFailure(trapData, trapIndex, builderClientId, TrapPlacementFailureReason.SpawnSetupInvalid, logicObj: logicObj);
+                yield break;
+            }
         }
 
         if (!ValidateNetworkSpawnable(trapData.prefab, trapData.name))
         {
-            if (logicNetObj != null && logicNetObj.IsSpawned)
-                logicNetObj.Despawn(true);
+            HandleTrapSpawnFailure(trapData, trapIndex, builderClientId, TrapPlacementFailureReason.SpawnSetupInvalid, logicNetObj, logicObj);
             yield break;
         }
 
         GameObject newTrap = Instantiate(trapData.prefab, pos, Quaternion.identity);
-        if (newTrap.TryGetComponent<NetworkObject>(out var netObj))
+        if (!newTrap.TryGetComponent<NetworkObject>(out var netObj))
         {
-            NetworkedTrapVisual networkedTrapVisual = newTrap.GetComponent<NetworkedTrapVisual>();
-            if (networkedTrapVisual != null)
-            {
-                ulong logicObjectId = logicNetObj != null ? logicNetObj.NetworkObjectId : 0;
-                networkedTrapVisual.InitializeServer(builderClientId, trapIndex, logicObjectId);
-            }
-
-            netObj.Spawn();
-
-            if (logicBase != null)
-                logicBase.BindVisualServer(netObj.NetworkObjectId);
+            HandleTrapSpawnFailure(trapData, trapIndex, builderClientId, TrapPlacementFailureReason.SpawnFailed, logicNetObj, logicObj, newTrap);
+            yield break;
         }
+
+        NetworkedTrapVisual networkedTrapVisual = newTrap.GetComponent<NetworkedTrapVisual>();
+        if (networkedTrapVisual == null)
+        {
+            HandleTrapSpawnFailure(trapData, trapIndex, builderClientId, TrapPlacementFailureReason.SpawnFailed, logicNetObj, logicObj, newTrap);
+            yield break;
+        }
+
+        ulong logicObjectId = logicNetObj != null ? logicNetObj.NetworkObjectId : 0;
+        networkedTrapVisual.InitializeServer(builderClientId, trapIndex, logicObjectId);
+        netObj.Spawn();
+        ReleasePendingTrapPlacement(trapIndex);
+        networkedTrapVisual.EnsureRegisteredServer();
+
+        Debug.Log($"[BuildManager] Trap spawn concluido: {GetTrapDisplayName(trapIndex)} | trapIndex={trapIndex} | builder={builderClientId} | visualNetId={netObj.NetworkObjectId} | logicNetId={logicObjectId}");
+
+        if (logicBase != null)
+            logicBase.BindVisualServer(netObj.NetworkObjectId);
 
         NotifyBuildingPlacedClientRpc(pos);
     }
@@ -623,22 +683,131 @@ public class BuildManager : NetworkBehaviour
         return availableTraps[trapIndex];
     }
 
-    public void DecrementTrapCount(int trapIndex)
+    public void RegisterTrapInstance(int trapIndex, ulong trapObjectId)
     {
-        if (!IsServer) return;
-        if (activeTrapCounts.ContainsKey(trapIndex))
+        if (!IsServer)
+            return;
+
+        if (trapIndex < 0)
         {
-            activeTrapCounts[trapIndex] = Mathf.Max(0, activeTrapCounts[trapIndex] - 1);
-            UpdateTrapCountsClientRpc(trapIndex, activeTrapCounts[trapIndex]);
+            Debug.LogWarning($"[BuildManager] Ignorando registro de armadilha com trapIndex invalido. netId={trapObjectId}");
+            return;
         }
+
+        if (!authoritativeTrapInstances.TryGetValue(trapIndex, out HashSet<ulong> trackedInstances))
+        {
+            trackedInstances = new HashSet<ulong>();
+            authoritativeTrapInstances[trapIndex] = trackedInstances;
+        }
+
+        if (!trackedInstances.Add(trapObjectId))
+            return;
+
+        Debug.Log($"[BuildManager] Trap registrada: {GetTrapDisplayName(trapIndex)} | trapIndex={trapIndex} | netId={trapObjectId} | total={trackedInstances.Count}");
+        BroadcastTrapCountServer(trapIndex);
+    }
+
+    public void UnregisterTrapInstance(int trapIndex, ulong trapObjectId)
+    {
+        if (!IsServer || trapIndex < 0 ||
+            !authoritativeTrapInstances.TryGetValue(trapIndex, out HashSet<ulong> trackedInstances))
+        {
+            return;
+        }
+
+        if (!trackedInstances.Remove(trapObjectId))
+            return;
+
+        if (trackedInstances.Count == 0)
+            authoritativeTrapInstances.Remove(trapIndex);
+
+        Debug.Log($"[BuildManager] Trap removida: {GetTrapDisplayName(trapIndex)} | trapIndex={trapIndex} | netId={trapObjectId} | total={trackedInstances.Count}");
+        BroadcastTrapCountServer(trapIndex);
+    }
+
+    private bool IsNetworkTrapSyncActive()
+    {
+        return NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+    }
+
+    private void InitializeTrapCountSnapshot()
+    {
+        EnsureTrapCountSnapshotInitialized(true);
+
+        if (IsServer && availableTraps != null)
+        {
+            for (int trapIndex = 0; trapIndex < availableTraps.Count; trapIndex++)
+                syncedTrapCounts[trapIndex] = GetAuthoritativeTrapCountServer(trapIndex);
+        }
+
+        RefreshTrapUiIfAvailable();
+    }
+
+    private void EnsureTrapCountSnapshotInitialized(bool reset = false)
+    {
+        if (syncedTrapCounts == null)
+            syncedTrapCounts = new Dictionary<int, int>();
+
+        if (reset)
+            syncedTrapCounts.Clear();
+
+        int trapCount = availableTraps != null ? availableTraps.Count : 0;
+        for (int trapIndex = 0; trapIndex < trapCount; trapIndex++)
+        {
+            if (reset || !syncedTrapCounts.ContainsKey(trapIndex))
+                syncedTrapCounts[trapIndex] = 0;
+        }
+    }
+
+    private void ApplyTrapCountSnapshotLocal(int trapIndex, int newCount)
+    {
+        if (trapIndex < 0)
+            return;
+
+        EnsureTrapCountSnapshotInitialized();
+        syncedTrapCounts[trapIndex] = Mathf.Max(0, newCount);
+    }
+
+    private void ApplyTrapCountSnapshotLocal(int[] counts)
+    {
+        EnsureTrapCountSnapshotInitialized(true);
+
+        if (counts == null || availableTraps == null)
+            return;
+
+        int trapCount = Mathf.Min(counts.Length, availableTraps.Count);
+        for (int trapIndex = 0; trapIndex < trapCount; trapIndex++)
+            syncedTrapCounts[trapIndex] = Mathf.Max(0, counts[trapIndex]);
     }
 
     [ClientRpc]
     private void UpdateTrapCountsClientRpc(int trapIndex, int newCount)
     {
-        if (syncedTrapCounts == null)
-            syncedTrapCounts = new Dictionary<int, int>();
-        syncedTrapCounts[trapIndex] = newCount;
+        ApplyTrapCountSnapshotLocal(trapIndex, newCount);
+        RefreshTrapUiIfAvailable();
+    }
+
+    [ClientRpc]
+    private void SyncAllTrapCountsClientRpc(int[] counts, ClientRpcParams clientRpcParams = default)
+    {
+        ApplyTrapCountSnapshotLocal(counts);
+        RefreshTrapUiIfAvailable();
+    }
+
+    [ClientRpc]
+    private void NotifyTrapPlacementRejectedClientRpc(int trapIndex, int authoritativeCount, int failureReason, ClientRpcParams clientRpcParams = default)
+    {
+        if (trapIndex >= 0)
+            ApplyTrapCountSnapshotLocal(trapIndex, authoritativeCount);
+
+        RefreshTrapUiIfAvailable();
+
+        string message = BuildTrapPlacementFailureMessage((TrapPlacementFailureReason)failureReason, trapIndex, authoritativeCount);
+        if (!string.IsNullOrEmpty(message))
+        {
+            Debug.LogWarning($"[BuildManager] {message}");
+            UINotificationManager.Instance?.ShowLocalNotification(message, new Color(1f, 0.35f, 0.35f));
+        }
     }
 
     private bool TryPopulateBuildUiFromCanonicalSlots(CharacterBase[] equipe)
@@ -736,6 +905,272 @@ public class BuildManager : NetworkBehaviour
         }
 
         return true;
+    }
+
+    private void OnClientConnectedSyncTrapCounts(ulong clientId)
+    {
+        if (!IsServer)
+            return;
+
+        SyncAllTrapCountsToClient(clientId);
+    }
+
+    private void SyncAllTrapCountsToClient(ulong clientId)
+    {
+        int trapCount = availableTraps != null ? availableTraps.Count : 0;
+        int[] counts = new int[trapCount];
+
+        for (int trapIndex = 0; trapIndex < trapCount; trapIndex++)
+            counts[trapIndex] = GetAuthoritativeTrapCountServer(trapIndex);
+
+        ClientRpcParams targetParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] { clientId }
+            }
+        };
+
+        SyncAllTrapCountsClientRpc(counts, targetParams);
+    }
+
+    private void BroadcastTrapCountServer(int trapIndex)
+    {
+        int newCount = GetAuthoritativeTrapCountServer(trapIndex);
+        ApplyTrapCountSnapshotLocal(trapIndex, newCount);
+        UpdateTrapCountsClientRpc(trapIndex, newCount);
+    }
+
+    private int GetAuthoritativeTrapCountServer(int trapIndex)
+    {
+        if (trapIndex < 0)
+            return 0;
+
+        return authoritativeTrapInstances.TryGetValue(trapIndex, out HashSet<ulong> trackedInstances)
+            ? trackedInstances.Count
+            : 0;
+    }
+
+    private int GetPendingTrapCount(int trapIndex)
+    {
+        if (trapIndex < 0)
+            return 0;
+
+        return pendingTrapPlacements.TryGetValue(trapIndex, out int pendingCount)
+            ? pendingCount
+            : 0;
+    }
+
+    private void ReservePendingTrapPlacement(int trapIndex)
+    {
+        if (!IsServer || trapIndex < 0)
+            return;
+
+        pendingTrapPlacements[trapIndex] = GetPendingTrapCount(trapIndex) + 1;
+    }
+
+    private void ReleasePendingTrapPlacement(int trapIndex)
+    {
+        if (!IsServer || trapIndex < 0 || !pendingTrapPlacements.TryGetValue(trapIndex, out int pendingCount))
+            return;
+
+        pendingCount = Mathf.Max(0, pendingCount - 1);
+        if (pendingCount == 0)
+            pendingTrapPlacements.Remove(trapIndex);
+        else
+            pendingTrapPlacements[trapIndex] = pendingCount;
+    }
+
+    private bool TryValidateTrapPlacementRequest(
+        int trapIndex,
+        out TrapDataSO trapData,
+        out TrapPlacementFailureReason failureReason,
+        out int authoritativeCount)
+    {
+        trapData = null;
+        failureReason = TrapPlacementFailureReason.None;
+        authoritativeCount = -1;
+
+        if (trapIndex < 0 || trapIndex >= availableTraps.Count)
+        {
+            failureReason = TrapPlacementFailureReason.InvalidTrapIndex;
+            return false;
+        }
+
+        authoritativeCount = GetAuthoritativeTrapCountServer(trapIndex);
+        trapData = availableTraps[trapIndex];
+
+        if (trapData == null || trapData.prefab == null)
+        {
+            failureReason = TrapPlacementFailureReason.InvalidTrapData;
+            return false;
+        }
+
+        if (CurrencyManager.Instance == null ||
+            !CurrencyManager.Instance.HasEnoughCurrency(trapData.geoditeCost, CurrencyType.Geodites) ||
+            !CurrencyManager.Instance.HasEnoughCurrency(trapData.darkEtherCost, CurrencyType.DarkEther))
+        {
+            failureReason = TrapPlacementFailureReason.NotEnoughCurrency;
+            return false;
+        }
+
+        if (trapData.buildLimit > 0 &&
+            authoritativeCount + GetPendingTrapCount(trapIndex) >= trapData.buildLimit)
+        {
+            failureReason = TrapPlacementFailureReason.LimitReached;
+            return false;
+        }
+
+        if (!ValidateTrapNetworkSetup(trapData))
+        {
+            failureReason = TrapPlacementFailureReason.SpawnSetupInvalid;
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool ValidateTrapNetworkSetup(TrapDataSO trapData)
+    {
+        if (trapData == null || trapData.prefab == null)
+            return false;
+
+        if (!ValidateNetworkSpawnable(trapData.prefab, trapData.trapName))
+            return false;
+
+        return trapData.logicPrefab == null || ValidateNetworkSpawnable(trapData.logicPrefab, $"{trapData.trapName} logic");
+    }
+
+    private bool TrySpendTrapCost(TrapDataSO trapData)
+    {
+        if (trapData == null || CurrencyManager.Instance == null)
+            return false;
+
+        if (!CurrencyManager.Instance.HasEnoughCurrency(trapData.geoditeCost, CurrencyType.Geodites) ||
+            !CurrencyManager.Instance.HasEnoughCurrency(trapData.darkEtherCost, CurrencyType.DarkEther))
+        {
+            return false;
+        }
+
+        if (trapData.geoditeCost > 0)
+            CurrencyManager.Instance.SpendCurrency(trapData.geoditeCost, CurrencyType.Geodites);
+
+        if (trapData.darkEtherCost > 0)
+            CurrencyManager.Instance.SpendCurrency(trapData.darkEtherCost, CurrencyType.DarkEther);
+
+        return true;
+    }
+
+    private void RefundTrapCost(TrapDataSO trapData)
+    {
+        if (trapData == null || CurrencyManager.Instance == null)
+            return;
+
+        if (trapData.geoditeCost > 0)
+            CurrencyManager.Instance.AddCurrency(trapData.geoditeCost, CurrencyType.Geodites);
+
+        if (trapData.darkEtherCost > 0)
+            CurrencyManager.Instance.AddCurrency(trapData.darkEtherCost, CurrencyType.DarkEther);
+    }
+
+    private void HandleTrapSpawnFailure(
+        TrapDataSO trapData,
+        int trapIndex,
+        ulong builderClientId,
+        TrapPlacementFailureReason failureReason,
+        NetworkObject logicNetObj = null,
+        GameObject logicObj = null,
+        GameObject trapVisualObj = null)
+    {
+        if (trapVisualObj != null)
+            Destroy(trapVisualObj);
+
+        if (logicNetObj != null)
+        {
+            if (logicNetObj.IsSpawned)
+                logicNetObj.Despawn(true);
+            else if (logicNetObj.gameObject != null)
+                Destroy(logicNetObj.gameObject);
+        }
+        else if (logicObj != null)
+        {
+            Destroy(logicObj);
+        }
+
+        RefundTrapCost(trapData);
+        ReleasePendingTrapPlacement(trapIndex);
+        Debug.LogError($"[BuildManager] Falha no spawn da trap {GetTrapDisplayName(trapIndex)} | trapIndex={trapIndex} | builder={builderClientId} | motivo={failureReason}");
+        NotifyTrapPlacementRejected(builderClientId, trapIndex, GetAuthoritativeTrapCountServer(trapIndex), failureReason);
+    }
+
+    private void NotifyTrapPlacementRejected(ulong clientId, int trapIndex, int authoritativeCount, TrapPlacementFailureReason failureReason)
+    {
+        if (!IsServer)
+            return;
+
+        ClientRpcParams targetParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] { clientId }
+            }
+        };
+
+        NotifyTrapPlacementRejectedClientRpc(trapIndex, authoritativeCount, (int)failureReason, targetParams);
+    }
+
+    private void RefreshTrapUiIfAvailable()
+    {
+        if (UIManager.Instance == null || availableTraps == null)
+            return;
+
+        if (UIManager.Instance.buildButtonUI != null && UIManager.Instance.buildButtonUI.HasTrapButtons)
+        {
+            UIManager.Instance.RefreshTrapBuildUI(availableTraps);
+            return;
+        }
+
+        if (GameDataManager.Instance != null)
+            SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);
+    }
+
+    private string BuildTrapPlacementFailureMessage(TrapPlacementFailureReason failureReason, int trapIndex, int authoritativeCount)
+    {
+        string trapName = GetTrapDisplayName(trapIndex);
+
+        switch (failureReason)
+        {
+            case TrapPlacementFailureReason.InvalidTrapIndex:
+                return "Falha ao construir: armadilha inválida.";
+            case TrapPlacementFailureReason.InvalidTrapData:
+                return $"Falha ao construir {trapName}: dados ou prefab inválidos.";
+            case TrapPlacementFailureReason.NotEnoughCurrency:
+                return $"Recursos insuficientes para construir {trapName}.";
+            case TrapPlacementFailureReason.LimitReached:
+                int buildLimit = (trapIndex >= 0 && trapIndex < availableTraps.Count && availableTraps[trapIndex] != null)
+                    ? availableTraps[trapIndex].buildLimit
+                    : 0;
+                return buildLimit > 0
+                    ? $"{trapName} atingiu o limite global ({authoritativeCount}/{buildLimit})."
+                    : $"{trapName} atingiu o limite global.";
+            case TrapPlacementFailureReason.SpawnSetupInvalid:
+                return $"Falha ao construir {trapName}: configuração de rede inválida.";
+            case TrapPlacementFailureReason.SpawnFailed:
+                return $"Falha ao construir {trapName}: o servidor não concluiu o spawn.";
+            default:
+                return string.Empty;
+        }
+    }
+
+    private string GetTrapDisplayName(int trapIndex)
+    {
+        if (trapIndex >= 0 && trapIndex < availableTraps.Count && availableTraps[trapIndex] != null &&
+            !string.IsNullOrWhiteSpace(availableTraps[trapIndex].trapName))
+        {
+            return availableTraps[trapIndex].trapName;
+        }
+
+        return "a armadilha";
     }
 
     private void SanitizeRuntimeBuildable(GameObject buildableInstance, bool isPreview)

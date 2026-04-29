@@ -7455,7 +7455,6 @@ GameObject:
   - component: {fileID: 227151045}
   - component: {fileID: 227151048}
   - component: {fileID: 227151043}
-  - component: {fileID: 227151044}
   - component: {fileID: 227151042}
   - component: {fileID: 227151041}
   - component: {fileID: 227151040}
@@ -7465,6 +7464,7 @@ GameObject:
   - component: {fileID: 227151046}
   - component: {fileID: 227151049}
   - component: {fileID: 227151050}
+  - component: {fileID: 227151051}
   m_Layer: 0
   m_Name: ManagersDaPartida
   m_TagString: Untagged
@@ -7577,30 +7577,6 @@ MonoBehaviour:
   darkEtherText: {fileID: 0}
   initialGeodites: 10000000
   initialDarkEther: 0
---- !u!114 &227151044
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 227151036}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d84f645d7fef8b541a5f2ae8eb3486ba, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  hudPanel: {fileID: 952988210}
-  pausePanel: {fileID: 1677525049}
-  buildPanel: {fileID: 952988213}
-  buildButtonUI: {fileID: 952988215}
-  timerText: {fileID: 1996353364}
-  objectiveHealthSystem: {fileID: 0}
-  objectiveHealthText: {fileID: 372065045}
-  objectiveHealthBar: {fileID: 1593375844}
-  towerShopButton: {fileID: 34802618}
-  trapShopButton: {fileID: 34802617}
-  towerShopPanel: {fileID: 34802622}
-  trapShopPanel: {fileID: 34802620}
 --- !u!4 &227151045
 Transform:
   m_ObjectHideFlags: 0
@@ -7726,19 +7702,7 @@ MonoBehaviour:
     m_ActionId: 9caa3d8a-6b2f-4e8e-8bad-6ede561bd9be
     m_ActionName: UI/TrackedDeviceOrientation
   - m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 227151042}
-        m_TargetAssemblyTypeName: BuildManager, Assembly-CSharp
-        m_MethodName: OnBuild
-        m_Mode: 0
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
     m_ActionId: 9e6be54f-3389-45ba-a0a3-ee9341f80f09
     m_ActionName: 'Player/Build[/Keyboard/b]'
   - m_PersistentCalls:
@@ -7826,6 +7790,20 @@ MonoBehaviour:
   fadeDuration: 0.5
   displayDuration: 3
   messageCooldown: 10
+--- !u!114 &227151051
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da307db2cd14df84cabfc9afd851dc47, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 100
+  currentHealth: 100
 --- !u!1001 &227908105
 PrefabInstance:
   m_ObjectHideFlags: 0

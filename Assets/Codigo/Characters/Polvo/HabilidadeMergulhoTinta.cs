@@ -11,6 +11,13 @@ public class HabilidadeMergulhoTinta : Ability
     [Tooltip("O prefab visual da poca (sem collider!)")]
     public GameObject visualPuddlePrefab;
 
+    [Tooltip("Sprite simples usada como placeholder da poca enquanto o VFX definitivo nao estiver pronto.")]
+    public Sprite fallbackPuddleSprite;
+
+    [Tooltip("Tamanho aproximado da poca simples em unidades de mundo.")]
+    [Min(0.1f)]
+    public float fallbackPuddleWorldSize = 4.5f;
+
     [Header("Shader de Dissolve (opcional)")]
     [Tooltip("Material com _dissolveamount (0=visivel, 1=invisivel). Null = desabilita renderers imediatamente.")]
     public Material diveShaderMaterial;
