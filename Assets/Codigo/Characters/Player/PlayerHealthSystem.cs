@@ -50,6 +50,7 @@ public class PlayerHealthSystem : NetworkBehaviour
 
     public event Action OnHealthChanged;
     public event Action<float> OnDamageDealt;
+    public event Action<float, Transform, bool, ulong> OnServerDamageTaken;
 
     public override void OnNetworkSpawn()
     {
@@ -140,6 +141,9 @@ public class PlayerHealthSystem : NetworkBehaviour
         currentHealth.Value -= finalDamage;
         timeSinceLastDamage = 0f;
         isRegenerating = false;
+
+        if (finalDamage > 0f)
+            OnServerDamageTaken?.Invoke(finalDamage, request.Attacker, request.IsMelee, request.AttackerClientId);
 
         if (currentHealth.Value <= 0f)
             Die();

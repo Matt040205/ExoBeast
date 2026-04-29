@@ -136,6 +136,17 @@ public class CommanderAbilityController : NetworkBehaviour
         if (!IsOwner)
             return;
 
+        if (GetComponent<MergulhoTintaLogic>() != null)
+        {
+            if (inputBridge == null)
+                inputBridge = GetComponent<LocalPlayerInputBridge>();
+
+            inputBridge?.ConsumeAbility1Pressed();
+            inputBridge?.ConsumeAbility2Pressed();
+            inputBridge?.ConsumeUltimatePressed();
+            return;
+        }
+
         if (inputBridge == null)
             inputBridge = GetComponent<LocalPlayerInputBridge>();
 
@@ -188,13 +199,20 @@ public class CommanderAbilityController : NetworkBehaviour
         abilityCooldowns[ability] = ability.cooldown;
     }
 
-    public void StartLocalMergulhoTintaOwnerProxy(float duration, float exitDamage, float damageRadius)
+    public void StartLocalMergulhoTintaOwnerProxy(
+        float duration,
+        float exitDamage,
+        float damageRadius)
     {
         HabilidadeMergulhoTinta ability = ResolveAbilityOfType<HabilidadeMergulhoTinta>();
         if (ability == null || !CanSendOwnerOnlyAbilityProxy())
             return;
 
-        StartLocalMergulhoTintaOwnerClientRpc(duration, exitDamage, damageRadius, BuildOwnerOnlyRpcParams());
+        StartLocalMergulhoTintaOwnerClientRpc(
+            duration,
+            exitDamage,
+            damageRadius,
+            BuildOwnerOnlyRpcParams());
     }
 
     [ClientRpc]
@@ -212,7 +230,13 @@ public class CommanderAbilityController : NetworkBehaviour
             return;
 
         MergulhoTintaLogic logic = gameObject.AddComponent<MergulhoTintaLogic>();
-        logic.StartDive(duration, exitDamage, damageRadius, ability.visualPuddlePrefab, ability, false);
+        logic.StartDive(
+            duration,
+            exitDamage,
+            damageRadius,
+            ability.visualPuddlePrefab,
+            ability,
+            false);
     }
 
     public void CompleteLocalMergulhoTintaOwnerProxy(Vector3 surfacePosition)

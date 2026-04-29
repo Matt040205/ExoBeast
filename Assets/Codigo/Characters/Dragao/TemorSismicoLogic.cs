@@ -8,6 +8,7 @@ public class TemorSismicoLogic : NetworkBehaviour
     private float range;
     private float angle;
     private float damage;
+    private float stunDuration;
     private float knockUpDuration;
     private float knockUpForce;
     private float vulnerabilityMultiplier;
@@ -22,18 +23,20 @@ public class TemorSismicoLogic : NetworkBehaviour
         float newRange,
         float newAngle,
         float newDamage,
+        float newStunDuration,
         float newKnockUpDuration,
         float newKnockUpForce,
         float newVulnerabilityMultiplier,
         float newVulnerabilityDuration)
     {
-        range = newRange;
-        angle = newAngle;
-        damage = newDamage;
-        knockUpDuration = newKnockUpDuration;
-        knockUpForce = newKnockUpForce;
-        vulnerabilityMultiplier = newVulnerabilityMultiplier;
-        vulnerabilityDuration = newVulnerabilityDuration;
+        range = Mathf.Max(0f, newRange);
+        angle = Mathf.Clamp(newAngle, 0f, 360f);
+        damage = Mathf.Max(0f, newDamage);
+        stunDuration = Mathf.Max(0f, newStunDuration);
+        knockUpDuration = Mathf.Max(0f, newKnockUpDuration);
+        knockUpForce = Mathf.Max(0f, newKnockUpForce);
+        vulnerabilityMultiplier = Mathf.Max(1f, newVulnerabilityMultiplier);
+        vulnerabilityDuration = Mathf.Max(0f, newVulnerabilityDuration);
         isConfigured = true;
 
         NetworkGameplayResolver.TryResolveAttackerFromPlayer(owner, out attackerClientId, out attackerHealth);
@@ -70,28 +73,39 @@ public class TemorSismicoLogic : NetworkBehaviour
         hasAppliedEffects = true;
 
         Collider[] hits = Physics.OverlapSphere(transform.position, range);
+        System.Collections.Generic.HashSet<EnemyController> affectedEnemies = new System.Collections.Generic.HashSet<EnemyController>();
+
         foreach (Collider hit in hits)
         {
-            if (!hit.CompareTag("Enemy"))
+            EnemyController enemyController = hit.GetComponentInParent<EnemyController>();
+            if (enemyController == null || enemyController.IsDead || !affectedEnemies.Add(enemyController))
                 continue;
 
-            Vector3 directionToEnemy = (hit.transform.position - transform.position).normalized;
-            if (Vector3.Angle(transform.forward, directionToEnemy) >= angle * 0.5f)
+            Vector3 directionToEnemy = enemyController.transform.position - transform.position;
+            directionToEnemy.y = 0f;
+
+            if (angle < 359.9f &&
+                directionToEnemy.sqrMagnitude > 0.0001f &&
+                Vector3.Angle(transform.forward, directionToEnemy.normalized) > angle * 0.5f)
                 continue;
 
-            EnemyHealthSystem enemyHealth = hit.GetComponent<EnemyHealthSystem>();
+            EnemyHealthSystem enemyHealth = enemyController.GetComponent<EnemyHealthSystem>();
+            if (enemyHealth == null)
+                enemyHealth = hit.GetComponentInParent<EnemyHealthSystem>();
+
             if (enemyHealth != null)
             {
                 DamageContext damageContext = new DamageContext(attackerClientId, false, DamageFeedbackMode.AllObservers);
                 enemyHealth.ApplyAuthoritativeDamage(damage, 0f, damageContext, attackerHealth);
 
-                if (vulnerabilityMultiplier > 1f)
+                if (vulnerabilityMultiplier > 1f && vulnerabilityDuration > 0f)
                     enemyHealth.AplicarVulnerabilidadeTemporaria(vulnerabilityMultiplier, vulnerabilityDuration);
             }
 
-            EnemyController enemyController = hit.GetComponent<EnemyController>();
-            if (enemyController != null)
-                enemyController.ApplyKnockUp(knockUpDuration, knockUpForce);
+            if (stunDuration > 0f)
+                enemyController.ApplyStun(stunDuration);
+
+            enemyController.ApplyKnockUp(knockUpDuration, knockUpForce);
         }
     }
 
@@ -104,6 +118,6 @@ public class TemorSismicoLogic : NetworkBehaviour
     private void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(transform.position, 5f);
+        Gizmos.DrawWireSphere(transform.position, range > 0f ? range : 5f);
     }
 }

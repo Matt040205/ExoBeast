@@ -10,6 +10,8 @@ using UnityEngine.InputSystem;
 public class LocalPlayerInputBridge : MonoBehaviour
 {
     private PlayerInput playerInput;
+    private InputActionAsset cachedActionsAsset;
+    private string cachedActionMapName;
 
     private InputAction moveAction;
     private InputAction sprintAction;
@@ -17,17 +19,20 @@ public class LocalPlayerInputBridge : MonoBehaviour
     private InputAction aimAction;
     private InputAction fireAction;
     private InputAction reloadAction;
+    private InputAction buildAction;
     private InputAction ability1Action;
     private InputAction ability2Action;
     private InputAction ultimateAction;
 
     private bool wasJumpHeld;
     private bool wasReloadHeld;
+    private bool wasBuildHeld;
     private bool wasAbility1Held;
     private bool wasAbility2Held;
     private bool wasUltimateHeld;
     private bool jumpPressed;
     private bool reloadPressed;
+    private bool buildPressed;
     private bool ability1Pressed;
     private bool ability2Pressed;
     private bool ultimatePressed;
@@ -40,24 +45,14 @@ public class LocalPlayerInputBridge : MonoBehaviour
     private void Awake()
     {
         playerInput = GetComponent<PlayerInput>();
-        CacheActions();
+        RefreshBindingsAfterPlayerInputReset();
     }
 
     private void OnEnable()
     {
         // Limpa referências antes de re-cachear: o PlayerInput pode ter passado por um
         // ciclo disable→enable que invalida o estado interno das actions.
-        moveAction = null;
-        sprintAction = null;
-        jumpAction = null;
-        aimAction = null;
-        fireAction = null;
-        reloadAction = null;
-        ability1Action = null;
-        ability2Action = null;
-        ultimateAction = null;
-        CacheActions();
-        ResetLatchedState();
+        RefreshBindingsAfterPlayerInputReset();
     }
 
     private void Update()
@@ -71,6 +66,7 @@ public class LocalPlayerInputBridge : MonoBehaviour
             return;
         }
 
+        EnsureBindingsMatchCurrentPlayerInput();
         CacheActions();
 
         Move = moveAction != null ? moveAction.ReadValue<Vector2>() : Vector2.zero;
@@ -87,6 +83,11 @@ public class LocalPlayerInputBridge : MonoBehaviour
         if (reloadHeldNow && !wasReloadHeld)
             reloadPressed = true;
         wasReloadHeld = reloadHeldNow;
+
+        bool buildHeldNow = buildAction != null && buildAction.IsPressed();
+        if (buildHeldNow && !wasBuildHeld)
+            buildPressed = true;
+        wasBuildHeld = buildHeldNow;
 
         bool ability1HeldNow = ability1Action != null && ability1Action.IsPressed();
         if (ability1HeldNow && !wasAbility1Held)
@@ -122,6 +123,15 @@ public class LocalPlayerInputBridge : MonoBehaviour
         return true;
     }
 
+    public bool ConsumeBuildPressed()
+    {
+        if (!buildPressed)
+            return false;
+
+        buildPressed = false;
+        return true;
+    }
+
     public bool ConsumeAbility1Pressed()
     {
         if (!ability1Pressed)
@@ -149,6 +159,51 @@ public class LocalPlayerInputBridge : MonoBehaviour
         return true;
     }
 
+    public void RefreshBindingsAfterPlayerInputReset()
+    {
+        playerInput = GetComponent<PlayerInput>();
+        InvalidateCachedActions();
+        CacheActions();
+        ResetLatchedState();
+    }
+
+    private void EnsureBindingsMatchCurrentPlayerInput()
+    {
+        InputActionAsset currentActionsAsset = playerInput != null ? playerInput.actions : null;
+        string currentActionMapName = playerInput?.currentActionMap != null
+            ? playerInput.currentActionMap.name
+            : string.Empty;
+
+        if (currentActionsAsset == cachedActionsAsset &&
+            currentActionMapName == cachedActionMapName)
+        {
+            return;
+        }
+
+        InvalidateCachedActions();
+        CacheActions();
+        ResetLatchedState();
+    }
+
+    private void InvalidateCachedActions()
+    {
+        cachedActionsAsset = playerInput != null ? playerInput.actions : null;
+        cachedActionMapName = playerInput?.currentActionMap != null
+            ? playerInput.currentActionMap.name
+            : string.Empty;
+
+        moveAction = null;
+        sprintAction = null;
+        jumpAction = null;
+        aimAction = null;
+        fireAction = null;
+        reloadAction = null;
+        buildAction = null;
+        ability1Action = null;
+        ability2Action = null;
+        ultimateAction = null;
+    }
+
     private void CacheActions()
     {
         if (playerInput == null || playerInput.actions == null)
@@ -160,6 +215,7 @@ public class LocalPlayerInputBridge : MonoBehaviour
         aimAction ??= playerInput.actions.FindAction("Aim", throwIfNotFound: false);
         fireAction ??= playerInput.actions.FindAction("Attack", throwIfNotFound: false);
         reloadAction ??= playerInput.actions.FindAction("Reload", throwIfNotFound: false);
+        buildAction ??= playerInput.actions.FindAction("Build", throwIfNotFound: false);
         ability1Action ??= playerInput.actions.FindAction("Ability1", throwIfNotFound: false);
         ability2Action ??= playerInput.actions.FindAction("Ability2", throwIfNotFound: false);
         ultimateAction ??= playerInput.actions.FindAction("Ultimate", throwIfNotFound: false);
@@ -169,11 +225,13 @@ public class LocalPlayerInputBridge : MonoBehaviour
     {
         wasJumpHeld = false;
         wasReloadHeld = false;
+        wasBuildHeld = false;
         wasAbility1Held = false;
         wasAbility2Held = false;
         wasUltimateHeld = false;
         jumpPressed = false;
         reloadPressed = false;
+        buildPressed = false;
         ability1Pressed = false;
         ability2Pressed = false;
         ultimatePressed = false;

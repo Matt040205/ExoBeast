@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -19,6 +20,7 @@ public class ObjectiveHealthSystem : NetworkBehaviour
     private bool isDead;
     private float localHealth;
     private bool isNetworkDriven;
+    private Coroutine initialSyncRepublishCoroutine;
 
     public float CurrentHealth => isNetworkDriven ? currentHealth.Value : localHealth;
 
@@ -34,7 +36,7 @@ public class ObjectiveHealthSystem : NetworkBehaviour
             return;
         }
 
-        localHealth = maxHealth;
+        localHealth = Mathf.Max(maxHealth, 1f);
     }
 
     private void Start()
@@ -45,8 +47,8 @@ public class ObjectiveHealthSystem : NetworkBehaviour
         if (!ngoActive)
         {
             isNetworkDriven = false;
-            localHealth = maxHealth;
-            NotifyHealthChanged();
+            localHealth = Mathf.Max(maxHealth, 1f);
+            PublishHealthSnapshot();
         }
     }
 
@@ -54,19 +56,34 @@ public class ObjectiveHealthSystem : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
+        isDead = false;
         isNetworkDriven = true;
         if (IsServer)
             currentHealth.Value = maxHealth;
 
+        localHealth = Mathf.Clamp(currentHealth.Value, 0f, maxHealth);
         currentHealth.OnValueChanged += OnCurrentHealthChanged;
-        NotifyHealthChanged();
+        PublishHealthSnapshot();
+        RestartInitialSyncRepublish();
     }
 
     public override void OnNetworkDespawn()
     {
         currentHealth.OnValueChanged -= OnCurrentHealthChanged;
+        StopInitialSyncRepublish();
+        localHealth = Mathf.Clamp(CurrentHealth, 0f, maxHealth);
         isNetworkDriven = false;
         base.OnNetworkDespawn();
+    }
+
+    public override void OnDestroy()
+    {
+        StopInitialSyncRepublish();
+
+        if (Instance == this)
+            Instance = null;
+
+        base.OnDestroy();
     }
 
     public void TakeDamage(float damage)
@@ -87,7 +104,7 @@ public class ObjectiveHealthSystem : NetworkBehaviour
         else
         {
             localHealth = Mathf.Max(localHealth - damage, 0f);
-            NotifyHealthChanged();
+            PublishHealthSnapshot();
 
             if (localHealth <= 0f)
                 Die();
@@ -96,7 +113,35 @@ public class ObjectiveHealthSystem : NetworkBehaviour
 
     private void OnCurrentHealthChanged(float oldValue, float newValue)
     {
-        NotifyHealthChanged();
+        localHealth = Mathf.Clamp(newValue, 0f, maxHealth);
+        PublishHealthSnapshot();
+    }
+
+    private void RestartInitialSyncRepublish()
+    {
+        StopInitialSyncRepublish();
+        initialSyncRepublishCoroutine = StartCoroutine(RepublishAfterInitialSync());
+    }
+
+    private void StopInitialSyncRepublish()
+    {
+        if (initialSyncRepublishCoroutine == null)
+            return;
+
+        StopCoroutine(initialSyncRepublishCoroutine);
+        initialSyncRepublishCoroutine = null;
+    }
+
+    private IEnumerator RepublishAfterInitialSync()
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            yield return null;
+            localHealth = Mathf.Clamp(currentHealth.Value, 0f, maxHealth);
+            PublishHealthSnapshot();
+        }
+
+        initialSyncRepublishCoroutine = null;
     }
 
     private void Die()
@@ -112,9 +157,14 @@ public class ObjectiveHealthSystem : NetworkBehaviour
             SceneManager.LoadScene("Lose");
     }
 
-    private void NotifyHealthChanged()
+    private void PublishHealthSnapshot()
     {
+        float publishedHealth = isNetworkDriven
+            ? Mathf.Clamp(currentHealth.Value, 0f, maxHealth)
+            : Mathf.Clamp(localHealth, 0f, maxHealth);
+
+        localHealth = publishedHealth;
         OnHealthChanged?.Invoke();
-        ObjectiveHealthBus.Publish(CurrentHealth, maxHealth);
+        ObjectiveHealthBus.Publish(publishedHealth, maxHealth);
     }
 }

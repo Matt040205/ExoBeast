@@ -1,26 +1,23 @@
-using UnityEngine;
-using UnityEngine.AI;
 using System.Collections.Generic;
 using Unity.Netcode;
+using UnityEngine;
+using UnityEngine.AI;
 
 /// <summary>
-/// ── EnemyPoolManager ───────────────────────────────────
-/// Pool de inimigos integrado com NGO Spawn/Despawn via Handler.
-///
-///  ▸ Implementa INetworkPrefabInstanceHandler para que os clientes 
-///    puxem objetos DESTE pool em vez de rodarem Instantiate() quando 
-///    o Servidor fizer o Spawn.
-/// ─────────────────────────────────────────────────────
+/// Pool de inimigos integrado com NGO Spawn/Despawn via handler.
 /// </summary>
 public class EnemyPoolManager : MonoBehaviour
 {
     public static EnemyPoolManager Instance { get; private set; }
 
-    [Header("Configuração Base")]
+    [Header("Configuracao Base")]
     public int initialPoolSize = 5;
     public int maxPoolSize = 100;
 
-    private Dictionary<string, Queue<GameObject>> pools = new Dictionary<string, Queue<GameObject>>();
+    private readonly Dictionary<string, Queue<GameObject>> pools = new Dictionary<string, Queue<GameObject>>();
+    private readonly HashSet<GameObject> registeredPrefabs = new HashSet<GameObject>();
+
+    private bool IsNGOServer => NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer;
 
     private void Awake()
     {
@@ -29,6 +26,7 @@ public class EnemyPoolManager : MonoBehaviour
             Destroy(this);
             return;
         }
+
         Instance = this;
     }
 
@@ -37,55 +35,84 @@ public class EnemyPoolManager : MonoBehaviour
         RegisterNetworkPrefabs();
     }
 
-    /// <summary>
-    /// Percorre os prefabs do NetworkManager e cadastra o manipulador de instâncias
-    /// para cada um que seja um inimigo.
-    /// </summary>
+    private void OnDestroy()
+    {
+        UnregisterNetworkPrefabs();
+
+        if (Instance == this)
+            Instance = null;
+    }
+
     private void RegisterNetworkPrefabs()
     {
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.NetworkConfig.Prefabs != null)
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null || networkManager.NetworkConfig?.Prefabs == null)
+            return;
+
+        UnregisterNetworkPrefabs();
+
+        foreach (NetworkPrefab networkPrefab in networkManager.NetworkConfig.Prefabs.Prefabs)
         {
-            foreach (var networkPrefab in NetworkManager.Singleton.NetworkConfig.Prefabs.Prefabs)
-            {
-                var prefab = networkPrefab.Prefab;
-                if (prefab != null && prefab.GetComponent<EnemyController>() != null)
-                {
-                    // Registra para interceptar a criação no cliente
-                    NetworkManager.Singleton.PrefabHandler.AddHandler(prefab, new EnemyPrefabHandler(prefab, this));
-                }
-            }
+            GameObject prefab = networkPrefab.Prefab;
+            if (prefab == null || prefab.GetComponent<EnemyController>() == null)
+                continue;
+
+            if (prefab.GetComponent<NetworkObject>() == null)
+                continue;
+
+            networkManager.PrefabHandler.RemoveHandler(prefab);
+            networkManager.PrefabHandler.AddHandler(prefab, new EnemyPrefabHandler(prefab, this));
+            registeredPrefabs.Add(prefab);
         }
     }
 
-    private bool IsNGOServer => NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer;
-
-    public GameObject GetPooledEnemy(GameObject prefab, Vector3 position, Quaternion rotation)
+    private void UnregisterNetworkPrefabs()
     {
-        string prefabName = prefab.name;
-        if (!pools.ContainsKey(prefabName))
+        if (registeredPrefabs.Count == 0)
+            return;
+
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager != null)
         {
-            pools[prefabName] = new Queue<GameObject>();
-            for (int i = 0; i < initialPoolSize; i++)
+            foreach (GameObject prefab in registeredPrefabs)
             {
-                GameObject preWarmed = CreateNewInPool(prefab, prefabName);
-                pools[prefabName].Enqueue(preWarmed); // Pré-popula a fila
+                if (prefab != null)
+                    networkManager.PrefabHandler.RemoveHandler(prefab);
             }
         }
 
-        GameObject enemy;
-        if (pools[prefabName].Count > 0)
+        registeredPrefabs.Clear();
+    }
+
+    public GameObject GetPooledEnemy(GameObject prefab, Vector3 position, Quaternion rotation)
+    {
+        if (prefab == null)
+            return null;
+
+        string prefabName = prefab.name;
+        if (!pools.TryGetValue(prefabName, out Queue<GameObject> pool))
         {
-            enemy = pools[prefabName].Dequeue();
+            pool = new Queue<GameObject>();
+            pools[prefabName] = pool;
+
+            for (int i = 0; i < initialPoolSize; i++)
+            {
+                GameObject preWarmed = CreateNewInPool(prefab, prefabName);
+                if (preWarmed != null)
+                    pool.Enqueue(preWarmed);
+            }
         }
-        else
-        {
+
+        GameObject enemy = TryDequeueValidPooledEnemy(pool);
+        if (enemy == null)
             enemy = CreateNewInPool(prefab, prefabName);
-        }
 
-        if (enemy == null) return null;
+        if (enemy == null)
+            return null;
 
-        var navAgent = enemy.GetComponent<NavMeshAgent>();
-        if (navAgent != null) navAgent.enabled = false;
+        NavMeshAgent navAgent = enemy.GetComponent<NavMeshAgent>();
+        if (navAgent != null)
+            navAgent.enabled = false;
 
         enemy.transform.position = position;
         enemy.transform.rotation = rotation;
@@ -97,109 +124,129 @@ public class EnemyPoolManager : MonoBehaviour
             navAgent.Warp(position);
         }
 
-        // IMPORTANTE: Só disparamos Spawn manual quando SOMOS O SERVIDOR.
-        // O cliente passará por aqui quando o NGO chamar Instantiate() nele.
-        if (IsNGOServer && enemy.TryGetComponent<NetworkObject>(out var netObj))
-        {
-            if (!netObj.IsSpawned)
-            {
-                netObj.Spawn(true);
-            }
-        }
+        if (IsNGOServer && enemy.TryGetComponent(out NetworkObject netObj) && !netObj.IsSpawned)
+            netObj.Spawn(true);
 
         return enemy;
     }
 
     private GameObject CreateNewInPool(GameObject prefab, string prefabName)
     {
+        if (prefab == null)
+            return null;
+
         GameObject newObj = Instantiate(prefab, transform);
         newObj.name = prefabName;
 
-        var navAgent = newObj.GetComponent<NavMeshAgent>();
-        if (navAgent != null) navAgent.enabled = false;
+        NavMeshAgent navAgent = newObj.GetComponent<NavMeshAgent>();
+        if (navAgent != null)
+            navAgent.enabled = false;
 
         newObj.SetActive(false);
-        // NÃO enfileira aqui — o chamador (GetPooledEnemy) já usa o retorno diretamente.
-        // Enfileirar causava o objeto aparecer na fila E ser usado ao mesmo tempo,
-        // resultando em reuso duplicado na próxima chamada.
         return newObj;
     }
 
-    /// <summary>
-    /// Devolve um inimigo ao pool e o despawna da rede (se for server) sem destruí-lo.
-    /// Clientes caem aqui pelo callback .Destroy() do PrefabHandler do NGO.
-    /// </summary>
+    private GameObject TryDequeueValidPooledEnemy(Queue<GameObject> pool)
+    {
+        if (pool == null)
+            return null;
+
+        while (pool.Count > 0)
+        {
+            GameObject candidate = pool.Dequeue();
+            if (candidate != null)
+                return candidate;
+        }
+
+        return null;
+    }
+
     public void ReturnToPool(GameObject enemy)
     {
-        if (enemy == null) return;
+        if (enemy == null)
+            return;
 
-        var navAgent = enemy.GetComponent<NavMeshAgent>();
-        if (navAgent != null) navAgent.enabled = false;
+        NavMeshAgent navAgent = enemy.GetComponent<NavMeshAgent>();
+        if (navAgent != null)
+            navAgent.enabled = false;
 
-        string prefabName = enemy.name;
-
-        if (!pools.ContainsKey(prefabName))
+        string prefabName = enemy.name.Replace("(Clone)", string.Empty).Trim();
+        if (!pools.TryGetValue(prefabName, out Queue<GameObject> pool))
         {
-            pools[prefabName] = new Queue<GameObject>();
+            pool = new Queue<GameObject>();
+            pools[prefabName] = pool;
         }
 
-        bool hasNetworkObject = enemy.TryGetComponent<NetworkObject>(out var netObj);
-
-        if (IsNGOServer && hasNetworkObject)
-        {
-            if (netObj.IsSpawned)
-            {
-                netObj.Despawn(false);
-            }
-        }
+        bool hasNetworkObject = enemy.TryGetComponent(out NetworkObject netObj);
+        if (IsNGOServer && hasNetworkObject && netObj.IsSpawned)
+            netObj.Despawn(false);
 
         enemy.SetActive(false);
 
         if (IsNGOServer || !hasNetworkObject)
             enemy.transform.SetParent(transform);
 
-        if (!pools[prefabName].Contains(enemy))
-            pools[prefabName].Enqueue(enemy);
+        if (!pool.Contains(enemy))
+            pool.Enqueue(enemy);
     }
 
     public void ClearAllPools()
     {
-        foreach (var pool in pools.Values)
+        foreach (Queue<GameObject> pool in pools.Values)
         {
             while (pool.Count > 0)
             {
-                Destroy(pool.Dequeue());
+                GameObject pooledObject = pool.Dequeue();
+                if (pooledObject != null)
+                    Destroy(pooledObject);
             }
         }
+
         pools.Clear();
     }
 }
 
 /// <summary>
-/// Classe injetada no NetworkManager para interceptar o Instantiate e Destroy automático do NGO
-/// e redirecionar para o EnemyPoolManager.
+/// Handler de spawn/despawn para redirecionar inimigos ao EnemyPoolManager.
 /// </summary>
 public class EnemyPrefabHandler : INetworkPrefabInstanceHandler
 {
-    private GameObject _prefab;
-    private EnemyPoolManager _poolManager;
+    private readonly GameObject prefab;
+    private readonly EnemyPoolManager poolManager;
 
     public EnemyPrefabHandler(GameObject prefab, EnemyPoolManager poolManager)
     {
-        _prefab = prefab;
-        _poolManager = poolManager;
+        this.prefab = prefab;
+        this.poolManager = poolManager;
     }
 
     public NetworkObject Instantiate(ulong ownerClientId, Vector3 position, Quaternion rotation)
     {
-        // O servidor enviou o Spawn. Em vez de Instantiate puro, pegamos do pool.
-        GameObject obj = _poolManager.GetPooledEnemy(_prefab, position, rotation);
-        return obj.GetComponent<NetworkObject>();
+        GameObject obj = poolManager != null
+            ? poolManager.GetPooledEnemy(prefab, position, rotation)
+            : null;
+
+        if (obj == null && prefab != null)
+        {
+            obj = Object.Instantiate(prefab, position, rotation);
+            obj.name = prefab.name;
+            obj.SetActive(true);
+        }
+
+        return obj != null ? obj.GetComponent<NetworkObject>() : null;
     }
 
     public void Destroy(NetworkObject networkObject)
     {
-        // O servidor despawnou o objeto. Em vez de Destroy puro, devolvemos ao pool.
-        _poolManager.ReturnToPool(networkObject.gameObject);
+        if (networkObject == null)
+            return;
+
+        if (poolManager != null)
+        {
+            poolManager.ReturnToPool(networkObject.gameObject);
+            return;
+        }
+
+        Object.Destroy(networkObject.gameObject);
     }
 }

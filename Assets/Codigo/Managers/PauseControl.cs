@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 /// <summary>
 /// ── PauseControl ────────────────────────────────────
@@ -42,6 +43,15 @@ public class PauseControl : MonoBehaviour
             if (isPaused) ResumeGame();
             else PauseGame();
         }
+    }
+
+    public void OnPause(InputAction.CallbackContext ctx)
+    {
+        if (!ctx.performed)
+            return;
+
+        if (isPaused) ResumeGame();
+        else PauseGame();
     }
 
     public void PauseGame()

@@ -15,7 +15,36 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - `Assets/Codigo/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
 - `Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
 
-## Ultima atualizacao: refactor de autoridade, HUD, traps, habilidades e IA (2026-04-28)
+## Ultima atualizacao: correcoes de input local, build toggle e disputa de PlayerInput (2026-04-29)
+
+- O problema observado no log nao era mais de spawn, auth ou lobby: o host completava login EOS, criava lobby, entrava na partida e o `PlayerNetworkSetup` terminava o setup local, mas o comandante ainda nao respondia aos inputs de gameplay.
+- A investigacao mostrou um `PlayerInput` na cena, no objeto `ManagersDaPartida` de `Assets/Scenes/CenaMapaTeste.unity`, com o action `Player/Build` ligado diretamente a `BuildManager.OnBuild`. Esse componente competia com o `PlayerInput` do player local pelo mesmo teclado/mouse.
+- O `PlayerInput` do player local tambem passava por um ciclo `disable -> enable` em `PlayerNetworkSetup`, o que podia deixar referencias de `InputAction` cacheadas em estado velho dentro do `LocalPlayerInputBridge`.
+- `PauseControl` ja estava mapeado no prefab, mas nao possuia um callback `OnPause(InputAction.CallbackContext)` compativel com o Input System novo.
+
+### Correcoes aplicadas
+
+| Arquivo | O que foi ajustado |
+|---|---|
+| `Assets/Codigo/Towers/BuildManager.cs` | Desabilita o `PlayerInput` de cena em `Awake()` para evitar disputa de device com o comandante local. O toggle de build passou a ser lido via `LocalPlayerInputBridge` do owner, com fallback para `Keyboard.current.bKey.wasPressedThisFrame`. |
+| `Assets/Codigo/Characters/Player/LocalPlayerInputBridge.cs` | Passou a recachear bindings quando o `PlayerInput` muda de estado, incluindo a action `Build`. Tambem ganhou `ConsumeBuildPressed()`, flags de estado para `Build` e refresh explicito apos reset do `PlayerInput`. |
+| `Assets/Codigo/Multiplayer/Sync/PlayerNetworkSetup.cs` | Depois do `disable -> enable -> SwitchCurrentActionMap("Player")`, agora chama `RefreshBindingsAfterPlayerInputReset()` no bridge. O sanity-check do owner tambem passou a verificar `devices.Count` e `currentActionMap.enabled`. |
+| `Assets/Codigo/Managers/PauseControl.cs` | Ganhou `OnPause(InputAction.CallbackContext)` para receber o evento do action `Player/Pause` que ja estava ligado no prefab. |
+
+### Comportamento novo
+
+- O `BuildManager` nao depende mais do `PlayerInput` da cena para abrir/fechar build mode.
+- O jogador local passa a ser a fonte de verdade para input de gameplay, via `LocalPlayerInputBridge`.
+- O build toggle agora pode vir do action `Build` do owner ou, se necessario, do teclado `B`.
+- O bridge recacheia `Move`, `Sprint`, `Jump`, `Aim`, `Attack`, `Reload`, `Build`, `Ability1`, `Ability2` e `Ultimate` apos reset do `PlayerInput`.
+- O sanity-check local agora acusa claramente se o owner estiver com `PlayerInput` sem device pareado, action map ausente ou action map desabilitado.
+
+### Validacao
+
+- `dotnet build Assembly-CSharp.csproj` concluiu com sucesso, com `0 erro(s)` e `0 aviso(s)`.
+- O log do host continua mostrando login EOS, criacao de lobby, conexao, spawn do player local e setup final; a mudanca desta rodada foi focada especificamente em corrigir a disputa de input.
+
+## Atualizacao anterior: refactor de autoridade, HUD, traps, habilidades e IA (2026-04-28)
 
 - `ObjectiveHealthSystem` virou a fonte autoritativa da vida da Base e agora publica atualizacoes via `ObjectiveHealthBus`; `PlayerHUD` e `UIManager` apenas escutam eventos.
 - `Prefeitura.prefab` agora e um `NetworkObject` de cena para a Base sincronizar vida e derrota corretamente entre host e clientes.

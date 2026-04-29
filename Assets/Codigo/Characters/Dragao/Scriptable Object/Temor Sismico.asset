@@ -14,13 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   abilityName: Temor Sismico
   description: "Ela golpeia o ch\xE3o com for\xE7a total, criando uma onda de choque
-    em uma \xE1rea triangular \xE0 sua frente. Causa dano e levanta todos os inimigos
-    para cima, deixando-os suspensos e vulner\xE1veis por 2s."
+    em uma \xE1rea triangular \xE0 sua frente. Causa dano, atordoa e lan\xE7a para
+    cima os inimigos atingidos, deixando-os vulner\xE1veis."
   icon: {fileID: 21300000, guid: a448ecba7eb23394296fb8f399df5050, type: 3}
   cooldown: 1
   range: 10
-  angle: 360
+  angle: 90
   damage: 30
+  stunDuration: 2
   knockUpDuration: 2
   knockUpForce: 8
   vulnerabilityMultiplier: 1.8

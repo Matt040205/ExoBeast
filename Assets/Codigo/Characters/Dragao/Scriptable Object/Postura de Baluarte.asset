@@ -13,12 +13,13 @@ MonoBehaviour:
   m_Name: Postura de Baluarte
   m_EditorClassIdentifier: 
   abilityName: Postura de Baluarte
-  description: "Ela firma os p\xE9s no ch\xE3o e levanta o martelo em defesa. Durante
-    4s, ela bloqueia todo dano frontal e, se for atacada corpo-a-corpo, contra-ataca
-    automaticamente derrubando o inimigo."
+  description: "Ela firma os p\xE9s no ch\xE3o e provoca os inimigos ao redor. Durante
+    4s, fica parada e devolve ao agressor todo o dano que receber."
   icon: {fileID: 21300000, guid: b9e323d9abb8930418c1f474b912f162, type: 3}
   cooldown: 1
   duration: 4
+  tauntRadius: 10
+  tauntTickInterval: 0.2
   counterDamage: 50
   counterKnockback: 10
   logicPrefab: {fileID: 9043722966469428769, guid: f5775368c8b43a245876337d28f12b4e, type: 3}

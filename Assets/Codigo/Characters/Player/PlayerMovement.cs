@@ -612,6 +612,7 @@ public class PlayerMovement : NetworkBehaviour
             inputBridge = gameObject.AddComponent<LocalPlayerInputBridge>();
 
         inputBridge.enabled = true;
+        inputBridge.RefreshBindingsAfterPlayerInputReset();
 
         TryResolveCriticalReferences(false);
 
@@ -669,5 +670,43 @@ public class PlayerMovement : NetworkBehaviour
             basisRight.Normalize();
 
         return usingCameraController;
+    }
+
+    public bool IsGroundedForGameplay(float extraGroundProbeDistance = 0.35f)
+    {
+        if (controller != null && controller.enabled && controller.isGrounded)
+            return true;
+
+        if (IsOwner && isGrounded)
+            return true;
+
+        if (!IsOwner && netIsGrounded.Value)
+            return true;
+
+        return ProbeGrounded(extraGroundProbeDistance);
+    }
+
+    private bool ProbeGrounded(float extraGroundProbeDistance)
+    {
+        LayerMask probeMask = groundMask.value != 0 ? groundMask : Physics.DefaultRaycastLayers;
+        float sphereRadius = 0.2f;
+        float probeDistance = Mathf.Max(0.5f, extraGroundProbeDistance);
+        Vector3 origin = transform.position + Vector3.up * 0.15f;
+
+        if (controller != null)
+        {
+            sphereRadius = Mathf.Max(0.15f, controller.radius * 0.9f);
+            origin = transform.position + Vector3.up * Mathf.Max(0.1f, sphereRadius);
+            probeDistance = Mathf.Max(probeDistance, controller.skinWidth + 0.4f);
+        }
+
+        return Physics.SphereCast(
+            origin,
+            sphereRadius,
+            Vector3.down,
+            out _,
+            probeDistance,
+            probeMask,
+            QueryTriggerInteraction.Ignore);
     }
 }

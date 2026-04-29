@@ -5,18 +5,19 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "Temor Sismico", menuName = "ExoBeasts/Personagens/Dragao/Habilidade/Temor Sismico")]
 public class HabilidadeTemorSismico : Ability
 {
-    [Header("Configuracoes de Combate")]
+    [Header("Area de Impacto")]
     public float range = 15f;
-    [Range(0, 360)] public float angle = 45f;
-    public float damage = 100f;
+    [Range(0, 360)] public float angle = 90f;
+    public float damage = 30f;
 
     [Header("Controle de Grupo")]
+    public float stunDuration = 2f;
     public float knockUpDuration = 2f;
     public float knockUpForce = 12f;
 
-    [Header("Debuff (Vulnerabilidade)")]
+    [Header("Debuff")]
     [Tooltip("Multiplicador de dano recebido. 1.5 = 50% a mais.")]
-    public float vulnerabilityMultiplier = 1.5f;
+    public float vulnerabilityMultiplier = 1.8f;
     public float vulnerabilityDuration = 5f;
 
     [Header("Visual e Logica")]
@@ -51,6 +52,7 @@ public class HabilidadeTemorSismico : Ability
             range,
             angle,
             damage,
+            stunDuration,
             knockUpDuration,
             knockUpForce,
             vulnerabilityMultiplier,

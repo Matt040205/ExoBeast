@@ -4,6 +4,10 @@ using UnityEngine;
 public class HabilidadePosturaBaluarte : Ability
 {
     public float duration = 4f;
+    public float tauntRadius = 10f;
+    public float tauntTickInterval = 0.2f;
+
+    [Header("Legado")]
     public float counterDamage = 50f;
     public float counterKnockback = 10f;
 
@@ -22,6 +26,6 @@ public class HabilidadePosturaBaluarte : Ability
         }
 
         CommanderAbilityController controller = quemUsou.GetComponent<CommanderAbilityController>();
-        return defensiveStance.ActivateServer(duration, counterDamage, counterKnockback, controller, this);
+        return defensiveStance.ActivateServer(duration, tauntRadius, tauntTickInterval, controller, this);
     }
 }

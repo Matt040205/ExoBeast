@@ -85,6 +85,7 @@ namespace ExoBeasts.Multiplayer.Sync
                 localInputBridge = gameObject.AddComponent<LocalPlayerInputBridge>();
 
             localInputBridge.enabled = true;
+            localInputBridge.RefreshBindingsAfterPlayerInputReset();
 
             Debug.Log("[PlayerNetworkSetup] PlayerInput configurado no ActionMap 'Player'.");
 
@@ -130,6 +131,53 @@ namespace ExoBeasts.Multiplayer.Sync
                     $"BuildManager={BuildManager.Instance != null} | " +
                     $"GameDataManager={GameDataManager.Instance != null}");
             }
+            StartCoroutine(LogOwnerInputSanityAfterMaterialization());
+        }
+
+        private IEnumerator LogOwnerInputSanityAfterMaterialization()
+        {
+            yield return new WaitForSecondsRealtime(2.6f);
+
+            if (!IsOwner)
+                yield break;
+
+            var playerInput = GetComponent<PlayerInput>();
+            var inputBridge = localInputBridge != null ? localInputBridge : GetComponent<LocalPlayerInputBridge>();
+            var playerMovement = movement != null ? movement : GetComponent<PlayerMovement>();
+            var combatManager = playerCombatManager as PlayerCombatManager ?? GetComponent<PlayerCombatManager>();
+            var abilityController = GetComponent<CommanderAbilityController>();
+            int pairedDeviceCount = playerInput != null ? playerInput.devices.Count : -1;
+            bool actionMapMissingOrDisabled = playerInput == null ||
+                playerInput.currentActionMap == null ||
+                !playerInput.currentActionMap.enabled;
+
+            bool playerInputDisabled = playerInput != null && !playerInput.enabled;
+            bool inputBridgeDisabled = inputBridge != null && !inputBridge.isActiveAndEnabled;
+            bool movementDisabled = playerMovement != null && !playerMovement.enabled;
+            bool combatDisabled = combatManager != null && !combatManager.enabled;
+            bool abilityDisabled = abilityController != null && !abilityController.enabled;
+
+            if (!playerInputDisabled &&
+                !inputBridgeDisabled &&
+                !movementDisabled &&
+                !combatDisabled &&
+                !abilityDisabled &&
+                pairedDeviceCount > 0 &&
+                !actionMapMissingOrDisabled)
+            {
+                yield break;
+            }
+
+            Debug.LogWarning(
+                $"[PlayerNetworkSetup] Sanity-check do owner detectou estado local suspeito em '{name}'. " +
+                $"PlayerInput={playerInput?.enabled.ToString() ?? "missing"} | " +
+                $"Devices={pairedDeviceCount} | " +
+                $"ActionMap={playerInput?.currentActionMap?.name ?? "missing"} | " +
+                $"ActionMapEnabled={(playerInput?.currentActionMap != null ? playerInput.currentActionMap.enabled.ToString() : "missing")} | " +
+                $"LocalPlayerInputBridge={inputBridge?.isActiveAndEnabled.ToString() ?? "missing"} | " +
+                $"PlayerMovement={playerMovement?.enabled.ToString() ?? "missing"} | " +
+                $"PlayerCombatManager={combatManager?.enabled.ToString() ?? "missing"} | " +
+                $"CommanderAbilityController={abilityController?.enabled.ToString() ?? "missing"}");
         }
 
         /// <summary>

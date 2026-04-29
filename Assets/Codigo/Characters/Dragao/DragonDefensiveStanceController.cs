@@ -1,44 +1,70 @@
 using System.Collections;
+using System.Collections.Generic;
+using ExoBeasts.Multiplayer.Core;
+using ExoBeasts.Multiplayer.Sync;
 using Unity.Netcode;
 using UnityEngine;
-using ExoBeasts.Multiplayer.Sync;
+using UnityEngine.InputSystem;
 
-public class DragonDefensiveStanceController : NetworkBehaviour, IDamageInterceptor
+public class DragonDefensiveStanceController : NetworkBehaviour
 {
-    [SerializeField] private float frontalBlockDot = 0.15f;
-
     public NetworkVariable<bool> IsActive = new NetworkVariable<bool>(
         false,
         NetworkVariableReadPermission.Everyone,
         NetworkVariableWritePermission.Server);
 
     private PlayerHealthSystem playerHealth;
+    private PlayerMovement playerMovement;
+    private PlayerShooting playerShooting;
+    private PlayerCombatManager combatManager;
+    private LocalPlayerInputBridge inputBridge;
+    private PlayerInput playerInput;
+
     private Coroutine activeRoutine;
+    private Coroutine tauntRoutine;
     private bool localActiveState;
-    private float counterDamage;
-    private float counterKnockback;
+    private bool serverHooksApplied;
+    private bool ownerGameplaySuppressed;
+
+    private float tauntRadius;
+    private float tauntTickInterval;
     private ulong ownerClientId;
     private PlayerHealthSystem ownerHealth;
+
+    private bool movementWasEnabled;
+    private bool shootingWasEnabled;
+    private bool combatWasEnabled;
+    private bool inputBridgeWasEnabled;
+    private bool playerInputWasEnabled;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
         ResolveDependencies();
         IsActive.OnValueChanged += OnActiveStateChanged;
+        SyncServerHooks(IsActive.Value);
         ApplyVisualState(IsActive.Value);
     }
 
     public override void OnNetworkDespawn()
     {
         IsActive.OnValueChanged -= OnActiveStateChanged;
+        SyncServerHooks(false);
         ApplyVisualState(false);
         base.OnNetworkDespawn();
     }
 
+    public override void OnDestroy()
+    {
+        SyncServerHooks(false);
+        ApplyVisualState(false);
+        base.OnDestroy();
+    }
+
     public bool ActivateServer(
         float duration,
-        float newCounterDamage,
-        float newCounterKnockback,
+        float newTauntRadius,
+        float newTauntTickInterval,
         CommanderAbilityController abilityController,
         Ability ability)
     {
@@ -47,12 +73,14 @@ public class DragonDefensiveStanceController : NetworkBehaviour, IDamageIntercep
             return false;
 
         ResolveDependencies();
+        if (IsStanceActive())
+            return false;
 
         if (abilityController != null)
             abilityController.SetAbilityUsage(ability, true);
 
-        counterDamage = newCounterDamage;
-        counterKnockback = newCounterKnockback;
+        tauntRadius = Mathf.Max(0f, newTauntRadius);
+        tauntTickInterval = Mathf.Max(0.1f, newTauntTickInterval);
         NetworkGameplayResolver.TryResolveAttackerFromPlayer(gameObject, out ownerClientId, out ownerHealth);
 
         if (activeRoutine != null)
@@ -63,17 +91,6 @@ public class DragonDefensiveStanceController : NetworkBehaviour, IDamageIntercep
         return true;
     }
 
-    public bool TryIntercept(PlayerHealthSystem target, ref DamageRequest request, ref DamageResponse response)
-    {
-        if (!IsStanceActive() || !request.IsMelee || !IsAttackerInFront(request.Attacker))
-            return false;
-
-        response.WasBlocked = true;
-        response.ModifiedDamage = 0f;
-        CounterAttack(request.Attacker);
-        return true;
-    }
-
     private IEnumerator ActiveRoutine(float duration)
     {
         yield return new WaitForSeconds(duration);
@@ -81,38 +98,52 @@ public class DragonDefensiveStanceController : NetworkBehaviour, IDamageIntercep
         activeRoutine = null;
     }
 
-    private void CounterAttack(Transform attacker)
+    private IEnumerator TauntRoutine()
     {
-        if (attacker == null)
-            return;
+        WaitForSeconds wait = new WaitForSeconds(tauntTickInterval);
 
-        EnemyHealthSystem enemyHealth = attacker.GetComponent<EnemyHealthSystem>();
-        if (enemyHealth != null)
+        while (IsStanceActive())
         {
-            DamageContext damageContext = new DamageContext(ownerClientId, false, DamageFeedbackMode.AllObservers);
-            enemyHealth.ApplyAuthoritativeDamage(counterDamage, 0f, damageContext, ownerHealth);
+            ApplyTauntPulse();
+            yield return wait;
         }
 
-        EnemyController enemyController = attacker.GetComponent<EnemyController>();
-        if (enemyController != null)
+        tauntRoutine = null;
+    }
+
+    private void ApplyTauntPulse()
+    {
+        if (tauntRadius <= 0f)
+            return;
+
+        Collider[] hits = Physics.OverlapSphere(transform.position, tauntRadius);
+        HashSet<EnemyController> tauntedEnemies = new HashSet<EnemyController>();
+
+        foreach (Collider hit in hits)
         {
-            enemyController.ApplySlip();
-            enemyController.ApplyKnockback(transform.forward, counterKnockback);
+            EnemyController enemy = hit.GetComponentInParent<EnemyController>();
+            if (enemy == null || enemy.IsDead || !tauntedEnemies.Add(enemy))
+                continue;
+
+            enemy.ApplyTaunt(transform, tauntTickInterval + 0.1f);
         }
     }
 
-    private bool IsAttackerInFront(Transform attacker)
+    private void HandleServerDamageTaken(float finalDamage, Transform attacker, bool isMelee, ulong attackerClientId)
     {
+        if (!IsStanceActive() || finalDamage <= 0f)
+            return;
+
+        playerHealth?.Heal(finalDamage);
+
         if (attacker == null)
-            return false;
+            return;
 
-        Vector3 toAttacker = attacker.position - transform.position;
-        toAttacker.y = 0f;
+        EnemyHealthSystem enemyHealth = attacker.GetComponentInParent<EnemyHealthSystem>();
+        if (enemyHealth == null)
+            return;
 
-        if (toAttacker.sqrMagnitude <= 0.0001f)
-            return true;
-
-        return Vector3.Dot(transform.forward, toAttacker.normalized) >= frontalBlockDot;
+        enemyHealth.ApplyAuthoritativeDamage(finalDamage, 0f, false, ownerClientId, ownerHealth);
     }
 
     private bool IsStanceActive()
@@ -128,11 +159,51 @@ public class DragonDefensiveStanceController : NetworkBehaviour, IDamageIntercep
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening && IsSpawned && IsServer)
             IsActive.Value = isActive;
 
+        SyncServerHooks(isActive);
         ApplyVisualState(isActive);
+    }
+
+    private void SyncServerHooks(bool isActive)
+    {
+        bool shouldManageServerHooks = (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+            ? true
+            : IsServer;
+
+        if (!shouldManageServerHooks)
+            return;
+
+        ResolveDependencies();
+
+        if (isActive)
+        {
+            if (!serverHooksApplied && playerHealth != null)
+            {
+                playerHealth.OnServerDamageTaken += HandleServerDamageTaken;
+                serverHooksApplied = true;
+            }
+
+            if (tauntRoutine == null)
+                tauntRoutine = StartCoroutine(TauntRoutine());
+
+            return;
+        }
+
+        if (serverHooksApplied && playerHealth != null)
+        {
+            playerHealth.OnServerDamageTaken -= HandleServerDamageTaken;
+            serverHooksApplied = false;
+        }
+
+        if (tauntRoutine != null)
+        {
+            StopCoroutine(tauntRoutine);
+            tauntRoutine = null;
+        }
     }
 
     private void OnActiveStateChanged(bool oldValue, bool newValue)
     {
+        SyncServerHooks(newValue);
         ApplyVisualState(newValue);
     }
 
@@ -142,11 +213,86 @@ public class DragonDefensiveStanceController : NetworkBehaviour, IDamageIntercep
 
         if (playerHealth != null)
             playerHealth.isCountering = isActive;
+
+        ApplyOwnerGameplaySuppression(isActive);
+    }
+
+    private void ApplyOwnerGameplaySuppression(bool isActive)
+    {
+        if (!IsOwner)
+            return;
+
+        ResolveDependencies();
+
+        if (isActive)
+        {
+            if (ownerGameplaySuppressed)
+                return;
+
+            movementWasEnabled = playerMovement != null && playerMovement.enabled;
+            shootingWasEnabled = playerShooting != null && playerShooting.enabled;
+            combatWasEnabled = combatManager != null && combatManager.enabled;
+            inputBridgeWasEnabled = inputBridge != null && inputBridge.enabled;
+            playerInputWasEnabled = playerInput != null && playerInput.enabled;
+
+            if (movementWasEnabled)
+                playerMovement.enabled = false;
+
+            if (shootingWasEnabled)
+                playerShooting.enabled = false;
+
+            if (combatWasEnabled)
+                combatManager.enabled = false;
+
+            if (inputBridgeWasEnabled)
+                inputBridge.enabled = false;
+
+            if (playerInputWasEnabled)
+                playerInput.enabled = false;
+
+            ownerGameplaySuppressed = true;
+            return;
+        }
+
+        if (!ownerGameplaySuppressed)
+            return;
+
+        if (playerMovement != null)
+            playerMovement.enabled = movementWasEnabled;
+
+        if (playerShooting != null)
+            playerShooting.enabled = shootingWasEnabled;
+
+        if (combatManager != null)
+            combatManager.enabled = combatWasEnabled;
+
+        if (inputBridge != null)
+            inputBridge.enabled = inputBridgeWasEnabled;
+
+        if (playerInput != null)
+            playerInput.enabled = playerInputWasEnabled;
+
+        ownerGameplaySuppressed = false;
     }
 
     private void ResolveDependencies()
     {
         if (playerHealth == null)
             playerHealth = GetComponent<PlayerHealthSystem>();
+
+        if (playerMovement == null)
+            playerMovement = GetComponent<PlayerMovement>();
+
+        if (playerShooting == null)
+            playerShooting = GetComponent<PlayerShooting>();
+
+        if (combatManager == null)
+            combatManager = GetComponent<PlayerCombatManager>();
+
+        if (inputBridge == null)
+            inputBridge = GetComponent<LocalPlayerInputBridge>();
+
+        if (playerInput == null)
+            playerInput = GetComponent<PlayerInput>();
     }
 }

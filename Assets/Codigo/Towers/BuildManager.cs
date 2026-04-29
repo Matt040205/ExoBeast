@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Cinemachine;
@@ -47,6 +48,8 @@ public class BuildManager : NetworkBehaviour
     private object selectedBuildableData;
     private int selectedBuildableCost;
     private bool isCurrentPlacementValid = false;
+    private PlayerInput scenePlayerInput;
+    private LocalPlayerInputBridge localOwnerInputBridge;
 
     private void Awake()
     {
@@ -57,6 +60,7 @@ public class BuildManager : NetworkBehaviour
         }
         Instance = this;
         isBuildingMode = false;
+        DisableCompetingScenePlayerInput();
     }
 
     public override void OnNetworkSpawn()
@@ -126,6 +130,8 @@ public class BuildManager : NetworkBehaviour
 
     void Update()
     {
+        HandleBuildToggleInput();
+
         if (isBuildingMode)
         {
             HandleBuildGhost();
@@ -141,6 +147,59 @@ public class BuildManager : NetworkBehaviour
                 ClearSelection();
             }
         }
+    }
+
+    private void DisableCompetingScenePlayerInput()
+    {
+        scenePlayerInput = GetComponent<PlayerInput>();
+        if (scenePlayerInput == null)
+            return;
+
+        scenePlayerInput.enabled = false;
+        Debug.Log("[BuildManager] PlayerInput de cena desabilitado para nao disputar teclado/mouse com o PlayerInput do comandante local.");
+    }
+
+    private void HandleBuildToggleInput()
+    {
+        if (PauseControl.isPaused)
+            return;
+
+        bool togglePressed = TryConsumeBuildPressedFromOwnerBridge();
+
+        if (!togglePressed && Keyboard.current != null && Keyboard.current.bKey.wasPressedThisFrame)
+            togglePressed = true;
+
+        if (!togglePressed)
+            return;
+
+        ForceBuildMode(!isBuildingMode);
+    }
+
+    private bool TryConsumeBuildPressedFromOwnerBridge()
+    {
+        if (localOwnerInputBridge == null || !localOwnerInputBridge.isActiveAndEnabled)
+            localOwnerInputBridge = FindLocalOwnerInputBridge();
+
+        return localOwnerInputBridge != null && localOwnerInputBridge.ConsumeBuildPressed();
+    }
+
+    private LocalPlayerInputBridge FindLocalOwnerInputBridge()
+    {
+        LocalPlayerInputBridge[] inputBridges = FindObjectsByType<LocalPlayerInputBridge>(
+            FindObjectsInactive.Exclude,
+            FindObjectsSortMode.None);
+
+        foreach (LocalPlayerInputBridge inputBridge in inputBridges)
+        {
+            if (inputBridge == null || !inputBridge.isActiveAndEnabled)
+                continue;
+
+            NetworkObject networkObject = inputBridge.GetComponent<NetworkObject>();
+            if (networkObject != null && networkObject.IsOwner)
+                return inputBridge;
+        }
+
+        return null;
     }
 
     void ToggleBuildMode(bool state)
@@ -642,6 +701,14 @@ public class BuildManager : NetworkBehaviour
 
     private void SanitizeRuntimeBuildable(GameObject buildableInstance, bool isPreview)
     {
+        RuntimeBuildableSanitizer.Sanitize(buildableInstance, isPreview);
+    }
+}
+
+public static class RuntimeBuildableSanitizer
+{
+    public static void Sanitize(GameObject buildableInstance, bool isPreview)
+    {
         if (buildableInstance == null)
             return;
 
@@ -669,6 +736,9 @@ public class BuildManager : NetworkBehaviour
         foreach (CommanderController commanderController in buildableInstance.GetComponentsInChildren<CommanderController>(true))
             commanderController.enabled = false;
 
+        foreach (DragonDefensiveStanceController defensiveStance in buildableInstance.GetComponentsInChildren<DragonDefensiveStanceController>(true))
+            defensiveStance.enabled = false;
+
         foreach (PlayerHealthSystem healthSystem in buildableInstance.GetComponentsInChildren<PlayerHealthSystem>(true))
             healthSystem.enabled = false;
 
@@ -687,6 +757,9 @@ public class BuildManager : NetworkBehaviour
         foreach (ClientNetworkTransform networkTransform in buildableInstance.GetComponentsInChildren<ClientNetworkTransform>(true))
             networkTransform.enabled = false;
 
+        foreach (NetworkAnimator networkAnimator in buildableInstance.GetComponentsInChildren<NetworkAnimator>(true))
+            networkAnimator.enabled = false;
+
         foreach (CinemachineCamera cinematicCamera in buildableInstance.GetComponentsInChildren<CinemachineCamera>(true))
             cinematicCamera.enabled = false;
 
@@ -701,6 +774,9 @@ public class BuildManager : NetworkBehaviour
 
         foreach (CapsuleCollider capsuleCollider in buildableInstance.GetComponentsInChildren<CapsuleCollider>(true))
             capsuleCollider.enabled = false;
+
+        foreach (Renderer renderer in buildableInstance.GetComponentsInChildren<Renderer>(true))
+            renderer.enabled = true;
 
         if (!isPreview)
             return;

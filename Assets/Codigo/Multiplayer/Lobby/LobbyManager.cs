@@ -806,9 +806,30 @@ namespace ExoBeasts.Multiplayer.Lobby
             // o dicionario pode ter entries validas populadas pelo ConnectionApprovalCallback de
             // clientes que ainda estao conectados. O Clear acontece em ClearLobbyState (LeaveLobby),
             // que e o momento em que o estado realmente precisa ser descartado.
-            int hostCharIndex = GetMyCharacterIndex();
-            CharacterChoiceCache.SetHostCharacterIndex(hostCharIndex, "LobbyManager.StartMatch");
-            Debug.Log($"[LobbyManager] Host charIndex cacheado: {hostCharIndex}");
+            bool hasCachedHostChoice = CharacterChoiceCache.TryGet(NetworkManager.ServerClientId, out int cachedHostCharIndex) &&
+                                       cachedHostCharIndex >= 0;
+            int computedHostCharIndex = GetMyCharacterIndex();
+
+            if (hasCachedHostChoice)
+            {
+                if (computedHostCharIndex >= 0 && computedHostCharIndex != cachedHostCharIndex)
+                {
+                    Debug.LogWarning(
+                        $"[LobbyManager] Divergencia na escolha do host antes do StartMatch. " +
+                        $"Cache={cachedHostCharIndex} | Computado={computedHostCharIndex}. " +
+                        "Preservando o valor ja registrado no cache para evitar spawn do prefab errado.");
+                }
+                else
+                {
+                    Debug.Log($"[LobbyManager] Host charIndex preservado do cache: {cachedHostCharIndex}");
+                }
+            }
+            else
+            {
+                int resolvedHostCharIndex = computedHostCharIndex >= 0 ? computedHostCharIndex : 0;
+                CharacterChoiceCache.SetHostCharacterIndex(resolvedHostCharIndex, "LobbyManager.StartMatchFallback");
+                Debug.Log($"[LobbyManager] Host charIndex cacheado por fallback: {resolvedHostCharIndex}");
+            }
 
             nm.NetworkConfig.ConnectionApproval = true;
             nm.ConnectionApprovalCallback = OnNgoConnectionApproval;

@@ -45,8 +45,19 @@ namespace ExoBeasts.Multiplayer.Sync
 
         private int _lastAppliedSignature = int.MinValue;
 
+        private void Awake()
+        {
+            RuntimeBuildableSanitizer.Sanitize(gameObject, false);
+
+            if (towerController == null)
+                towerController = GetComponent<TowerController>();
+        }
+
         public override void OnNetworkSpawn()
         {
+            base.OnNetworkSpawn();
+            RuntimeBuildableSanitizer.Sanitize(gameObject, false);
+
             if (towerController == null)
                 towerController = GetComponent<TowerController>();
 
@@ -172,6 +183,9 @@ namespace ExoBeasts.Multiplayer.Sync
             if (towerController == null || towerController.towerData == null)
                 return;
 
+            foreach (Renderer renderer in GetComponentsInChildren<Renderer>(true))
+                renderer.enabled = true;
+
             int signature =
                 (DpsLevel.Value * 1000000) +
                 (ControlLevel.Value * 100000) +
@@ -219,6 +233,7 @@ namespace ExoBeasts.Multiplayer.Sync
             SupportLevel.OnValueChanged -= OnAnyStateChanged;
             TotalCostSpent.OnValueChanged -= OnAnyStateChanged;
             IsActive.OnValueChanged -= OnActiveChanged;
+            base.OnNetworkDespawn();
         }
     }
 }
