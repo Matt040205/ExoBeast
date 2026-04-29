@@ -59,6 +59,7 @@ public class MeleeCombatSystem : NetworkBehaviour
     private Animator anim;
     private NetworkAnimator networkAnimator; // <--- CACHE SEGURO ADICIONADO AQUI
     private WeaponConfig currentStats;
+    private LocalPlayerInputBridge inputBridge;
 
     public override void OnNetworkSpawn()
     {
@@ -81,6 +82,8 @@ public class MeleeCombatSystem : NetworkBehaviour
         networkAnimator = GetComponent<NetworkAnimator>();
         if (networkAnimator == null) networkAnimator = GetComponentInChildren<NetworkAnimator>();
 
+        inputBridge = GetComponent<LocalPlayerInputBridge>();
+
         UpdateCurrentStats();
     }
 
@@ -90,11 +93,15 @@ public class MeleeCombatSystem : NetworkBehaviour
     {
         if (!IsOwner || !this.enabled) return;
 
+        // Bridge está ativo em multiplayer — o polling em Update() já cobre o input.
+        // Sem este guard, um ataque dispararia duas vezes (callback + polling) no mesmo frame.
+        if (inputBridge != null && inputBridge.isActiveAndEnabled) return;
+
         if (ctx.performed && !PauseControl.isPaused && !BuildManager.isBuildingMode)
         {
             // CORREÇÃO DA LINHA 79: Usando a referência segura para o NetworkAnimator
             if (networkAnimator != null) networkAnimator.SetTrigger("Attack");
-            
+
             hitProcessedForCurrentAttack = false;
             StartCoroutine(FallbackHitRoutine());
         }
@@ -122,6 +129,21 @@ public class MeleeCombatSystem : NetworkBehaviour
         {
             float targetSpeed = overrideAttackSpeed.HasValue ? overrideAttackSpeed.Value : currentStats.animationSpeed;
             anim.SetFloat("AttackSpeedMultiplier", targetSpeed);
+        }
+
+        if (IsOwner)
+        {
+            if (inputBridge == null) inputBridge = GetComponent<LocalPlayerInputBridge>();
+            if (inputBridge != null && inputBridge.isActiveAndEnabled)
+            {
+                if (inputBridge.ConsumeMeleeAttackPressed() &&
+                    !PauseControl.isPaused && !BuildManager.isBuildingMode)
+                {
+                    if (networkAnimator != null) networkAnimator.SetTrigger("Attack");
+                    hitProcessedForCurrentAttack = false;
+                    StartCoroutine(FallbackHitRoutine());
+                }
+            }
         }
     }
 

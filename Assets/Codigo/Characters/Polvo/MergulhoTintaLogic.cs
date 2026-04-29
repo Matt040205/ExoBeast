@@ -35,6 +35,12 @@ public class MergulhoTintaLogic : MonoBehaviour
     private bool shootingWasEnabled;
     private bool combatWasEnabled;
 
+    private Material _diveShaderMaterial;
+    private float _dissolveDuration;
+    private readonly Dictionary<SkinnedMeshRenderer, Material[]> originalSkinnedMaterials = new Dictionary<SkinnedMeshRenderer, Material[]>();
+    private readonly List<Material> dissolveInstances = new List<Material>();
+    private Coroutine dissolveCoroutine;
+
     private bool HasServerAuthority
     {
         get
@@ -73,6 +79,12 @@ public class MergulhoTintaLogic : MonoBehaviour
         abilityScript = GetComponent<CommanderAbilityController>();
         sourceAbility = abilitySource;
         networkObject = GetComponent<NetworkObject>();
+
+        if (abilitySource is HabilidadeMergulhoTinta mta)
+        {
+            _diveShaderMaterial = mta.diveShaderMaterial;
+            _dissolveDuration = Mathf.Max(0.1f, mta.dissolveDuration);
+        }
         isLocalProxy = networkObject != null && networkObject.IsSpawned && !HasServerAuthority;
 
         if (validateGround && !CheckIfGrounded())
@@ -136,16 +148,24 @@ public class MergulhoTintaLogic : MonoBehaviour
                 combatScript.enabled = false;
         }
 
-        foreach (Renderer renderer in originalRendererStates.Keys)
+        if (IsLocalOwnerInstance && _diveShaderMaterial != null)
         {
-            if (renderer != null)
-                renderer.enabled = false;
+            SwapToDissolveShader();
+            dissolveCoroutine = StartCoroutine(DissolveIn(puddlePrefab));
         }
-
-        if (puddlePrefab != null)
+        else
         {
-            Vector3 spawnPos = GetGroundPosition();
-            puddleInstance = Instantiate(puddlePrefab, spawnPos, Quaternion.Euler(90f, 0f, 0f));
+            foreach (Renderer renderer in originalRendererStates.Keys)
+            {
+                if (renderer != null)
+                    renderer.enabled = false;
+            }
+
+            if (puddlePrefab != null)
+            {
+                Vector3 spawnPos = GetGroundPosition();
+                puddleInstance = Instantiate(puddlePrefab, spawnPos, Quaternion.Euler(90f, 0f, 0f));
+            }
         }
 
         stateApplied = true;
@@ -359,10 +379,29 @@ public class MergulhoTintaLogic : MonoBehaviour
                 combatScript.enabled = combatWasEnabled;
         }
 
-        foreach (KeyValuePair<Renderer, bool> entry in originalRendererStates)
+        if (IsLocalOwnerInstance && _diveShaderMaterial != null)
         {
-            if (entry.Key != null)
-                entry.Key.enabled = entry.Value;
+            if (dissolveCoroutine != null)
+            {
+                StopCoroutine(dissolveCoroutine);
+                dissolveCoroutine = null;
+                RestoreOriginalSkinnedMaterials();
+            }
+
+            foreach (KeyValuePair<Renderer, bool> entry in originalRendererStates)
+                if (entry.Key != null) entry.Key.enabled = entry.Value;
+
+            SwapToDissolveShader();
+            SetDissolveAmount(1f);
+            dissolveCoroutine = StartCoroutine(DissolveOut());
+        }
+        else
+        {
+            foreach (KeyValuePair<Renderer, bool> entry in originalRendererStates)
+            {
+                if (entry.Key != null)
+                    entry.Key.enabled = entry.Value;
+            }
         }
 
         if (puddleInstance != null)
@@ -390,10 +429,92 @@ public class MergulhoTintaLogic : MonoBehaviour
             SetLayerRecursively(child.gameObject, newLayer);
     }
 
+    private void SwapToDissolveShader()
+    {
+        foreach (Material m in dissolveInstances)
+            if (m != null) Destroy(m);
+        dissolveInstances.Clear();
+        originalSkinnedMaterials.Clear();
+
+        foreach (SkinnedMeshRenderer smr in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+        {
+            originalSkinnedMaterials[smr] = smr.sharedMaterials;
+            Material[] newMats = new Material[smr.sharedMaterials.Length];
+            for (int i = 0; i < newMats.Length; i++)
+            {
+                Material inst = new Material(_diveShaderMaterial);
+                dissolveInstances.Add(inst);
+                newMats[i] = inst;
+            }
+            smr.materials = newMats;
+        }
+    }
+
+    private void RestoreOriginalSkinnedMaterials()
+    {
+        foreach (KeyValuePair<SkinnedMeshRenderer, Material[]> pair in originalSkinnedMaterials)
+        {
+            if (pair.Key != null)
+                pair.Key.materials = pair.Value;
+        }
+        foreach (Material m in dissolveInstances)
+            if (m != null) Destroy(m);
+        dissolveInstances.Clear();
+        originalSkinnedMaterials.Clear();
+    }
+
+    private void SetDissolveAmount(float value)
+    {
+        foreach (Material m in dissolveInstances)
+            if (m != null) m.SetFloat("_dissolveamount", value);
+    }
+
+    private IEnumerator DissolveIn(GameObject puddlePrefab)
+    {
+        float elapsed = 0f;
+        while (elapsed < _dissolveDuration)
+        {
+            elapsed += Time.deltaTime;
+            SetDissolveAmount(Mathf.Clamp01(elapsed / _dissolveDuration));
+            yield return null;
+        }
+
+        SetDissolveAmount(1f);
+
+        foreach (Renderer renderer in originalRendererStates.Keys)
+            if (renderer != null) renderer.enabled = false;
+
+        RestoreOriginalSkinnedMaterials();
+
+        if (puddlePrefab != null)
+        {
+            Vector3 spawnPos = GetGroundPosition();
+            puddleInstance = Instantiate(puddlePrefab, spawnPos, Quaternion.Euler(90f, 0f, 0f));
+        }
+
+        dissolveCoroutine = null;
+    }
+
+    private IEnumerator DissolveOut()
+    {
+        float elapsed = 0f;
+        while (elapsed < _dissolveDuration)
+        {
+            elapsed += Time.deltaTime;
+            SetDissolveAmount(1f - Mathf.Clamp01(elapsed / _dissolveDuration));
+            yield return null;
+        }
+
+        SetDissolveAmount(0f);
+        RestoreOriginalSkinnedMaterials();
+        dissolveCoroutine = null;
+    }
+
     private void OnDestroy()
     {
         CancelInvoke();
         StopAllCoroutines();
+        RestoreOriginalSkinnedMaterials();
         RestoreLocalPresentation(transform.position);
     }
 }

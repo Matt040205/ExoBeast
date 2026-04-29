@@ -83,8 +83,15 @@ public class PlayerHealthSystem : NetworkBehaviour
 
     private IEnumerator WaitAndRegisterHUD()
     {
-        yield return new WaitUntil(() => PlayerHUD.Instance != null);
-        PlayerHUD.Instance.RegistrarJogador(this);
+        float elapsed = 0f;
+        while (PlayerHUD.Instance == null && elapsed < 10f)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (PlayerHUD.Instance != null)
+            PlayerHUD.Instance.RegistrarJogador(this);
     }
 
     private void Update()

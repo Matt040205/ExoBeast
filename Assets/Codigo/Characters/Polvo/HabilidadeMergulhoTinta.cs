@@ -11,6 +11,12 @@ public class HabilidadeMergulhoTinta : Ability
     [Tooltip("O prefab visual da poca (sem collider!)")]
     public GameObject visualPuddlePrefab;
 
+    [Header("Shader de Dissolve (opcional)")]
+    [Tooltip("Material com _dissolveamount (0=visivel, 1=invisivel). Null = desabilita renderers imediatamente.")]
+    public Material diveShaderMaterial;
+    [Range(0.1f, 2f)]
+    public float dissolveDuration = 0.4f;
+
     public override bool Activate(GameObject quemUsou)
     {
         if (quemUsou.GetComponent<MergulhoTintaLogic>() != null)

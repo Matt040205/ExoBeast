@@ -45,6 +45,8 @@ public class GameSetupManager : NetworkBehaviour
             // como EscolherPersonagem, e OnClientConnected não dispara novamente ao carregar esta cena)
             foreach (var clientId in NetworkManager.Singleton.ConnectedClientsIds)
                 SpawnPlayerServerSide(clientId);
+
+            SpawnObjectiveHealth();
         }
     }
 
@@ -182,6 +184,27 @@ public class GameSetupManager : NetworkBehaviour
 
         if (BuildManager.Instance != null && GameDataManager.Instance != null)
             BuildManager.Instance.SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);
+    }
+
+    private void SpawnObjectiveHealth()
+    {
+        if (ObjectiveHealthSystem.Instance != null) return;
+
+        GameObject prefab = new GameObject("ObjectiveHealthPrefab");
+        prefab.AddComponent<NetworkObject>();
+        prefab.AddComponent<ObjectiveHealthSystem>();
+        prefab.SetActive(false);
+        DontDestroyOnLoad(prefab);
+
+        if (!NetworkManager.Singleton.NetworkConfig.Prefabs.Contains(prefab))
+            NetworkManager.Singleton.NetworkConfig.Prefabs.Add(prefab);
+
+        GameObject instance = Instantiate(prefab);
+        instance.SetActive(true);
+        instance.name = "ObjectiveHealth";
+
+        if (instance.TryGetComponent<NetworkObject>(out NetworkObject netObj))
+            netObj.Spawn();
     }
 
     public override void OnNetworkDespawn()

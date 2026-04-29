@@ -88,12 +88,49 @@ public class Teleportador : TrapLogicBase
         Quaternion destinationRotation = Quaternion.LookRotation(portalLigado.transform.forward, Vector3.up);
 
         if (playerObject != null && playerObject.IsSpawned)
+        {
             PlayerTeleportService.TeleportServerValidated(playerObject, destination, destinationRotation);
+
+            if (playerObject.OwnerClientId != NetworkManager.ServerClientId)
+            {
+                ClientRpcParams targetParams = new ClientRpcParams
+                {
+                    Send = new ClientRpcSendParams
+                    {
+                        TargetClientIds = new ulong[] { playerObject.OwnerClientId }
+                    }
+                };
+                NotifyPlayerTeleportClientRpc(
+                    playerObject.NetworkObjectId,
+                    destination,
+                    destinationRotation,
+                    targetParams);
+            }
+        }
         else
+        {
             PlayerTeleportService.TeleportLocal(localPlayerObject, destination, destinationRotation);
+        }
 
         StartCoroutine(StartCooldown(playerKey));
         StartCoroutine(portalLigado.StartCooldown(playerKey));
+    }
+
+    [ClientRpc]
+    private void NotifyPlayerTeleportClientRpc(
+        ulong playerNetObjId,
+        Vector3 destination,
+        Quaternion rotation,
+        ClientRpcParams rpcParams = default)
+    {
+        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects
+                .TryGetValue(playerNetObjId, out NetworkObject playerObj))
+            return;
+
+        if (!playerObj.IsOwner)
+            return;
+
+        PlayerTeleportService.TeleportLocal(playerObj.gameObject, destination, rotation);
     }
 
     private IEnumerator StartCooldown(ulong playerKey)

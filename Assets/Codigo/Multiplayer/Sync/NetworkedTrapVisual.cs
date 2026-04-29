@@ -32,6 +32,7 @@ namespace ExoBeasts.Multiplayer.Sync
 
         private TrapDataSO trapData;
         private Animator cachedAnimator;
+        private bool isBeingSold;
 
         public TrapDataSO TrapData
         {
@@ -57,6 +58,9 @@ namespace ExoBeasts.Multiplayer.Sync
 
         public override void OnNetworkDespawn()
         {
+            if (IsServer && !isBeingSold && BuildManager.Instance != null)
+                BuildManager.Instance.DecrementTrapCount(TrapIndex.Value);
+
             TrapIndex.OnValueChanged -= OnTrapIndexChanged;
             IsActivated.OnValueChanged -= OnActivationChanged;
             base.OnNetworkDespawn();
@@ -112,6 +116,10 @@ namespace ExoBeasts.Multiplayer.Sync
                 if (etherRefund > 0)
                     CurrencyManager.Instance.AddCurrency(etherRefund, CurrencyType.DarkEther);
             }
+
+            if (BuildManager.Instance != null)
+                BuildManager.Instance.DecrementTrapCount(TrapIndex.Value);
+            isBeingSold = true;
 
             if (LogicObjectId.Value != 0 &&
                 NetworkManager.Singleton != null &&

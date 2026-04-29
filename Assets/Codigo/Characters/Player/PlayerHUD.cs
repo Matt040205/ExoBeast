@@ -98,9 +98,8 @@ public class PlayerHUD : MonoBehaviour
                 AtualizarIconesHabilidades(abilityController.characterData);
 
             OnHealthChanged();
+            isSubscribed = true;
         }
-
-        isSubscribed = true;
     }
 
     private void Update()
@@ -115,6 +114,9 @@ public class PlayerHUD : MonoBehaviour
                     RegistrarJogador(health);
             }
         }
+
+        if (isSubscribed && playerHealth != null && playerHealth.characterData == null)
+            OnHealthChanged();
 
         if (playerHealth != null)
             UpdateHealthDisplay();

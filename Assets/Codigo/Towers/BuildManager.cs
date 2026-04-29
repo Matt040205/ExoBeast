@@ -51,6 +51,9 @@ public class BuildManager : NetworkBehaviour
     private PlayerInput scenePlayerInput;
     private LocalPlayerInputBridge localOwnerInputBridge;
 
+    private Dictionary<int, int> activeTrapCounts = new Dictionary<int, int>();
+    private Dictionary<int, int> syncedTrapCounts;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -341,6 +344,16 @@ public class BuildManager : NetworkBehaviour
     {
         if (trapData == null || trapData.prefab == null) return 0;
 
+        int trapIndex = availableTraps.IndexOf(trapData);
+
+        if (IsServer && activeTrapCounts != null && trapIndex >= 0
+            && activeTrapCounts.TryGetValue(trapIndex, out int authoritativeCount))
+            return authoritativeCount;
+
+        if (!IsServer && syncedTrapCounts != null && trapIndex >= 0
+            && syncedTrapCounts.TryGetValue(trapIndex, out int syncedCount))
+            return syncedCount;
+
         NetworkedTrapVisual[] networkedTraps = FindObjectsByType<NetworkedTrapVisual>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
         if (networkedTraps != null && networkedTraps.Length > 0)
         {
@@ -432,7 +445,13 @@ public class BuildManager : NetworkBehaviour
         if (!CurrencyManager.Instance.HasEnoughCurrency(trapData.geoditeCost, CurrencyType.Geodites)) return;
         if (!CurrencyManager.Instance.HasEnoughCurrency(trapData.darkEtherCost, CurrencyType.DarkEther)) return;
 
-        if (trapData.buildLimit > 0 && GetTrapCount(trapData) >= trapData.buildLimit) return;
+        if (trapData.buildLimit > 0)
+        {
+            int currentCount = activeTrapCounts.ContainsKey(trapIndex) ? activeTrapCounts[trapIndex] : 0;
+            if (currentCount >= trapData.buildLimit)
+                return;
+            activeTrapCounts[trapIndex] = currentCount + 1;
+        }
 
         if (trapData.geoditeCost > 0)
             CurrencyManager.Instance.SpendCurrency(trapData.geoditeCost, CurrencyType.Geodites);
@@ -442,6 +461,8 @@ public class BuildManager : NetworkBehaviour
 
         // Dispara o ClientRpc para os outros jogadores verem o feixe antes da torre spawnar
         PlaySpawnBeamClientRpc(pos, rpcParams.Receive.SenderClientId);
+
+        UpdateTrapCountsClientRpc(trapIndex, activeTrapCounts[trapIndex]);
 
         StartCoroutine(SpawnTrapWithDelay(trapData, trapIndex, pos, rpcParams.Receive.SenderClientId));
     }
@@ -600,6 +621,24 @@ public class BuildManager : NetworkBehaviour
             return null;
 
         return availableTraps[trapIndex];
+    }
+
+    public void DecrementTrapCount(int trapIndex)
+    {
+        if (!IsServer) return;
+        if (activeTrapCounts.ContainsKey(trapIndex))
+        {
+            activeTrapCounts[trapIndex] = Mathf.Max(0, activeTrapCounts[trapIndex] - 1);
+            UpdateTrapCountsClientRpc(trapIndex, activeTrapCounts[trapIndex]);
+        }
+    }
+
+    [ClientRpc]
+    private void UpdateTrapCountsClientRpc(int trapIndex, int newCount)
+    {
+        if (syncedTrapCounts == null)
+            syncedTrapCounts = new Dictionary<int, int>();
+        syncedTrapCounts[trapIndex] = newCount;
     }
 
     private bool TryPopulateBuildUiFromCanonicalSlots(CharacterBase[] equipe)
