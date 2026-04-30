@@ -27,4 +27,10 @@ MonoBehaviour:
   vulnerabilityMultiplier: 1.8
   vulnerabilityDuration: 5
   logicPrefab: {fileID: 2493877144496194484, guid: 2337272e085aa194dbd364da9f6d245a, type: 3}
+  groundSlashPrefab: {fileID: 6226563308423734848, guid: ebe444e1bf5cfc644b2ca519e1b89da8, type: 3}
+  numberOfSlashes: 5
+  travelSpeed: 14
+  travelTime: 1.5
+  slowDownRate: 0.5
+  fadeOutGracePeriod: 2
   sfxSlam: event:/SFX/SeismicSlam
