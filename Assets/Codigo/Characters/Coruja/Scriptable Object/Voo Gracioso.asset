@@ -13,11 +13,10 @@ MonoBehaviour:
   m_Name: Voo Gracioso
   m_EditorClassIdentifier: 
   abilityName: Voo Gracioso
-  description: "Fica parado no ar e da mais dano enquanto est\xE1 no ar.\n"
+  description: "Fica parado no ar e sua pr\xF3xima flecha explode."
   icon: {fileID: 21300000, guid: 1dbb27945792c3242b9fb5b6ce4d758c, type: 3}
   cooldown: 5
   jumpHeightModifier: 1.5
   staticAimDuration: 3
   bonusDamageMultiplier: 1.5
   bonusExplosionRadius: 5
-  logicPrefab: {fileID: 146054580399374588, guid: 8e13976ca4bcbcc4b9bda1c50b13a9a7, type: 3}
