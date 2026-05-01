@@ -14,6 +14,9 @@ namespace ExoBeasts.Multiplayer.Auth
     public class SessionManager : MonoBehaviour
     {
         private static SessionManager _instance;
+        public static bool HasInstance => _instance != null;
+        public static SessionManager TryGetExistingInstance() => _instance;
+
         public static SessionManager Instance
         {
             get

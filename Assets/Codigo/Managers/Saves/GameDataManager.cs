@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System;
 
 [System.Serializable]
 public class CharacterSaveData
@@ -41,6 +42,7 @@ public class FullSaveData
 public class GameDataManager : MonoBehaviour
 {
     public static GameDataManager Instance;
+    private static List<CharacterBase> _bootstrapLibrary;
 
     [Header("Banco de Dados")]
     public List<CharacterBase> bibliotecaOriginalPersonagens;
@@ -62,31 +64,40 @@ public class GameDataManager : MonoBehaviour
     private string[] _savedTeamSelection;
     private string saveFilePath;
 
+    public static GameDataManager EnsureInstance(IEnumerable<CharacterBase> bootstrapLibrary = null)
+    {
+        QueueBootstrapLibrary(bootstrapLibrary);
+
+        if (Instance == null)
+        {
+            GameObject go = new GameObject("GameDataManager");
+            return go.AddComponent<GameDataManager>();
+        }
+
+        Instance.ApplyBootstrapLibraryIfNeeded(rebuildRuntimeCharactersIfNeeded: true);
+        return Instance;
+    }
+
+    public static void QueueBootstrapLibrary(IEnumerable<CharacterBase> bootstrapLibrary)
+    {
+        if (bootstrapLibrary == null)
+            return;
+
+        _bootstrapLibrary = bootstrapLibrary
+            .Where(character => character != null)
+            .ToList();
+    }
+
     private void Awake()
     {
         if (Instance == null)
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            
-            personagensDoJogador.Clear();
-            var seen = new HashSet<string>();
-            foreach (var original in bibliotecaOriginalPersonagens)
-            {
-                if (original == null) continue;
-                if (!seen.Add(original.name))
-                {
-                    Debug.LogWarning($"[GameDataManager] Personagem duplicado ignorado: {original.name}. Remova a entrada extra de 'bibliotecaOriginalPersonagens' no Inspector.");
-                    continue;
-                }
-                CharacterBase clone = Instantiate(original);
-                clone.habilidadesDesbloqueadas = new List<string>();
-                clone.pontosPorCaminho = new List<CaminhoRastrosData>();
-                clone.pontosRastrosGastos = 0;
-                personagensDoJogador.Add(clone);
-            }
 
             saveFilePath = Path.Combine(Application.persistentDataPath, "savegame.json");
+            ApplyBootstrapLibraryIfNeeded(rebuildRuntimeCharactersIfNeeded: false);
+            RebuildRuntimeCharacterRoster();
             LoadGame();
         }
         else
@@ -239,6 +250,51 @@ public class GameDataManager : MonoBehaviour
             tutoriaisConcluidos.Clear();
             loadedCharacterData.Clear();
             Debug.Log("Save apagado!");
+        }
+    }
+
+    private void ApplyBootstrapLibraryIfNeeded(bool rebuildRuntimeCharactersIfNeeded)
+    {
+        if (_bootstrapLibrary != null && _bootstrapLibrary.Count > 0 &&
+            (bibliotecaOriginalPersonagens == null || bibliotecaOriginalPersonagens.Count == 0))
+        {
+            bibliotecaOriginalPersonagens = new List<CharacterBase>(_bootstrapLibrary);
+        }
+
+        if (bibliotecaOriginalPersonagens == null)
+            bibliotecaOriginalPersonagens = new List<CharacterBase>();
+
+        _bootstrapLibrary = null;
+
+        if (!rebuildRuntimeCharactersIfNeeded)
+            return;
+
+        if (bibliotecaOriginalPersonagens.Count == 0 || personagensDoJogador.Count > 0)
+            return;
+
+        RebuildRuntimeCharacterRoster();
+        LoadGame();
+    }
+
+    private void RebuildRuntimeCharacterRoster()
+    {
+        personagensDoJogador.Clear();
+
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var original in bibliotecaOriginalPersonagens)
+        {
+            if (original == null) continue;
+            if (!seen.Add(original.name))
+            {
+                Debug.LogWarning($"[GameDataManager] Personagem duplicado ignorado: {original.name}. Remova a entrada extra de 'bibliotecaOriginalPersonagens' no Inspector.");
+                continue;
+            }
+
+            CharacterBase clone = Instantiate(original);
+            clone.habilidadesDesbloqueadas = new List<string>();
+            clone.pontosPorCaminho = new List<CaminhoRastrosData>();
+            clone.pontosRastrosGastos = 0;
+            personagensDoJogador.Add(clone);
         }
     }
 }

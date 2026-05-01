@@ -34,6 +34,9 @@ namespace ExoBeasts.Multiplayer.Lobby
     public class LobbyManager : MonoBehaviour
     {
         private static LobbyManager _instance;
+        public static bool HasInstance => _instance != null;
+        public static LobbyManager TryGetExistingInstance() => _instance;
+
         public static LobbyManager Instance
         {
             get
@@ -569,6 +572,24 @@ namespace ExoBeasts.Multiplayer.Lobby
 
             ClearLobbyState();
             OnLobbyLeft?.Invoke();
+        }
+
+        public void CancelPendingClientConnect()
+        {
+            if (_pendingClientConnect == null)
+                return;
+
+            StopCoroutine(_pendingClientConnect);
+            _pendingClientConnect = null;
+        }
+
+        public void ForceResetRuntimeState(bool notifyLobbyLeft = false)
+        {
+            CancelPendingClientConnect();
+            ClearLobbyState();
+
+            if (notifyLobbyLeft)
+                OnLobbyLeft?.Invoke();
         }
 
         /// <summary>
@@ -1194,6 +1215,12 @@ namespace ExoBeasts.Multiplayer.Lobby
         // Chamado quando atributos de UM MEMBRO mudam (ex: IS_READY, CHARACTER_INDEX)
         private void OnMemberAttributeChanged(ref LobbyMemberUpdateReceivedCallbackInfo info)
         {
+            if (ExoBeasts.Managers.GameModeManager.CurrentMode != ExoBeasts.Managers.GameMode.Multiplayer)
+            {
+                CancelPendingClientConnect();
+                return;
+            }
+
             if (!_isInLobby || _currentLobby == null) return;
             if (info.LobbyId != _currentLobby.lobbyId) return;
 
@@ -1273,6 +1300,12 @@ namespace ExoBeasts.Multiplayer.Lobby
         // Chamado quando atributos do lobby mudam (clientes detectam SERVER_ADDRESS aqui)
         private void OnLobbyAttributeUpdated(ref LobbyUpdateReceivedCallbackInfo info)
         {
+            if (ExoBeasts.Managers.GameModeManager.CurrentMode != ExoBeasts.Managers.GameMode.Multiplayer)
+            {
+                CancelPendingClientConnect();
+                return;
+            }
+
             Debug.Log($"[LobbyManager][DBG] OnLobbyAttributeUpdated — LobbyId={info.LobbyId} | _isInLobby={_isInLobby} | currentLobby={_currentLobby?.lobbyId ?? "null"}");
 
             if (!_isInLobby || _currentLobby == null)
@@ -1319,6 +1352,12 @@ namespace ExoBeasts.Multiplayer.Lobby
         private void ProcessLobbyAttributes(LobbyDetails details)
         {
             if (details == null) return;
+
+            if (ExoBeasts.Managers.GameModeManager.CurrentMode != ExoBeasts.Managers.GameMode.Multiplayer)
+            {
+                CancelPendingClientConnect();
+                return;
+            }
 
             // O host do lobby EOS nunca conecta como cliente NGO.
             string _myUid = SessionManager.Instance?.GetUserId() ?? "";
@@ -1697,10 +1736,18 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         private void ClearLobbyState()
         {
+            CancelPendingClientConnect();
             _isInLobby = false;
             _currentLobby = null;
             _members.Clear();
-            SessionManager.Instance.SetCurrentLobby("");
+
+            var session = SessionManager.TryGetExistingInstance();
+            if (session != null)
+            {
+                session.SetCurrentLobby("");
+                session.SetCurrentMatch("");
+            }
+
             ReleaseDetailCache();
             // Ao sair de um lobby, descarta escolhas de personagem que ainda estariam cacheadas
             // de uma tentativa de StartMatch anterior (ex: host saiu mid-match ou partida foi abortada).

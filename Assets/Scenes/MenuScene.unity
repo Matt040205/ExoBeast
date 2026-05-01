@@ -5188,8 +5188,8 @@ MonoBehaviour:
   hudPanel: {fileID: 0}
   pauseButtons: []
   optionsCenterX: -117
-  botaoJogarSolo: {fileID: 0}
-  botaoJogarOnline: {fileID: 0}
+  botaoJogarSolo: {fileID: 751058865}
+  botaoJogarOnline: {fileID: 866111942}
 --- !u!4 &103263292
 Transform:
   m_ObjectHideFlags: 0
@@ -22288,19 +22288,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 751058866}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 103263291}
-        m_TargetAssemblyTypeName: MenuManager, Assembly-CSharp
-        m_MethodName: ChangeScene
-        m_Mode: 5
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: EscolherPersonagem
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &751058866
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -23025,31 +23013,7 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 866111943}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls:
-      - m_Target: {fileID: 103263291}
-        m_TargetAssemblyTypeName: MenuManager, Assembly-CSharp
-        m_MethodName: HostGame
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
-      - m_Target: {fileID: 272498661}
-        m_TargetAssemblyTypeName: LobbyUIManager, Assembly-CSharp
-        m_MethodName: AbrirPainelMultiplayer
-        m_Mode: 1
-        m_Arguments:
-          m_ObjectArgument: {fileID: 0}
-          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
-          m_IntArgument: 0
-          m_FloatArgument: 0
-          m_StringArgument: 
-          m_BoolArgument: 0
-        m_CallState: 2
+      m_Calls: []
 --- !u!114 &866111943
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -7465,6 +7465,7 @@ GameObject:
   - component: {fileID: 227151046}
   - component: {fileID: 227151049}
   - component: {fileID: 227151050}
+  - component: {fileID: 227151051}
   m_Layer: 0
   m_Name: ManagersDaPartida
   m_TagString: Untagged
@@ -7825,6 +7826,35 @@ MonoBehaviour:
   fadeDuration: 0.5
   displayDuration: 3
   messageCooldown: 10
+--- !u!114 &227151051
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 227151036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7f82fd7d9d864f7f98d8456f7cfb74b7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bibliotecaOriginalPersonagens:
+  - {fileID: 11400000, guid: 7dc5598ea1fd57444b7f91fc784d054b, type: 2}
+  - {fileID: 11400000, guid: 8eb457e248c385043bf118efaf313b53, type: 2}
+  - {fileID: 11400000, guid: 6be7037535adf3347bc4a1b2a3d84af7, type: 2}
+  - {fileID: 11400000, guid: 78cb2df0fda232c4792b569b2d154ee6, type: 2}
+  fallbackTeamSelection:
+  - {fileID: 11400000, guid: 7dc5598ea1fd57444b7f91fc784d054b, type: 2}
+  - {fileID: 11400000, guid: 8eb457e248c385043bf118efaf313b53, type: 2}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  autoBootstrapWhenNoNetworkSession: 1
+  allowOutsideEditor: 0
+  networkResetTimeoutSeconds: 3
 --- !u!1001 &227908105
 PrefabInstance:
   m_ObjectHideFlags: 0

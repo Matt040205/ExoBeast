@@ -425,37 +425,7 @@ public class LobbySceneUI : MonoBehaviour
 
     public void IrParaMenuPrincipal()
     {
-        Debug.Log("[LobbySceneUI] Voltando para Menu Principal...");
-
-        try
-        {
-            CancelCreateTimeout();
-            UnsubscribeEvents();
-
-            if (_lobby != null && _lobby.IsInLobby())
-            {
-                try { _lobby.ForceLeaveImmediate(); }
-                catch (System.Exception e) { Debug.LogWarning($"[LobbySceneUI] Erro ao sair do lobby: {e.Message}"); }
-            }
-
-            if (Unity.Netcode.NetworkManager.Singleton != null &&
-                Unity.Netcode.NetworkManager.Singleton.IsListening)
-            {
-                try { Unity.Netcode.NetworkManager.Singleton.Shutdown(); }
-                catch (System.Exception e) { Debug.LogWarning($"[LobbySceneUI] Erro ao desligar rede: {e.Message}"); }
-            }
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"[LobbySceneUI] Erro ao limpar estado: {e.Message}");
-        }
-        finally
-        {
-            // SEMPRE volta para singleplayer e carrega MenuScene,
-            // mesmo que a limpeza acima falhe.
-            GameModeManager.ReturnToSingleplayer();
-            UnityEngine.SceneManagement.SceneManager.LoadScene("MenuScene");
-        }
+        StartCoroutine(ReturnToMenuPrincipalRoutine());
     }
 
     // Navegação Pública para vincular no Inspecionar do Unity
@@ -842,5 +812,17 @@ public class LobbySceneUI : MonoBehaviour
         _auth.LoginWithDeviceId();
 
         _eosRunning = false;
+    }
+
+    private IEnumerator ReturnToMenuPrincipalRoutine()
+    {
+        Debug.Log("[LobbySceneUI] Voltando para Menu Principal...");
+
+        CancelCreateTimeout();
+        UnsubscribeEvents();
+
+        yield return MultiplayerRuntimeReset.ResetToOfflineLocal();
+        GameModeManager.ReturnToSingleplayer();
+        UnityEngine.SceneManagement.SceneManager.LoadScene("MenuScene");
     }
 }

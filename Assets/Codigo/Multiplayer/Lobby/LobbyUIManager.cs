@@ -106,7 +106,7 @@ public class LobbyUIManager : MonoBehaviour
         // Se o NGO já está rodando, significa que viemos do lobby via StartMatch.
         // NÃO redirecionar de volta para LobbyScene.
         if (GameModeManager.CurrentMode == GameMode.Multiplayer && !GameModeManager.IsNetworkSession)
-            StartCoroutine(InitMultiplayerFlow());
+            Debug.Log("[LobbyUIManager] Fluxo legado em modo manual/test-only. Nenhum redirecionamento automatico sera executado.");
     }
 
     private void OnDestroy() => UnsubscribeFromEvents();
@@ -117,11 +117,8 @@ public class LobbyUIManager : MonoBehaviour
 
     public void AbrirPainelMultiplayer()
     {
-        // Redireciona para a nova cena de lobby Canvas (LobbyScene.unity)
-        if (GameModeManager.Instance != null)
-            GameModeManager.Instance.StartMultiplayer();
-        else
-            GameModeManager.LoadSceneSafe("LobbyScene");
+        Debug.LogWarning("[LobbyUIManager] AbrirPainelMultiplayer() virou compatibilidade legado/test-only. Use o fluxo MenuScene -> LobbySceneUI.");
+        GameModeManager.EnsureInstance().StartMultiplayer();
     }
 
     public void FecharPainelMultiplayer()

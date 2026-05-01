@@ -1,6 +1,8 @@
 using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.SceneManagement;
+using System.Collections;
+using ExoBeasts.Multiplayer.Core;
 
 namespace ExoBeasts.Managers
 {
@@ -20,9 +22,13 @@ namespace ExoBeasts.Managers
     {
         public static GameModeManager Instance { get; private set; }
         public static GameMode CurrentMode { get; private set; } = GameMode.Singleplayer;
+        public static bool HasInstance => Instance != null;
+        public static GameModeManager TryGetExistingInstance() => Instance;
 
         [SerializeField] private string escolherPersonagemScene = "EscolherPersonagem";
         [SerializeField] private string lobbyScene = "LobbyScene";
+
+        private Coroutine _sceneTransitionRoutine;
 
         private void Awake()
         {
@@ -35,6 +41,15 @@ namespace ExoBeasts.Managers
             DontDestroyOnLoad(gameObject);
         }
 
+        public static GameModeManager EnsureInstance()
+        {
+            if (Instance != null)
+                return Instance;
+
+            var go = new GameObject("GameModeManager");
+            return go.AddComponent<GameModeManager>();
+        }
+
         /// <summary>
         /// Chamado pelo botao "Jogar Solo" no MenuManager.
         /// Seta modo singleplayer e vai para selecao de personagem.
@@ -43,8 +58,7 @@ namespace ExoBeasts.Managers
         /// </summary>
         public void StartSingleplayer()
         {
-            CurrentMode = GameMode.Singleplayer;
-            SceneManager.LoadScene(escolherPersonagemScene);
+            QueueSceneTransition(GameMode.Singleplayer, escolherPersonagemScene);
         }
 
         /// <summary>
@@ -53,8 +67,7 @@ namespace ExoBeasts.Managers
         /// </summary>
         public void StartMultiplayer()
         {
-            CurrentMode = GameMode.Multiplayer;
-            SceneManager.LoadScene(lobbyScene);
+            QueueSceneTransition(GameMode.Multiplayer, lobbyScene);
         }
 
         public static void ReturnToSingleplayer()
@@ -90,6 +103,26 @@ namespace ExoBeasts.Managers
             {
                 SceneManager.LoadScene(sceneName);
             }
+        }
+
+        private void QueueSceneTransition(GameMode targetMode, string sceneName)
+        {
+            if (_sceneTransitionRoutine != null)
+            {
+                Debug.LogWarning($"[GameModeManager] Transicao para '{sceneName}' ignorada porque outra transicao ja esta em andamento.");
+                return;
+            }
+
+            _sceneTransitionRoutine = StartCoroutine(SceneTransitionRoutine(targetMode, sceneName));
+        }
+
+        private IEnumerator SceneTransitionRoutine(GameMode targetMode, string sceneName)
+        {
+            yield return MultiplayerRuntimeReset.ResetToOfflineLocal();
+
+            CurrentMode = targetMode;
+            _sceneTransitionRoutine = null;
+            SceneManager.LoadScene(sceneName);
         }
     }
 }

@@ -15,6 +15,20 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - `Assets/Codigo/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
 - `Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
 
+## Ultima atualizacao: blindagem do fluxo de startup, lobby e play direto (2026-04-30)
+
+- O fluxo de entrada foi endurecido para nao depender de estado residual entre singleplayer, multiplayer e Play direto.
+- `MenuManager` agora rebinds os botoes `Singleplayer` e `Multiplayer` por nome se o Inspector perder as referencias, e sempre sobrescreve listeners antigos da cena.
+- `GameModeManager` passou a executar as trocas de modo atraves de `MultiplayerRuntimeReset`, que limpa lobby, sessao, callbacks pendentes e estado de NGO antes de voltar para local ou multiplayer.
+- `LobbyManager` foi protegido contra callbacks EOS residuais quando o jogo nao esta em fluxo multiplayer ativo, incluindo limpeza de `currentLobbyId` e `currentMatchId` e cancelamento de conexoes pendentes.
+- `LobbyUIManager` ficou apenas como superficie legado/teste, sem auto-redirecionamento ou auto-inicio de fluxo.
+- `LobbySceneUI` agora usa o reset compartilhado ao voltar para o menu, evitando reconexao involuntaria.
+- `CenaMapaTeste` ganhou `CenaMapaTesteDirectPlayBootstrap`, que garante os singletons minimos, restaura a equipe do ultimo save e aplica fallback debug quando o save nao vier valido.
+- `GameDataManager` ganhou suporte de bootstrap para reutilizar a biblioteca original de personagens sem depender da passagem previa por `EscolherPersonagem`.
+- `MenuScene` e `EscolherPersonagem` tiveram listeners persistentes antigos limpos, e a cena duplicada `Assets/Codigo/Multiplayer/LobbyScene.unity` foi arquivada como `LobbyScene_Legacy.unity` para evitar entrada na cena errada.
+- Foram adicionados testes de validacao em `Assets/Tests/Editor/` para checar refs criticas da `MenuScene`, listeners proibidos e consistencia das cenas canonicas.
+- Validacao: os scripts modificados passaram no `validate_script` do Unity MCP; o runner de testes ainda foi inconsistente em uma execucao, entao a confirmacao final continua sendo mais confiavel direto no Editor Unity.
+
 ## Ultima atualizacao: correcoes de input local, build toggle e disputa de PlayerInput (2026-04-29)
 
 - O problema observado no log nao era mais de spawn, auth ou lobby: o host completava login EOS, criava lobby, entrava na partida e o `PlayerNetworkSetup` terminava o setup local, mas o comandante ainda nao respondia aos inputs de gameplay.

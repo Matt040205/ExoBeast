@@ -1,16 +1,15 @@
-using UnityEngine;
-using UnityEngine.SceneManagement;
-using Unity.Netcode;
-using UnityEngine.UI;
 using System.Collections;
 using System.Collections.Generic;
 using ExoBeasts.Managers;
+using ExoBeasts.Multiplayer.Core;
+using Unity.Netcode;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 /// <summary>
-/// ── MenuManager ────────────────────────────────────────
-/// Gerencia o menu principal, pause e navegação de painéis de UI.
-/// Inclui agora funções de rede para iniciar Host, Client e Server.
-/// ─────────────────────────────────────────────────────
+/// Gerencia menu principal, pause e navegacao de UI.
+/// Mantem atalhos legados de rede e blinda a transicao entre fluxos.
 /// </summary>
 public class MenuManager : MonoBehaviour
 {
@@ -27,60 +26,52 @@ public class MenuManager : MonoBehaviour
     [SerializeField] private Button botaoJogarSolo;
     [SerializeField] private Button botaoJogarOnline;
 
+    private bool _sceneChangeInProgress;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
         {
-            Destroy(this); // Apenas destrói o script duplicado, protegendo o resto do objeto!
+            Destroy(this);
             return;
         }
+
         Instance = this;
     }
 
-
-    void Start()
+    private void Start()
     {
         if (optionsPanel) optionsPanel.SetActive(false);
         if (pausePanel) pausePanel.SetActive(false);
 
-        if (hudPanel != null) { if (menuPanel) menuPanel.SetActive(false); }
-        else { if (menuPanel) menuPanel.SetActive(true); }
+        if (hudPanel != null)
+        {
+            if (menuPanel) menuPanel.SetActive(false);
+        }
+        else
+        {
+            if (menuPanel) menuPanel.SetActive(true);
+        }
 
-        if (botaoJogarSolo != null)
-        {
-            // Substitui o evento inteiro para apagar listeners persistentes do Inspector
-            botaoJogarSolo.onClick = new Button.ButtonClickedEvent();
-            botaoJogarSolo.onClick.AddListener(() => GameModeManager.Instance.StartSingleplayer());
-        }
-        if (botaoJogarOnline != null)
-        {
-            // Substitui o evento inteiro — remove ChangeScene("EscolherPersonagem") e HostGame() persistentes
-            botaoJogarOnline.onClick = new Button.ButtonClickedEvent();
-            botaoJogarOnline.onClick.AddListener(() => GameModeManager.Instance.StartMultiplayer());
-        }
+        if (SceneManager.GetActiveScene().name == "MenuScene")
+            BindMainMenuButtons();
     }
 
-    #region Funções de Conexão (NGO)
+    #region Funcoes de Conexao (NGO)
 
-    /// <summary>
-    /// Inicia o jogo como HOST (Servidor e Jogador ao mesmo tempo).
-    /// </summary>
     public void HostGame()
     {
         if (NetworkManager.Singleton == null) return;
 
-        // Guard MPPM: clones nunca devem iniciar como Host — apenas o processo principal pode.
-        // Este botão existe no MenuScene e é visível em TODOS os Virtual Players do MPPM.
         if (ExoBeasts.Multiplayer.Core.MppmHelper.IsClone)
         {
-            Debug.LogWarning("[MenuManager] HostGame() ignorado — este processo é um clone MPPM. Remova o botão 'Host Game' da MenuScene para eliminar este aviso.");
+            Debug.LogWarning("[MenuManager] HostGame() ignorado porque este processo e um clone MPPM.");
             return;
         }
 
-        // Guard: evita StartHost duplicado se NGO já está rodando (ex: sessão anterior pendurada).
         if (NetworkManager.Singleton.IsListening)
         {
-            Debug.LogWarning("[MenuManager] HostGame() ignorado — NetworkManager já está em execução.");
+            Debug.LogWarning("[MenuManager] HostGame() ignorado porque o NetworkManager ja esta em execucao.");
             return;
         }
 
@@ -88,9 +79,6 @@ public class MenuManager : MonoBehaviour
         Debug.Log("[MenuManager] Iniciando como HOST...");
     }
 
-    /// <summary>
-    /// Inicia o jogo como CLIENT (Tenta conectar a um IP configurado no Unity Transport).
-    /// </summary>
     public void JoinGame()
     {
         if (NetworkManager.Singleton != null)
@@ -100,9 +88,6 @@ public class MenuManager : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Inicia apenas o SERVIDOR (Sem jogador local).
-    /// </summary>
     public void ServerOnly()
     {
         if (NetworkManager.Singleton != null)
@@ -150,11 +135,11 @@ public class MenuManager : MonoBehaviour
             optionsPanel.SetActive(true);
             RectTransform rt = optionsPanel.GetComponent<RectTransform>();
             if (rt != null)
-            {
                 rt.anchoredPosition = new Vector2(optionsCenterX, 0f);
-            }
+
             optionsPanel.transform.SetAsLastSibling();
         }
+
         Canvas.ForceUpdateCanvases();
     }
 
@@ -164,20 +149,18 @@ public class MenuManager : MonoBehaviour
         SetPauseButtonsState(true);
     }
 
-    private void SetPauseButtonsState(bool state)
-    {
-        foreach (GameObject btn in pauseButtons)
-        {
-            if (btn != null) btn.SetActive(state);
-        }
-    }
-
     public void ChangeScene(string nomeDaCena)
     {
-        PauseControl.isPaused = false;
+        if (_sceneChangeInProgress)
+            return;
 
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
-            NetworkManager.Singleton.Shutdown();
+        StartCoroutine(ChangeSceneRoutine(nomeDaCena));
+    }
+
+    private IEnumerator ChangeSceneRoutine(string nomeDaCena)
+    {
+        _sceneChangeInProgress = true;
+        PauseControl.isPaused = false;
 
         bool isMenuDestination = nomeDaCena.ToLower().Contains("menu");
         bool isSelectionDestination = nomeDaCena.ToLower().Contains("escolherpersonagem");
@@ -189,9 +172,67 @@ public class MenuManager : MonoBehaviour
         }
 
         if (isMenuDestination || isSelectionDestination)
-            GameModeManager.ReturnToSingleplayer();
+        {
+            yield return MultiplayerRuntimeReset.ResetToOfflineLocal();
+        }
+        else if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            NetworkManager.Singleton.Shutdown();
+        }
 
-        // Direto — não usa LoadSceneSafe para evitar race condition com IsListening pós-Shutdown
+        _sceneChangeInProgress = false;
         SceneManager.LoadScene(nomeDaCena);
+    }
+
+    private void SetPauseButtonsState(bool state)
+    {
+        foreach (GameObject btn in pauseButtons)
+        {
+            if (btn != null) btn.SetActive(state);
+        }
+    }
+
+    private void BindMainMenuButtons()
+    {
+        TryAutoBindButton(ref botaoJogarSolo, "Singleplayer");
+        TryAutoBindButton(ref botaoJogarOnline, "Multiplayer");
+
+        if (botaoJogarSolo != null)
+        {
+            botaoJogarSolo.onClick = new Button.ButtonClickedEvent();
+            botaoJogarSolo.onClick.AddListener(() => GameModeManager.EnsureInstance().StartSingleplayer());
+        }
+        else
+        {
+            Debug.LogError("[MenuManager] Nao foi possivel encontrar o botao 'Singleplayer' na MenuScene.");
+        }
+
+        if (botaoJogarOnline != null)
+        {
+            botaoJogarOnline.onClick = new Button.ButtonClickedEvent();
+            botaoJogarOnline.onClick.AddListener(() => GameModeManager.EnsureInstance().StartMultiplayer());
+        }
+        else
+        {
+            Debug.LogError("[MenuManager] Nao foi possivel encontrar o botao 'Multiplayer' na MenuScene.");
+        }
+    }
+
+    private void TryAutoBindButton(ref Button button, string expectedName)
+    {
+        if (button != null)
+            return;
+
+        foreach (Button candidate in FindObjectsOfType<Button>(true))
+        {
+            if (candidate != null &&
+                candidate.gameObject.scene == gameObject.scene &&
+                candidate.gameObject.name == expectedName)
+            {
+                button = candidate;
+                Debug.LogWarning($"[MenuManager] Botao '{expectedName}' nao estava serializado na MenuScene. Referencia reconstituida automaticamente por nome.");
+                return;
+            }
+        }
     }
 }
