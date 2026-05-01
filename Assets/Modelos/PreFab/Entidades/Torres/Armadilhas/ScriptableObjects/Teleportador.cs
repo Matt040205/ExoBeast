@@ -14,6 +14,8 @@ public class Teleportador : TrapLogicBase
     private Teleportador portalLigado;
     private float cooldownTeleporte = 1f;
     private float entradaOffset = 1.5f;
+    [SerializeField] private bool debugTeleportLogs;
+
     private bool isServerMode;
     private bool isSetup;
 
@@ -58,10 +60,8 @@ public class Teleportador : TrapLogicBase
                 Teleportador antigo = portais[0];
                 portais.RemoveAt(0);
 
-                if (antigo != null && antigo.TryGetComponent(out NetworkObject networkObject) && networkObject.IsSpawned)
-                    networkObject.Despawn();
-                else if (antigo != null)
-                    Destroy(antigo.gameObject);
+                if (antigo != null)
+                    antigo.DestroyTrapServer(false);
             }
             else
             {
@@ -75,11 +75,18 @@ public class Teleportador : TrapLogicBase
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!isServerMode || portalLigado == null || !other.CompareTag("Player"))
+        if (!isServerMode || portalLigado == null)
             return;
 
         if (!TryResolvePlayer(other, out NetworkObject playerObject, out GameObject localPlayerObject, out ulong playerKey))
+        {
+            if (LooksLikePlayerCollider(other))
+                LogTeleportWarning($"Trigger recebeu um possivel player, mas nao conseguiu resolver um NetworkObject valido. Collider: {GetColliderPath(other)}");
+            else
+                LogTeleportDebug($"Trigger ignorado por nao ser player. Collider: {GetColliderPath(other)}");
+
             return;
+        }
 
         if (playersOnCooldown.Contains(playerKey) || portalLigado.playersOnCooldown.Contains(playerKey))
             return;
@@ -89,6 +96,7 @@ public class Teleportador : TrapLogicBase
 
         if (playerObject != null && playerObject.IsSpawned)
         {
+            LogTeleportDebug($"Teleportando player {playerKey} para {destination}.");
             PlayerTeleportService.TeleportServerValidated(playerObject, destination, destinationRotation);
 
             if (playerObject.OwnerClientId != NetworkManager.ServerClientId)
@@ -109,6 +117,7 @@ public class Teleportador : TrapLogicBase
         }
         else
         {
+            LogTeleportDebug($"Teleportando player local sem NetworkObject para {destination}.");
             PlayerTeleportService.TeleportLocal(localPlayerObject, destination, destinationRotation);
         }
 
@@ -123,9 +132,18 @@ public class Teleportador : TrapLogicBase
         Quaternion rotation,
         ClientRpcParams rpcParams = default)
     {
-        if (!NetworkManager.Singleton.SpawnManager.SpawnedObjects
-                .TryGetValue(playerNetObjId, out NetworkObject playerObj))
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null || networkManager.SpawnManager == null)
+        {
+            LogTeleportWarning($"Cliente recebeu teleporte para NetworkObject {playerNetObjId}, mas nao ha NetworkManager/SpawnManager disponivel.");
             return;
+        }
+
+        if (!networkManager.SpawnManager.SpawnedObjects.TryGetValue(playerNetObjId, out NetworkObject playerObj))
+        {
+            LogTeleportWarning($"Cliente recebeu teleporte para NetworkObject {playerNetObjId}, mas o objeto nao esta em SpawnedObjects.");
+            return;
+        }
 
         if (!playerObj.IsOwner)
             return;
@@ -142,17 +160,139 @@ public class Teleportador : TrapLogicBase
 
     private bool TryResolvePlayer(Collider other, out NetworkObject playerObject, out GameObject localPlayerObject, out ulong playerKey)
     {
-        playerObject = other.GetComponent<NetworkObject>();
-        localPlayerObject = other.gameObject;
+        playerObject = null;
+        localPlayerObject = null;
+        playerKey = 0;
 
-        if (playerObject != null)
+        if (other == null)
+            return false;
+
+        GameObject playerRoot = ResolvePlayerRoot(other);
+        NetworkObject resolvedNetworkObject = ResolvePlayerNetworkObject(other, playerRoot);
+        bool networkSessionActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        bool resolvedAsPlayer = playerRoot != null || (resolvedNetworkObject != null && IsPlayerObject(resolvedNetworkObject.gameObject));
+
+        if (!resolvedAsPlayer)
+            return false;
+
+        if (networkSessionActive)
         {
-            playerKey = playerObject.NetworkObjectId;
+            if (resolvedNetworkObject == null || !resolvedNetworkObject.IsSpawned)
+                return false;
+
+            playerObject = resolvedNetworkObject;
+            localPlayerObject = playerRoot != null ? playerRoot : resolvedNetworkObject.gameObject;
+            playerKey = resolvedNetworkObject.NetworkObjectId;
             return true;
         }
 
-        playerKey = 0;
-        return localPlayerObject != null;
+        if (playerRoot == null && resolvedNetworkObject != null && IsPlayerObject(resolvedNetworkObject.gameObject))
+            playerRoot = resolvedNetworkObject.gameObject;
+
+        if (playerRoot == null)
+            return false;
+
+        playerObject = resolvedNetworkObject;
+        localPlayerObject = playerRoot;
+        playerKey = resolvedNetworkObject != null ? resolvedNetworkObject.NetworkObjectId : 0;
+        return true;
+    }
+
+    private static GameObject ResolvePlayerRoot(Collider other)
+    {
+        PlayerMovement movement = other.GetComponentInParent<PlayerMovement>();
+        if (movement != null)
+            return movement.gameObject;
+
+        PlayerHealthSystem healthSystem = other.GetComponentInParent<PlayerHealthSystem>();
+        if (healthSystem != null)
+            return healthSystem.gameObject;
+
+        Transform current = other.transform;
+        while (current != null)
+        {
+            if (current.CompareTag("Player"))
+                return current.gameObject;
+
+            current = current.parent;
+        }
+
+        return null;
+    }
+
+    private static NetworkObject ResolvePlayerNetworkObject(Collider other, GameObject playerRoot)
+    {
+        NetworkObject networkObject = null;
+
+        if (playerRoot != null)
+            networkObject = playerRoot.GetComponent<NetworkObject>();
+
+        if (networkObject == null)
+            networkObject = other.GetComponentInParent<NetworkObject>();
+
+        if (networkObject == null || IsPlayerObject(networkObject.gameObject))
+            return networkObject;
+
+        NetworkObject parentNetworkObject = networkObject.transform.parent != null
+            ? networkObject.transform.parent.GetComponentInParent<NetworkObject>()
+            : null;
+
+        return parentNetworkObject != null && IsPlayerObject(parentNetworkObject.gameObject)
+            ? parentNetworkObject
+            : networkObject;
+    }
+
+    private static bool IsPlayerObject(GameObject gameObject)
+    {
+        if (gameObject == null)
+            return false;
+
+        return gameObject.CompareTag("Player")
+            || gameObject.GetComponent<PlayerMovement>() != null
+            || gameObject.GetComponent<PlayerHealthSystem>() != null;
+    }
+
+    private static bool LooksLikePlayerCollider(Collider other)
+    {
+        if (other == null)
+            return false;
+
+        if (other.CompareTag("Player"))
+            return true;
+
+        if (other.GetComponentInParent<PlayerMovement>() != null || other.GetComponentInParent<PlayerHealthSystem>() != null)
+            return true;
+
+        NetworkObject networkObject = other.GetComponentInParent<NetworkObject>();
+        return networkObject != null && IsPlayerObject(networkObject.gameObject);
+    }
+
+    private void LogTeleportWarning(string message)
+    {
+        Debug.LogWarning($"[{nameof(Teleportador)}] {message}", this);
+    }
+
+    private void LogTeleportDebug(string message)
+    {
+        if (debugTeleportLogs)
+            Debug.Log($"[{nameof(Teleportador)}] {message}", this);
+    }
+
+    private static string GetColliderPath(Collider collider)
+    {
+        if (collider == null)
+            return "<null>";
+
+        Transform current = collider.transform;
+        string path = current.name;
+
+        while (current.parent != null)
+        {
+            current = current.parent;
+            path = current.name + "/" + path;
+        }
+
+        return path;
     }
 
     private static void LigarPortais()

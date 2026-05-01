@@ -10,15 +10,21 @@ public class HabilidadeObraPrima : Ability
     public float raio = 8f;
     public float duracaoSilencio = 2f; // <--- Certifique-se de que essa variável existe
 
-    [Tooltip("Prefab do efeito visual giratório")]
+    [Tooltip("Prefab do efeito visual giratório da lógica")]
     public ObraPrimaLogic logicPrefab;
+
+    [Header("Visual")]
+    [Tooltip("Prefab do efeito visual (shader) da ultimate")]
+    public GameObject ultimateVfxPrefab;
 
     public override bool Activate(GameObject quemUsou)
     {   
         if (logicPrefab == null) return true;
 
         ObraPrimaLogic logic = Instantiate(logicPrefab, quemUsou.transform);
-        logic.StartUltimate(quemUsou, duracao, quantidadeTiros, danoPorTiro, raio, duracaoSilencio);
+        logic.transform.localPosition = Vector3.zero;
+        logic.transform.localRotation = Quaternion.identity;
+        logic.StartUltimate(quemUsou, duracao, quantidadeTiros, danoPorTiro, raio, duracaoSilencio, true, ultimateVfxPrefab);
 
         CommanderAbilityController controller = quemUsou.GetComponent<CommanderAbilityController>();
         controller?.StartLocalObraPrimaOwnerProxy(duracao, quantidadeTiros, danoPorTiro, raio, duracaoSilencio);

@@ -5,16 +5,34 @@ using TMPro;
 
 public class BuildButtonUI : MonoBehaviour
 {
+    private sealed class TrapButtonBinding
+    {
+        public TrapButtonBinding(GameObject buttonObject, Button button, TrapDataSO trapData)
+        {
+            ButtonObject = buttonObject;
+            Button = button;
+            TrapData = trapData;
+        }
+
+        public GameObject ButtonObject { get; }
+        public Button Button { get; }
+        public TrapDataSO TrapData { get; }
+    }
+
     public GameObject buildButtonPrefab;
 
-    [Header("Contêineres das Lojas")]
+    [Header("ContÃªineres das Lojas")]
     public Transform towerButtonContainer;
     public Transform trapButtonContainer;
 
-    [Header("Configuração do Prefab (NOMES EXATOS)")]
+    [Header("ConfiguraÃ§Ã£o do Prefab (NOMES EXATOS)")]
     public string iconChildObjectName = "Icon";
     public string limitTextChildObjectName = "LimitText";
     public string priceTextChildObjectName = "PriceText";
+
+    private readonly Dictionary<TrapDataSO, TrapButtonBinding> trapButtonBindings = new Dictionary<TrapDataSO, TrapButtonBinding>();
+
+    public bool HasTrapButtons => trapButtonBindings.Count > 0;
 
     public void ClearTowerButtons()
     {
@@ -24,6 +42,8 @@ public class BuildButtonUI : MonoBehaviour
 
     public void ClearTrapButtons()
     {
+        trapButtonBindings.Clear();
+
         if (trapButtonContainer == null) return;
         foreach (Transform child in trapButtonContainer) Destroy(child.gameObject);
     }
@@ -68,24 +88,10 @@ public class BuildButtonUI : MonoBehaviour
             BuildTooltipTrigger tooltipTrigger = buttonGO.GetComponent<BuildTooltipTrigger>();
             if (tooltipTrigger != null) tooltipTrigger.SetBuildInfo(trapData.trapName, trapData.description);
 
-            bool showLimit = false;
-            string limitString = "";
-
-            if (trapData.buildLimit > 0 && BuildManager.Instance != null)
-            {
-                int currentCount = BuildManager.Instance.GetTrapCount(trapData);
-                limitString = $"{currentCount}/{trapData.buildLimit}";
-                showLimit = true;
-
-                if (currentCount >= trapData.buildLimit) button.interactable = false;
-            }
-
-            SetTextOnButton(buttonGO, limitTextChildObjectName, limitString, showLimit);
-
             List<string> costs = new List<string>();
             if (trapData.geoditeCost > 0) costs.Add($"<color=#76D7C4>{trapData.geoditeCost}G</color>");
             if (trapData.darkEtherCost > 0) costs.Add($"<color=#C39BD3>{trapData.darkEtherCost}E</color>");
-            string priceString = costs.Count > 0 ? string.Join(" / ", costs) : "Grátis";
+            string priceString = costs.Count > 0 ? string.Join(" / ", costs) : "GrÃ¡tis";
 
             SetTextOnButton(buttonGO, priceTextChildObjectName, priceString, true);
 
@@ -96,8 +102,50 @@ public class BuildButtonUI : MonoBehaviour
                 iconImage.enabled = true;
             }
 
-            if (button != null && button.interactable) button.onClick.AddListener(() => { BuildManager.Instance.SelectTrapToBuild(trapData); });
+            TrapDataSO capturedTrapData = trapData;
+            if (button != null)
+                button.onClick.AddListener(() => { BuildManager.Instance.SelectTrapToBuild(capturedTrapData); });
+
+            trapButtonBindings[capturedTrapData] = new TrapButtonBinding(buttonGO, button, capturedTrapData);
+            UpdateTrapButtonAvailability(trapButtonBindings[capturedTrapData]);
         }
+    }
+
+    public void RefreshTrapAvailability(List<TrapDataSO> availableTraps)
+    {
+        if (availableTraps == null || trapButtonBindings.Count == 0)
+            return;
+
+        foreach (TrapDataSO trapData in availableTraps)
+        {
+            if (trapData == null || !trapButtonBindings.TryGetValue(trapData, out TrapButtonBinding binding))
+                continue;
+
+            UpdateTrapButtonAvailability(binding);
+        }
+    }
+
+    private void UpdateTrapButtonAvailability(TrapButtonBinding binding)
+    {
+        if (binding == null || binding.TrapData == null || binding.ButtonObject == null)
+            return;
+
+        bool showLimit = false;
+        string limitString = "";
+        bool canBuild = true;
+
+        if (binding.TrapData.buildLimit > 0 && BuildManager.Instance != null)
+        {
+            int currentCount = BuildManager.Instance.GetTrapCount(binding.TrapData);
+            limitString = $"{currentCount}/{binding.TrapData.buildLimit}";
+            showLimit = true;
+            canBuild = currentCount < binding.TrapData.buildLimit;
+        }
+
+        SetTextOnButton(binding.ButtonObject, limitTextChildObjectName, limitString, showLimit);
+
+        if (binding.Button != null)
+            binding.Button.interactable = canBuild;
     }
 
     private Image FindChildIcon(GameObject buttonGO)
@@ -125,7 +173,7 @@ public class BuildButtonUI : MonoBehaviour
         {
             string objName = txt.gameObject.name.Replace(" ", "").ToLower();
 
-            // Checa se o nome é EXATAMENTE igual (ignorando espaços e maiúsculas)
+            // Checa se o nome e EXATAMENTE igual (ignorando espacos e maiusculas)
             if (objName == searchString)
             {
                 txt.text = textContent;
@@ -134,12 +182,12 @@ public class BuildButtonUI : MonoBehaviour
             }
         }
 
-        // SE O CÓDIGO CHEGOU AQUI, ELE NÃO ACHOU O TEXTO! Vamos dedurar o que tem lá dentro:
+        // SE O CODIGO CHEGOU AQUI, ELE NAO ACHOU O TEXTO! Vamos dedurar o que tem la dentro:
         string foundNames = "";
         foreach (var t in allTMPTexts) foundNames += $"[{t.gameObject.name}] ";
 
-        Debug.LogError($"<color=red><b>[ERRO DE UI]</b></color> A HUD tentou atualizar o texto procurando pelo nome '{expectedName}', mas ele NÃO EXISTE dentro do seu Prefab de Botão!\n" +
-                       $"Os únicos TextMeshPro que eu achei aí dentro foram: <b>{foundNames}</b>\n" +
-                       $"<b>SOLUÇÃO:</b> Abra o Prefab do seu botão da loja e renomeie o objeto de texto para ficar EXATAMENTE igual a '{expectedName}'!");
+        Debug.LogError($"<color=red><b>[ERRO DE UI]</b></color> A HUD tentou atualizar o texto procurando pelo nome '{expectedName}', mas ele NAO EXISTE dentro do seu Prefab de Botao!\n" +
+                       $"Os unicos TextMeshPro que eu achei ai dentro foram: <b>{foundNames}</b>\n" +
+                       $"<b>SOLUCAO:</b> Abra o Prefab do seu botao da loja e renomeie o objeto de texto para ficar EXATAMENTE igual a '{expectedName}'!");
     }
 }

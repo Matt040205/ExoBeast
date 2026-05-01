@@ -134,6 +134,11 @@ public class UINotificationManager : NetworkBehaviour
         activeFadeRoutine = StartCoroutine(FadeRoutine(message, messageColor));
     }
 
+    public void ShowLocalNotification(string message, Color messageColor)
+    {
+        ShowNotificationLocal(message, messageColor);
+    }
+
     private IEnumerator FadeRoutine(string message, Color targetColor)
     {
         notificationText.text = message;

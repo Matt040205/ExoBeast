@@ -29,7 +29,42 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - Foram adicionados testes de validacao em `Assets/Tests/Editor/` para checar refs criticas da `MenuScene`, listeners proibidos e consistencia das cenas canonicas.
 - Validacao: os scripts modificados passaram no `validate_script` do Unity MCP; o runner de testes ainda foi inconsistente em uma execucao, entao a confirmacao final continua sendo mais confiavel direto no Editor Unity.
 
-## Ultima atualizacao: correcoes de input local, build toggle e disputa de PlayerInput (2026-04-29)
+## Atualizacao anterior: investigacao de armadilhas multiplayer e fallback visual da Polva (2026-04-29)
+
+- Sintomas observados nesta rodada:
+  - no host, o limite global das armadilhas nao era respeitado;
+  - a UI de contagem de armadilhas nao refletia o estado real do mapa;
+  - algumas armadilhas entravam no mapa mas nao funcionavam como esperado;
+  - o `Player.log` mostrava praticamente nada do ciclo de vida das armadilhas, entao a investigacao dependia mais do codigo do que do log.
+- A primeira leitura do `Player.log` confirmou que havia fluxo de host, lobby, spawn e horda, mas quase nenhum evento de spawn/registro/despawn das armadilhas.
+- Tambem foi feita uma varredura nos prefabs de armadilha e apareceu um padrao suspeito: varios `NetworkObject` de armadilha visual estavam com `GlobalObjectIdHash: 0`, e alguns prefabs logicos importantes tambem estavam inconsistentes. Isso virou a principal suspeita para as armadilhas que "aparecem" mas nao se comportam direito em rede.
+
+### Tentativas feitas nas armadilhas
+
+| Tentativa | O que foi alterado | Resultado pratico |
+|---|---|---|
+| 1 | A contagem da UI de armadilhas foi unificada para host e clientes via `syncedTrapCounts` no `BuildManager`, com `BuildButtonUI` e `UIManager` recebendo refresh dedicado em vez de recriar a loja inteira. | Compilou e melhorou a base da UI, mas nao resolveu o host construir acima do limite nem tornou o contador confiavel no runtime da partida. |
+| 2 | O `BuildManager` passou a inicializar snapshot de contagem no `OnNetworkSpawn`, atualizar o snapshot local antes de broadcast, limpar o snapshot no `OnNetworkDespawn` e reenviar as contagens para clientes tardios. | A arquitetura ficou mais consistente, mas o problema persistiu no jogo real. |
+| 3 | O `NetworkedTrapVisual` foi modificado para se registrar e desregistrar de forma autoritativa no `BuildManager`, com reconciliacao quando o `TrapIndex` muda e com confirmacao explicita de registro logo apos `Spawn()`. | Compilou, adicionou logs e deixou o ciclo de vida mais defensivo, mas o comportamento da trap ainda nao ficou correto em runtime. |
+| 4 | Foram adicionados logs de debug para spawn concluido, registro, remoção, falha de spawn e rejeicao por limite/custo/setup. | Isso melhora a proxima investigacao, mas nao corrige o bug por si so. |
+| 5 | As cenas multiplayer tiveram o `UIManager` duplicado removido para evitar comportamento nao deterministico de UI. | A limpeza ajudou a reduzir ruido, mas nao eliminou o problema principal das armadilhas. |
+| 6 | A analise dos prefabs revelou `GlobalObjectIdHash: 0` em todos os visuais de armadilha de `Assets/Mapa prefab` e tambem em alguns prefabs logicos de armadilhas. | Ficou como forte suspeita de problema de NGO/prefab/hash, mas nao houve correção definitiva nesta rodada. |
+
+### Estado deixado por esta investigacao
+
+- O limite global por tipo continua sendo a regra do projeto, mas a implementacao de armadilhas ainda nao foi fechada de forma confiavel.
+- O host ainda precisava ser validado com uma nova rodada de teste depois das correcoes, porque as tentativas anteriores nao resolveram o problema de forma definitiva.
+- A memoria do projeto agora considera a suspeita de hash/prefab e a ausencia de logs de ciclo de vida como pontos centrais para a proxima investigacao.
+
+### Fallback visual da Polva
+
+- A habilidade `HabilidadeMergulhoTinta` ganhou um fallback simples para a poa de tinta enquanto o shader definitivo nao estiver pronto.
+- O `ScriptableObject` passou a expor `fallbackPuddleSprite` e `fallbackPuddleWorldSize` alem do `visualPuddlePrefab` ja existente.
+- `MergulhoTintaLogic` agora tenta renderizar a poa com a `Sprite` simples antes de cair no prefab visual mais complexo.
+- O asset atual da habilidade foi preenchido com `PocaTinta.png`, entao o fluxo de teste imediato passa a usar uma imagem tosca em vez de depender do VFX.
+- Esse fallback resolve o problema pratico de visual temporario, mas nao substitui a versao final de arte nem muda a autoridade da habilidade no multiplayer.
+
+## Atualizacao anterior: correcoes de input local, build toggle e disputa de PlayerInput (2026-04-29)
 
 - O problema observado no log nao era mais de spawn, auth ou lobby: o host completava login EOS, criava lobby, entrava na partida e o `PlayerNetworkSetup` terminava o setup local, mas o comandante ainda nao respondia aos inputs de gameplay.
 - A investigacao mostrou um `PlayerInput` na cena, no objeto `ManagersDaPartida` de `Assets/Scenes/CenaMapaTeste.unity`, com o action `Player/Build` ligado diretamente a `BuildManager.OnBuild`. Esse componente competia com o `PlayerInput` do player local pelo mesmo teclado/mouse.

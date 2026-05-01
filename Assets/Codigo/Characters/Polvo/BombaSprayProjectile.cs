@@ -10,8 +10,14 @@ public class BombaSprayProjectile : MonoBehaviour
     private bool jaExplodiu;
 
     [Header("Configuracoes da Explosao")]
-    [Tooltip("Prefab da nuvem de tinta")]
+    [Tooltip("Prefab da nuvem de tinta (Lógica)")]
     public GameObject gasCloudPrefab;
+
+    [Header("VFX")]
+    [Tooltip("O prefab que contem o VFX Graph da fumaca")]
+    public GameObject smokeVfxPrefab;
+    [Tooltip("Tempo que a fumaca visual fica no mapa antes de sumir")]
+    public float smokeDuration = 8f;
 
     [Header("Configuracoes de Tempo")]
     public float tempoMaximoVida = 7f;
@@ -52,8 +58,17 @@ public class BombaSprayProjectile : MonoBehaviour
         jaExplodiu = true;
 
         bool isNetworkSession = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        
+        // Lógica de Rede (Nuvem de Tinta) - Apenas o Servidor Spawna a lógica que dá dano/lentidão
         if (gasCloudPrefab != null && (!isVisualProxy || !isNetworkSession))
             SpawnInkCloud(isNetworkSession);
+
+        // Lógica Visual (VFX) - Todos os clientes instanciam a fumaça localmente
+        if (smokeVfxPrefab != null)
+        {
+            GameObject smoke = Instantiate(smokeVfxPrefab, transform.position, Quaternion.identity);
+            Destroy(smoke, smokeDuration);
+        }
 
         Destroy(gameObject);
     }

@@ -18,8 +18,10 @@ MonoBehaviour:
     de usar habilidades especiais) e extremamente lentos por 6s.\r\n"
   icon: {fileID: 21300000, guid: 1330dfafe9488644ea475eb9a12b4fb4, type: 3}
   cooldown: 1
-  duration: 6
-  damagePerSecond: 100
-  radius: 10
-  silenceDuration: 6
+  duracao: 5
+  quantidadeTiros: 10
+  danoPorTiro: 15
+  raio: 8
+  duracaoSilencio: 2
   logicPrefab: {fileID: -2663580836634220369, guid: 31ec75dde74dea345b5c075681aca062, type: 3}
+  ultimateVfxPrefab: {fileID: 7503632959060452848, guid: 0c63a9fa76e6c204d8562963c689cd4b, type: 3}

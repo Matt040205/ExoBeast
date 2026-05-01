@@ -37,6 +37,8 @@ public class MergulhoTintaLogic : MonoBehaviour
 
     private Material _diveShaderMaterial;
     private float _dissolveDuration;
+    private Sprite _fallbackPuddleSprite;
+    private float _fallbackPuddleWorldSize = 4.5f;
     private readonly Dictionary<SkinnedMeshRenderer, Material[]> originalSkinnedMaterials = new Dictionary<SkinnedMeshRenderer, Material[]>();
     private readonly List<Material> dissolveInstances = new List<Material>();
     private Coroutine dissolveCoroutine;
@@ -84,6 +86,8 @@ public class MergulhoTintaLogic : MonoBehaviour
         {
             _diveShaderMaterial = mta.diveShaderMaterial;
             _dissolveDuration = Mathf.Max(0.1f, mta.dissolveDuration);
+            _fallbackPuddleSprite = mta.fallbackPuddleSprite;
+            _fallbackPuddleWorldSize = Mathf.Max(0.1f, mta.fallbackPuddleWorldSize);
         }
         isLocalProxy = networkObject != null && networkObject.IsSpawned && !HasServerAuthority;
 
@@ -161,11 +165,7 @@ public class MergulhoTintaLogic : MonoBehaviour
                     renderer.enabled = false;
             }
 
-            if (puddlePrefab != null)
-            {
-                Vector3 spawnPos = GetGroundPosition();
-                puddleInstance = Instantiate(puddlePrefab, spawnPos, Quaternion.Euler(90f, 0f, 0f));
-            }
+            SpawnPuddleVisual(puddlePrefab);
         }
 
         stateApplied = true;
@@ -213,10 +213,32 @@ public class MergulhoTintaLogic : MonoBehaviour
     private Vector3 GetGroundPosition()
     {
         Vector3 origin = transform.position + Vector3.up * 1.0f;
-        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 5f, groundLayerMask, QueryTriggerInteraction.Ignore))
-            return hit.point + Vector3.up * 0.02f;
+        RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.down, 5f, ~0, QueryTriggerInteraction.Ignore);
+        
+        Vector3 bestPoint = transform.position;
+        float highestY = -9999f;
+        bool found = false;
 
-        return transform.position + Vector3.up * 0.02f;
+        foreach (var hit in hits)
+        {
+            if (hit.collider.transform.root != transform.root && !hit.collider.isTrigger)
+            {
+                if (hit.point.y > highestY)
+                {
+                    highestY = hit.point.y;
+                    bestPoint = hit.point;
+                    found = true;
+                }
+            }
+        }
+
+        if (found) return bestPoint;
+
+        CharacterController cc = GetComponent<CharacterController>();
+        if (cc != null)
+            return new Vector3(transform.position.x, cc.bounds.min.y, transform.position.z);
+
+        return transform.position;
     }
 
     private bool CheckIfGrounded()
@@ -239,6 +261,8 @@ public class MergulhoTintaLogic : MonoBehaviour
         return false;
     }
 
+    private PlayerMovement _cachedPlayerMovement;
+
     private void Update()
     {
         if (puddleInstance == null)
@@ -246,6 +270,14 @@ public class MergulhoTintaLogic : MonoBehaviour
 
         Vector3 groundPos = GetGroundPosition();
         puddleInstance.transform.position = new Vector3(transform.position.x, groundPos.y, transform.position.z);
+
+        if (_cachedPlayerMovement == null)
+            _cachedPlayerMovement = GetComponent<PlayerMovement>();
+
+        if (_cachedPlayerMovement != null && _cachedPlayerMovement.GetModelPivot() != null)
+        {
+            puddleInstance.transform.rotation = _cachedPlayerMovement.GetModelPivot().rotation;
+        }
     }
 
     private void EndDive()
@@ -487,12 +519,61 @@ public class MergulhoTintaLogic : MonoBehaviour
         RestoreOriginalSkinnedMaterials();
 
         if (puddlePrefab != null)
-        {
-            Vector3 spawnPos = GetGroundPosition();
-            puddleInstance = Instantiate(puddlePrefab, spawnPos, Quaternion.Euler(90f, 0f, 0f));
-        }
+            SpawnPuddleVisual(puddlePrefab);
 
         dissolveCoroutine = null;
+    }
+
+    private void SpawnPuddleVisual(GameObject puddlePrefab)
+    {
+        if (puddlePrefab != null)
+        {
+            Vector3 spawnPos = GetGroundPosition();
+            
+            // Pega a rotação do modelPivot (que é o que realmente gira na personagem)
+            Quaternion spawnRot = transform.rotation;
+            PlayerMovement pm = GetComponent<PlayerMovement>();
+            if (pm != null && pm.GetModelPivot() != null)
+            {
+                spawnRot = pm.GetModelPivot().rotation;
+            }
+
+            puddleInstance = Instantiate(puddlePrefab, spawnPos, spawnRot);
+            
+            CaminhoInkController inkController = puddleInstance.GetComponent<CaminhoInkController>();
+            if (inkController != null)
+                inkController.SetSphereActive(true); // Habilidade tem a esfera ativada
+            
+            return;
+        }
+
+        if (_fallbackPuddleSprite != null)
+        {
+            puddleInstance = CreateSimplePuddleSprite(_fallbackPuddleSprite, _fallbackPuddleWorldSize);
+        }
+    }
+
+    private GameObject CreateSimplePuddleSprite(Sprite sprite, float worldSize)
+    {
+        if (sprite == null)
+            return null;
+
+        GameObject puddleVisual = new GameObject("PocaSpriteVisual");
+        puddleVisual.transform.SetPositionAndRotation(GetGroundPosition(), Quaternion.Euler(90f, 0f, 0f));
+
+        SpriteRenderer spriteRenderer = puddleVisual.AddComponent<SpriteRenderer>();
+        spriteRenderer.sprite = sprite;
+        spriteRenderer.color = Color.white;
+        spriteRenderer.maskInteraction = SpriteMaskInteraction.None;
+        spriteRenderer.sortingOrder = 0;
+
+        float spriteWidth = sprite.bounds.size.x;
+        float spriteHeight = sprite.bounds.size.y;
+        float largestDimension = Mathf.Max(spriteWidth, spriteHeight, 0.01f);
+        float scaleFactor = Mathf.Max(0.1f, worldSize) / largestDimension;
+        puddleVisual.transform.localScale = new Vector3(scaleFactor, scaleFactor, 1f);
+
+        return puddleVisual;
     }
 
     private IEnumerator DissolveOut()

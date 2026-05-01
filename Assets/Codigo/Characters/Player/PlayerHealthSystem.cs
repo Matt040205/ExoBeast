@@ -50,6 +50,11 @@ public class PlayerHealthSystem : NetworkBehaviour
     public event Action<float> OnDamageDealt;
     public event Action<float, Transform, bool, ulong> OnServerDamageTaken;
 
+    /// <summary>
+    /// Evento disparado no cliente local quando ele sofre dano, util para atualizar a UI (DamageIndicator).
+    /// </summary>
+    public event Action<float, Vector3, bool> OnLocalDamageTaken;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -148,7 +153,19 @@ public class PlayerHealthSystem : NetworkBehaviour
         isRegenerating = false;
 
         if (finalDamage > 0f)
+        {
             OnServerDamageTaken?.Invoke(finalDamage, request.Attacker, request.IsMelee, request.AttackerClientId);
+
+            // Avisa o cliente dono sobre o dano recebido e a posicao do atacante
+            Vector3 attackerPos = request.Attacker != null ? request.Attacker.position : Vector3.zero;
+            bool hasAttacker = request.Attacker != null;
+            
+            ClientRpcParams clientRpcParams = new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { OwnerClientId } }
+            };
+            NotifyDamageTakenClientRpc(finalDamage, attackerPos, hasAttacker, clientRpcParams);
+        }
 
         if (currentHealth.Value <= 0f)
             Die();
@@ -232,6 +249,15 @@ public class PlayerHealthSystem : NetworkBehaviour
             PlayerTeleportService.TeleportLocal(gameObject, spawnPosition, transform.rotation);
 
         RestartSpawnMaterializationFlow();
+    }
+
+    [ClientRpc]
+    private void NotifyDamageTakenClientRpc(float damage, Vector3 attackerPosition, bool hasAttacker, ClientRpcParams rpcParams = default)
+    {
+        if (IsOwner)
+        {
+            OnLocalDamageTaken?.Invoke(damage, attackerPosition, hasAttacker);
+        }
     }
 
     private void RestartSpawnMaterializationFlow()
