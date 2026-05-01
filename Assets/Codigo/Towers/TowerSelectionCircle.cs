@@ -2,21 +2,21 @@ using UnityEngine;
 
 public class TowerSelectionCircle : MonoBehaviour
 {
-    [Header("Referências Visuais")]
-    [Tooltip("O GameObject do círculo (o mesh/quad) que muda de cor.")]
+    [Header("Referencias Visuais")]
+    [Tooltip("O GameObject do circulo (o mesh/quad) que muda de cor.")]
     public GameObject circleVisual;
 
-    [Tooltip("Material para 'cor destacada' (quando o rato está perto).")]
+    [Tooltip("Material para 'cor destacada' (quando o rato esta perto).")]
     public Material highlightMaterial;
 
     private Renderer circleRenderer;
     private Material defaultMaterial; // Guarda o material original
 
-    void Start()
+    void Start()
     {
         if (circleVisual == null)
         {
-            Debug.LogError($"[TowerSelectionCircle] O 'circleVisual' não foi definido no Inspector da torre {gameObject.name}");
+            Debug.LogError($"[TowerSelectionCircle] O 'circleVisual' nao foi definido no Inspector da torre {gameObject.name}");
             this.enabled = false;
             return;
         }
@@ -25,25 +25,35 @@ public class TowerSelectionCircle : MonoBehaviour
         if (circleRenderer != null)
         {
             defaultMaterial = circleRenderer.material; // Guarda o material original
-        }
+        }
 
-        // Começa desligado, como você pediu
-        circleVisual.SetActive(false);
+        // Comeca desligado, como voce pediu
+        circleVisual.SetActive(false);
     }
 
     public void Highlight()
     {
-        if (circleRenderer == null || highlightMaterial == null) return;
+        if (circleRenderer != null && highlightMaterial != null)
+        {
+            circleVisual.SetActive(true);
+            circleRenderer.material = highlightMaterial;
+        }
 
-        circleVisual.SetActive(true);
-        circleRenderer.material = highlightMaterial;
+        TowerRangeIndicator rangeInd = GetComponent<TowerRangeIndicator>();
+        if (rangeInd == null) rangeInd = GetComponentInChildren<TowerRangeIndicator>();
+        if (rangeInd != null) rangeInd.ShowRange(true);
     }
 
     public void Unhighlight()
     {
-        if (circleRenderer == null || defaultMaterial == null) return;
+        if (circleRenderer != null && defaultMaterial != null)
+        {
+            circleRenderer.material = defaultMaterial;
+            circleVisual.SetActive(false);
+        }
 
-        circleRenderer.material = defaultMaterial;
-        circleVisual.SetActive(false);
+        TowerRangeIndicator rangeInd = GetComponent<TowerRangeIndicator>();
+        if (rangeInd == null) rangeInd = GetComponentInChildren<TowerRangeIndicator>();
+        if (rangeInd != null) rangeInd.ShowRange(false);
     }
 }

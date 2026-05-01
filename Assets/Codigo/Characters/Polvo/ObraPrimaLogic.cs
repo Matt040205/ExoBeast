@@ -21,7 +21,8 @@ public class ObraPrimaLogic : MonoBehaviour
         float damagePerShot,
         float radius,
         float silenceDur,
-        bool applyDamage = true)
+        bool applyDamage = true,
+        GameObject vfxPrefab = null)
     {
         _owner = owner.transform;
         _duration = duration;
@@ -31,6 +32,19 @@ public class ObraPrimaLogic : MonoBehaviour
         _silenceDur = silenceDur;
         _applyDamage = applyDamage;
         NetworkGameplayResolver.TryResolveAttackerFromPlayer(owner, out _attackerClientId, out _attackerHealth);
+
+        if (vfxPrefab != null)
+        {
+            Debug.Log($"[ObraPrimaLogic] Instanciando VFX: {vfxPrefab.name} no owner {owner.name}");
+            GameObject vfx = Instantiate(vfxPrefab, transform);
+            // Garante que o VFX nasça na posição exata da personagem (e não com offsets estranhos)
+            vfx.transform.localPosition = Vector3.zero;
+            vfx.transform.localRotation = Quaternion.identity;
+        }
+        else
+        {
+            Debug.LogError($"[ObraPrimaLogic] vfxPrefab ESTÁ NULO! O slot 'Ultimate Vfx Prefab' na ScriptableObject deve estar vazio!");
+        }
 
         StartCoroutine(DealDamageRoutine());
     }

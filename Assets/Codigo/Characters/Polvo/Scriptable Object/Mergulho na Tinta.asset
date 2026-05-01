@@ -21,6 +21,8 @@ MonoBehaviour:
   duration: 3
   exitDamage: 40
   damageRadius: 4
-  visualPuddlePrefab: {fileID: 2788596489867798966, guid: ab945303daceebf439bf60472c1999cc, type: 3}
+  visualPuddlePrefab: {fileID: 3941258103375081457, guid: d6a2ca09cb8d53a4d9d87727a05e4f93, type: 3}
   fallbackPuddleSprite: {fileID: 21300000, guid: 84e48a56d5dc86b4faf78b2e88b45d28, type: 3}
   fallbackPuddleWorldSize: 4.5
+  diveShaderMaterial: {fileID: 2100000, guid: a854c4f0c9e3a814d9bb99efb00c5e1a, type: 2}
+  dissolveDuration: 0.4

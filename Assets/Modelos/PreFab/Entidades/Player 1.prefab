@@ -24,12 +24,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 414561533210532575}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.94, y: 0.28744617, z: 0.79799104}
-  m_LocalScale: {x: 0.3874, y: 0.32283333, z: 0.3874}
+  m_LocalRotation: {x: 0.000000049360096, y: -0.00000014062971, z: 0.70710653, w: 0.7071071}
+  m_LocalPosition: {x: 0.00094, y: -0, z: 0}
+  m_LocalScale: {x: 0.0075477134, y: 0.0062897615, z: 0.00754772}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 702061340975147476}
+  m_Father: {fileID: 8701486573267194323}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1458758049813393618
 GameObject:
@@ -455,7 +455,6 @@ Transform:
   - {fileID: 709946347891326473}
   - {fileID: 6099578788305256835}
   - {fileID: 4237064630503924919}
-  - {fileID: 4757579757688161299}
   - {fileID: 5456940512777862082}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -600,6 +599,7 @@ MonoBehaviour:
   rotationSpeed: 15
   cameraController: {fileID: 0}
   modelPivot: {fileID: 4237064630503924919}
+  doubleJumpVfxPrefab: {fileID: 0}
   aimRig: {fileID: 2734900487233724365}
   aimConstraint: {fileID: 143155106745808703}
   aimLayerMask:
@@ -635,6 +635,12 @@ MonoBehaviour:
   projectileVisualPrefab: {fileID: 2027974582639016208, guid: e3fa2040e19007744b3937f9244f4c9f, type: 3}
   impactEffectPrefab: {fileID: 0}
   muzzleFlashPrefab: {fileID: 0}
+  explosionVfxPrefab: {fileID: 0}
+  explosionVfxRadiusParam: Radius
+  empoweredShotShake:
+    amplitude: 3
+    frequency: 0.5
+    duration: 0.3
   aimTarget: {fileID: 0}
   aimTargetDistance: 20
   tipoDeSom: Arma
@@ -697,6 +703,10 @@ MonoBehaviour:
   isBuffed: 0
   isCountering: 0
   respawnPointNameOrTag: RespawnPoint
+  tempoDeSpawn: 2
+  materialHolograma: {fileID: 0}
+  materialToon: {fileID: 0}
+  materialOutline: {fileID: 0}
 --- !u!114 &6853114845528409664
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -739,6 +749,11 @@ MonoBehaviour:
     sfxHit2: 
     sfxHit3: 
     sfxHit4: 
+  slashVfxPrefab: {fileID: 0}
+  ultimateHitShake:
+    amplitude: 0.8
+    frequency: 15
+    duration: 0.1
 --- !u!114 &4810200277711100742
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -807,6 +822,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dde71cdb55b1ac14895f5f0b20cdc898, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  hoverVfxPrefab: {fileID: 0}
 --- !u!114 &1514725371722067090
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -822,6 +838,10 @@ MonoBehaviour:
   effectParticles: {fileID: 0}
   beamVisualPrefab: {fileID: 0}
   visualDuration: 0.5
+  ultimateShake:
+    amplitude: 5
+    frequency: 5
+    duration: 0.6
 --- !u!114 &5783181433193836938
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1587,6 +1607,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 6879602051789942334, guid: 613add97b4fba6a428860000a6652312, type: 3}
       insertIndex: -1
       addedObject: {fileID: 6478298243723770104}
+    - targetCorrespondingSourceObject: {fileID: 6879602051789942334, guid: 613add97b4fba6a428860000a6652312, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 4757579757688161299}
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 5779095713070474810, guid: 613add97b4fba6a428860000a6652312, type: 3}
       insertIndex: -1

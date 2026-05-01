@@ -297,7 +297,9 @@ public class CommanderAbilityController : NetworkBehaviour
             return;
 
         ObraPrimaLogic logic = Instantiate(ability.logicPrefab, transform);
-        logic.StartUltimate(gameObject, duration, shotsCount, damagePerShot, radius, silenceDuration, false);
+        logic.transform.localPosition = Vector3.zero;
+        logic.transform.localRotation = Quaternion.identity;
+        logic.StartUltimate(gameObject, duration, shotsCount, damagePerShot, radius, silenceDuration, false, ability.ultimateVfxPrefab);
     }
 
     public void StartLocalAquiNaoOwnerProxy(Vector3 pos, Quaternion rot, string sfxSwing)
