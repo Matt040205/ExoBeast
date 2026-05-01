@@ -1132,6 +1132,34 @@ PrefabInstance:
       propertyPath: GlobalObjectIdHash
       value: 15138207
       objectReference: {fileID: 0}
+    - target: {fileID: -3926413528464722638, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_ActionEvents.Array.size
+      value: 26
+      objectReference: {fileID: 0}
+    - target: {fileID: -3926413528464722638, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_ActionEvents.Array.data[23].m_ActionId
+      value: 2e6f5a43-1f4b-4421-9aef-0dfce17d1c01
+      objectReference: {fileID: 0}
+    - target: {fileID: -3926413528464722638, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_ActionEvents.Array.data[24].m_ActionId
+      value: a8bc8d5a-38a4-4a9b-a270-998ad8cfae14
+      objectReference: {fileID: 0}
+    - target: {fileID: -3926413528464722638, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_ActionEvents.Array.data[25].m_ActionId
+      value: 4dfce0f4-5bf9-4be0-b17d-19c9a0550d92
+      objectReference: {fileID: 0}
+    - target: {fileID: -3926413528464722638, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_ActionEvents.Array.data[23].m_ActionName
+      value: 'Player/Ability1[/Keyboard/q]'
+      objectReference: {fileID: 0}
+    - target: {fileID: -3926413528464722638, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_ActionEvents.Array.data[24].m_ActionName
+      value: 'Player/Ability2[/Keyboard/e]'
+      objectReference: {fileID: 0}
+    - target: {fileID: -3926413528464722638, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_ActionEvents.Array.data[25].m_ActionName
+      value: 'Player/Ultimate[/Keyboard/x]'
+      objectReference: {fileID: 0}
     - target: {fileID: 179775970337438739, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_Weight
       value: 1
@@ -1639,7 +1667,7 @@ PrefabInstance:
     - target: {fileID: 9215532886368702831, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: projectileVisualPrefab
       value: 
-      objectReference: {fileID: 2354577146078742747, guid: 0a07cd6892ea9fe42bfc3d36971813bc, type: 3}
+      objectReference: {fileID: 7911379305023646343, guid: c7345ee66ac859846a92bab69b26cef1, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects:
     - {fileID: 8614219079200053719, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
@@ -1709,7 +1737,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 1536422954
+  GlobalObjectIdHash: 3614457225
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1

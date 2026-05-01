@@ -581,7 +581,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterData: {fileID: 11400000, guid: 6be7037535adf3347bc4a1b2a3d84af7, type: 2}
   firePoint: {fileID: 7918053145919156436}
-  projectileVisualPrefab: {fileID: 6569401662765405448, guid: 28d19a6cedd4d634a93234500f6d2067, type: 3}
+  projectileVisualPrefab: {fileID: 7911379305023646343, guid: c7345ee66ac859846a92bab69b26cef1, type: 3}
   impactEffectPrefab: {fileID: 0}
   muzzleFlashPrefab: {fileID: 0}
   explosionVfxPrefab: {fileID: 0}
@@ -892,6 +892,18 @@ MonoBehaviour:
         m_CallState: 2
     m_ActionId: 5122d884-93dc-4d01-b917-87e27b63dafa
     m_ActionName: 'Player/Pause[/Keyboard/p]'
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 2e6f5a43-1f4b-4421-9aef-0dfce17d1c01
+    m_ActionName: 'Player/Ability1[/Keyboard/q]'
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: a8bc8d5a-38a4-4a9b-a270-998ad8cfae14
+    m_ActionName: 'Player/Ability2[/Keyboard/e]'
+  - m_PersistentCalls:
+      m_Calls: []
+    m_ActionId: 4dfce0f4-5bf9-4be0-b17d-19c9a0550d92
+    m_ActionName: 'Player/Ultimate[/Keyboard/x]'
   m_NeverAutoSwitchControlSchemes: 0
   m_DefaultControlScheme: 
   m_DefaultActionMap: Player

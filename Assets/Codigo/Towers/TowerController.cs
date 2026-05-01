@@ -263,10 +263,12 @@ public class TowerController : MonoBehaviour
         if (targetEnemy == null) return;
         if (animator != null) animator.SetTrigger(shootTrigger);
 
+        Vector3 originPoint = firePoint != null ? firePoint.position : (partToRotate != null ? partToRotate.position : transform.position);
+        TowerTracerVFX tracer = GetComponentInChildren<TowerTracerVFX>();
+
         PiercingBehavior piercer = GetComponent<PiercingBehavior>();
         if (piercer != null)
         {
-            Vector3 originPoint = firePoint != null ? firePoint.position : (partToRotate != null ? partToRotate.position : transform.position);
             Vector3 dir = (targetEnemy.position - originPoint).normalized;
             RaycastHit[] hits = Physics.SphereCastAll(originPoint, 1f, dir, CurrentRange);
             System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
@@ -283,6 +285,8 @@ public class TowerController : MonoBehaviour
                 processed.Add(primary);
             }
 
+            Vector3 finalHitPosition = targetEnemy.position;
+
             foreach (var hit in hits)
             {
                 if (hitsDone >= maxHits) break;
@@ -294,13 +298,31 @@ public class TowerController : MonoBehaviour
                     ProcessDamageInstance(ehs);
                     hitsDone++;
                     processed.Add(ehs);
+                    finalHitPosition = ehs.transform.position;
                 }
+            }
+
+            if (tracer != null)
+            {
+                tracer.DrawTracer(originPoint, finalHitPosition);
             }
         }
         else
         {
             EnemyHealthSystem healthSystem = targetEnemy.GetComponent<EnemyHealthSystem>();
-            if (healthSystem != null) ProcessDamageInstance(healthSystem);
+            if (healthSystem != null) 
+            {
+                ProcessDamageInstance(healthSystem);
+
+                if (tracer != null)
+                {
+                    // Usa ClosestPoint para que o rastro bata na borda do inimigo e não atravesse até o centro
+                    Collider enemyCol = targetEnemy.GetComponentInChildren<Collider>();
+                    Vector3 endPoint = enemyCol != null ? enemyCol.ClosestPoint(originPoint) : targetEnemy.position;
+                    
+                    tracer.DrawTracer(originPoint, endPoint);
+                }
+            }
         }
     }
 
