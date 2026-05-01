@@ -13,11 +13,10 @@ MonoBehaviour:
   m_Name: Perseguindo as Presas
   m_EditorClassIdentifier: 
   abilityName: Perseguindo as Presas
-  description: "Marca o inimigo, podendo ver ele atrav\xE9s da parede, al\xE9m disso,aumenta
-    o dano recebido por ele em 15%.\n"
+  description: "Marca os inimigos, podendo ver ele atrav\xE9s da parede, al\xE9m
+    disso,aumenta o dano recebido por ele em 15%.\n"
   icon: {fileID: 21300000, guid: f48a7515d4307494fa4b4d012d4ce765, type: 3}
   cooldown: 1
   markDuration: 5
   bonusDamageMultiplier: 1.25
-  highlightMaterial: {fileID: 2100000, guid: b11428986655acf45a379779f4a621b6, type: 2}
   eventoTEC: event:/SFX/TEC
