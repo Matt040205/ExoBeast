@@ -22,6 +22,9 @@ public class EnemyController : MonoBehaviour
     public float selfDefenseRadius = 5f;
     public float maxChaseTime = 10f;
     public float maxChaseDistance = 20f;
+    
+    [Tooltip("Objeto visual (ex: ícone de exclamação) que liga quando o inimigo foca no jogador")]
+    public GameObject aggroIndicatorVisual;
 
     [Header("Configuracoes Fisicas")]
     public float originalMoveSpeed = 3.5f;
@@ -84,6 +87,8 @@ public class EnemyController : MonoBehaviour
         currentChaseTimer = 0f;
         paintStacks = 0;
         paintStackResetTime = 0f;
+
+        SetAggroVisual(false);
 
         EnemyEvents.OnEnemySpawned?.Invoke(pathIndex + 1);
         statusController.ResetState();
@@ -274,9 +279,18 @@ public class EnemyController : MonoBehaviour
         target = null;
         playerTransform = null;
         currentChaseTimer = 0f;
+        SetAggroVisual(false);
 
         if (agent != null && agent.enabled && agent.isOnNavMesh)
             agent.ResetPath();
+    }
+
+    private void SetAggroVisual(bool isActive)
+    {
+        if (aggroIndicatorVisual != null && aggroIndicatorVisual.activeSelf != isActive)
+        {
+            aggroIndicatorVisual.SetActive(isActive);
+        }
     }
 
     public void RefreshTargetNow()
@@ -330,6 +344,7 @@ public class EnemyController : MonoBehaviour
             {
                 target = null;
                 currentChaseTimer = 0f;
+                SetAggroVisual(false);
             }
         }
         else
@@ -345,6 +360,7 @@ public class EnemyController : MonoBehaviour
                 target = playerTransform;
                 initialChasePosition = transform.position;
                 currentChaseTimer = 0f;
+                SetAggroVisual(true);
             }
         }
     }
