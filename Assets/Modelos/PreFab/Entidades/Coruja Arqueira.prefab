@@ -172,6 +172,13 @@ PrefabInstance:
       propertyPath: ultimateChargeThreshold
       value: 100
       objectReference: {fileID: 0}
+    - target: {fileID: 3035468913146140951, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_WarningMessage
+      value: "\nBinding warning: Some generic clip(s) animate transforms that are
+        already bound by a Humanoid avatar. These transforms can only be changed
+        by Humanoid clips.\n\tTransform 'spine'\n\tTransform 'spine.001'\n\tTransform
+        'spine'\n\tTransform 'spine.001'\n\tTransform 'spine'\n\tTransform 'spine.001'"
+      objectReference: {fileID: 0}
     - target: {fileID: 3205705750547484078, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_Materials.Array.size
       value: 2
@@ -191,6 +198,18 @@ PrefabInstance:
     - target: {fileID: 4757579757688161299, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_LocalPosition.y
       value: 0.619
+      objectReference: {fileID: 0}
+    - target: {fileID: 4780086033350187988, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.00003
+      objectReference: {fileID: 0}
+    - target: {fileID: 4780086033350187988, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4780086033350187988, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.00001
       objectReference: {fileID: 0}
     - target: {fileID: 5783181433193836938, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: statusBase
@@ -261,6 +280,14 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 9215532886368702831, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: aimTarget
+      value: 
+      objectReference: {fileID: 8433726488357682558}
+    - target: {fileID: 9215532886368702831, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      propertyPath: firePoint
+      value: 
+      objectReference: {fileID: 0}
+    - target: {fileID: 9215532886368702831, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: tipoDeSom
       value: Arco
       objectReference: {fileID: 0}
@@ -285,7 +312,8 @@ PrefabInstance:
       value: 
       objectReference: {fileID: 7911379305023646343, guid: 40e26279e95b9dc418fd8ab49a998d77, type: 3}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 414561533210532575, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 2682399473942067493, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
@@ -423,3 +451,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b4d577a2c26dea049819c5de70bca308, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!4 &8433726488357682558 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 4780086033350187988, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+  m_PrefabInstance: {fileID: 3989304598710478506}
+  m_PrefabAsset: {fileID: 0}
