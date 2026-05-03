@@ -13385,7 +13385,7 @@ Transform:
   m_GameObject: {fileID: 444947867}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 51.878, y: 92.5, z: 84.67728}
+  m_LocalPosition: {x: 52, y: 92.667, z: 84}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -26080,6 +26080,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: CaixaDagua
       objectReference: {fileID: 0}
+    - target: {fileID: 2969275740655960818, guid: 9f6dcc239d442cf43ac25aa1299b9f1a, type: 3}
+      propertyPath: m_Convex
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -33750,8 +33754,55 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 5620177763568760758, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1075425046}
+    - targetCorrespondingSourceObject: {fileID: 5620177763568760758, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1075425047}
   m_SourcePrefab: {fileID: 100100000, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
+--- !u!1 &1075425045 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5620177763568760758, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
+  m_PrefabInstance: {fileID: 1075425044}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1075425046
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1075425045}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 2153875730
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
+--- !u!114 &1075425047
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1075425045}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: da307db2cd14df84cabfc9afd851dc47, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 100
+  currentHealth:
+    m_InternalValue: 100
 --- !u!1001 &1077677620
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -65010,7 +65061,7 @@ Transform:
   m_GameObject: {fileID: 2127789263}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 51.87, y: 92.49, z: 84.67728}
+  m_LocalPosition: {x: 52, y: 92.667, z: 84}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
