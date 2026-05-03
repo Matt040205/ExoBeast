@@ -30,7 +30,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3291846872735581186, guid: 469bde3d549602c4b9c8eddca3c9fca9, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.35389364
+      value: 0.062
       objectReference: {fileID: 0}
     - target: {fileID: 3291846872735581186, guid: 469bde3d549602c4b9c8eddca3c9fca9, type: 3}
       propertyPath: m_LocalPosition.z
@@ -138,6 +138,22 @@ PrefabInstance:
       propertyPath: attackVfxPrefab
       value: 
       objectReference: {fileID: 7044212507199555230, guid: 699db3667441620439f755b88597d45f, type: 3}
+    - target: {fileID: 2896903471347598868, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3133169317417433774, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.493
+      objectReference: {fileID: 0}
+    - target: {fileID: 3133169317417433774, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.799
+      objectReference: {fileID: 0}
+    - target: {fileID: 3868895309836021607, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 1.641
+      objectReference: {fileID: 0}
     - target: {fileID: 6837223848380582383, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -152,7 +168,7 @@ PrefabInstance:
       objectReference: {fileID: 1530198455052353034, guid: 1018e202175868c46ac9f72f3cf3b39e, type: 3}
     - target: {fileID: 8902707751699061829, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_Height
-      value: 2.147635
+      value: 1.8489065
       objectReference: {fileID: 0}
     - target: {fileID: 8902707751699061829, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_Radius
@@ -168,14 +184,16 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8902707751699061829, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_Center.y
-      value: 1.1038046
+      value: 0.45388192
       objectReference: {fileID: 0}
     - target: {fileID: 8902707751699061829, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_Center.z
-      value: 0.22
+      value: 0.22000001
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 4723723226853623873, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+    - {fileID: 1881180898542956724, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 1035349113437046572, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       insertIndex: 1
