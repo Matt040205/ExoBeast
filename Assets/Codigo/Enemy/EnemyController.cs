@@ -290,7 +290,22 @@ public class EnemyController : MonoBehaviour
         Collider[] hitTowers = Physics.OverlapSphere(transform.position, allowedRadius);
         foreach (Collider col in hitTowers)
         {
-            if (col.GetComponent<TowerController>() != null || col.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null)
+            TowerController tower = col.GetComponent<TowerController>();
+            if (tower != null)
+            {
+                // Ignora torres destruídas que ainda existem na cena (pooling)
+                if (tower.IsDestroyed) continue;
+
+                float distance = GetDistanceToTarget(col.transform);
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestEntity = col.transform;
+                }
+                continue;
+            }
+
+            if (col.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null)
             {
                 float distance = GetDistanceToTarget(col.transform);
                 if (distance < nearestDistance)

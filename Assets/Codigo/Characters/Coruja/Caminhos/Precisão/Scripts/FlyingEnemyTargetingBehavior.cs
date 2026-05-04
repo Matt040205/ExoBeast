@@ -1,13 +1,12 @@
 using UnityEngine;
-using Unity.Netcode;
 
 /// <summary>
 /// ── FlyingEnemyTargetingBehavior ─────────────────────────
-/// Enables the tower to target airborne enemies.
+/// Enables the tower to target airborne enemies (Precisão Nível 3).
 ///
-///  ▸ Server-only: TargetsFlyingEnemies flag read server-side during targeting
-///  ▸ OnDestroy resets the flag so the tower stops targeting fliers if behavior is removed
-///  ▸ towerOwner cached separately to survive towerController base-class null check in OnDestroy
+///  ▸ Seta TargetsFlyingEnemies = true no Initialize, sem guard de IsServer,
+///    pois UpdateTarget() roda localmente em todos os contextos (MonoBehaviour).
+///  ▸ OnDestroy reseta o flag para que a torre pare de mirar voadores se o behavior for removido.
 /// ─────────────────────────────────────────────────────────
 /// </summary>
 public class FlyingEnemyTargetingBehavior : TowerBehavior
@@ -17,20 +16,15 @@ public class FlyingEnemyTargetingBehavior : TowerBehavior
     public override void Initialize(TowerController owner)
     {
         base.Initialize(owner);
-        if (!IsServer) return;
 
-        this.towerOwner = owner;
+        towerOwner = owner;
         if (owner != null)
-        {
             owner.TargetsFlyingEnemies = true;
-        }
     }
 
     private void OnDestroy()
     {
-        if (IsServer && towerOwner != null)
-        {
+        if (towerOwner != null)
             towerOwner.TargetsFlyingEnemies = false;
-        }
     }
 }

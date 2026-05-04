@@ -197,20 +197,25 @@ public class EnemyCombatSystem : NetworkBehaviour
     /// <summary>
     /// Verifica se um Transform é um alvo válido de combate,
     /// subindo e descendo na hierarquia (essencial para CharacterController).
+    /// Rejeita alvos destruídos/mortos mesmo que o objeto ainda exista na cena (pooling).
     /// </summary>
     private bool IsValidCombatTarget(Transform t)
     {
         if (t == null) return false;
 
-        // Checa jogador: sobe na hierarquia para encontrar PlayerHealthSystem
-        if (t.GetComponentInParent<PlayerHealthSystem>() != null) return true;
-        if (t.GetComponentInChildren<PlayerHealthSystem>() != null) return true;
+        // Checa jogador: aceita apenas se ainda tem vida
+        PlayerHealthSystem playerHealth = t.GetComponentInParent<PlayerHealthSystem>()
+            ?? t.GetComponentInChildren<PlayerHealthSystem>();
+        if (playerHealth != null)
+            return playerHealth.currentHealth.Value > 0f;
 
-        // Checa torre
-        if (t.GetComponentInParent<TowerController>() != null) return true;
-        if (t.GetComponentInChildren<TowerController>() != null) return true;
+        // Checa torre: rejeita se já foi destruída (IsDestroyed = true)
+        TowerController tower = t.GetComponentInParent<TowerController>()
+            ?? t.GetComponentInChildren<TowerController>();
+        if (tower != null)
+            return !tower.IsDestroyed;
 
-        // Checa NetworkedBuilding
+        // Checa NetworkedBuilding (sem estado de morte próprio — aceita se existir)
         if (t.GetComponentInParent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null) return true;
 
         return false;
