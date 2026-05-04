@@ -11,7 +11,7 @@ public class EnemyCombatSystem : NetworkBehaviour
         Recover
     }
 
-    [Header("Configuracoes de Combate (Player)")]
+    [Header("Configuracoes de Combate")]
     public float attackRange = 2f;
     public float timeToDamage = 2f;
 
@@ -71,9 +71,25 @@ public class EnemyCombatSystem : NetworkBehaviour
             return;
 
         Transform currentTarget = enemyController.Target;
-        bool hasValidPlayerTarget = currentTarget != null && currentTarget.CompareTag("Player");
+        bool hasValidTarget = currentTarget != null && (currentTarget.CompareTag("Player") || currentTarget.CompareTag("Tower") || currentTarget.GetComponent<TowerController>() != null || currentTarget.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null);
 
-        if (!hasValidPlayerTarget || !enemyController.IsTargetInAttackRange(currentTarget))
+        if (!hasValidTarget)
+        {
+            ResetAttackState();
+            return;
+        }
+
+        bool inRange = false;
+        if (attackState != AttackState.Idle)
+        {
+            inRange = enemyController.IsTargetInDisengageRange(currentTarget);
+        }
+        else
+        {
+            inRange = enemyController.IsTargetInAttackRange(currentTarget);
+        }
+
+        if (!inRange)
         {
             ResetAttackState();
             return;
@@ -126,10 +142,11 @@ public class EnemyCombatSystem : NetworkBehaviour
         if (currentTarget == null || currentTarget != trackedTarget)
             return false;
 
-        if (!currentTarget.CompareTag("Player"))
+        bool isValid = currentTarget.CompareTag("Player") || currentTarget.CompareTag("Tower") || currentTarget.GetComponent<TowerController>() != null || currentTarget.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null;
+        if (!isValid)
             return false;
 
-        return enemyController.IsTargetInAttackRange(currentTarget);
+        return enemyController.IsTargetInDisengageRange(currentTarget);
     }
 
     private void TriggerAttackVfx(Vector3 targetPos)
@@ -160,11 +177,19 @@ public class EnemyCombatSystem : NetworkBehaviour
             Vector3 origin = attackPoint != null ? attackPoint.position : transform.position;
             Vector3 direction = (targetTransform.position - origin).normalized;
 
-            if (Physics.Raycast(origin, direction, out RaycastHit hit, enemyController.loseSightDistance, playerLayer))
+            if (Physics.Raycast(origin, direction, out RaycastHit hit, enemyController.loseSightDistance, playerLayer | towerLayer))
             {
                 PlayerHealthSystem playerHealth = hit.collider.GetComponent<PlayerHealthSystem>();
                 if (playerHealth != null)
+                {
                     playerHealth.TakeDamage(currentDamage, transform, false);
+                }
+                else
+                {
+                    TowerController tower = hit.collider.GetComponent<TowerController>();
+                    if (tower != null)
+                        tower.TakeDamage(currentDamage);
+                }
             }
 
             return;
@@ -182,13 +207,21 @@ public class EnemyCombatSystem : NetworkBehaviour
             return;
 
         Vector3 origin = attackPoint != null ? attackPoint.position : transform.position;
-        Collider[] hitPlayers = Physics.OverlapSphere(origin, attackRange, playerLayer);
+        Collider[] hitTargets = Physics.OverlapSphere(origin, attackRange, playerLayer | towerLayer);
 
-        foreach (Collider col in hitPlayers)
+        foreach (Collider col in hitTargets)
         {
             PlayerHealthSystem playerHealth = col.GetComponent<PlayerHealthSystem>();
             if (playerHealth != null)
+            {
                 playerHealth.TakeDamage(currentDamage, transform, true);
+            }
+            else
+            {
+                TowerController tower = col.GetComponent<TowerController>();
+                if (tower != null)
+                    tower.TakeDamage(currentDamage);
+            }
         }
     }
 

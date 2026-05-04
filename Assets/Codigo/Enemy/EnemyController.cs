@@ -22,6 +22,9 @@ public class EnemyController : MonoBehaviour
     public float selfDefenseRadius = 5f;
     public float maxChaseTime = 10f;
     public float maxChaseDistance = 20f;
+
+    [Header("Hysteresis (Tolerância de Combate)")]
+    public float disengageDistance = 3.0f;
     
     [Tooltip("Objeto visual (ex: ícone de exclamação) que liga quando o inimigo foca no jogador")]
     public GameObject aggroIndicatorVisual;
@@ -54,6 +57,8 @@ public class EnemyController : MonoBehaviour
     private float paintStackResetTime;
 
     private Coroutine tauntCoroutine;
+    private Coroutine aiTickCoroutine;
+    private Vector3 lastDestinationSet = Vector3.positiveInfinity;
 
     private const string TAG_POCA = "Poca";
 
@@ -87,6 +92,7 @@ public class EnemyController : MonoBehaviour
         currentChaseTimer = 0f;
         paintStacks = 0;
         paintStackResetTime = 0f;
+        lastDestinationSet = Vector3.positiveInfinity;
 
         SetAggroVisual(false);
 
@@ -108,13 +114,13 @@ public class EnemyController : MonoBehaviour
             agent.speed = originalMoveSpeed;
         }
 
-        StartCoroutine(RefreshTargetAfterDelay(0.5f));
-    }
+        if (aiTickCoroutine != null)
+            StopCoroutine(aiTickCoroutine);
 
-    private IEnumerator RefreshTargetAfterDelay(float delay)
-    {
-        yield return new WaitForSeconds(delay);
-        playerTransform = FindNearestPlayer();
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        {
+            aiTickCoroutine = StartCoroutine(AI_TickRoutine());
+        }
     }
 
     private void Update()
@@ -125,21 +131,232 @@ public class EnemyController : MonoBehaviour
         if (IsDead)
             return;
 
-        DecideTarget();
-
         if (paintStacks > 0 && Time.time > paintStackResetTime)
             paintStacks = 0;
 
         if (statusController != null && !statusController.CanMove)
         {
             FaceTarget();
+            if (anim != null) anim.SetBool("isWalking", false);
             return;
         }
 
-        if (target != null)
-            ChaseTarget();
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
+        {
+            bool isWalking = !agent.isStopped && agent.velocity.sqrMagnitude > 0.1f;
+            if (anim != null)
+                anim.SetBool("isWalking", isWalking);
+        }
+    }
+
+    private IEnumerator AI_TickRoutine()
+    {
+        while (!IsDead)
+        {
+            if (tauntCoroutine != null || (statusController != null && !statusController.CanMove))
+            {
+                yield return new WaitForSeconds(0.3f);
+                continue;
+            }
+
+            DecideTargetTick();
+
+            if (target != null)
+            {
+                if (agent.isStopped)
+                {
+                    if (!IsTargetInDisengageRange())
+                    {
+                        ResumeMovement();
+                        MoveTowardsPositionTick(target.position);
+                    }
+                    else
+                    {
+                        FaceTarget();
+                    }
+                }
+                else
+                {
+                    if (IsTargetInAttackRange())
+                    {
+                        HoldAttackPosition();
+                    }
+                    else
+                    {
+                        ResumeMovement();
+                        MoveTowardsPositionTick(target.position);
+                    }
+                }
+            }
+            else
+            {
+                ResumeMovement();
+                PatrolTick();
+            }
+
+            yield return new WaitForSeconds(0.3f);
+        }
+    }
+
+    private void DecideTargetTick()
+    {
+        Transform nearestAlly = FindNearestAlly();
+
+        if (nearestAlly == null || nearestAlly.CompareTag(TAG_POCA))
+        {
+            target = null;
+            return;
+        }
+
+        float distanceToAlly = Vector3.Distance(transform.position, nearestAlly.position);
+        
+        if (target == nearestAlly)
+        {
+            currentChaseTimer += 0.3f;
+            float distanceTraveled = Vector3.Distance(transform.position, initialChasePosition);
+
+            if (currentChaseTimer >= maxChaseTime ||
+                distanceTraveled >= maxChaseDistance ||
+                distanceToAlly > loseSightDistance)
+            {
+                target = null;
+                currentChaseTimer = 0f;
+                SetAggroVisual(false);
+            }
+        }
         else
-            Patrol();
+        {
+            bool shouldChase = false;
+            if (mainPriority == AITargetPriority.Player && distanceToAlly <= findDistance)
+                shouldChase = true;
+            else if (mainPriority == AITargetPriority.Objective && distanceToAlly <= selfDefenseRadius)
+                shouldChase = true;
+
+            if (shouldChase)
+            {
+                target = nearestAlly;
+                initialChasePosition = transform.position;
+                currentChaseTimer = 0f;
+                SetAggroVisual(true);
+            }
+        }
+    }
+
+    private Transform FindNearestAlly()
+    {
+        Transform nearestAlly = null;
+        float nearestDistance = float.MaxValue;
+
+        if (PlayerRegistry.Instance != null)
+        {
+            foreach (GameObject playerObject in PlayerRegistry.Instance.GetAllPlayers().Values)
+            {
+                if (playerObject == null || playerObject.CompareTag(TAG_POCA))
+                    continue;
+
+                float distance = Vector3.Distance(transform.position, playerObject.transform.position);
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestAlly = playerObject.transform;
+                }
+            }
+        }
+
+        float searchRadius = Mathf.Max(findDistance, selfDefenseRadius);
+        Collider[] hitTowers = Physics.OverlapSphere(transform.position, searchRadius);
+        foreach (Collider col in hitTowers)
+        {
+            if (col.CompareTag("Tower") || col.GetComponent<TowerController>() != null || col.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null)
+            {
+                float distance = Vector3.Distance(transform.position, col.transform.position);
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestAlly = col.transform;
+                }
+            }
+        }
+
+        return nearestAlly;
+    }
+
+    private void PatrolTick()
+    {
+        if (patrolPoints == null || patrolPoints.Count == 0 || currentPointIndex >= patrolPoints.Count)
+        {
+            if (anim != null)
+                anim.SetBool("isWalking", false);
+
+            AttackObjectiveAndDie();
+            return;
+        }
+
+        if (agent == null || !agent.enabled || !agent.isOnNavMesh)
+        {
+            if (agent != null)
+            {
+                agent.enabled = false;
+                agent.enabled = true;
+                agent.Warp(transform.position);
+            }
+            return;
+        }
+
+        Transform waypoint = patrolPoints[currentPointIndex];
+        if (waypoint == null)
+        {
+            currentPointIndex++;
+            return;
+        }
+
+        if (!hasTriggeredHalfway && patrolPoints.Count > 0 && currentPointIndex >= patrolPoints.Count / 2)
+        {
+            hasTriggeredHalfway = true;
+            EnemyEvents.OnEnemyHalfway?.Invoke(pathIndex + 1);
+        }
+
+        Vector3 flatPosition = new Vector3(transform.position.x, 0f, transform.position.z);
+        Vector3 flatWaypoint = new Vector3(waypoint.position.x, 0f, waypoint.position.z);
+        float distanceToWaypoint = Vector3.Distance(flatPosition, flatWaypoint);
+
+        if (distanceToWaypoint <= 3f)
+        {
+            currentPointIndex++;
+            return;
+        }
+
+        MoveTowardsPositionTick(waypoint.position);
+    }
+
+    private void MoveTowardsPositionTick(Vector3 targetPosition)
+    {
+        if (agent == null || !agent.enabled || !agent.isOnNavMesh)
+            return;
+
+        float speedMultiplier = statusController != null ? statusController.SpeedModifier : 1f;
+        agent.speed = originalMoveSpeed * speedMultiplier;
+
+        if (Vector3.Distance(targetPosition, lastDestinationSet) > 1.0f)
+        {
+            agent.SetDestination(targetPosition);
+            lastDestinationSet = targetPosition;
+        }
+    }
+
+    private void FaceTarget()
+    {
+        if (target == null)
+            return;
+
+        Vector3 direction = (target.position - transform.position).normalized;
+        direction.y = 0f;
+
+        if (direction == Vector3.zero)
+            return;
+
+        Quaternion targetRotation = Quaternion.LookRotation(direction);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 10f * Time.deltaTime);
     }
 
     public void ApplyTaunt(Transform tauntTarget, float duration)
@@ -162,10 +379,22 @@ public class EnemyController : MonoBehaviour
         return Vector3.Distance(transform.position, currentTarget.position) <= attackDistance;
     }
 
+    public bool IsTargetInDisengageRange(Transform targetOverride = null)
+    {
+        Transform currentTarget = targetOverride != null ? targetOverride : target;
+        if (currentTarget == null)
+            return false;
+
+        return Vector3.Distance(transform.position, currentTarget.position) <= disengageDistance;
+    }
+
     public void HoldAttackPosition()
     {
         if (agent != null && agent.enabled && agent.isOnNavMesh)
+        {
             agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+        }
 
         if (anim != null)
             anim.SetBool("isWalking", false);
@@ -188,6 +417,9 @@ public class EnemyController : MonoBehaviour
             return;
 
         IsDead = true;
+
+        if (aiTickCoroutine != null)
+            StopCoroutine(aiTickCoroutine);
 
         if (anim != null)
         {
@@ -277,8 +509,8 @@ public class EnemyController : MonoBehaviour
     public void LoseTarget()
     {
         target = null;
-        playerTransform = null;
         currentChaseTimer = 0f;
+        lastDestinationSet = Vector3.positiveInfinity;
         SetAggroVisual(false);
 
         if (agent != null && agent.enabled && agent.isOnNavMesh)
@@ -298,10 +530,10 @@ public class EnemyController : MonoBehaviour
         if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsServer)
             return;
 
-        playerTransform = FindNearestPlayer();
         target = null;
         currentChaseTimer = 0f;
-        DecideTarget();
+        lastDestinationSet = Vector3.positiveInfinity;
+        DecideTargetTick();
     }
 
     private IEnumerator TauntRoutine(Transform tauntTarget, float duration)
@@ -315,225 +547,6 @@ public class EnemyController : MonoBehaviour
         }
 
         tauntCoroutine = null;
-    }
-
-    private void DecideTarget()
-    {
-        if (tauntCoroutine != null)
-            return;
-
-        Transform nearestPlayer = FindNearestPlayer();
-        if (nearestPlayer != null)
-            playerTransform = nearestPlayer;
-
-        if (playerTransform == null || playerTransform.CompareTag(TAG_POCA))
-        {
-            target = null;
-            return;
-        }
-
-        float distanceToPlayer = Vector3.Distance(transform.position, playerTransform.position);
-        if (target == playerTransform)
-        {
-            currentChaseTimer += Time.deltaTime;
-            float distanceTraveled = Vector3.Distance(transform.position, initialChasePosition);
-
-            if (currentChaseTimer >= maxChaseTime ||
-                distanceTraveled >= maxChaseDistance ||
-                distanceToPlayer > loseSightDistance)
-            {
-                target = null;
-                currentChaseTimer = 0f;
-                SetAggroVisual(false);
-            }
-        }
-        else
-        {
-            bool shouldChase = false;
-            if (mainPriority == AITargetPriority.Player && distanceToPlayer <= findDistance)
-                shouldChase = true;
-            else if (mainPriority == AITargetPriority.Objective && distanceToPlayer <= selfDefenseRadius)
-                shouldChase = true;
-
-            if (shouldChase)
-            {
-                target = playerTransform;
-                initialChasePosition = transform.position;
-                currentChaseTimer = 0f;
-                SetAggroVisual(true);
-            }
-        }
-    }
-
-    private Transform FindNearestPlayer()
-    {
-        Transform nearestVisiblePlayer = null;
-        float nearestVisibleDistance = float.MaxValue;
-        Transform nearestPocaPlayer = null;
-        float nearestPocaDistance = float.MaxValue;
-
-        if (PlayerRegistry.Instance != null)
-        {
-            Dictionary<ulong, GameObject> players = PlayerRegistry.Instance.GetAllPlayers();
-            if (players.Count > 0)
-            {
-                foreach (GameObject playerObject in players.Values)
-                {
-                    if (playerObject == null)
-                        continue;
-
-                    float distance = Vector3.Distance(transform.position, playerObject.transform.position);
-                    if (playerObject.CompareTag(TAG_POCA))
-                    {
-                        if (distance < nearestPocaDistance)
-                        {
-                            nearestPocaDistance = distance;
-                            nearestPocaPlayer = playerObject.transform;
-                        }
-
-                        continue;
-                    }
-
-                    if (distance < nearestVisibleDistance)
-                    {
-                        nearestVisibleDistance = distance;
-                        nearestVisiblePlayer = playerObject.transform;
-                    }
-                }
-
-                if (nearestVisiblePlayer != null)
-                    return nearestVisiblePlayer;
-
-                if (nearestPocaPlayer != null)
-                    return nearestPocaPlayer;
-            }
-        }
-
-        GameObject[] fallbackPlayers = GameObject.FindGameObjectsWithTag("Player");
-        foreach (GameObject playerObject in fallbackPlayers)
-        {
-            if (playerObject == null)
-                continue;
-
-            float distance = Vector3.Distance(transform.position, playerObject.transform.position);
-            if (playerObject.CompareTag(TAG_POCA))
-            {
-                if (distance < nearestPocaDistance)
-                {
-                    nearestPocaDistance = distance;
-                    nearestPocaPlayer = playerObject.transform;
-                }
-
-                continue;
-            }
-
-            if (distance < nearestVisibleDistance)
-            {
-                nearestVisibleDistance = distance;
-                nearestVisiblePlayer = playerObject.transform;
-            }
-        }
-
-        if (nearestVisiblePlayer != null)
-            return nearestVisiblePlayer;
-
-        return nearestPocaPlayer != null ? nearestPocaPlayer : playerTransform;
-    }
-
-    private void Patrol()
-    {
-        if (patrolPoints == null || patrolPoints.Count == 0 || currentPointIndex >= patrolPoints.Count)
-        {
-            if (anim != null)
-                anim.SetBool("isWalking", false);
-
-            AttackObjectiveAndDie();
-            return;
-        }
-
-        if (agent == null || !agent.enabled || !agent.isOnNavMesh)
-        {
-            if (agent != null)
-            {
-                agent.enabled = false;
-                agent.enabled = true;
-                agent.Warp(transform.position);
-            }
-
-            return;
-        }
-
-        Transform waypoint = patrolPoints[currentPointIndex];
-        if (waypoint == null)
-        {
-            currentPointIndex++;
-            return;
-        }
-
-        if (!hasTriggeredHalfway && patrolPoints.Count > 0 && currentPointIndex >= patrolPoints.Count / 2)
-        {
-            hasTriggeredHalfway = true;
-            EnemyEvents.OnEnemyHalfway?.Invoke(pathIndex + 1);
-        }
-
-        Vector3 flatPosition = new Vector3(transform.position.x, 0f, transform.position.z);
-        Vector3 flatWaypoint = new Vector3(waypoint.position.x, 0f, waypoint.position.z);
-        float distanceToWaypoint = Vector3.Distance(flatPosition, flatWaypoint);
-
-        if (distanceToWaypoint <= 3f)
-        {
-            currentPointIndex++;
-            return;
-        }
-
-        if (anim != null)
-            anim.SetBool("isWalking", true);
-
-        MoveTowardsPosition(waypoint.position);
-    }
-
-    private void ChaseTarget()
-    {
-        if (target == null)
-            return;
-
-        if (IsTargetInAttackRange())
-        {
-            HoldAttackPosition();
-            return;
-        }
-
-        ResumeMovement();
-
-        if (anim != null)
-            anim.SetBool("isWalking", true);
-
-        MoveTowardsPosition(target.position);
-    }
-
-    private void MoveTowardsPosition(Vector3 targetPosition)
-    {
-        if (agent == null || !agent.enabled || !agent.isOnNavMesh)
-            return;
-
-        float speedMultiplier = statusController != null ? statusController.SpeedModifier : 1f;
-        agent.speed = originalMoveSpeed * speedMultiplier;
-        agent.SetDestination(targetPosition);
-    }
-
-    private void FaceTarget()
-    {
-        if (target == null)
-            return;
-
-        Vector3 direction = (target.position - transform.position).normalized;
-        direction.y = 0f;
-
-        if (direction == Vector3.zero)
-            return;
-
-        Quaternion targetRotation = Quaternion.LookRotation(direction);
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 10f * Time.deltaTime);
     }
 
     private void AttackObjectiveAndDie()

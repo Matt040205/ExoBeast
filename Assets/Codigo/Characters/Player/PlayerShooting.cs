@@ -130,11 +130,8 @@ public class PlayerShooting : NetworkBehaviour
 
     public void OnFire(InputAction.CallbackContext ctx)
     {
-        if (!IsOwner || !enabled || UsesPolledInput())
-            return;
-
-        if (ctx.started || ctx.performed) fireInputHeld = true;
-        else if (ctx.canceled) fireInputHeld = false;
+        // Removido para evitar duplo acionamento por eventos. 
+        // O input é processado exclusivamente por Polling em SyncOwnerInputFromBridge().
     }
 
     public void OnReload(InputAction.CallbackContext ctx)
@@ -173,7 +170,17 @@ public class PlayerShooting : NetworkBehaviour
         if (!UsesPolledInput())
             return;
 
-        fireInputHeld = inputBridge.FireHeld;
+        if (characterData != null && characterData.fireMode != FireMode.FullAuto)
+        {
+            if (inputBridge.ConsumeFirePressed())
+            {
+                fireInputHeld = true;
+            }
+        }
+        else
+        {
+            fireInputHeld = inputBridge.FireHeld;
+        }
 
         if (inputBridge.ConsumeReloadPressed() && !isReloading && currentAmmo < maxAmmo)
             RequestReloadServerRpc();
@@ -272,14 +279,17 @@ public class PlayerShooting : NetworkBehaviour
         if (combatManager != null && combatManager.netCombatType.Value != CombatType.Ranged)
             return;
 
-        if (isReloading || currentAmmo <= 0 || Time.time < nextShotTime)
-            return;
+        if (!IsOwner)
+        {
+            if (isReloading || currentAmmo <= 0 || Time.time < nextShotTime)
+                return;
+
+            float attackSpeed = characterData != null && characterData.attackSpeed > 0f ? characterData.attackSpeed : 1f;
+            nextShotTime = Time.time + (1f / attackSpeed);
+            currentAmmo--;
+        }
 
         direction.Normalize();
-
-        float attackSpeed = characterData != null && characterData.attackSpeed > 0f ? characterData.attackSpeed : 1f;
-        nextShotTime = Time.time + (1f / attackSpeed);
-        currentAmmo--;
 
         float damage = CalculateAuthoritativeDamage(out bool isCritical, out float areaRadius);
         float armorPenetration = characterData != null ? characterData.armorPenetration : 0f;
@@ -287,7 +297,7 @@ public class PlayerShooting : NetworkBehaviour
         SpawnServerProjectile(origin, direction, damage, isCritical, armorPenetration, areaRadius > 0f, areaRadius, rpcParams.Receive.SenderClientId);
         ShootVisualClientRpc(origin, direction);
 
-        if (currentAmmo <= 0 && !isReloading)
+        if (!IsOwner && currentAmmo <= 0 && !isReloading)
             ReloadClientRpc();
     }
 

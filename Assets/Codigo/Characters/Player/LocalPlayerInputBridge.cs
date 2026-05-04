@@ -38,6 +38,7 @@ public class LocalPlayerInputBridge : MonoBehaviour
     private bool ability2Pressed;
     private bool ultimatePressed;
     private bool meleeAttackPressed;
+    private bool firePressed;
 
     public Vector2 Move { get; private set; }
     public bool SprintHeld { get; private set; }
@@ -77,7 +78,11 @@ public class LocalPlayerInputBridge : MonoBehaviour
         FireHeld = fireAction != null && fireAction.IsPressed();
 
         bool fireHeldNow = FireHeld;
-        if (fireHeldNow && !wasFireHeld) meleeAttackPressed = true;
+        if (fireHeldNow && !wasFireHeld) 
+        {
+            meleeAttackPressed = true;
+            firePressed = true;
+        }
         wasFireHeld = fireHeldNow;
 
         bool jumpHeldNow = jumpAction != null && jumpAction.IsPressed();
@@ -174,6 +179,15 @@ public class LocalPlayerInputBridge : MonoBehaviour
         return true;
     }
 
+    public bool ConsumeFirePressed()
+    {
+        if (!firePressed)
+            return false;
+
+        firePressed = false;
+        return true;
+    }
+
     public void RefreshBindingsAfterPlayerInputReset()
     {
         playerInput = GetComponent<PlayerInput>();
@@ -252,6 +266,7 @@ public class LocalPlayerInputBridge : MonoBehaviour
         ability2Pressed = false;
         ultimatePressed = false;
         meleeAttackPressed = false;
+        firePressed = false;
     }
 
     private void ClearState()
