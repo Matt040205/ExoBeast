@@ -71,7 +71,7 @@ public class EnemyCombatSystem : NetworkBehaviour
             return;
 
         Transform currentTarget = enemyController.Target;
-        bool hasValidTarget = currentTarget != null && (currentTarget.CompareTag("Player") || currentTarget.CompareTag("Tower") || currentTarget.GetComponent<TowerController>() != null || currentTarget.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null);
+        bool hasValidTarget = currentTarget != null && (currentTarget.CompareTag("Player") || currentTarget.GetComponent<TowerController>() != null || currentTarget.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null);
 
         if (!hasValidTarget)
         {
@@ -103,34 +103,57 @@ public class EnemyCombatSystem : NetworkBehaviour
 
     private IEnumerator AttackCycle(Transform initialTarget)
     {
+        Debug.Log($"[EnemyCombatSystem] Entrou no Range contra {initialTarget.name}. Iniciando ciclo de ataque.");
         Transform trackedTarget = initialTarget;
 
         while (CanContinueAttacking(trackedTarget))
         {
+            Debug.Log("[EnemyCombatSystem] Cooldown Liberado. Disparando animacao de ataque.");
             attackState = AttackState.Windup;
 
-            Animator animator = GetComponentInChildren<Animator>();
-            if (animator != null)
-                animator.SetTrigger("doAttack");
+            PlayAttackAnimationClientRpc();
 
             yield return new WaitForSeconds(timeToDamage);
 
             if (!CanContinueAttacking(trackedTarget))
+            {
+                Debug.Log("[EnemyCombatSystem] Alvo saiu do range ou morreu durante o Windup. Abortando aplicacao do dano.");
                 break;
+            }
 
+            Debug.Log("[EnemyCombatSystem] Tempo de Windup (timeToDamage) concluido. Processando VFX e Dano.");
             TriggerAttackVfx(trackedTarget.position);
             ProcessAttack(trackedTarget);
 
             attackState = AttackState.Recover;
             float cooldown = enemyData.attackSpeed > 0f ? 1f / enemyData.attackSpeed : 1f;
+            Debug.Log($"[EnemyCombatSystem] Entrando em cooldown de {cooldown} segundos.");
+            
             yield return new WaitForSeconds(cooldown);
 
             trackedTarget = enemyController.Target;
         }
 
+        Debug.Log("[EnemyCombatSystem] Ciclo de ataque quebrado. Alvo fora de alcance ou morto. Retomando patrulha/perseguição.");
         attackState = AttackState.Idle;
         attackCoroutine = null;
-        enemyController.ResumeMovement();
+        
+        if (enemyController != null)
+            enemyController.ResumeMovement();
+    }
+
+    [ClientRpc]
+    private void PlayAttackAnimationClientRpc()
+    {
+        Animator animator = GetComponentInChildren<Animator>();
+        if (animator != null)
+        {
+            animator.SetTrigger("doAttack"); // Certifique-se de que o parâmetro na Unity se chama exatamente assim
+        }
+        else
+        {
+            Debug.LogWarning("[EnemyCombatSystem] Animator nao encontrado no inimigo para tocar animacao de ataque.");
+        }
     }
 
     private bool CanContinueAttacking(Transform trackedTarget)
@@ -142,7 +165,7 @@ public class EnemyCombatSystem : NetworkBehaviour
         if (currentTarget == null || currentTarget != trackedTarget)
             return false;
 
-        bool isValid = currentTarget.CompareTag("Player") || currentTarget.CompareTag("Tower") || currentTarget.GetComponent<TowerController>() != null || currentTarget.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null;
+        bool isValid = currentTarget.CompareTag("Player") || currentTarget.GetComponent<TowerController>() != null || currentTarget.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null;
         if (!isValid)
             return false;
 
@@ -172,38 +195,51 @@ public class EnemyCombatSystem : NetworkBehaviour
 
     private void ProcessAttack(Transform targetTransform)
     {
-        if (enemyData.enemyType == EnemyType.Voador)
-        {
-            Vector3 origin = attackPoint != null ? attackPoint.position : transform.position;
-            Vector3 direction = (targetTransform.position - origin).normalized;
-
-            if (Physics.Raycast(origin, direction, out RaycastHit hit, enemyController.loseSightDistance, playerLayer | towerLayer))
-            {
-                PlayerHealthSystem playerHealth = hit.collider.GetComponent<PlayerHealthSystem>();
-                if (playerHealth != null)
-                {
-                    playerHealth.TakeDamage(currentDamage, transform, false);
-                }
-                else
-                {
-                    TowerController tower = hit.collider.GetComponent<TowerController>();
-                    if (tower != null)
-                        tower.TakeDamage(currentDamage);
-                }
-            }
-
+        if (enemyController.IsBlinded && Random.value < 0.8f)
             return;
-        }
 
-        ApplyDamageInArea();
+        // Garante dano no alvo principal travado ignorando físicas que poderiam falhar
+        DealDamageToTarget(targetTransform);
+
+        // Se for melee, também espalha o dano em área para quem estiver perto
+        if (enemyData.enemyType != EnemyType.Voador)
+        {
+            ApplyDamageInArea(targetTransform);
+        }
     }
 
-    private void ApplyDamageInArea()
+    private void DealDamageToTarget(Transform targetTransform)
+    {
+        if (targetTransform == null)
+        {
+            Debug.LogWarning("[EnemyCombatSystem] Alvo nulo na hora do dano.");
+            return;
+        }
+        
+        PlayerHealthSystem playerHealth = targetTransform.GetComponent<PlayerHealthSystem>();
+        if (playerHealth != null)
+        {
+            Debug.Log($"[EnemyCombatSystem] Dano Aplicado ao Player ({targetTransform.name}).");
+            playerHealth.TakeDamage(currentDamage, transform, enemyData.enemyType != EnemyType.Voador);
+        }
+        else
+        {
+            TowerController tower = targetTransform.GetComponent<TowerController>();
+            if (tower != null)
+            {
+                Debug.Log($"[EnemyCombatSystem] Dano Aplicado a Torre ({targetTransform.name}).");
+                tower.TakeDamage(currentDamage);
+            }
+            else
+            {
+                Debug.LogWarning($"[EnemyCombatSystem] Alvo ({targetTransform.name}) nao possui componente de vida reconhecido. Dano ignorado.");
+            }
+        }
+    }
+
+    private void ApplyDamageInArea(Transform excludeTarget)
     {
         if (!IsServer || enemyData == null)
-            return;
-
-        if (enemyController.IsBlinded && Random.value < 0.8f)
             return;
 
         Vector3 origin = attackPoint != null ? attackPoint.position : transform.position;
@@ -211,6 +247,8 @@ public class EnemyCombatSystem : NetworkBehaviour
 
         foreach (Collider col in hitTargets)
         {
+            if (col.transform == excludeTarget) continue;
+
             PlayerHealthSystem playerHealth = col.GetComponent<PlayerHealthSystem>();
             if (playerHealth != null)
             {

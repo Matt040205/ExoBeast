@@ -59,6 +59,9 @@ public class EnemyController : MonoBehaviour
     private Coroutine tauntCoroutine;
     private Coroutine aiTickCoroutine;
     private Vector3 lastDestinationSet = Vector3.positiveInfinity;
+    
+    private Vector3 lastTickPosition;
+    private int stuckTickCount;
 
     private const string TAG_POCA = "Poca";
 
@@ -88,11 +91,12 @@ public class EnemyController : MonoBehaviour
         hasTriggeredHalfway = false;
         currentPointIndex = 0;
         IsDead = false;
-        target = null;
         currentChaseTimer = 0f;
         paintStacks = 0;
         paintStackResetTime = 0f;
         lastDestinationSet = Vector3.positiveInfinity;
+        lastTickPosition = transform.position;
+        stuckTickCount = 0;
 
         SetAggroVisual(false);
 
@@ -194,59 +198,63 @@ public class EnemyController : MonoBehaviour
                 PatrolTick();
             }
 
+            if (agent != null && agent.enabled && agent.isOnNavMesh && !agent.isStopped)
+            {
+                float distanceMoved = Vector3.Distance(transform.position, lastTickPosition);
+                if (distanceMoved < 0.1f)
+                {
+                    stuckTickCount++;
+                    if (stuckTickCount >= 3)
+                    {
+                        HandleStuckState();
+                        stuckTickCount = 0;
+                    }
+                }
+                else
+                {
+                    stuckTickCount = 0;
+                }
+            }
+            else
+            {
+                stuckTickCount = 0;
+            }
+
+            lastTickPosition = transform.position;
+
             yield return new WaitForSeconds(0.3f);
+        }
+    }
+
+    private void HandleStuckState()
+    {
+        if (target == null)
+        {
+            if (patrolPoints != null && patrolPoints.Count > 0 && currentPointIndex < patrolPoints.Count - 1)
+            {
+                currentPointIndex++;
+            }
+        }
+        else
+        {
+            if (agent != null && agent.isOnNavMesh)
+            {
+                Vector2 randomCircle = Random.insideUnitCircle * 2f;
+                Vector3 offsetTarget = target.position + new Vector3(randomCircle.x, 0, randomCircle.y);
+                agent.SetDestination(offsetTarget);
+                lastDestinationSet = offsetTarget;
+            }
         }
     }
 
     private void DecideTargetTick()
     {
-        Transform nearestAlly = FindNearestAlly();
+        float allowedRadius = (mainPriority == AITargetPriority.Player) ? findDistance : selfDefenseRadius;
 
-        if (nearestAlly == null || nearestAlly.CompareTag(TAG_POCA))
-        {
-            target = null;
-            return;
-        }
-
-        float distanceToAlly = Vector3.Distance(transform.position, nearestAlly.position);
-        
-        if (target == nearestAlly)
-        {
-            currentChaseTimer += 0.3f;
-            float distanceTraveled = Vector3.Distance(transform.position, initialChasePosition);
-
-            if (currentChaseTimer >= maxChaseTime ||
-                distanceTraveled >= maxChaseDistance ||
-                distanceToAlly > loseSightDistance)
-            {
-                target = null;
-                currentChaseTimer = 0f;
-                SetAggroVisual(false);
-            }
-        }
-        else
-        {
-            bool shouldChase = false;
-            if (mainPriority == AITargetPriority.Player && distanceToAlly <= findDistance)
-                shouldChase = true;
-            else if (mainPriority == AITargetPriority.Objective && distanceToAlly <= selfDefenseRadius)
-                shouldChase = true;
-
-            if (shouldChase)
-            {
-                target = nearestAlly;
-                initialChasePosition = transform.position;
-                currentChaseTimer = 0f;
-                SetAggroVisual(true);
-            }
-        }
-    }
-
-    private Transform FindNearestAlly()
-    {
-        Transform nearestAlly = null;
+        Transform nearestEntity = null;
         float nearestDistance = float.MaxValue;
 
+        // 1. Busca Jogadores (via Registry e Fallback)
         if (PlayerRegistry.Instance != null)
         {
             foreach (GameObject playerObject in PlayerRegistry.Instance.GetAllPlayers().Values)
@@ -258,27 +266,75 @@ public class EnemyController : MonoBehaviour
                 if (distance < nearestDistance)
                 {
                     nearestDistance = distance;
-                    nearestAlly = playerObject.transform;
+                    nearestEntity = playerObject.transform;
                 }
             }
         }
 
-        float searchRadius = Mathf.Max(findDistance, selfDefenseRadius);
-        Collider[] hitTowers = Physics.OverlapSphere(transform.position, searchRadius);
+        // Fallback garantido caso o Registry demore a syncar o Host
+        GameObject[] fallbackPlayers = GameObject.FindGameObjectsWithTag("Player");
+        foreach (GameObject playerObject in fallbackPlayers)
+        {
+            if (playerObject == null || playerObject.CompareTag(TAG_POCA))
+                continue;
+
+            float distance = Vector3.Distance(transform.position, playerObject.transform.position);
+            if (distance < nearestDistance)
+            {
+                nearestDistance = distance;
+                nearestEntity = playerObject.transform;
+            }
+        }
+
+        // 2. Busca Torres (apenas dentro do allowedRadius para otimizar Physics)
+        Collider[] hitTowers = Physics.OverlapSphere(transform.position, allowedRadius);
         foreach (Collider col in hitTowers)
         {
-            if (col.CompareTag("Tower") || col.GetComponent<TowerController>() != null || col.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null)
+            if (col.GetComponent<TowerController>() != null || col.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null)
             {
                 float distance = Vector3.Distance(transform.position, col.transform.position);
                 if (distance < nearestDistance)
                 {
                     nearestDistance = distance;
-                    nearestAlly = col.transform;
+                    nearestEntity = col.transform;
                 }
             }
         }
 
-        return nearestAlly;
+        // 3. Decisão do Alvo
+        if (nearestEntity != null && nearestDistance <= allowedRadius)
+        {
+            if (target != nearestEntity)
+            {
+                // Novo alvo adquirido
+                target = nearestEntity;
+                initialChasePosition = transform.position;
+                currentChaseTimer = 0f;
+                SetAggroVisual(true);
+            }
+            else
+            {
+                // Mantém perseguição e aplica regras de tempo/distância máxima
+                currentChaseTimer += 0.3f;
+                float distanceTraveled = Vector3.Distance(transform.position, initialChasePosition);
+
+                if (currentChaseTimer >= maxChaseTime ||
+                    distanceTraveled >= maxChaseDistance ||
+                    nearestDistance > loseSightDistance)
+                {
+                    target = null;
+                    currentChaseTimer = 0f;
+                    SetAggroVisual(false);
+                }
+            }
+        }
+        else
+        {
+            // Ninguém dentro do allowedRadius
+            target = null;
+            currentChaseTimer = 0f;
+            SetAggroVisual(false);
+        }
     }
 
     private void PatrolTick()
@@ -320,6 +376,24 @@ public class EnemyController : MonoBehaviour
         Vector3 flatWaypoint = new Vector3(waypoint.position.x, 0f, waypoint.position.z);
         float distanceToWaypoint = Vector3.Distance(flatPosition, flatWaypoint);
 
+        if (currentPointIndex + 1 < patrolPoints.Count)
+        {
+            Transform nextWaypoint = patrolPoints[currentPointIndex + 1];
+            if (nextWaypoint != null)
+            {
+                Vector3 flatNextWaypoint = new Vector3(nextWaypoint.position.x, 0f, nextWaypoint.position.z);
+                float distanceToNextWaypoint = Vector3.Distance(flatPosition, flatNextWaypoint);
+
+                if (distanceToNextWaypoint < distanceToWaypoint)
+                {
+                    currentPointIndex++;
+                    waypoint = nextWaypoint;
+                    flatWaypoint = flatNextWaypoint;
+                    distanceToWaypoint = distanceToNextWaypoint;
+                }
+            }
+        }
+
         if (distanceToWaypoint <= 3f)
         {
             currentPointIndex++;
@@ -336,6 +410,7 @@ public class EnemyController : MonoBehaviour
 
         float speedMultiplier = statusController != null ? statusController.SpeedModifier : 1f;
         agent.speed = originalMoveSpeed * speedMultiplier;
+        agent.stoppingDistance = attackDistance;
 
         if (Vector3.Distance(targetPosition, lastDestinationSet) > 1.0f)
         {
@@ -376,7 +451,7 @@ public class EnemyController : MonoBehaviour
         if (currentTarget == null)
             return false;
 
-        return Vector3.Distance(transform.position, currentTarget.position) <= attackDistance;
+        return GetDistanceToTarget(currentTarget) <= attackDistance;
     }
 
     public bool IsTargetInDisengageRange(Transform targetOverride = null)
@@ -385,7 +460,18 @@ public class EnemyController : MonoBehaviour
         if (currentTarget == null)
             return false;
 
-        return Vector3.Distance(transform.position, currentTarget.position) <= disengageDistance;
+        return GetDistanceToTarget(currentTarget) <= disengageDistance;
+    }
+
+    private float GetDistanceToTarget(Transform targetTransform)
+    {
+        Collider targetCollider = targetTransform.GetComponentInChildren<Collider>();
+        if (targetCollider != null)
+        {
+            Vector3 closestPoint = targetCollider.ClosestPoint(transform.position);
+            return Vector3.Distance(transform.position, closestPoint);
+        }
+        return Vector3.Distance(transform.position, targetTransform.position);
     }
 
     public void HoldAttackPosition()

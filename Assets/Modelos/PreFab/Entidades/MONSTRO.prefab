@@ -1917,7 +1917,7 @@ Rigidbody:
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 1
-  m_IsKinematic: 0
+  m_IsKinematic: 1
   m_Interpolate: 0
   m_Constraints: 80
   m_CollisionDetection: 0
@@ -1933,13 +1933,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6a6d0951f3c04614cacc6bf8333be13c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  mainPriority: 1
+  mainPriority: 0
   findDistance: 15
-  attackDistance: 2
+  attackDistance: 5
   loseSightDistance: 25
   selfDefenseRadius: 5
   maxChaseTime: 10
   maxChaseDistance: 20
+  disengageDistance: 3
   aggroIndicatorVisual: {fileID: 2896903471347598868}
   originalMoveSpeed: 3.5
   IsDead: 0
@@ -2047,7 +2048,7 @@ NavMeshAgent:
   m_Acceleration: 8
   avoidancePriority: 50
   m_AngularSpeed: 120
-  m_StoppingDistance: 0
+  m_StoppingDistance: 4.8
   m_AutoTraverseOffMeshLink: 1
   m_AutoBraking: 1
   m_AutoRepath: 1

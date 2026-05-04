@@ -174,10 +174,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3035468913146140951, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_WarningMessage
-      value: "\nBinding warning: Some generic clip(s) animate transforms that are
-        already bound by a Humanoid avatar. These transforms can only be changed
-        by Humanoid clips.\n\tTransform 'spine'\n\tTransform 'spine.001'\n\tTransform
-        'spine'\n\tTransform 'spine.001'\n\tTransform 'spine'\n\tTransform 'spine.001'"
+      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 3205705750547484078, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: m_Materials.Array.size
@@ -328,6 +325,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 2682399473942067493, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 3254454128197330301}
+    - targetCorrespondingSourceObject: {fileID: 2682399473942067493, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 60269073879648645}
   m_SourcePrefab: {fileID: 100100000, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
 --- !u!1 &1325491475885760399 stripped
 GameObject:
@@ -418,6 +418,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b79657e49eccd0f4ebae13d0c0d67bb9, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!208 &60269073879648645
+NavMeshObstacle:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1325491475885760399}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Shape: 1
+  m_Extents: {x: 0.5, y: 1, z: 0.5}
+  m_MoveThreshold: 0.1
+  m_Carve: 1
+  m_CarveOnlyStationary: 1
+  m_Center: {x: 0, y: 0, z: 0}
+  m_TimeToStationary: 0.5
 --- !u!114 &1344477207999002983 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 2734900487233724365, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}

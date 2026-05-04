@@ -49,6 +49,7 @@ GameObject:
   - component: {fileID: -1791860694425721037}
   - component: {fileID: 314006566109750924}
   - component: {fileID: 3210992934624880515}
+  - component: {fileID: 6043082209739498597}
   m_Layer: 8
   m_Name: TorretaSamurai
   m_TagString: Untagged
@@ -235,7 +236,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 0
+  GlobalObjectIdHash: 2484139809
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -256,14 +257,37 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 271a053691a15b048a86dbc304328fd0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Type:
+  towerController: {fileID: 0}
+  BuilderClientId:
     m_InternalValue: 0
-  Level:
-    m_InternalValue: 1
-  Health:
-    m_InternalValue: 100
+  CharacterIndex:
+    m_InternalValue: -1
+  TotalCostSpent:
+    m_InternalValue: 0
+  DpsLevel:
+    m_InternalValue: 0
+  ControlLevel:
+    m_InternalValue: 0
+  SupportLevel:
+    m_InternalValue: 0
   IsActive:
     m_InternalValue: 1
+--- !u!208 &6043082209739498597
+NavMeshObstacle:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3333250326587255744}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Shape: 1
+  m_Extents: {x: 0.5, y: 0.5, z: 0.5}
+  m_MoveThreshold: 0.1
+  m_Carve: 1
+  m_CarveOnlyStationary: 1
+  m_Center: {x: 0, y: 0, z: 0}
+  m_TimeToStationary: 0.5
 --- !u!1 &6064600159238130718
 GameObject:
   m_ObjectHideFlags: 0
@@ -358,6 +382,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 7756684303358794162}
     m_Modifications:
+    - target: {fileID: 98002455548248229, guid: 5843ccbf567479e4dba9f61c4cc00bad, type: 3}
+      propertyPath: m_WarningMessage
+      value: 
+      objectReference: {fileID: 0}
     - target: {fileID: 6321928399093504735, guid: 5843ccbf567479e4dba9f61c4cc00bad, type: 3}
       propertyPath: m_LocalPosition.x
       value: -0.021544456

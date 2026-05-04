@@ -154,6 +154,10 @@ PrefabInstance:
       propertyPath: m_LocalPosition.y
       value: 1.641
       objectReference: {fileID: 0}
+    - target: {fileID: 4918446304132380940, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: mainPriority
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 6837223848380582383, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_Enabled
       value: 0
@@ -162,6 +166,10 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 78e5eef98eb411d41b1d3145e0b4c704, type: 2}
+    - target: {fileID: 7039939480628894558, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: m_IsKinematic
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8001866522814007648, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: deathVfxPrefab
       value: 
