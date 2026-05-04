@@ -9,6 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3175350371044582952}
+  - component: {fileID: 8554350085797067152}
   - component: {fileID: 7382248574386118403}
   m_Layer: 0
   m_Name: BuildManager
@@ -32,6 +33,27 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8554350085797067152
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1840008494478657899}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  GlobalObjectIdHash: 4021889263
+  InScenePlacedSourceGlobalObjectIdHash: 0
+  AlwaysReplicateAsRoot: 0
+  SynchronizeTransform: 1
+  ActiveSceneSynchronization: 0
+  SceneMigrationSynchronization: 1
+  SpawnWithObservers: 1
+  DontDestroyWithOwner: 0
+  AutoObjectParentSync: 1
 --- !u!114 &7382248574386118403
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -44,7 +66,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 968367f4e1f81284383328b14c0794dd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  thirdPersonCamera: {fileID: 0}
-  buildCamera: {fileID: 0}
-  buildUI: {fileID: 0}
-  currentBuildPrefab: {fileID: 0}
+  gridSize: 1
+  globalHeightOffset: 0.5
+  validPlacementMaterial: {fileID: 0}
+  invalidPlacementMaterial: {fileID: 0}
+  spawnBeamVfxPrefab: {fileID: 0}
+  buildablePrefabs: []
+  availableTraps: []
+  playableAreaBounds: {fileID: 0}

@@ -72,6 +72,8 @@ public class LobbySceneUI : MonoBehaviour
     private bool   _isCreatingLobby = false;
     private Coroutine _createTimeoutCoroutine;
 
+    public GameObject Copiar;
+
     private static readonly string[] _charNames = { "Coruja", "Samurai" };
 
     private LobbyManager     _lobby;
@@ -84,7 +86,7 @@ public class LobbySceneUI : MonoBehaviour
     private void Awake()
     {
         _lobby = LobbyManager.Instance;
-        _auth  = EOSAuthenticator.Instance;
+        _auth = EOSAuthenticator.Instance;
         AutoDetectElements();
     }
 
@@ -418,6 +420,18 @@ public class LobbySceneUI : MonoBehaviour
     {
         GUIUtility.systemCopyBuffer = _lobbyId;
         SetStatus("ID copiado para a área de transferência!");
+    }
+
+    public void Copiado()
+    {
+        if (Copiar == false)
+        {
+            Copiar.SetActive(true);
+        }
+        if (Copiar == true)
+        {
+            Copiar.SetActive(false);
+        }
     }
 
     public void AbrirModoHost()    => SetState(State.HostConfig);
