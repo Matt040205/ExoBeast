@@ -2434,43 +2434,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 3989353761819456513, guid: 09d737f3dfb099d43839309628bd5bb7, type: 3}
   m_PrefabInstance: {fileID: 164011954}
   m_PrefabAsset: {fileID: 0}
---- !u!84 &165543658
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 512
-  m_Height: 512
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 94
-  m_ColorFormat: 4
-  m_MipMap: 0
-  m_GenerateMips: 1
-  m_SRGB: 1
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 2
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &170407293
 GameObject:
   m_ObjectHideFlags: 0
@@ -14946,52 +14909,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5200191624368517695, guid: 7a00e99003217b1468195af973840aaf, type: 3}
   m_PrefabInstance: {fileID: 896886222}
   m_PrefabAsset: {fileID: 0}
---- !u!21 &911037376
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: ShaderGrass(Clone)
-  m_Shader: {fileID: -6465566751694194690, guid: c1998fd2a7a6e654e84504d5d3d130c0, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses:
-  - MOTIONVECTORS
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - unity_Lightmaps:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - unity_LightmapsInd:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - unity_ShadowMasks:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _Blend: 1
-    - _BlendMult: 1
-    - _BlendOff: 0
-    - _QueueControl: 0
-    - _QueueOffset: 0
-    m_Colors: []
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1001 &914432579
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -17239,13 +17156,13 @@ LineRenderer:
   m_SortingOrder: 0
   m_Positions:
   - {x: 46.9655, y: 32.710968, z: -0.7076678}
-  - {x: 49.78112, y: 32.41763, z: -2.5946634}
-  - {x: 52.596737, y: 32.22225, z: -4.481659}
-  - {x: 55.412357, y: 32.124832, z: -6.3686543}
-  - {x: 58.227978, y: 32.12537, z: -8.25565}
-  - {x: 61.0436, y: 32.223866, z: -10.142645}
-  - {x: 63.859215, y: 32.420326, z: -12.02964}
-  - {x: 66.674835, y: 32.71474, z: -13.9166355}
+  - {x: 49.499283, y: 32.415524, z: 2.1728387}
+  - {x: 52.033062, y: 32.21804, z: 5.053345}
+  - {x: 54.566845, y: 32.118515, z: 7.9338517}
+  - {x: 57.100628, y: 32.116947, z: 10.814359}
+  - {x: 59.63441, y: 32.213337, z: 13.694865}
+  - {x: 62.16819, y: 32.407692, z: 16.57537}
+  - {x: 64.70197, y: 32.7, z: 19.455877}
   m_Parameters:
     serializedVersion: 3
     widthMultiplier: 9.91144
@@ -17881,7 +17798,7 @@ MonoBehaviour:
   m_OverrideVoxelSize: 0
   m_VoxelSize: 0.1
   m_MinRegionArea: 2
-  m_NavMeshData: {fileID: 23800000, guid: 4600e1b8a5ced754cb800de2a21d0b96, type: 2}
+  m_NavMeshData: {fileID: 23800000, guid: 8955094384202cf4796c846b98a1163d, type: 2}
   m_BuildHeightMesh: 0
 --- !u!4 &1091759512
 Transform:
@@ -24506,7 +24423,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0.7071068, y: -0, z: -0, w: 0.7071068}
   m_LocalPosition: {x: 71.81961, y: 6.0599403, z: 46.909775}
-  m_LocalScale: {x: 1, y: 1.0000148, z: 1.0000148}
+  m_LocalScale: {x: 1, y: 1.0000153, z: 1.0000153}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1676059913}
@@ -24604,7 +24521,7 @@ Camera:
     serializedVersion: 2
     m_Bits: 1024
   m_RenderingPath: -1
-  m_TargetTexture: {fileID: 165543658}
+  m_TargetTexture: {fileID: 1754217712}
   m_TargetDisplay: 0
   m_TargetEye: 3
   m_HDR: 1
@@ -42454,7 +42371,7 @@ MonoBehaviour:
     normal: {x: 0.21948823, y: 0.9754437, z: 0.018290687}
     length: {x: 2, y: 0.65}
     color: {x: 0.2651599, y: 0.9596323, z: 0.24732204}
-  m_InstantiatedMaterial: {fileID: 911037376}
+  m_InstantiatedMaterial: {fileID: 1724054676}
 --- !u!4 &1618611989
 Transform:
   m_ObjectHideFlags: 0
@@ -44422,6 +44339,52 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6487878161993209078, guid: 394fb5766b7cc344ba8dae2069b6b779, type: 3}
   m_PrefabInstance: {fileID: 1720736291}
   m_PrefabAsset: {fileID: 0}
+--- !u!21 &1724054676
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ShaderGrass(Clone)
+  m_Shader: {fileID: -6465566751694194690, guid: c1998fd2a7a6e654e84504d5d3d130c0, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses:
+  - MOTIONVECTORS
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Blend: 1
+    - _BlendMult: 1
+    - _BlendOff: 0
+    - _QueueControl: 0
+    - _QueueOffset: 0
+    m_Colors: []
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1001 &1729343447
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -46624,6 +46587,43 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 293870080f63b15489ab9c3f0ede5a7c, type: 3}
   m_PrefabInstance: {fileID: 1753775669}
   m_PrefabAsset: {fileID: 0}
+--- !u!84 &1754217712
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 512
+  m_Height: 512
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 94
+  m_ColorFormat: 4
+  m_MipMap: 0
+  m_GenerateMips: 1
+  m_SRGB: 1
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 2
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1001 &1761637320
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -48519,6 +48519,14 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 173164125}
     m_Modifications:
+    - target: {fileID: 3303487678704238432, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
+      propertyPath: GlobalObjectIdHash
+      value: 3670138128
+      objectReference: {fileID: 0}
+    - target: {fileID: 3303487678704238432, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
+      propertyPath: InScenePlacedSourceGlobalObjectIdHash
+      value: 2850706630
+      objectReference: {fileID: 0}
     - target: {fileID: 5095032750535142668, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
       propertyPath: m_LocalScale.x
       value: -330.69
@@ -48582,60 +48590,13 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 5620177763568760758, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1865175765}
-    - targetCorrespondingSourceObject: {fileID: 5620177763568760758, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1865175766}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
 --- !u!4 &1865175763 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 5095032750535142668, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
   m_PrefabInstance: {fileID: 1865175762}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &1865175764 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 5620177763568760758, guid: 4d6eda6278c9b714abf504c5aac9350c, type: 3}
-  m_PrefabInstance: {fileID: 1865175762}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &1865175765
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1865175764}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 3095827193
-  InScenePlacedSourceGlobalObjectIdHash: 0
-  AlwaysReplicateAsRoot: 0
-  SynchronizeTransform: 1
-  ActiveSceneSynchronization: 0
-  SceneMigrationSynchronization: 1
-  SpawnWithObservers: 1
-  DontDestroyWithOwner: 0
-  AutoObjectParentSync: 1
---- !u!114 &1865175766
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1865175764}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: da307db2cd14df84cabfc9afd851dc47, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  maxHealth: 100
-  currentHealth:
-    m_InternalValue: 100
 --- !u!1001 &1865936085
 PrefabInstance:
   m_ObjectHideFlags: 0

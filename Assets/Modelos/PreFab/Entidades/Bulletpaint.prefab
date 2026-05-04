@@ -291,7 +291,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   speed: 80
   maxLifetime: 10
-  impactEffectPrefab: {fileID: 0}
+  defaultImpactEffectPrefab: {fileID: 0}
+  characterImpactEffects:
+  - characterName: Polvo
+    impactPrefab: {fileID: 0}
 --- !u!114 &-6298404914876989763
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -290,4 +290,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   speed: 80
   maxLifetime: 10
-  impactEffectPrefab: {fileID: 0}
+  defaultImpactEffectPrefab: {fileID: 0}
+  characterImpactEffects:
+  - characterName: Raposa
+    impactPrefab: {fileID: 7915983778938240472, guid: 64735ead15d82b645969d3e503653157, type: 3}
