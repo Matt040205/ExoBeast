@@ -84,7 +84,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8987182849631250749, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 733047146
+      value: 3597747980
       objectReference: {fileID: 0}
     - target: {fileID: 366370626998246806, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_Name
@@ -164,8 +164,32 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 1035349113437046572, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       insertIndex: -1
       addedObject: {fileID: 2008918008450946219}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 366370626998246806, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: -351768046941554558}
   m_SourcePrefab: {fileID: 100100000, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+--- !u!1 &7123626439960702019 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 366370626998246806, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+  m_PrefabInstance: {fileID: 7478694086274068949}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &-351768046941554558
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7123626439960702019}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3bd6da05a9095d24b9c5fc8dc05a2518, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bleedDamagePerTick: 5
+  bleedTickInterval: 1
+  bleedDuration: 5
+  maxBleedStacks: 3
 --- !u!4 &7608800980355806969 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1035349113437046572, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}

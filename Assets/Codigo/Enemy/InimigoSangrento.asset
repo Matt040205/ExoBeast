@@ -10,18 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b99c2fcabcc0ff9418ea43cf94220c11, type: 3}
-  m_Name: InimigoRanged
+  m_Name: InimigoSangrento
   m_EditorClassIdentifier: 
-  enemyPrefab: {fileID: 8676188461304220958, guid: e246350e14706304a82d941bf54faf0c, type: 3}
+  enemyPrefab: {fileID: 7123626439960702019, guid: 504da9bc40ab18f4a87b5624850dd64b, type: 3}
   enemyType: 0
-  baseHP: 90
-  baseATQ: 6
-  moveSpeed: 2
+  baseHP: 80
+  baseATQ: 8
+  moveSpeed: 3
   attackSpeed: 1
   baseArmor: 0
   hpPerLevel: 10
   atqPerLevel: 2
   speedPerLevel: 0.5
   armorPerLevel: 0.01
-  geoditasOnDeath: 40
+  geoditasOnDeath: 1
   etherDropChance: 0.1

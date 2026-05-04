@@ -292,7 +292,7 @@ public class EnemyController : MonoBehaviour
         {
             if (col.GetComponent<TowerController>() != null || col.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null)
             {
-                float distance = Vector3.Distance(transform.position, col.transform.position);
+                float distance = GetDistanceToTarget(col.transform);
                 if (distance < nearestDistance)
                 {
                     nearestDistance = distance;
@@ -373,46 +373,34 @@ public class EnemyController : MonoBehaviour
         }
 
         Vector3 flatPosition = new Vector3(transform.position.x, 0f, transform.position.z);
-        Vector3 flatWaypoint = new Vector3(waypoint.position.x, 0f, waypoint.position.z);
+        Vector3 flatWaypoint  = new Vector3(waypoint.position.x, 0f, waypoint.position.z);
         float distanceToWaypoint = Vector3.Distance(flatPosition, flatWaypoint);
 
-        if (currentPointIndex + 1 < patrolPoints.Count)
-        {
-            Transform nextWaypoint = patrolPoints[currentPointIndex + 1];
-            if (nextWaypoint != null)
-            {
-                Vector3 flatNextWaypoint = new Vector3(nextWaypoint.position.x, 0f, nextWaypoint.position.z);
-                float distanceToNextWaypoint = Vector3.Distance(flatPosition, flatNextWaypoint);
-
-                if (distanceToNextWaypoint < distanceToWaypoint)
-                {
-                    currentPointIndex++;
-                    waypoint = nextWaypoint;
-                    flatWaypoint = flatNextWaypoint;
-                    distanceToWaypoint = distanceToNextWaypoint;
-                }
-            }
-        }
-
-        if (distanceToWaypoint <= 3f)
+        // Avança para o próximo waypoint apenas quando chegou perto o suficiente do atual.
+        // REMOVIDO: a lógica que comparava distâncias com o próximo ponto causava
+        // skip de waypoints — o inimigo pulava pontos no meio do caminho.
+        if (distanceToWaypoint <= 1.2f)
         {
             currentPointIndex++;
             return;
         }
 
-        MoveTowardsPositionTick(waypoint.position);
+        MoveTowardsPositionTick(waypoint.position, isPatrol: true);
     }
 
-    private void MoveTowardsPositionTick(Vector3 targetPosition)
+    private void MoveTowardsPositionTick(Vector3 targetPosition, bool isPatrol = false)
     {
         if (agent == null || !agent.enabled || !agent.isOnNavMesh)
             return;
 
         float speedMultiplier = statusController != null ? statusController.SpeedModifier : 1f;
         agent.speed = originalMoveSpeed * speedMultiplier;
-        agent.stoppingDistance = attackDistance;
 
-        if (Vector3.Distance(targetPosition, lastDestinationSet) > 1.0f)
+        // Durante a patrulha o agente não deve parar antes dos waypoints.
+        // Durante o combate usa attackDistance para parar na distância correta.
+        agent.stoppingDistance = isPatrol ? 0f : attackDistance;
+
+        if (Vector3.Distance(targetPosition, lastDestinationSet) > 0.5f)
         {
             agent.SetDestination(targetPosition);
             lastDestinationSet = targetPosition;
@@ -465,13 +453,11 @@ public class EnemyController : MonoBehaviour
 
     private float GetDistanceToTarget(Transform targetTransform)
     {
-        Collider targetCollider = targetTransform.GetComponentInChildren<Collider>();
-        if (targetCollider != null)
-        {
-            Vector3 closestPoint = targetCollider.ClosestPoint(transform.position);
-            return Vector3.Distance(transform.position, closestPoint);
-        }
-        return Vector3.Distance(transform.position, targetTransform.position);
+        // Ignora a altura (Y) para não inflar a distância quando o pivot do jogador
+        // está mais alto (ex: no peito) e o inimigo está no chão.
+        Vector3 flatSelf = new Vector3(transform.position.x, 0f, transform.position.z);
+        Vector3 flatTarget = new Vector3(targetTransform.position.x, 0f, targetTransform.position.z);
+        return Vector3.Distance(flatSelf, flatTarget);
     }
 
     public void HoldAttackPosition()

@@ -40,17 +40,34 @@ public class EnemyCombatSystem : NetworkBehaviour
         base.OnNetworkSpawn();
 
         enemyController = GetComponent<EnemyController>();
-        if (!IsServer)
+
+        if (IsServer)
+        {
+            // Re-habilita caso tenha sido desativado em uma vida anterior do pool
+            enabled = true;
+        }
+        else
         {
             enabled = false;
-            return;
         }
     }
 
     public void InitializeCombat(EnemyDataSO data, int nivel)
     {
-        if (!IsServer)
+        // Garante que a referência ao controller existe (essencial para inimigos reciclados do pool)
+        if (enemyController == null)
+            enemyController = GetComponent<EnemyController>();
+
+        // Re-habilita o componente caso tenha sido desativado em um ciclo anterior
+        if (!enabled)
+            enabled = true;
+
+        // Em modo rede, apenas o servidor processa combate
+        if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsServer)
+        {
+            enabled = false;
             return;
+        }
 
         enemyData = data;
         if (enemyData == null)
@@ -67,77 +84,72 @@ public class EnemyCombatSystem : NetworkBehaviour
 
     private void Update()
     {
-        if (!IsServer || enemyController == null || enemyController.IsDead || enemyData == null)
+        if (enemyController == null)
+            enemyController = GetComponent<EnemyController>();
+
+        if (enemyController == null || enemyController.IsDead || enemyData == null)
+            return;
+
+        if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsServer)
             return;
 
         Transform currentTarget = enemyController.Target;
-        bool hasValidTarget = currentTarget != null && (currentTarget.CompareTag("Player") || currentTarget.GetComponent<TowerController>() != null || currentTarget.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null);
 
-        if (!hasValidTarget)
+        if (currentTarget == null)
         {
             ResetAttackState();
             return;
         }
 
-        bool inRange = false;
-        if (attackState != AttackState.Idle)
+        // Se já tem uma coroutine rodando, não interfere —
+        // a coroutine gerencia o próprio ciclo via CanContinueAttacking.
+        if (attackCoroutine != null)
         {
-            inRange = enemyController.IsTargetInDisengageRange(currentTarget);
-        }
-        else
-        {
-            inRange = enemyController.IsTargetInAttackRange(currentTarget);
-        }
-
-        if (!inRange)
-        {
-            ResetAttackState();
+            enemyController.HoldAttackPosition();
             return;
         }
+
+        if (!IsValidCombatTarget(currentTarget))
+            return;
+
+        // Só verifica range para INICIAR um novo ciclo
+        if (!enemyController.IsTargetInAttackRange(currentTarget))
+            return;
 
         enemyController.HoldAttackPosition();
-
-        if (attackCoroutine == null)
-            attackCoroutine = StartCoroutine(AttackCycle(currentTarget));
+        attackCoroutine = StartCoroutine(AttackCycle(currentTarget));
     }
 
     private IEnumerator AttackCycle(Transform initialTarget)
     {
-        Debug.Log($"[EnemyCombatSystem] Entrou no Range contra {initialTarget.name}. Iniciando ciclo de ataque.");
         Transform trackedTarget = initialTarget;
 
         while (CanContinueAttacking(trackedTarget))
         {
-            Debug.Log("[EnemyCombatSystem] Cooldown Liberado. Disparando animacao de ataque.");
             attackState = AttackState.Windup;
 
             PlayAttackAnimationClientRpc();
 
             yield return new WaitForSeconds(timeToDamage);
 
-            if (!CanContinueAttacking(trackedTarget))
-            {
-                Debug.Log("[EnemyCombatSystem] Alvo saiu do range ou morreu durante o Windup. Abortando aplicacao do dano.");
+            // Após o windup, só aborta se o inimigo MORREU.
+            // Se o alvo saiu do range, o golpe sai mesmo assim (commit to attack).
+            if (enemyController == null || enemyController.IsDead)
                 break;
-            }
 
-            Debug.Log("[EnemyCombatSystem] Tempo de Windup (timeToDamage) concluido. Processando VFX e Dano.");
             TriggerAttackVfx(trackedTarget.position);
             ProcessAttack(trackedTarget);
 
             attackState = AttackState.Recover;
             float cooldown = enemyData.attackSpeed > 0f ? 1f / enemyData.attackSpeed : 1f;
-            Debug.Log($"[EnemyCombatSystem] Entrando em cooldown de {cooldown} segundos.");
-            
             yield return new WaitForSeconds(cooldown);
 
             trackedTarget = enemyController.Target;
         }
 
-        Debug.Log("[EnemyCombatSystem] Ciclo de ataque quebrado. Alvo fora de alcance ou morto. Retomando patrulha/perseguição.");
         attackState = AttackState.Idle;
         attackCoroutine = null;
-        
+
         if (enemyController != null)
             enemyController.ResumeMovement();
     }
@@ -162,14 +174,46 @@ public class EnemyCombatSystem : NetworkBehaviour
             return false;
 
         Transform currentTarget = enemyController.Target;
-        if (currentTarget == null || currentTarget != trackedTarget)
+        if (currentTarget == null)
             return false;
 
-        bool isValid = currentTarget.CompareTag("Player") || currentTarget.GetComponent<TowerController>() != null || currentTarget.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null;
-        if (!isValid)
+        // Compara o GameObject raiz para não quebrar se o target foi refreshado
+        // para o mesmo jogador (ex: IA tick atualizou a referência)
+        GameObject currentRoot = currentTarget.root.gameObject;
+        GameObject trackedRoot = trackedTarget.root.gameObject;
+        if (currentRoot != trackedRoot)
             return false;
 
-        return enemyController.IsTargetInDisengageRange(currentTarget);
+        if (!IsValidCombatTarget(currentTarget))
+            return false;
+
+        // CORREÇÃO: usa IsTargetInAttackRange (não disengageRange que era 3u enquanto
+        // o ataque iniciava a 16u — causava o while sair imediatamente todo frame).
+        // O disengageDistance é para o EnemyController decidir quando PARAR de perseguir,
+        // não para o CombatSystem decidir quando continuar atacando.
+        return enemyController.IsTargetInAttackRange(currentTarget);
+    }
+
+    /// <summary>
+    /// Verifica se um Transform é um alvo válido de combate,
+    /// subindo e descendo na hierarquia (essencial para CharacterController).
+    /// </summary>
+    private bool IsValidCombatTarget(Transform t)
+    {
+        if (t == null) return false;
+
+        // Checa jogador: sobe na hierarquia para encontrar PlayerHealthSystem
+        if (t.GetComponentInParent<PlayerHealthSystem>() != null) return true;
+        if (t.GetComponentInChildren<PlayerHealthSystem>() != null) return true;
+
+        // Checa torre
+        if (t.GetComponentInParent<TowerController>() != null) return true;
+        if (t.GetComponentInChildren<TowerController>() != null) return true;
+
+        // Checa NetworkedBuilding
+        if (t.GetComponentInParent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null) return true;
+
+        return false;
     }
 
     private void TriggerAttackVfx(Vector3 targetPos)
@@ -198,14 +242,17 @@ public class EnemyCombatSystem : NetworkBehaviour
         if (enemyController.IsBlinded && Random.value < 0.8f)
             return;
 
-        // Garante dano no alvo principal travado ignorando físicas que poderiam falhar
+        // Dano imediato do golpe
         DealDamageToTarget(targetTransform);
+
+        // Sangramento: aplicado se o inimigo tiver o componente EnemyBleedAttack
+        EnemyBleedAttack bleed = GetComponent<EnemyBleedAttack>();
+        if (bleed != null)
+            bleed.ApplyBleed(targetTransform);
 
         // Se for melee, também espalha o dano em área para quem estiver perto
         if (enemyData.enemyType != EnemyType.Voador)
-        {
             ApplyDamageInArea(targetTransform);
-        }
     }
 
     private void DealDamageToTarget(Transform targetTransform)
@@ -215,26 +262,33 @@ public class EnemyCombatSystem : NetworkBehaviour
             Debug.LogWarning("[EnemyCombatSystem] Alvo nulo na hora do dano.");
             return;
         }
-        
+
+        // CharacterController: PlayerHealthSystem pode estar no pai, no próprio objeto ou num filho.
+        // Sempre busca em toda a hierarquia para não depender da estrutura exata do prefab.
         PlayerHealthSystem playerHealth = targetTransform.GetComponent<PlayerHealthSystem>();
+        if (playerHealth == null) playerHealth = targetTransform.GetComponentInParent<PlayerHealthSystem>();
+        if (playerHealth == null) playerHealth = targetTransform.GetComponentInChildren<PlayerHealthSystem>();
+
         if (playerHealth != null)
         {
-            Debug.Log($"[EnemyCombatSystem] Dano Aplicado ao Player ({targetTransform.name}).");
+            Debug.Log($"[EnemyCombatSystem] Dano Aplicado ao Player ({playerHealth.gameObject.name}). Dano={currentDamage}");
             playerHealth.TakeDamage(currentDamage, transform, enemyData.enemyType != EnemyType.Voador);
+            return;
         }
-        else
+
+        // Checa torre
+        TowerController tower = targetTransform.GetComponent<TowerController>();
+        if (tower == null) tower = targetTransform.GetComponentInParent<TowerController>();
+        if (tower == null) tower = targetTransform.GetComponentInChildren<TowerController>();
+
+        if (tower != null)
         {
-            TowerController tower = targetTransform.GetComponent<TowerController>();
-            if (tower != null)
-            {
-                Debug.Log($"[EnemyCombatSystem] Dano Aplicado a Torre ({targetTransform.name}).");
-                tower.TakeDamage(currentDamage);
-            }
-            else
-            {
-                Debug.LogWarning($"[EnemyCombatSystem] Alvo ({targetTransform.name}) nao possui componente de vida reconhecido. Dano ignorado.");
-            }
+            Debug.Log($"[EnemyCombatSystem] Dano Aplicado a Torre ({tower.gameObject.name}). Dano={currentDamage}");
+            tower.TakeDamage(currentDamage);
+            return;
         }
+
+        Debug.LogWarning($"[EnemyCombatSystem] Alvo '{targetTransform.name}' (root='{targetTransform.root.name}') nao possui PlayerHealthSystem nem TowerController em toda a hierarquia. Dano ignorado.");
     }
 
     private void ApplyDamageInArea(Transform excludeTarget)
