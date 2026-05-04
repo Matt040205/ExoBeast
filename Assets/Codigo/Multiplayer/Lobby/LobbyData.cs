@@ -35,7 +35,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             hostDisplayName = "Host";
             currentPlayers = 0;
             maxPlayers = 4;
-            mapName = "CenaMapaTeste";
+            mapName = "CenaMapaNOVO";
             isPublic = true;
             state = LobbyState.WaitingForPlayers;
         }
@@ -99,14 +99,14 @@ namespace ExoBeasts.Multiplayer.Lobby
         public string lobbyName;
         public int maxPlayers = 4;
         public bool isPublic = true;
-        public string mapName = "CenaMapaTeste";
+        public string mapName = "CenaMapaNOVO";
 
         public LobbySettings()
         {
             lobbyName = "Sala do Jogador";
             maxPlayers = 4;
             isPublic = true;
-            mapName = "CenaMapaTeste";
+            mapName = "CenaMapaNOVO";
         }
     }
 

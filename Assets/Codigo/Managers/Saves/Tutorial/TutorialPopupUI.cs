@@ -60,7 +60,7 @@ public class TutorialPopupUI : MonoBehaviour
             tutorialPopupPanel.SetActive(false);
 
         string cenaAtual = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-        if (cenaAtual == "CenaMapaTeste" && !BuildManager.isBuildingMode)
+        if (cenaAtual == "CenaMapaNOVO" && !BuildManager.isBuildingMode)
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;

@@ -200,7 +200,7 @@ namespace ExoBeasts.Multiplayer.Sync
                 {
                     Debug.LogError(
                         "[PlayerNetworkSetup] Timeout aguardando PlayerIdentityBridge spawnar. " +
-                        "Verifique se o NetworkObject esta presente em CenaMapaTeste. " +
+                        "Verifique se o NetworkObject esta presente em CenaMapaNOVO. " +
                         "Identidade EOS nao sera vinculada ao clientId.");
                     yield break;
                 }

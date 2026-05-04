@@ -310,7 +310,7 @@ namespace ExoBeasts.Multiplayer.Testing
                         lobbyName  = string.IsNullOrWhiteSpace(_newLobbyName) ? "Minha Sala" : _newLobbyName,
                         maxPlayers = _newMaxPlayers,
                         isPublic   = true,
-                        mapName    = "CenaMapaTeste",
+                        mapName    = "CenaMapaNOVO",
                     });
                     _showCreate = false;
                 }

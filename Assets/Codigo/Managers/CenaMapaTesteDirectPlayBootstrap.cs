@@ -137,7 +137,7 @@ namespace ExoBeasts.Managers
             NetworkManager networkManager = NetworkManager.Singleton;
             if (networkManager == null)
             {
-                Debug.LogError("[CenaMapaTesteDirectPlayBootstrap] NetworkManager.Singleton nao encontrado em CenaMapaTeste.");
+                Debug.LogError("[CenaMapaTesteDirectPlayBootstrap] NetworkManager.Singleton nao encontrado em CenaMapaNOVO.");
                 yield break;
             }
 
@@ -151,7 +151,7 @@ namespace ExoBeasts.Managers
                 yield break;
             }
 
-            Debug.Log("[CenaMapaTesteDirectPlayBootstrap] Host local iniciado para play direto em CenaMapaTeste.");
+            Debug.Log("[CenaMapaTesteDirectPlayBootstrap] Host local iniciado para play direto em CenaMapaNOVO.");
         }
 
         private bool IsCharacterResolvable(GameDataManager dataManager, CharacterBase character)

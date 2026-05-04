@@ -35,7 +35,7 @@ public class SelecaoManager : NetworkBehaviour
     public Transform gridEquipeContainer;
     public Button botaoJogar;
     public Toggle togglePronto;
-    public string nomeDaCenaDoJogo = "CenaMapaTeste";
+    public string nomeDaCenaDoJogo = "CenaMapaNOVO";
 
     [Header("Lista de Jogadores da Sala")]
     public GameObject painelJogadoresLobby; // O painel base que contém a lista
