@@ -28,7 +28,7 @@ public class PreyMarkBehavior : TowerBehavior
 
     private void HandleTowerAttack(EnemyHealthSystem target)
     {
-        if (target != null)
+        if (target != null && target.gameObject.activeInHierarchy)
         {
             target.ApplyMarkedStatus(1.0f + damageBonusToMarked, markDuration);
         }

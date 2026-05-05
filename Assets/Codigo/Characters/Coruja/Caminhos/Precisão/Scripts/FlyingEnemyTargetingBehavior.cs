@@ -21,10 +21,4 @@ public class FlyingEnemyTargetingBehavior : TowerBehavior
         if (owner != null)
             owner.TargetsFlyingEnemies = true;
     }
-
-    private void OnDestroy()
-    {
-        if (towerOwner != null)
-            towerOwner.TargetsFlyingEnemies = false;
-    }
 }

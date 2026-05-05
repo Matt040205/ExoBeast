@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using System.Collections.Generic;
 
 public enum StatType { Damage, AttackSpeed, Range, Armor, CritChance, CritDamage, ArmorPenetration }
@@ -15,7 +15,7 @@ public struct StatModifier
 [CreateAssetMenu(fileName = "Novo Upgrade", menuName = "ScriptableObjects/Trilhas/Nivel")]
 public class Upgrade : ScriptableObject
 {
-    [Header("Informações do Upgrade")]
+    [Header("Informacoes do Upgrade")]
     public string upgradeName;
     [TextArea] public string description;
 
@@ -23,10 +23,10 @@ public class Upgrade : ScriptableObject
     public int geoditeCost;
     public int darkEtherCost;
 
-    [Header("Bônus de Status Simples")]
+    [Header("Bonus de Status Simples")]
     public List<StatModifier> modifiers;
 
     [Header("Comportamento Especial Desbloqueado")]
-    [Tooltip("Arraste o PREFAB do comportamento que este upgrade desbloqueia.")]
-    public TowerBehavior behaviorToUnlock;
+    [Tooltip("Arraste o PREFAB (GameObject) do comportamento que este upgrade desbloqueia.")]
+    public GameObject behaviorToUnlock;
 }

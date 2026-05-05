@@ -127,6 +127,7 @@ public class TowerController : MonoBehaviour
 
         CurrentRange = towerData.attackRange;
         IsDestroyed = false;
+        TargetsFlyingEnemies = false;
     }
 
     // --- MUDANÃ‡A IMPORTANTE AQUI ---
@@ -147,16 +148,20 @@ public class TowerController : MonoBehaviour
         // 2. Desbloqueia Comportamentos Extras (Se houver)
         if (upgradeToApply.behaviorToUnlock != null)
         {
-            GameObject behaviorObject = Instantiate(upgradeToApply.behaviorToUnlock.gameObject, transform);
+            GameObject behaviorObject = Instantiate(upgradeToApply.behaviorToUnlock, transform);
             TowerBehavior newBehavior = behaviorObject.GetComponent<TowerBehavior>();
             if (newBehavior != null)
             {
                 newBehavior.Initialize(this);
                 activeBehaviors.Add(newBehavior);
             }
+            else
+            {
+                Debug.LogError($"[Upgrade] ERRO: Prefab '{upgradeToApply.behaviorToUnlock.name}' NAO tem TowerBehavior na raiz!");
+            }
         }
 
-        // 3. Incrementa o nÃ­vel na base da torre para UI funcionar
+        // 3. Incrementa o nivel na base da torre para UI funcionar
         if (path == TowerPath.DPS) currentPathLevels[0]++;
         else if (path == TowerPath.Control) currentPathLevels[1]++;
         else if (path == TowerPath.Support) currentPathLevels[2]++;

@@ -25,9 +25,21 @@ public class DragonPatrolBehavior : MonoBehaviour
 
         if (agent != null)
         {
-            agent.speed = moveSpeed;
-            // Para antes de encostar, pra bater no range
-            agent.stoppingDistance = (tower != null ? tower.CurrentRange * 0.8f : 1.5f); 
+            // Validação de NavMesh: Se a torre foi construída em um Node sem NavMesh (ex: quadrado rosa fora da malha)
+            // o agente iria teleportar pro ponto válido mais próximo (ex: o rio/rua).
+            // Para evitar o teleporte bizarro, desligamos o agente se não houver NavMesh perto.
+            NavMeshHit hit;
+            if (NavMesh.SamplePosition(homePosition, out hit, 2.0f, NavMesh.AllAreas))
+            {
+                agent.Warp(hit.position);
+                agent.speed = moveSpeed;
+                agent.stoppingDistance = (tower != null ? tower.CurrentRange * 0.8f : 1.5f); 
+            }
+            else
+            {
+                Debug.LogWarning($"[DragonPatrol] Construído muito longe do NavMesh! Desativando patrulha na torre {gameObject.name}.");
+                agent.enabled = false;
+            }
         }
     }
 
@@ -36,6 +48,20 @@ public class DragonPatrolBehavior : MonoBehaviour
         if (tower == null || agent == null || !agent.isOnNavMesh) return;
 
         Transform chaseTarget = tower.TargetEnemy;
+
+        // Se o alvo morreu ou sumiu, anula para nao seguir para o Pooling
+        if (chaseTarget != null)
+        {
+            EnemyHealthSystem ehsTarget = chaseTarget.GetComponent<EnemyHealthSystem>();
+            if (ehsTarget != null && ehsTarget.isDead)
+            {
+                chaseTarget = null;
+            }
+            else if (!chaseTarget.gameObject.activeInHierarchy)
+            {
+                chaseTarget = null;
+            }
+        }
 
         // Se o Tower nao achou ninguem porque esta muito longe, o Radar de Patrulha procura
         if (chaseTarget == null)
@@ -70,11 +96,15 @@ public class DragonPatrolBehavior : MonoBehaviour
             }
         }
 
+        // Deixa a TowerController cuidar da rotação fina se tiver alvo
+        agent.updateRotation = (chaseTarget == null);
+
+        float dragonDistToHome = Vector3.Distance(homePosition, transform.position);
+
         if (chaseTarget != null)
         {
-            // Se o inimigo fugiu ou a torre perseguiu pra fora do raio MAXIMO
-            float distToHome = Vector3.Distance(homePosition, chaseTarget.position);
-            if (distToHome > patrolVisionRadius * 1.5f) 
+            // Se o dragao foi longe demais da base, forca a volta
+            if (dragonDistToHome > patrolVisionRadius) 
             {
                 agent.SetDestination(homePosition);
             }
@@ -85,7 +115,15 @@ public class DragonPatrolBehavior : MonoBehaviour
         }
         else
         {
-            agent.SetDestination(homePosition);
+            // Voltar base
+            if (dragonDistToHome > 0.5f)
+            {
+                agent.SetDestination(homePosition);
+            }
+            else
+            {
+                agent.ResetPath(); // Para evitar andar no mesmo lugar
+            }
         }
     }
 
