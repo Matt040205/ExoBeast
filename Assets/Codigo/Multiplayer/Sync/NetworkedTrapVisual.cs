@@ -70,7 +70,11 @@ namespace ExoBeasts.Multiplayer.Sync
 
         public void InitializeServer(ulong builderClientId, int trapIndex, ulong logicObjectId)
         {
-            if (!IsServer)
+            // REGRA DE OURO NGO: NUNCA usar `IsServer` herdado em métodos chamados ANTES de Spawn().
+            // IsServer = IsSpawned && NetworkManager.IsServer — antes de Spawn() retorna FALSE
+            // mesmo no servidor. Use NetworkManager.Singleton.IsServer diretamente.
+            // Sem isso: NetworkVariables ficam em defaults → buildLimit ignorado, HUD zerado, TrapData null.
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer)
                 return;
 
             BuilderClientId.Value = builderClientId;

@@ -250,5 +250,21 @@ public class GameSetupManager : NetworkBehaviour
             playerInstance.AddComponent<ClientNetworkTransform>();
             Debug.LogWarning($"[GameSetupManager] '{playerInstance.name}' recebeu ClientNetworkTransform em runtime.");
         }
+
+        // REGRA DE OURO NGO: jogos com ClientNetworkTransform para player precisam de Rigidbody
+        // Kinematic no prefab para que triggers Physics disparem no servidor com player remoto.
+        // Sem isso: ClientNetworkTransform escreve transform.position direto → CharacterController
+        // não atualiza Physics System (só Move() faz isso) → OnTriggerEnter NÃO dispara no servidor
+        // para player remoto (Teleportador, Fogueira heal, Espinhos, Piche, Broca quebram).
+        // Kinematic = não responde a forças (PlayerMovement não usa AddForce), mas Physics.SyncTransforms
+        // automático quando transform muda → triggers disparam corretamente.
+        if (playerInstance.GetComponent<Rigidbody>() == null)
+        {
+            Rigidbody rb = playerInstance.AddComponent<Rigidbody>();
+            rb.isKinematic = true;
+            rb.useGravity = false;
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            Debug.LogWarning($"[GameSetupManager] '{playerInstance.name}' recebeu Rigidbody Kinematic em runtime para detecção de triggers no servidor (player remoto).");
+        }
     }
 }

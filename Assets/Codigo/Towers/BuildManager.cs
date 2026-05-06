@@ -85,11 +85,34 @@ public class BuildManager : NetworkBehaviour
         ForceBuildMode(false);
         InitializeTrapCountSnapshot();
         if (IsServer && NetworkManager.Singleton != null)
+        {
             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnectedSyncTrapCounts;
+            // OnClientConnectedCallback NÃO dispara para o próprio host — o host nunca recebe
+            // seu próprio sync inicial. Se a cena tem armadilhas pré-existentes, contagem
+            // ficaria zerada. Esta coroutine repopula syncedTrapCounts no host após settle.
+            StartCoroutine(SyncHostTrapCountsAfterSceneSettled());
+        }
         // Inicializa o UI de build em todos os clientes ao entrar na cena.
         // Sem isso, clientes remotos só recebem SetAvailableTowers após a primeira
         // construção (via NotifyBuildingPlacedClientRpc), deixando os tooltips vazios.
         StartCoroutine(InitBuildUIWhenReady());
+    }
+
+    private IEnumerator SyncHostTrapCountsAfterSceneSettled()
+    {
+        yield return null;
+        yield return null;
+
+        if (!IsServer)
+            yield break;
+
+        EnsureTrapCountSnapshotInitialized(true);
+        if (availableTraps != null)
+        {
+            for (int trapIndex = 0; trapIndex < availableTraps.Count; trapIndex++)
+                syncedTrapCounts[trapIndex] = GetAuthoritativeTrapCountServer(trapIndex);
+        }
+        RefreshTrapUiIfAvailable();
     }
 
     public override void OnNetworkDespawn()
@@ -347,16 +370,19 @@ public class BuildManager : NetworkBehaviour
 
     /// <summary>
     /// Verifica se um ponto do mundo está dentro da área jogável definida pelo
-    /// collider playableAreaBounds, checando APENAS eixos X e Z (horizontal).
-    /// Isso evita bugs se o cubo estiver um pouco acima ou abaixo do chão real.
+    /// collider playableAreaBounds. Checa X/Z estritos + Y com tolerância de ±50
+    /// unidades para acomodar rampas, plataformas e ledges sem rejeitar placements
+    /// válidos por diferenças pequenas de altura.
     /// </summary>
     private bool IsInsidePlayableArea(Vector3 worldPoint)
     {
         if (playableAreaBounds == null) return true;
 
         Bounds b = playableAreaBounds.bounds;
+        const float yTolerance = 50f;
         return (worldPoint.x >= b.min.x && worldPoint.x <= b.max.x &&
-                worldPoint.z >= b.min.z && worldPoint.z <= b.max.z);
+                worldPoint.z >= b.min.z && worldPoint.z <= b.max.z &&
+                worldPoint.y >= b.min.y - yTolerance && worldPoint.y <= b.max.y + yTolerance);
     }
 
     private bool IsBuildAllowedLocal(object buildableData)
@@ -492,6 +518,15 @@ public class BuildManager : NetworkBehaviour
                 out int authoritativeCount))
         {
             NotifyTrapPlacementRejected(senderClientId, trapIndex, authoritativeCount, failureReason);
+            return;
+        }
+
+        // Re-valida geometria server-side ANTES de reservar pending — clientes podem forjar
+        // Vector3 inválido (NaN/Infinity crasharia Instantiate) ou posição fora do mapa.
+        if (!IsServerPlacementPositionValid(pos, trapData))
+        {
+            NotifyTrapPlacementRejected(senderClientId, trapIndex, authoritativeCount, TrapPlacementFailureReason.SpawnSetupInvalid);
+            Debug.LogWarning($"[BuildManager] Placement rejeitado: posição inválida ou fora da playable area. sender={senderClientId} trapIndex={trapIndex} pos={pos}");
             return;
         }
 
@@ -806,8 +841,27 @@ public class BuildManager : NetworkBehaviour
         if (!string.IsNullOrEmpty(message))
         {
             Debug.LogWarning($"[BuildManager] {message}");
-            UINotificationManager.Instance?.ShowLocalNotification(message, new Color(1f, 0.35f, 0.35f));
+            // Usa coroutine de fallback para cobrir o caso UINotificationManager ainda não pronto
+            // (cena recém-carregada). Sem isso, `?.` silencia a notificação e o player gasta
+            // moeda em placement rejeitado sem ver motivo.
+            StartCoroutine(ShowNotificationWhenReady(message, new Color(1f, 0.35f, 0.35f)));
         }
+    }
+
+    private IEnumerator ShowNotificationWhenReady(string message, Color color)
+    {
+        const float maxWait = 2f;
+        float elapsed = 0f;
+        while (UINotificationManager.Instance == null && elapsed < maxWait)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (UINotificationManager.Instance != null)
+            UINotificationManager.Instance.ShowLocalNotification(message, color);
+        else
+            Debug.LogWarning($"[BuildManager] UINotificationManager não disponível após {maxWait}s — notificação descartada: {message}");
     }
 
     private bool TryPopulateBuildUiFromCanonicalSlots(CharacterBase[] equipe)
@@ -1039,6 +1093,14 @@ public class BuildManager : NetworkBehaviour
             return false;
 
         return trapData.logicPrefab == null || ValidateNetworkSpawnable(trapData.logicPrefab, $"{trapData.trapName} logic");
+    }
+
+    private bool IsServerPlacementPositionValid(Vector3 pos, TrapDataSO trapData)
+    {
+        if (!float.IsFinite(pos.x) || !float.IsFinite(pos.y) || !float.IsFinite(pos.z))
+            return false;
+
+        return IsInsidePlayableArea(pos);
     }
 
     private bool TrySpendTrapCost(TrapDataSO trapData)

@@ -9,6 +9,9 @@ public class Teleportador : TrapLogicBase
     private static readonly List<Teleportador> portais = new List<Teleportador>();
     private const int MaxPortais = 2;
 
+    private static readonly Dictionary<ulong, float> unpairedNotificationCooldowns = new Dictionary<ulong, float>();
+    private const float UnpairedNotificationCooldownSeconds = 3f;
+
     private readonly HashSet<ulong> playersOnCooldown = new HashSet<ulong>();
 
     private Teleportador portalLigado;
@@ -75,7 +78,7 @@ public class Teleportador : TrapLogicBase
 
     private void OnTriggerEnter(Collider other)
     {
-        if (!isServerMode || portalLigado == null)
+        if (!isServerMode)
             return;
 
         if (!TryResolvePlayer(other, out NetworkObject playerObject, out GameObject localPlayerObject, out ulong playerKey))
@@ -85,6 +88,13 @@ public class Teleportador : TrapLogicBase
             else
                 LogTeleportDebug($"Trigger ignorado por nao ser player. Collider: {GetColliderPath(other)}");
 
+            return;
+        }
+
+        // Portal solo: notifica o player owner (amarelo) com cooldown de 3s para evitar spam.
+        if (portalLigado == null)
+        {
+            NotifyUnpairedPortalToOwner(playerObject);
             return;
         }
 
@@ -156,6 +166,52 @@ public class Teleportador : TrapLogicBase
         playersOnCooldown.Add(playerKey);
         yield return new WaitForSeconds(cooldownTeleporte);
         playersOnCooldown.Remove(playerKey);
+    }
+
+    private void NotifyUnpairedPortalToOwner(NetworkObject playerObject)
+    {
+        if (playerObject == null)
+            return;
+
+        ulong ownerId = playerObject.OwnerClientId;
+        float now = Time.unscaledTime;
+        if (unpairedNotificationCooldowns.TryGetValue(ownerId, out float lastNotify) &&
+            now - lastNotify < UnpairedNotificationCooldownSeconds)
+        {
+            return;
+        }
+        unpairedNotificationCooldowns[ownerId] = now;
+
+        if (NetworkManager.Singleton != null && ownerId == NetworkManager.ServerClientId)
+        {
+            ShowUnpairedNotificationLocal();
+            return;
+        }
+
+        ClientRpcParams targetParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] { ownerId }
+            }
+        };
+        NotifyUnpairedPortalClientRpc(targetParams);
+    }
+
+    [ClientRpc]
+    private void NotifyUnpairedPortalClientRpc(ClientRpcParams rpcParams = default)
+    {
+        ShowUnpairedNotificationLocal();
+    }
+
+    private static void ShowUnpairedNotificationLocal()
+    {
+        if (UINotificationManager.Instance != null)
+        {
+            UINotificationManager.Instance.ShowLocalNotification(
+                "Coloque um segundo portal para teleportar!",
+                new Color(1f, 0.85f, 0.2f));
+        }
     }
 
     private bool TryResolvePlayer(Collider other, out NetworkObject playerObject, out GameObject localPlayerObject, out ulong playerKey)

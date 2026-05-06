@@ -35,6 +35,10 @@ public class PlayerHealthSystem : NetworkBehaviour
     public bool isCountering;
 
     private float timeSinceLastDamage;
+    // Acumulador local de regen — só escreve currentHealth.Value quando acumular >=1 HP.
+    // Sem isso, escrever todo frame em NetworkVariable enviava ~30-60 deltas/s por jogador
+    // durante toda a regeneracao (dezenas de KB/s desperdiçados em variacao invisível).
+    private float _pendingRegenAmount;
     private Transform respawnPoint;
     private Coroutine buffCoroutine;
     private Coroutine spawnMaterializationCoroutine;
@@ -150,6 +154,7 @@ public class PlayerHealthSystem : NetworkBehaviour
         finalDamage = Mathf.Max(0f, finalDamage);
         currentHealth.Value -= finalDamage;
         timeSinceLastDamage = 0f;
+        _pendingRegenAmount = 0f;
         isRegenerating = false;
 
         if (finalDamage > 0f)
@@ -212,6 +217,7 @@ public class PlayerHealthSystem : NetworkBehaviour
         if (currentHealth.Value >= characterData.maxHealth)
         {
             isRegenerating = false;
+            _pendingRegenAmount = 0f;
             return;
         }
 
@@ -220,8 +226,18 @@ public class PlayerHealthSystem : NetworkBehaviour
             return;
 
         isRegenerating = true;
-        currentHealth.Value += characterData.maxHealth * 0.01f * Time.deltaTime;
-        currentHealth.Value = Mathf.Min(currentHealth.Value, characterData.maxHealth);
+
+        // Acumula regen localmente — escreve em NetworkVariable apenas quando o delta
+        // for >=1 HP (granularidade da barra de HP). Reduz pacotes de ~30-60/s para
+        // ~1/s por jogador em regeneracao, sem mudanca visivel para o usuario.
+        _pendingRegenAmount += characterData.maxHealth * 0.01f * Time.deltaTime;
+
+        if (_pendingRegenAmount >= 1f)
+        {
+            float toApply = Mathf.Floor(_pendingRegenAmount);
+            _pendingRegenAmount -= toApply;
+            currentHealth.Value = Mathf.Min(currentHealth.Value + toApply, characterData.maxHealth);
+        }
     }
 
     private void Die()

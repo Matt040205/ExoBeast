@@ -31,6 +31,7 @@ public class BuildButtonUI : MonoBehaviour
     public string priceTextChildObjectName = "PriceText";
 
     private readonly Dictionary<TrapDataSO, TrapButtonBinding> trapButtonBindings = new Dictionary<TrapDataSO, TrapButtonBinding>();
+    private List<TrapDataSO> _lastAvailableTraps;
 
     public bool HasTrapButtons => trapButtonBindings.Count > 0;
 
@@ -109,13 +110,30 @@ public class BuildButtonUI : MonoBehaviour
             trapButtonBindings[capturedTrapData] = new TrapButtonBinding(buttonGO, button, capturedTrapData);
             UpdateTrapButtonAvailability(trapButtonBindings[capturedTrapData]);
         }
+
+        // Re-aplica o último estado de disponibilidade conhecido — cobre updates que chegaram
+        // ANTES dos botões existirem (race entre UpdateTrapCountsClientRpc e abertura do menu).
+        if (_lastAvailableTraps != null)
+            ApplyTrapAvailabilityToBindings(_lastAvailableTraps);
     }
 
     public void RefreshTrapAvailability(List<TrapDataSO> availableTraps)
     {
-        if (availableTraps == null || trapButtonBindings.Count == 0)
+        if (availableTraps == null)
             return;
 
+        // Armazena SEMPRE o último estado, mesmo se botões ainda não existem.
+        // CreateTrapBuildButtons re-aplica este snapshot ao final, garantindo convergência da UI.
+        _lastAvailableTraps = availableTraps;
+
+        if (trapButtonBindings.Count == 0)
+            return;
+
+        ApplyTrapAvailabilityToBindings(availableTraps);
+    }
+
+    private void ApplyTrapAvailabilityToBindings(List<TrapDataSO> availableTraps)
+    {
         foreach (TrapDataSO trapData in availableTraps)
         {
             if (trapData == null || !trapButtonBindings.TryGetValue(trapData, out TrapButtonBinding binding))

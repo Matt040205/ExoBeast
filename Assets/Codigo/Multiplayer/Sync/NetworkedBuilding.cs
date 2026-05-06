@@ -77,7 +77,10 @@ namespace ExoBeasts.Multiplayer.Sync
 
         public void InitializeTowerServer(ulong builderClientId, int characterIndex, int initialCostSpent)
         {
-            if (!IsServer) return;
+            // REGRA DE OURO NGO: usar NetworkManager.Singleton.IsServer (não IsServer herdado).
+            // Método chamado ANTES de Spawn() — IsServer herdado depende de IsSpawned e retornaria FALSE
+            // mesmo no servidor, deixando NetworkVariables em defaults (BuilderClientId=0, CharacterIndex=-1).
+            if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsServer) return;
 
             BuilderClientId.Value = builderClientId;
             CharacterIndex.Value = characterIndex;

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using ExoBeasts.Multiplayer.GameServer;
 
 public class UIManager : MonoBehaviour
 {
@@ -58,17 +59,27 @@ public class UIManager : MonoBehaviour
 
     private void Update()
     {
-        if (HordeManager.Instance != null && !HordeManager.Instance.IsLocalMode)
+        // Timer agora vem do MatchManager (canonico). HordeManager.IsLocalMode segue como
+        // fonte de verdade para "estamos em rede ou local" porque o HordeManager existe
+        // tanto em singleplayer quanto multiplayer, enquanto o MatchManager so existe em rede.
+        bool isNetworkMatch = HordeManager.Instance != null &&
+                              !HordeManager.Instance.IsLocalMode &&
+                              MatchManager.Instance != null;
+
+        if (isNetworkMatch)
         {
-            HordeManager hordeManager = HordeManager.Instance;
+            MatchManager matchManager = MatchManager.Instance;
 
             if (!matchManagerFound)
             {
                 matchManagerFound = true;
-                hordeManager.currentMatchTime.OnValueChanged += OnServerTimeSynced;
+                matchManager.MatchTime.OnValueChanged += OnServerTimeSynced;
             }
 
-            float serverTime = hordeManager.currentMatchTime.Value;
+            // Dead-reckoning: extrapola localmente entre snapshots autoritativos.
+            // O servidor agora publica MatchTime apenas a cada 1s, mas o display
+            // continua suave porque incrementamos com Time.deltaTime entre updates.
+            float serverTime = matchManager.MatchTime.Value;
             if (serverTime != lastServerTime)
             {
                 gameTime = serverTime;
@@ -91,8 +102,8 @@ public class UIManager : MonoBehaviour
     {
         ObjectiveHealthBus.OnObjectiveHealthChanged -= OnObjectiveHealthChanged;
 
-        if (matchManagerFound && HordeManager.Instance != null)
-            HordeManager.Instance.currentMatchTime.OnValueChanged -= OnServerTimeSynced;
+        if (matchManagerFound && MatchManager.Instance != null)
+            MatchManager.Instance.MatchTime.OnValueChanged -= OnServerTimeSynced;
     }
 
     public void ForceTimerSync(float serverTime)
@@ -182,7 +193,16 @@ public class UIManager : MonoBehaviour
             ShowTowerShop();
 
             if (BuildManager.Instance != null)
-                RefreshTrapBuildUI(BuildManager.Instance.availableTraps);
+            {
+                // Se a UI ainda não tem botões de armadilha (ex: cena recém-carregada antes do
+                // SetAvailableTowers chegar), recria toda a UI de build em vez de só dar refresh.
+                // Sem esse fallback, RefreshTrapAvailability sai cedo (binding vazio) e os
+                // botões nunca aparecem mesmo que o BuildManager tenha dados disponíveis.
+                if (buildButtonUI != null && !buildButtonUI.HasTrapButtons && GameDataManager.Instance != null)
+                    BuildManager.Instance.SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);
+                else
+                    RefreshTrapBuildUI(BuildManager.Instance.availableTraps);
+            }
         }
         else
         {

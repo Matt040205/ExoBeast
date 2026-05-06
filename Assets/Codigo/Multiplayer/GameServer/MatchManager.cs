@@ -74,23 +74,37 @@ namespace ExoBeasts.Multiplayer.GameServer
             }
         }
 
+        // Acumulador local do tempo de partida; só escreve em MatchTime.Value a cada 1s
+        // para evitar 60 NetworkVariable updates/segundo (timer de UI tem precisao de seg).
+        private float _matchTimeAccumulator = 0f;
+        private const float MATCH_TIME_PUBLISH_INTERVAL = 1f;
+
+#if UNITY_EDITOR
         private float _debugLogTimer = 0f;
+#endif
 
         private void Update()
         {
             if (!IsServer) return;
 
-            // Log de diagnóstico a cada 5 segundos para verificar o estado
+#if UNITY_EDITOR
+            // Log de diagnostico apenas no editor — em build polui o Player.log e aloca strings.
             _debugLogTimer += Time.deltaTime;
             if (_debugLogTimer >= 5f)
             {
                 _debugLogTimer = 0f;
                 Debug.Log($"[MatchManager] Update - State={CurrentMatchState.Value}, MatchTime={MatchTime.Value:F1}s, autoStartMatch={autoStartMatch}");
             }
+#endif
 
             if (CurrentMatchState.Value == MatchState.Playing)
             {
-                MatchTime.Value += Time.deltaTime;
+                _matchTimeAccumulator += Time.deltaTime;
+                if (_matchTimeAccumulator >= MATCH_TIME_PUBLISH_INTERVAL)
+                {
+                    MatchTime.Value += _matchTimeAccumulator;
+                    _matchTimeAccumulator = 0f;
+                }
             }
         }
 
@@ -115,6 +129,7 @@ namespace ExoBeasts.Multiplayer.GameServer
         {
             CurrentMatchState.Value = MatchState.Playing;
             MatchTime.Value = 0f;
+            _matchTimeAccumulator = 0f;
             CurrentWave.Value = 1;
         }
 

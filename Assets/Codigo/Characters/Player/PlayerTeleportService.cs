@@ -11,9 +11,16 @@ public static class PlayerTeleportService
 
         TeleportInternal(player.gameObject, position, rotation);
 
+        // REGRA DE OURO NGO: SetState() em ClientNetworkTransform server-side é IGNORADO para
+        // players não-host owners (CNT é owner-authoritative). Só faz sentido quando o servidor
+        // É o owner — caso do host-owned player. Para players remotos, o caller (Teleportador.cs)
+        // envia NotifyPlayerTeleportClientRpc owner-targeted que faz TeleportLocal no cliente owner.
         ClientNetworkTransform networkTransform = player.GetComponent<ClientNetworkTransform>();
-        if (networkTransform != null && player.IsSpawned)
+        if (networkTransform != null && player.IsSpawned &&
+            player.OwnerClientId == NetworkManager.ServerClientId)
+        {
             networkTransform.SetState(position, rotation, player.transform.localScale, teleportDisabled: false);
+        }
 
         return true;
     }

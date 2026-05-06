@@ -44,9 +44,9 @@ public class HordeManager : NetworkBehaviour
     public NetworkVariable<int> currentHorde = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<int> enemiesRemaining = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<bool> isWaveActive = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    
-    // Variável para sincronizar o tempo global da partida (timer HUD)
-    public NetworkVariable<float> currentMatchTime = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    // Timer da partida agora vive no MatchManager.MatchTime (canonico segundo Estado_Atual_Multiplayer.md).
+    // currentMatchTime aqui foi removido para eliminar duplicacao de NetworkVariable + escrita por frame.
 
     // ── Fallback local (quando NGO não está ativo) ──
     private int localCurrentHorde = 0;
@@ -89,15 +89,6 @@ public class HordeManager : NetworkBehaviour
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
-    }
-
-    private void Update()
-    {
-        // Incrementa o tempo da partida apenas no servidor (sincroniza com clientes via netcode)
-        if (IsServer)
-        {
-            currentMatchTime.Value += Time.deltaTime;
-        }
     }
 
     private bool hordeStarted = false;

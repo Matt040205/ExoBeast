@@ -29,15 +29,19 @@ namespace ExoBeasts.Multiplayer.Sync
             NetworkVariableWritePermission.Server
         );
 
+        // Municao e UI exclusiva do owner (HUD propria) — broadcast para Everyone era desperdicio.
+        // Se houver futuro UI de "balas restantes" do aliado, usar ClientRpc esparso em vez de NetworkVariable.
         public NetworkVariable<int> NetworkAmmo = new NetworkVariable<int>(
             30,
-            NetworkVariableReadPermission.Everyone,
+            NetworkVariableReadPermission.Owner,
             NetworkVariableWritePermission.Server
         );
 
         public override void OnNetworkSpawn()
         {
+#if UNITY_EDITOR
             Debug.Log($"[NetworkedPlayerController] Spawned - IsOwner: {IsOwner}, IsServer: {IsServer}");
+#endif
 
             if (!IsOwner)
             {
@@ -61,22 +65,33 @@ namespace ExoBeasts.Multiplayer.Sync
 
         private void DisableLocalControls()
         {
+#if UNITY_EDITOR
             Debug.Log($"[NetworkedPlayerController] Controles locais desabilitados (jogador remoto)");
+#endif
         }
 
+        // Hot path: hooks de NetworkVariable disparam por update de delta.
+        // Em combate, podem rodar dezenas de vezes/s — Debug.Log + string concat aloca GC.
+        // Mantemos o gancho funcional (assinatura) para preservar futura integracao com HUD/eventos.
         private void OnHealthChanged(float oldValue, float newValue)
         {
+#if UNITY_EDITOR
             Debug.Log($"[NetworkedPlayerController] Vida mudou: {oldValue} -> {newValue}");
+#endif
         }
 
         private void OnAmmoChanged(int oldValue, int newValue)
         {
+#if UNITY_EDITOR
             Debug.Log($"[NetworkedPlayerController] Municao mudou: {oldValue} -> {newValue}");
+#endif
         }
 
         private void OnCharacterChanged(int oldValue, int newValue)
         {
+#if UNITY_EDITOR
             Debug.Log($"[NetworkedPlayerController] Personagem mudou: {oldValue} -> {newValue}");
+#endif
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -87,7 +102,9 @@ namespace ExoBeasts.Multiplayer.Sync
             float finalDamage = damage;
             NetworkHealth.Value = Mathf.Max(0, NetworkHealth.Value - finalDamage);
 
+#if UNITY_EDITOR
             Debug.Log($"[NetworkedPlayerController] Dano recebido: {damage}. Vida: {NetworkHealth.Value}");
+#endif
 
             if (NetworkHealth.Value <= 0)
             {

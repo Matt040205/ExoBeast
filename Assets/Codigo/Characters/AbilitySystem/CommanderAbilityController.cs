@@ -30,6 +30,11 @@ public class CommanderAbilityController : NetworkBehaviour
     public NetworkVariable<float> netUltimateCharge = new NetworkVariable<float>(
         0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+    // Acumulador local de carga por segundo — só escreve em netUltimateCharge.Value
+    // quando acumular >=1 unidade. Reduz ~30-60 NetworkVariable updates/s para ~1/s
+    // durante a carga passiva, sem mudanca visivel no HUD (granularidade ja era 1/threshold).
+    private float _pendingPassiveCharge;
+
     public float CurrentUltimateCharge
     {
         get
@@ -114,9 +119,17 @@ public class CommanderAbilityController : NetworkBehaviour
             characterData != null &&
             characterData.ultimateChargePerSecond > 0)
         {
-            netUltimateCharge.Value = Mathf.Min(
-                netUltimateCharge.Value + characterData.ultimateChargePerSecond * Time.deltaTime,
-                ultimateChargeThreshold);
+            // Acumula localmente; só publica em NetworkVariable em delta >=1 unidade.
+            _pendingPassiveCharge += characterData.ultimateChargePerSecond * Time.deltaTime;
+
+            if (_pendingPassiveCharge >= 1f)
+            {
+                float toApply = Mathf.Floor(_pendingPassiveCharge);
+                _pendingPassiveCharge -= toApply;
+                netUltimateCharge.Value = Mathf.Min(
+                    netUltimateCharge.Value + toApply,
+                    ultimateChargeThreshold);
+            }
         }
 
         if (IsServer || IsOwner)
@@ -425,6 +438,7 @@ public class CommanderAbilityController : NetworkBehaviour
         {
             abilityCooldowns[characterData.ultimate] = characterData.ultimate.cooldown;
             netUltimateCharge.Value = 0f;
+            _pendingPassiveCharge = 0f;
             ActivateUltimateVisualClientRpc();
         }
     }
@@ -448,7 +462,12 @@ public class CommanderAbilityController : NetworkBehaviour
     [ServerRpc]
     private void AddUltimateChargeServerRpc(float amount)
     {
-        netUltimateCharge.Value = Mathf.Min(netUltimateCharge.Value + amount, ultimateChargeThreshold);
+        // Flush do acumulador passivo antes de aplicar o evento discreto de dano,
+        // para nao perder fração acumulada quando o jogador acerta um critico no meio
+        // do tick de carga passiva.
+        float total = amount + _pendingPassiveCharge;
+        _pendingPassiveCharge = 0f;
+        netUltimateCharge.Value = Mathf.Min(netUltimateCharge.Value + total, ultimateChargeThreshold);
     }
 
     public void RefundCooldown(string keyword)
