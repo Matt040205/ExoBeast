@@ -157,10 +157,10 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 1851992434513104381}
   - {fileID: 767720479140574361}
   - {fileID: 793342674280610480}
   - {fileID: 5639264420978021470}
+  - {fileID: 1851992434513104381}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!33 &3638872965786020690
@@ -220,7 +220,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   towerData: {fileID: 11400000, guid: 6be7037535adf3347bc4a1b2a3d84af7, type: 2}
-  partToRotate: {fileID: 0}
+  partToRotate: {fileID: 5639264420978021470}
   firePoint: {fileID: 3182203365280486715}
   tempoDeSpawn: 2
   materialHolograma: {fileID: 0}
@@ -258,7 +258,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 127251062
+  GlobalObjectIdHash: 2831531947
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -542,6 +542,10 @@ PrefabInstance:
       propertyPath: GlobalObjectIdHash
       value: 2831531947
       objectReference: {fileID: 0}
+    - target: {fileID: 1077178184275188685, guid: c03ecd1f5e3031447b0babfdc63e5ce9, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 2838156437463877109, guid: c03ecd1f5e3031447b0babfdc63e5ce9, type: 3}
       propertyPath: firePoint
       value: 
@@ -631,6 +635,7 @@ PrefabInstance:
     - {fileID: 5738464622027490514, guid: c03ecd1f5e3031447b0babfdc63e5ce9, type: 3}
     - {fileID: 3417547770801766067, guid: c03ecd1f5e3031447b0babfdc63e5ce9, type: 3}
     - {fileID: 7926698676025372789, guid: c03ecd1f5e3031447b0babfdc63e5ce9, type: 3}
+    - {fileID: 1077178184275188685, guid: c03ecd1f5e3031447b0babfdc63e5ce9, type: 3}
     m_RemovedGameObjects:
     - {fileID: 963542791583956613, guid: c03ecd1f5e3031447b0babfdc63e5ce9, type: 3}
     - {fileID: 2086700447321655050, guid: c03ecd1f5e3031447b0babfdc63e5ce9, type: 3}

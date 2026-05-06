@@ -496,6 +496,9 @@ public class SelecaoManager : NetworkBehaviour
                         return;
                     }
 
+                    if (ExoBeasts.Managers.Loading.LoadingScreenUI.Instance != null)
+                        ExoBeasts.Managers.Loading.LoadingScreenUI.Instance.Show();
+                    
                     nm.SceneManager.LoadScene(nomeDaCenaDoJogo, UnityEngine.SceneManagement.LoadSceneMode.Single);
                 }
             }
@@ -541,6 +544,9 @@ public class SelecaoManager : NetworkBehaviour
             Debug.LogError("[SelecaoManager] StartHost() falhou. Verifique o estado do NetworkManager.");
             yield break;
         }
+
+        if (ExoBeasts.Managers.Loading.LoadingScreenUI.Instance != null)
+            ExoBeasts.Managers.Loading.LoadingScreenUI.Instance.Show();
 
         nm.SceneManager.LoadScene(nomeDaCenaDoJogo, UnityEngine.SceneManagement.LoadSceneMode.Single);
     }

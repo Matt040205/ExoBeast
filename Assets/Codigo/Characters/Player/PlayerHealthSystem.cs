@@ -355,6 +355,7 @@ public class PlayerHealthSystem : NetworkBehaviour
             {
                 elapsedTime += Time.deltaTime;
                 float progress = Mathf.Clamp01(elapsedTime / tempoDeSpawn);
+                float invertedProgress = 1f - progress;
 
                 if (materialHolograma != null)
                 {
@@ -363,9 +364,9 @@ public class PlayerHealthSystem : NetworkBehaviour
                         foreach (Material mat in renderer.materials)
                         {
                             if (mat.HasProperty("Progresso_Holograma"))
-                                mat.SetFloat("Progresso_Holograma", progress);
+                                mat.SetFloat("Progresso_Holograma", invertedProgress);
                             else if (mat.HasProperty("_Progresso_Holograma"))
-                                mat.SetFloat("_Progresso_Holograma", progress);
+                                mat.SetFloat("_Progresso_Holograma", invertedProgress);
                         }
                     }
                 }
