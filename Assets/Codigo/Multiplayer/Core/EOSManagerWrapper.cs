@@ -62,6 +62,8 @@ namespace ExoBeasts.Multiplayer.Core
 
 #if !EOS_DISABLE
         private PlatformInterface platformInterface;
+        private PlayEveryWare.EpicOnlineServices.EOSManager _pewMonoCache;
+        private float _lastPewSearchTime = -10f;
 
         public PlatformInterface GetPlatformInterface()
         {
@@ -103,11 +105,39 @@ namespace ExoBeasts.Multiplayer.Core
 #if !EOS_DISABLE
         private void Update()
         {
-            // Fallback tick: garante que o EOS SDK processa callbacks mesmo se o
-            // PlayEveryWare EOSManager nao estiver presente ou ativo na cena.
-            // Double-tick e seguro — callbacks sao removidos da fila apos disparar.
-            if (isInitialized)
+            // OPTIMIZATION (Sprint 3 / Item A2 - 2026-05-07): detectar se o PlayEveryWare EOSManager
+            // MonoBehaviour esta ativo + enabled. Se sim, ele ja chama Tick() no proprio Update.
+            // Antes: tick incondicional sempre que isInitialized.
+            // Agora: tick apenas quando o PEW esta ausente ou desabilitado (caso raro documentado em Initialize).
+            // Sem isso: cada frame processava callbacks EOS duas vezes, desperdicando CPU em P/Invoke e callbacks idle.
+            if (!isInitialized) return;
+
+            if (ShouldFallbackTick())
+            {
                 GetPlatformInterface()?.Tick();
+            }
+        }
+
+        private bool ShouldFallbackTick()
+        {
+            // Hot path: em estado normal, o MonoBehaviour PEW vivo ja chama Tick() no proprio Update.
+            if (_pewMonoCache != null && _pewMonoCache.isActiveAndEnabled)
+                return false;
+
+            // PEW nulo ou desabilitado: refresca cache no maximo 1x/s para evitar FindObjectsByType por frame.
+            if (Time.unscaledTime - _lastPewSearchTime >= 1f)
+            {
+                _lastPewSearchTime = Time.unscaledTime;
+                var monos = UnityEngine.Object.FindObjectsByType<PlayEveryWare.EpicOnlineServices.EOSManager>(
+                    FindObjectsInactive.Include, FindObjectsSortMode.None);
+                _pewMonoCache = monos.Length > 0 ? monos[0] : null;
+
+                if (_pewMonoCache != null && _pewMonoCache.isActiveAndEnabled)
+                    return false;
+            }
+
+            // PEW nao existe ou existe disabled: o wrapper assume o tick de fallback.
+            return true;
         }
 #endif
 
@@ -178,6 +208,12 @@ namespace ExoBeasts.Multiplayer.Core
             var eosMonos = UnityEngine.Object.FindObjectsByType<PlayEveryWare.EpicOnlineServices.EOSManager>(
                 FindObjectsInactive.Include, FindObjectsSortMode.None);
             var eosMono = eosMonos.Length > 0 ? eosMonos[0] : null;
+            // OPTIMIZATION (Sprint 3 / Item A2 - 2026-05-07): cachear o MonoBehaviour PEW achado na inicializacao.
+            // Antes: o Update fallback nao sabia se o PEW vivo ja ticava.
+            // Agora: ShouldFallbackTick usa este cache no hot path e evita busca/tick duplicado.
+            // Sem isso: o wrapper podia gastar Tick() extra ou procurar o PEW cedo demais.
+            _pewMonoCache = eosMono;
+            _lastPewSearchTime = Time.unscaledTime;
 
             if (eosMono != null)
                 DontDestroyOnLoad(eosMono.gameObject);
@@ -225,7 +261,13 @@ namespace ExoBeasts.Multiplayer.Core
                 {
                     var eosMonos2 = UnityEngine.Object.FindObjectsByType<PlayEveryWare.EpicOnlineServices.EOSManager>(
                         FindObjectsInactive.Include, FindObjectsSortMode.None);
-                    if (eosMonos2.Length > 0) DontDestroyOnLoad(eosMonos2[0].gameObject);
+                    // OPTIMIZATION (Sprint 3 / Item A2 - 2026-05-07): atualizar o cache quando a init assincrona resolve.
+                    // Antes: o caminho de coroutine nao preservava o MonoBehaviour PEW para o hot path do Update.
+                    // Agora: o fallback sabe imediatamente se o PEW ativo vai chamar Tick().
+                    // Sem isso: haveria uma busca extra ou tick de fallback ate o refresh rate-limited.
+                    _pewMonoCache = eosMonos2.Length > 0 ? eosMonos2[0] : null;
+                    _lastPewSearchTime = Time.unscaledTime;
+                    if (_pewMonoCache != null) DontDestroyOnLoad(_pewMonoCache.gameObject);
                     platformInterface = platform;   // cache
                     isInitialized = true;
                     Debug.Log("[EOSManagerWrapper] EOS SDK inicializado com sucesso!");
