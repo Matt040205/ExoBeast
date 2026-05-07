@@ -267,10 +267,10 @@ public class EnemyController : MonoBehaviour
         {
             foreach (GameObject playerObject in PlayerRegistry.Instance.GetAllPlayers().Values)
             {
-                if (playerObject == null || playerObject.CompareTag(TAG_POCA))
+                if (playerObject == null || !playerObject.activeInHierarchy || playerObject.CompareTag(TAG_POCA))
                     continue;
 
-                float distance = Vector3.Distance(transform.position, playerObject.transform.position);
+                float distance = GetDistanceToTarget(playerObject.transform);
                 if (distance < nearestDistance)
                 {
                     nearestDistance = distance;

@@ -79,6 +79,7 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         private const ushort DEFAULT_PORT = 7777;
         private const string BUCKET_ID = "ExoBeasts";
+        private const string NO_RELAY_CODE = "__NO_RELAY__";
 
         private void Awake()
         {
@@ -985,15 +986,15 @@ namespace ExoBeasts.Multiplayer.Lobby
             {
                 // Publica AMBOS atributos em todas as plataformas para que editor<->build funcione.
                 // RELAY_CODE e preferido por clientes; SERVER_ADDRESS e fallback para LAN.
-                if (!string.IsNullOrEmpty(relayJoinCode))
-                    AddStringAttr(mod, LobbyAttributes.RELAY_CODE, relayJoinCode, LobbyAttributeVisibility.Public);
+                string relayCodeToPublish = !string.IsNullOrEmpty(relayJoinCode) ? relayJoinCode : NO_RELAY_CODE;
+                AddStringAttr(mod, LobbyAttributes.RELAY_CODE, relayCodeToPublish, LobbyAttributeVisibility.Public);
 
                 string publishIp = localIp ?? GetLocalIpAddress();
                 AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, publishIp, LobbyAttributeVisibility.Public);
                 AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, port, LobbyAttributeVisibility.Public);
                 AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.InGame.ToString(), LobbyAttributeVisibility.Public);
 
-                Debug.Log($"[LobbyManager] Publicando atributos: RELAY_CODE='{relayJoinCode ?? ""}' | SERVER_ADDRESS='{publishIp}' | PORT={port}");
+                Debug.Log($"[LobbyManager] Publicando atributos: RELAY_CODE='{relayCodeToPublish}' | SERVER_ADDRESS='{publishIp}' | PORT={port}");
 
                 string capturedMapOverride = mapOverride;
                 var updateOpts = new UpdateLobbyOptions { LobbyModificationHandle = mod };
@@ -1397,7 +1398,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             if (relayAttrResult == Result.Success && relayAttr.HasValue)
             {
                 string relayCode = relayAttr.Value.Data?.Value.AsUtf8 ?? "";
-                if (!string.IsNullOrEmpty(relayCode))
+                if (IsUsableRelayCode(relayCode))
                 {
                     Debug.Log($"[LobbyManager] Conectando via Relay: {relayCode}");
                     var nmClientRelay = NetworkManager.Singleton;
@@ -1408,6 +1409,10 @@ namespace ExoBeasts.Multiplayer.Lobby
                         _pendingClientConnect = StartCoroutine(ConnectClientViaRelayCoroutine(nmClientRelay, transportRelay, relayCode));
                     }
                     return;
+                }
+                else if (!string.IsNullOrEmpty(relayCode))
+                {
+                    Debug.Log("[LobbyManager] RELAY_CODE sentinel/invalidado. Usando fallback SERVER_ADDRESS.");
                 }
             }
 
@@ -1434,6 +1439,12 @@ namespace ExoBeasts.Multiplayer.Lobby
                     }
                 }
             }
+        }
+
+        private static bool IsUsableRelayCode(string relayCode)
+        {
+            return !string.IsNullOrWhiteSpace(relayCode) &&
+                   !string.Equals(relayCode, NO_RELAY_CODE, System.StringComparison.Ordinal);
         }
 
         private System.Collections.IEnumerator ConnectClientCoroutine(

@@ -107,6 +107,20 @@ public class MeleeCombatSystem : NetworkBehaviour
         if (cachedMovement != null) cachedMovement.FaceCameraImmediately();
     }
 
+    private Vector3 ResolveAttackForward()
+    {
+        Vector3 forward = AbilityAimUtility.ResolveAimForward(gameObject);
+        if (forward.sqrMagnitude <= 0.0001f && attackPoint != null)
+            forward = attackPoint.forward;
+
+        forward.y = 0f;
+        if (forward.sqrMagnitude <= 0.0001f)
+            forward = transform.forward;
+
+        forward.y = 0f;
+        return forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
+    }
+
     public void OnFire(InputAction.CallbackContext ctx)
     {
         if (!IsOwner || !this.enabled) return;
@@ -204,13 +218,20 @@ public class MeleeCombatSystem : NetworkBehaviour
 
         float currentAngle = overrideAttackAngle ?? currentStats.attackAngle;
         float currentRange = currentStats.attackRange;
+        Vector3 attackOrigin = attackPoint != null ? attackPoint.position : transform.position;
+        Vector3 attackForward = ResolveAttackForward();
 
-        Collider[] hitTargets = Physics.OverlapSphere(attackPoint.position, currentRange, hitLayers);
+        Collider[] hitTargets = Physics.OverlapSphere(attackOrigin, currentRange, hitLayers);
 
         foreach (Collider target in hitTargets)
         {
-            Vector3 directionToTarget = (target.transform.position - attackPoint.position).normalized;
-            float angleToTarget = Vector3.Angle(attackPoint.forward, directionToTarget);
+            Vector3 directionToTarget = target.transform.position - attackOrigin;
+            directionToTarget.y = 0f;
+
+            if (directionToTarget.sqrMagnitude <= 0.0001f)
+                continue;
+
+            float angleToTarget = Vector3.Angle(attackForward, directionToTarget.normalized);
 
             if (angleToTarget < currentAngle / 2)
             {
@@ -267,8 +288,9 @@ public class MeleeCombatSystem : NetworkBehaviour
 
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(attackPoint.position, currentRange);
-        Vector3 leftBound = Quaternion.Euler(0, -currentAngle / 2, 0) * attackPoint.forward * currentRange;
-        Vector3 rightBound = Quaternion.Euler(0, currentAngle / 2, 0) * attackPoint.forward * currentRange;
+        Vector3 attackForward = Application.isPlaying ? ResolveAttackForward() : AbilityAimUtility.ResolveFlatForward(attackPoint);
+        Vector3 leftBound = Quaternion.Euler(0, -currentAngle / 2, 0) * attackForward * currentRange;
+        Vector3 rightBound = Quaternion.Euler(0, currentAngle / 2, 0) * attackForward * currentRange;
         Gizmos.DrawLine(attackPoint.position, attackPoint.position + leftBound);
         Gizmos.DrawLine(attackPoint.position, attackPoint.position + rightBound);
     }

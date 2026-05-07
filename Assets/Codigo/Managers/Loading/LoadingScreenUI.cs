@@ -20,6 +20,7 @@ namespace ExoBeasts.Managers.Loading
         
         private float timeShown;
         private CanvasGroup canvasGroup;
+        public bool IsVisible => loadingPanel != null && loadingPanel.activeInHierarchy;
 
         private void Awake()
         {
@@ -111,6 +112,15 @@ namespace ExoBeasts.Managers.Loading
             }
         }
 
+        public void ForceHide()
+        {
+            StopAllCoroutines();
+            progressCoroutine = null;
+            currentVisualProgress = 0f;
+            UpdateVisuals(0f);
+            HideInstant();
+        }
+
         private System.Collections.IEnumerator FinishProgressAndHide(float delay)
         {
             float start = currentVisualProgress;
@@ -151,6 +161,12 @@ namespace ExoBeasts.Managers.Loading
         private void HideInstant()
         {
             Debug.Log("[LoadingScreenUI] Tela de carregamento oculta (HideInstant).");
+            if (canvasGroup != null)
+            {
+                canvasGroup.alpha = 0f;
+                canvasGroup.blocksRaycasts = false;
+            }
+
             if (loadingPanel != null)
                 loadingPanel.SetActive(false);
         }

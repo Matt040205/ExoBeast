@@ -69,8 +69,7 @@ public class UpgradePanelUI : MonoBehaviour
         if (currentHash == lastUiStateHash)
             return;
 
-        lastUiStateHash = currentHash;
-        UpdatePanelInfo();
+        ForceRefreshPanelInfo();
     }
 
     public void ShowPanel(TowerController tower)
@@ -87,7 +86,7 @@ public class UpgradePanelUI : MonoBehaviour
             ResetTowerImageAlpha();
         }
 
-        UpdatePanelInfo();
+        ForceRefreshPanelInfo();
     }
 
     public void HidePanel()
@@ -288,6 +287,7 @@ public class UpgradePanelUI : MonoBehaviour
             if (TutorialManager.Instance != null)
                 TutorialManager.Instance.TriggerTutorial("NEXT_WAVE");
 
+            ForceRefreshPanelInfo();
             StartCoroutine(RefreshUIAfterFrame());
             return;
         }
@@ -335,6 +335,7 @@ public class UpgradePanelUI : MonoBehaviour
                 TutorialManager.Instance.TriggerTutorial("NEXT_WAVE");
             }
 
+            ForceRefreshPanelInfo();
             StartCoroutine(RefreshUIAfterFrame());
         }
         else
@@ -369,6 +370,15 @@ public class UpgradePanelUI : MonoBehaviour
             hash = (hash * 31) + GetCurrentLevel(i);
 
         return hash;
+    }
+
+    private void ForceRefreshPanelInfo()
+    {
+        if (currentTower == null || uiPanel == null || !uiPanel.activeInHierarchy)
+            return;
+
+        UpdatePanelInfo();
+        lastUiStateHash = CaptureUiStateHash();
     }
 
     private void TryResolveUpgradeTooltipTargets()
@@ -426,7 +436,7 @@ public class UpgradePanelUI : MonoBehaviour
         yield return new WaitForEndOfFrame();
         if (currentTower != null && uiPanel.activeInHierarchy)
         {
-            UpdatePanelInfo();
+            ForceRefreshPanelInfo();
             if (uiPanel != null)
             {
                 LayoutRebuilder.ForceRebuildLayoutImmediate(uiPanel.GetComponent<RectTransform>());

@@ -12,6 +12,7 @@ public class UpgradeTooltip : MonoBehaviour, IPointerEnterHandler, IPointerExitH
 
     private string upgradeName;
     private string description;
+    public bool IsVisible => tooltipPanel != null && tooltipPanel.activeInHierarchy;
 
     void Start()
     {
@@ -26,14 +27,16 @@ public class UpgradeTooltip : MonoBehaviour, IPointerEnterHandler, IPointerExitH
     {
         upgradeName = newName;
         description = newDescription;
+
+        if (IsVisible)
+            ApplyTooltipText();
     }
 
     public void OnPointerEnter(PointerEventData eventData)
     {
         if (tooltipPanel != null && !string.IsNullOrEmpty(description))
         {
-            upgradeNameText.text = upgradeName;
-            descriptionText.text = description;
+            ApplyTooltipText();
             tooltipPanel.SetActive(true);
         }
     }
@@ -44,5 +47,14 @@ public class UpgradeTooltip : MonoBehaviour, IPointerEnterHandler, IPointerExitH
         {
             tooltipPanel.SetActive(false);
         }
+    }
+
+    private void ApplyTooltipText()
+    {
+        if (upgradeNameText != null)
+            upgradeNameText.text = upgradeName;
+
+        if (descriptionText != null)
+            descriptionText.text = description;
     }
 }

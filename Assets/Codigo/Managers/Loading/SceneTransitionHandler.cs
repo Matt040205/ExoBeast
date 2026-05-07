@@ -1,5 +1,7 @@
 using UnityEngine;
 using Unity.Netcode;
+using UnityEngine.SceneManagement;
+using ExoBeasts.Multiplayer.Lobby;
 
 namespace ExoBeasts.Managers.Loading
 {
@@ -12,6 +14,9 @@ namespace ExoBeasts.Managers.Loading
     {
         private static SceneTransitionHandler instance;
         private const string HIDE_MSG = "HideLoadingScreen";
+        private const string LOBBY_SCENE_NAME = "LobbyScene";
+        private const string NETWORK_FAILURE_MESSAGE = "Conexao multiplayer perdida. Voltando ao lobby.";
+        private bool handlingNetworkFailure;
 
         private void Awake()
         {
@@ -42,6 +47,7 @@ namespace ExoBeasts.Managers.Loading
 
             NetworkManager.Singleton.OnServerStarted += SubscribeToSceneEvents;
             NetworkManager.Singleton.OnClientStarted += SubscribeToSceneEvents;
+            SubscribeToNetworkFailureEvents();
             
             // Se o jogo já tiver iniciado (o NetworkManager já subiu)
             if (NetworkManager.Singleton.IsServer || NetworkManager.Singleton.IsClient)
@@ -65,6 +71,21 @@ namespace ExoBeasts.Managers.Loading
                 NetworkManager.Singleton.CustomMessagingManager.UnregisterNamedMessageHandler(HIDE_MSG);
                 NetworkManager.Singleton.CustomMessagingManager.RegisterNamedMessageHandler(HIDE_MSG, OnReceiveHideMessage);
             }
+
+            SubscribeToNetworkFailureEvents();
+        }
+
+        private void SubscribeToNetworkFailureEvents()
+        {
+            if (NetworkManager.Singleton == null)
+                return;
+
+            NetworkManager.Singleton.OnTransportFailure -= OnTransportFailure;
+            NetworkManager.Singleton.OnTransportFailure += OnTransportFailure;
+            NetworkManager.Singleton.OnClientStopped -= OnNetworkStopped;
+            NetworkManager.Singleton.OnClientStopped += OnNetworkStopped;
+            NetworkManager.Singleton.OnServerStopped -= OnNetworkStopped;
+            NetworkManager.Singleton.OnServerStopped += OnNetworkStopped;
         }
 
         private void OnDestroy()
@@ -78,6 +99,9 @@ namespace ExoBeasts.Managers.Loading
             {
                 NetworkManager.Singleton.OnServerStarted -= SubscribeToSceneEvents;
                 NetworkManager.Singleton.OnClientStarted -= SubscribeToSceneEvents;
+                NetworkManager.Singleton.OnTransportFailure -= OnTransportFailure;
+                NetworkManager.Singleton.OnClientStopped -= OnNetworkStopped;
+                NetworkManager.Singleton.OnServerStopped -= OnNetworkStopped;
                 
                 if (NetworkManager.Singleton.CustomMessagingManager != null)
                     NetworkManager.Singleton.CustomMessagingManager.UnregisterNamedMessageHandler(HIDE_MSG);
@@ -105,6 +129,60 @@ namespace ExoBeasts.Managers.Loading
                     }
                     break;
             }
+        }
+
+        private void OnTransportFailure()
+        {
+            TryRecoverLoadingFailure("transport failure");
+        }
+
+        private void OnNetworkStopped(bool wasHost)
+        {
+            TryRecoverLoadingFailure(wasHost ? "host stopped" : "client stopped");
+        }
+
+        private void TryRecoverLoadingFailure(string reason)
+        {
+            if (handlingNetworkFailure)
+                return;
+
+            if (GameModeManager.CurrentMode != GameMode.Multiplayer)
+                return;
+
+            LoadingScreenUI loading = LoadingScreenUI.Instance;
+            if (loading == null || !loading.IsVisible)
+                return;
+
+            Debug.LogWarning($"[SceneTransitionHandler] Falha de rede durante loading ({reason}). Retornando para LobbyScene.");
+            StartCoroutine(ReturnToLobbyAfterNetworkFailure());
+        }
+
+        private System.Collections.IEnumerator ReturnToLobbyAfterNetworkFailure()
+        {
+            handlingNetworkFailure = true;
+
+            if (LoadingScreenUI.Instance != null)
+                LoadingScreenUI.Instance.ForceHide();
+
+            LobbyManager.TryGetExistingInstance()?.ForceResetRuntimeState(false);
+            GameModeManager.ReturnToMultiplayerLobby();
+
+            NetworkManager nm = NetworkManager.Singleton;
+            if (nm != null && (nm.IsListening || nm.IsClient || nm.IsHost || nm.IsServer))
+            {
+                nm.Shutdown();
+
+                float elapsed = 0f;
+                while (nm.IsListening && elapsed < 3f)
+                {
+                    elapsed += Time.unscaledDeltaTime;
+                    yield return null;
+                }
+            }
+
+            global::LobbySceneUI.SetPendingStatusMessage(NETWORK_FAILURE_MESSAGE);
+            SceneManager.LoadScene(LOBBY_SCENE_NAME, LoadSceneMode.Single);
+            handlingNetworkFailure = false;
         }
 
         private void HideLoadingForEveryone()

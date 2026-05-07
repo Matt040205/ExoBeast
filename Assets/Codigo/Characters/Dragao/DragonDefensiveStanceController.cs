@@ -79,6 +79,9 @@ public class DragonDefensiveStanceController : NetworkBehaviour
         if (IsStanceActive())
             return false;
 
+        if (!CanActivateFromGround())
+            return false;
+
         if (abilityController != null)
             abilityController.SetAbilityUsage(ability, true);
 
@@ -92,6 +95,12 @@ public class DragonDefensiveStanceController : NetworkBehaviour
         SetActiveState(true);
         activeRoutine = StartCoroutine(ActiveRoutine(duration));
         return true;
+    }
+
+    private void LateUpdate()
+    {
+        if (currentShieldVfx != null && IsStanceActive())
+            UpdateShieldVfxTransform();
     }
 
     private IEnumerator ActiveRoutine(float duration)
@@ -227,10 +236,13 @@ public class DragonDefensiveStanceController : NetworkBehaviour
                 GameObject shieldPrefab = GetShieldPrefab();
                 if (shieldPrefab != null)
                 {
-                    // Spawna na frente do personagem e parenteado nele para acompanhar o movimento
-                    Vector3 spawnPos = transform.position + transform.forward * 1.0f + Vector3.up * 1f;
-                    currentShieldVfx = Instantiate(shieldPrefab, spawnPos, transform.rotation, transform);
+                    currentShieldVfx = Instantiate(shieldPrefab, transform.position, transform.rotation, transform);
+                    UpdateShieldVfxTransform();
                 }
+            }
+            else
+            {
+                UpdateShieldVfxTransform();
             }
         }
         else
@@ -241,6 +253,39 @@ public class DragonDefensiveStanceController : NetworkBehaviour
                 currentShieldVfx = null;
             }
         }
+    }
+
+    private bool CanActivateFromGround()
+    {
+        ResolveDependencies();
+
+        if (playerMovement != null)
+            return playerMovement.IsGroundedForGameplay(0.75f);
+
+        CharacterController characterController = GetComponent<CharacterController>();
+        if (characterController != null && characterController.enabled)
+            return characterController.isGrounded;
+
+        return Physics.Raycast(transform.position + Vector3.up * 0.25f, Vector3.down, 1.0f);
+    }
+
+    private void UpdateShieldVfxTransform()
+    {
+        if (currentShieldVfx == null)
+            return;
+
+        Vector3 aimForward = AbilityAimUtility.ResolveAimForward(gameObject);
+        if (aimForward.sqrMagnitude <= 0.0001f)
+            aimForward = transform.forward;
+
+        aimForward.y = 0f;
+        if (aimForward.sqrMagnitude <= 0.0001f)
+            aimForward = Vector3.forward;
+
+        aimForward.Normalize();
+        Vector3 shieldPosition = transform.position + aimForward * 1.0f + Vector3.up * 1f;
+        Quaternion shieldRotation = Quaternion.LookRotation(aimForward, Vector3.up);
+        currentShieldVfx.transform.SetPositionAndRotation(shieldPosition, shieldRotation);
     }
 
     private GameObject GetShieldPrefab()

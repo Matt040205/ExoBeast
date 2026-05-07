@@ -31,6 +31,8 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
     private GameObject caster;
     private LayerMask visualRaycastMask;
     private Animator anim;
+    private bool hasAppliedBeamDamage;
+    private bool hasShownBeamVisual;
 
     public override void OnNetworkSpawn()
     {
@@ -99,7 +101,14 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
         netWidth.Value = width;
         netCaster.Value = new NetworkObjectReference(caster.GetComponent<NetworkObject>());
 
+        StartCoroutine(ServerForceBeamVisualFallback());
         StartCoroutine(ServerDespawnCoroutine());
+    }
+
+    private IEnumerator ServerForceBeamVisualFallback()
+    {
+        yield return null;
+        ForceBeamVisualClientRpc();
     }
 
     private IEnumerator ServerDespawnCoroutine()
@@ -114,20 +123,36 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
     public void AnimEvent_FireBeam()
     {
         // Called by Animator on all clients because animations are synced via NetworkAnimator
-        if (IsServer)
-        {
-            ApplyBeamDamage();
-        }
+        TryApplyBeamDamageOnce();
+        TryShowBeamVisualLocal();
+    }
 
-        if (IsClient && beamVisualPrefab != null)
-        {
-            if (netCaster.Value.TryGet(out NetworkObject casterNO) && casterNO.IsOwner)
-            {
-                JuiceEvents.OnCameraShake?.Invoke(transform.forward, ultimateShake.amplitude, ultimateShake.frequency, ultimateShake.duration);
-            }
-            
-            StartCoroutine(ShowBeamVisual());
-        }
+    [ClientRpc]
+    private void ForceBeamVisualClientRpc()
+    {
+        TryShowBeamVisualLocal();
+    }
+
+    private void TryApplyBeamDamageOnce()
+    {
+        if (!IsServer || hasAppliedBeamDamage)
+            return;
+
+        hasAppliedBeamDamage = true;
+        ApplyBeamDamage();
+    }
+
+    private void TryShowBeamVisualLocal()
+    {
+        if (!IsClient || beamVisualPrefab == null || hasShownBeamVisual)
+            return;
+
+        hasShownBeamVisual = true;
+
+        if (netCaster.Value.TryGet(out NetworkObject casterNO) && casterNO.IsOwner)
+            JuiceEvents.OnCameraShake?.Invoke(transform.forward, ultimateShake.amplitude, ultimateShake.frequency, ultimateShake.duration);
+
+        StartCoroutine(ShowBeamVisual());
     }
 
     private IEnumerator ShowBeamVisual()
@@ -206,11 +231,12 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
         Vector3 direction = transform.forward;
 
         RaycastHit[] inimigosAcertados = Physics.SphereCastAll(startPoint, netWidth.Value, direction, netRange.Value, enemyLayer);
+        HashSet<EnemyHealthSystem> damagedEnemies = new HashSet<EnemyHealthSystem>();
 
         foreach (var hit in inimigosAcertados)
         {
-            EnemyHealthSystem vidaInimigo = hit.collider.GetComponent<EnemyHealthSystem>();
-            if (vidaInimigo != null)
+            EnemyHealthSystem vidaInimigo = hit.collider.GetComponentInParent<EnemyHealthSystem>();
+            if (vidaInimigo != null && damagedEnemies.Add(vidaInimigo))
             {
                 vidaInimigo.TakeDamage(netDamage.Value, 0f, false);
             }

@@ -21,6 +21,13 @@ using ExoBeasts.Managers;
 /// </summary>
 public class LobbySceneUI : MonoBehaviour
 {
+    private static string pendingStatusMessage;
+
+    public static void SetPendingStatusMessage(string message)
+    {
+        pendingStatusMessage = message ?? "";
+    }
+
     // ── Painéis ────────────────────────────────────────────────────────────
     // Fluxo: painel Lobby → painel CriarLobby → painel Jogadores
     [Header("Painéis (auto-detectados por nome se não atribuídos)")]
@@ -97,6 +104,7 @@ public class LobbySceneUI : MonoBehaviour
         if (iniciarPartidaButton != null) iniciarPartidaButton.gameObject.SetActive(false);
 
         SetState(State.LobbyMenu);
+        PreviewPendingStatusMessage();
         StartCoroutine(InitEOSFlow());
     }
 
@@ -499,6 +507,7 @@ public class LobbySceneUI : MonoBehaviour
         if (!string.IsNullOrEmpty(nick) && nickField != null) nickField.text = nick;
         AtualizarNickLocal();
         SetStatus("Pronto! Crie ou entre em uma sala.");
+        TryApplyPendingStatusMessage();
     }
 
     private void OnLoginFailed(string err) => SetStatus($"Falha no login: {err}");
@@ -720,6 +729,22 @@ public class LobbySceneUI : MonoBehaviour
         Debug.Log($"[LobbySceneUI] {msg}");
     }
 
+    private void PreviewPendingStatusMessage()
+    {
+        if (!string.IsNullOrEmpty(pendingStatusMessage))
+            SetStatus(pendingStatusMessage);
+    }
+
+    private bool TryApplyPendingStatusMessage()
+    {
+        if (string.IsNullOrEmpty(pendingStatusMessage))
+            return false;
+
+        SetStatus(pendingStatusMessage);
+        pendingStatusMessage = "";
+        return true;
+    }
+
     private void SubscribeEvents()
     {
         if (_auth != null)
@@ -793,6 +818,7 @@ public class LobbySceneUI : MonoBehaviour
             string savedNick = PlayerPrefs.GetString("PlayerDisplayName", "");
             if (!string.IsNullOrEmpty(savedNick) && nickField != null) nickField.text = savedNick;
             SetStatus("Pronto! Crie ou entre em uma sala.");
+            TryApplyPendingStatusMessage();
             _eosRunning = false;
             yield break;
         }

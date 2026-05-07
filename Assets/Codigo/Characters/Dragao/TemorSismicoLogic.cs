@@ -5,6 +5,9 @@ using ExoBeasts.Multiplayer.Sync;
 [RequireComponent(typeof(NetworkObject))]
 public class TemorSismicoLogic : NetworkBehaviour
 {
+    private const int MinVisualSlashes = 3;
+    private const int MaxVisualSlashes = 5;
+
     private float range;
     private float angle;
     private float damage;
@@ -80,7 +83,7 @@ public class TemorSismicoLogic : NetworkBehaviour
         if (vfxSlowRateOverride >= 0f) slowDownRate = vfxSlowRateOverride;
         if (vfxFadeTimeOverride > 0f) fadeOutGracePeriod = vfxFadeTimeOverride;
 
-        numberOfSlashes = Mathf.Max(1, numberOfSlashes);
+        numberOfSlashes = ResolveRuntimeSlashCount(numberOfSlashes);
         totalLifeTime = Mathf.Max(2f, travelTime + fadeOutGracePeriod + 0.5f);
 
         isConfigured = true;
@@ -98,6 +101,7 @@ public class TemorSismicoLogic : NetworkBehaviour
         // Inicializamos com base nos serialized fields (que vieram com o prefab).
         if (!IsServer)
         {
+            numberOfSlashes = ResolveRuntimeSlashCount(numberOfSlashes);
             totalLifeTime = Mathf.Max(2f, travelTime + fadeOutGracePeriod + 0.5f);
         }
 
@@ -173,11 +177,15 @@ public class TemorSismicoLogic : NetworkBehaviour
     private void SpawnVisualSlashes()
     {
         if (groundSlashPrefab == null) return;
-        
-        float startingAngle = numberOfSlashes > 1 ? -angle / 2f : 0f;
-        float angleStep = numberOfSlashes > 1 ? angle / (numberOfSlashes - 1) : 0f;
 
-        for (int i = 0; i < numberOfSlashes; i++)
+        int slashCount = ResolveRuntimeSlashCount(numberOfSlashes);
+        numberOfSlashes = slashCount;
+        float visualAngle = angle > 0.1f ? angle : 60f;
+        
+        float startingAngle = slashCount > 1 ? -visualAngle / 2f : 0f;
+        float angleStep = slashCount > 1 ? visualAngle / (slashCount - 1) : 0f;
+
+        for (int i = 0; i < slashCount; i++)
         {
             float currentAngle = startingAngle + (angleStep * i);
             Quaternion rotationOffset = Quaternion.Euler(0f, currentAngle, 0f);
@@ -203,6 +211,11 @@ public class TemorSismicoLogic : NetworkBehaviour
             };
             visualSlashes.Add(vs);
         }
+    }
+
+    private int ResolveRuntimeSlashCount(int configuredCount)
+    {
+        return Mathf.Clamp(configuredCount, MinVisualSlashes, MaxVisualSlashes);
     }
 
     private void Update()

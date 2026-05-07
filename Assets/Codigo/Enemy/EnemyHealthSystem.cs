@@ -10,8 +10,10 @@ public class EnemyHealthSystem : MonoBehaviour
     public EnemyDataSO enemyData;
     public Material markedMaterial;
     private Renderer enemyRenderer;
+    private Renderer[] enemyRenderers;
     private WorldSpaceEnemyUI worldSpaceUI;
     private Material[] originalMaterials;
+    private readonly Dictionary<Renderer, Material[]> originalRendererMaterials = new Dictionary<Renderer, Material[]>();
 
     [Header("Feedback Visual")]
     public GameObject deathVfxPrefab;
@@ -45,15 +47,8 @@ public class EnemyHealthSystem : MonoBehaviour
         networkedEnemy = GetComponent<NetworkedEnemy>();
         worldSpaceUI = GetComponentInChildren<WorldSpaceEnemyUI>();
 
-        enemyRenderer = GetComponent<Renderer>();
-        if (enemyRenderer == null) enemyRenderer = GetComponentInChildren<Renderer>();
-
         propBlock = new MaterialPropertyBlock();
-
-        if (enemyRenderer != null)
-        {
-            originalMaterials = enemyRenderer.materials.ToArray();
-        }
+        CacheRenderers();
     }
 
     public void InitializeHealth(int level)
@@ -68,13 +63,8 @@ public class EnemyHealthSystem : MonoBehaviour
         markedDamageMultiplier = 1f;
         vulnerabilityMultiplier = 1f;
 
-        if (enemyRenderer != null && originalMaterials != null)
-        {
-            enemyRenderer.materials = originalMaterials;
-            enemyRenderer.GetPropertyBlock(propBlock);
-            propBlock.Clear();
-            enemyRenderer.SetPropertyBlock(propBlock);
-        }
+        RestoreOriginalMaterialsOnAllRenderers();
+        ClearPropertyBlocksOnAllRenderers();
         isMarked = false;
 
         if (networkedEnemy != null && networkedEnemy.IsServer)
@@ -257,19 +247,102 @@ public class EnemyHealthSystem : MonoBehaviour
     /// </summary>
     public void ApplyMarkedVisualLocal(bool marked)
     {
-        if (enemyRenderer == null || originalMaterials == null) return;
+        if (!HasCachedRenderers()) return;
 
         if (marked && markedMaterial != null)
         {
-            Material[] markMats = new Material[originalMaterials.Length];
-            for (int i = 0; i < markMats.Length; i++) markMats[i] = markedMaterial;
-            enemyRenderer.materials = markMats;
+            ApplyMaterialToAllRenderers(markedMaterial);
             isMarked = true;
         }
         else if (!marked && isMarked)
         {
-            enemyRenderer.materials = originalMaterials;
+            RestoreOriginalMaterialsOnAllRenderers();
             isMarked = false;
+        }
+    }
+
+    private void CacheRenderers()
+    {
+        enemyRenderer = GetComponent<Renderer>();
+        enemyRenderers = GetComponentsInChildren<Renderer>(true);
+
+        if ((enemyRenderers == null || enemyRenderers.Length == 0) && enemyRenderer != null)
+            enemyRenderers = new[] { enemyRenderer };
+
+        if (enemyRenderer == null && enemyRenderers != null && enemyRenderers.Length > 0)
+            enemyRenderer = enemyRenderers[0];
+
+        originalRendererMaterials.Clear();
+        if (enemyRenderers != null)
+        {
+            foreach (Renderer renderer in enemyRenderers)
+            {
+                if (renderer == null || originalRendererMaterials.ContainsKey(renderer))
+                    continue;
+
+                originalRendererMaterials.Add(renderer, renderer.materials.ToArray());
+            }
+        }
+
+        if (enemyRenderer != null && originalMaterials == null)
+            originalMaterials = enemyRenderer.materials.ToArray();
+    }
+
+    private bool HasCachedRenderers()
+    {
+        if (enemyRenderers == null || enemyRenderers.Length == 0 || originalRendererMaterials.Count == 0)
+            CacheRenderers();
+
+        return enemyRenderers != null && enemyRenderers.Length > 0 && originalRendererMaterials.Count > 0;
+    }
+
+    private void ApplyMaterialToAllRenderers(Material material)
+    {
+        if (material == null || !HasCachedRenderers())
+            return;
+
+        foreach (Renderer renderer in enemyRenderers)
+        {
+            if (renderer == null)
+                continue;
+
+            int materialCount = 1;
+            if (originalRendererMaterials.TryGetValue(renderer, out Material[] rendererOriginals) && rendererOriginals != null)
+                materialCount = Mathf.Max(1, rendererOriginals.Length);
+
+            Material[] markMats = new Material[materialCount];
+            for (int i = 0; i < markMats.Length; i++)
+                markMats[i] = material;
+
+            renderer.materials = markMats;
+        }
+    }
+
+    private void RestoreOriginalMaterialsOnAllRenderers()
+    {
+        if (!HasCachedRenderers())
+            return;
+
+        foreach (KeyValuePair<Renderer, Material[]> pair in originalRendererMaterials)
+        {
+            if (pair.Key != null && pair.Value != null)
+                pair.Key.materials = pair.Value;
+        }
+    }
+
+    private void ClearPropertyBlocksOnAllRenderers()
+    {
+        if (!HasCachedRenderers())
+            return;
+
+        foreach (Renderer renderer in enemyRenderers)
+        {
+            if (renderer == null)
+                continue;
+
+            renderer.GetPropertyBlock(propBlock);
+            propBlock.Clear();
+            renderer.SetPropertyBlock(propBlock);
         }
     }
 
@@ -305,20 +378,13 @@ public class EnemyHealthSystem : MonoBehaviour
     private IEnumerator RevealRoutine(float duration)
     {
         revealCounter++;
-        if (enemyRenderer != null && markedMaterial != null)
-        {
-            Material[] markMats = new Material[originalMaterials.Length];
-            for (int i = 0; i < markMats.Length; i++) markMats[i] = markedMaterial;
-            enemyRenderer.materials = markMats;
-        }
+        ApplyMaterialToAllRenderers(markedMaterial);
 
         yield return new WaitForSeconds(duration);
         revealCounter--;
 
-        if (revealCounter <= 0 && enemyRenderer != null && originalMaterials != null && !isMarked)
-        {
-            enemyRenderer.materials = originalMaterials;
-        }
+        if (revealCounter <= 0 && !isMarked)
+            RestoreOriginalMaterialsOnAllRenderers();
     }
 
     public bool IsArmorShredded => armorShredStacks > 0;

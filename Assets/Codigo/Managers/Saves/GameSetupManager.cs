@@ -178,12 +178,30 @@ public class GameSetupManager : NetworkBehaviour
         if (PlayerRegistry.Instance != null)
         {
             PlayerRegistry.Instance.RegisterPlayer(clientId, playerInstance, charIndex);
+            RefreshEnemyTargetsAfterPlayerRegistration(clientId);
         }
 
         Debug.Log($"[GameSetupManager] Spawnou clientId={clientId} como charIndex={charIndex} ({characterEscolhido?.name})");
 
         if (BuildManager.Instance != null && GameDataManager.Instance != null)
             BuildManager.Instance.SetAvailableTowers(GameDataManager.Instance.equipeSelecionada);
+    }
+
+    private void RefreshEnemyTargetsAfterPlayerRegistration(ulong clientId)
+    {
+        if (!IsServer)
+            return;
+
+        EnemyController[] enemies = FindObjectsByType<EnemyController>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        foreach (EnemyController enemy in enemies)
+        {
+            if (enemy == null || enemy.IsDead)
+                continue;
+
+            enemy.RefreshTargetNow();
+        }
+
+        Debug.Log($"[GameSetupManager] Targets de {enemies.Length} inimigo(s) atualizados apos registrar clientId={clientId}.");
     }
 
     private void ValidateObjectiveHealthSetup()
