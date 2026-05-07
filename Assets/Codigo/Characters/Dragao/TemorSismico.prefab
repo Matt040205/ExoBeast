@@ -45,7 +45,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 0
+  GlobalObjectIdHash: 3558998008
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -66,3 +66,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ddca53d78b1ac54c8a3721ac40b28fa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  groundSlashPrefab: {fileID: 6226563308423734848, guid: ebe444e1bf5cfc644b2ca519e1b89da8, type: 3}
+  numberOfSlashes: 3
+  travelSpeed: 14
+  travelTime: 1.5
+  slowDownRate: 0.5
+  fadeOutGracePeriod: 2

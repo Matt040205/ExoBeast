@@ -93,6 +93,19 @@ public class MeleeCombatSystem : NetworkBehaviour
 
     private bool hitProcessedForCurrentAttack = false;
     private bool isInAttackSequence = false;
+    private PlayerMovement cachedMovement;
+
+    /// <summary>
+    /// BUG FIX (Bug 9 - 7 Maio 2026): forca o modelPivot a apontar para a camera ANTES de
+    /// disparar o trigger de ataque. Sem isso, attackPoint (child do modelPivot) ficava na
+    /// rotacao do spawn quando o jogador estava parado e nao mirando — Dragao so batia para
+    /// o lado em que spawnou. Centralizado num helper para Update() e OnFire() compartilharem.
+    /// </summary>
+    private void FaceCameraBeforeAttack()
+    {
+        if (cachedMovement == null) cachedMovement = GetComponent<PlayerMovement>();
+        if (cachedMovement != null) cachedMovement.FaceCameraImmediately();
+    }
 
     public void OnFire(InputAction.CallbackContext ctx)
     {
@@ -104,6 +117,8 @@ public class MeleeCombatSystem : NetworkBehaviour
 
         if (ctx.performed && !PauseControl.isPaused && !BuildManager.isBuildingMode)
         {
+            FaceCameraBeforeAttack();
+
             // CORREÇÃO DA LINHA 79: Usando a referência segura para o NetworkAnimator
             if (networkAnimator != null) networkAnimator.SetTrigger("Attack");
 
@@ -145,6 +160,8 @@ public class MeleeCombatSystem : NetworkBehaviour
                 if (inputBridge.ConsumeMeleeAttackPressed() &&
                     !PauseControl.isPaused && !BuildManager.isBuildingMode)
                 {
+                    FaceCameraBeforeAttack();
+
                     if (networkAnimator != null) networkAnimator.SetTrigger("Attack");
                     hitProcessedForCurrentAttack = false;
                     isInAttackSequence = true;

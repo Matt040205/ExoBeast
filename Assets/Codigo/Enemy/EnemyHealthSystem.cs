@@ -235,20 +235,38 @@ public class EnemyHealthSystem : MonoBehaviour
         if (networkedEnemy != null && !networkedEnemy.IsServer) return;
         markedDamageMultiplier = multiplier;
 
-        if (multiplier > 1.0f && enemyRenderer != null && markedMaterial != null)
+        // BUG FIX (Bug 2b - 7 Maio 2026): visual estava limitado ao servidor. Agora aplicamos
+        // local + broadcast via ClientRpc para que TODOS os clientes vejam o highlight da marca.
+        bool shouldMark = multiplier > 1.0f;
+        ApplyMarkedVisualLocal(shouldMark);
+
+        if (networkedEnemy != null && networkedEnemy.IsSpawned)
+            networkedEnemy.ApplyMarkVisualClientRpc(shouldMark);
+
+        if (shouldMark && duration > 0)
+        {
+            if (markCoroutine != null) StopCoroutine(markCoroutine);
+            markCoroutine = StartCoroutine(MarkExpirationRoutine(duration));
+        }
+    }
+
+    /// <summary>
+    /// Aplica apenas o efeito visual da marca (troca de material). Chamado tanto local-side
+    /// (pelo servidor em ApplyMarkedStatus) quanto via ClientRpc para todos os clientes.
+    /// Nao altera markedDamageMultiplier — esse eh server-authoritative em ApplyMarkedStatus.
+    /// </summary>
+    public void ApplyMarkedVisualLocal(bool marked)
+    {
+        if (enemyRenderer == null || originalMaterials == null) return;
+
+        if (marked && markedMaterial != null)
         {
             Material[] markMats = new Material[originalMaterials.Length];
             for (int i = 0; i < markMats.Length; i++) markMats[i] = markedMaterial;
             enemyRenderer.materials = markMats;
             isMarked = true;
-
-            if (duration > 0)
-            {
-                if (markCoroutine != null) StopCoroutine(markCoroutine);
-                markCoroutine = StartCoroutine(MarkExpirationRoutine(duration));
-            }
         }
-        else if (multiplier <= 1.0f && enemyRenderer != null && originalMaterials != null && isMarked)
+        else if (!marked && isMarked)
         {
             enemyRenderer.materials = originalMaterials;
             isMarked = false;

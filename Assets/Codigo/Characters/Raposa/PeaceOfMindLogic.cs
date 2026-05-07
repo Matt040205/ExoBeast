@@ -25,12 +25,14 @@ public class PeaceOfMindLogic : NetworkBehaviour
 
     public void StartEffect(float totalHeal, float duration, Ability sourceAbility)
     {
-        RequestPeaceOfMindServerRpc(totalHeal, duration);
-    }
+        // BUG FIX (Bug 3 - 7 Maio 2026): antes esta chamada usava RequestPeaceOfMindServerRpc
+        // sem RequireOwnership=false. Como Activate() ja roda no servidor (via
+        // RequestActivateAbilityServerRpc no CommanderAbilityController) e o servidor (clientId 0)
+        // NAO eh owner do player Raposa (cliente clientId 4), o NGO REJEITAVA a ServerRpc com
+        // warning silencioso por ownership mismatch. Resultado: cura nunca aplicava.
+        // Correcao: replicar padrao do NineTailsDanceLogic.StartEffect — rodar direto no servidor.
+        if (!IsServer) return;
 
-    [ServerRpc]
-    private void RequestPeaceOfMindServerRpc(float totalHeal, float duration)
-    {
         healthSystem = GetComponent<PlayerHealthSystem>();
         if (healthSystem != null)
         {

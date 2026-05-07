@@ -43,6 +43,7 @@ public class EnemyController : MonoBehaviour
     private EnemyHealthSystem healthSystem;
     private EnemyCombatSystem combatSystem;
     private EnemyStatusController statusController;
+    private ExoBeasts.Multiplayer.Sync.NetworkedEnemy networkedEnemy;
 
     private Transform target;
     private Transform playerTransform;
@@ -74,6 +75,7 @@ public class EnemyController : MonoBehaviour
         healthSystem = GetComponent<EnemyHealthSystem>();
         combatSystem = GetComponent<EnemyCombatSystem>();
         statusController = GetComponent<EnemyStatusController>();
+        networkedEnemy = GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedEnemy>();
 
         if (statusController == null)
             statusController = gameObject.AddComponent<EnemyStatusController>();
@@ -247,6 +249,10 @@ public class EnemyController : MonoBehaviour
         }
     }
 
+    // Buffer pre-alocado para Physics.OverlapSphereNonAlloc — evita GC todo tick.
+    // 64 colliders é generoso para um raio de visão típico de inimigo (findDistance ~15m).
+    private static readonly Collider[] _targetingBuffer = new Collider[64];
+
     private void DecideTargetTick()
     {
         float allowedRadius = (mainPriority == AITargetPriority.Player) ? findDistance : selfDefenseRadius;
@@ -254,8 +260,10 @@ public class EnemyController : MonoBehaviour
         Transform nearestEntity = null;
         float nearestDistance = float.MaxValue;
 
-        // 1. Busca Jogadores (via Registry e Fallback)
-        if (PlayerRegistry.Instance != null)
+        // 1. Busca Jogadores via PlayerRegistry (fonte autoritativa server-side).
+        // Em singleplayer (sem NGO), PlayerRegistry pode não existir — caímos no fallback
+        // por tag UMA VEZ apenas (em vez de todo tick) via early return abaixo.
+        if (PlayerRegistry.Instance != null && PlayerRegistry.Instance.GetPlayerCount() > 0)
         {
             foreach (GameObject playerObject in PlayerRegistry.Instance.GetAllPlayers().Values)
             {
@@ -270,26 +278,31 @@ public class EnemyController : MonoBehaviour
                 }
             }
         }
-
-        // Fallback garantido caso o Registry demore a syncar o Host
-        GameObject[] fallbackPlayers = GameObject.FindGameObjectsWithTag("Player");
-        foreach (GameObject playerObject in fallbackPlayers)
+        else
         {
-            if (playerObject == null || playerObject.CompareTag(TAG_POCA))
-                continue;
-
-            float distance = Vector3.Distance(transform.position, playerObject.transform.position);
-            if (distance < nearestDistance)
+            // Fallback singleplayer: registry vazio = não há rede ativa, então cai no FindWithTag.
+            // FindGameObjectsWithTag (plural) percorre toda a hierarchy a cada chamada — 90+ scans/s
+            // em wave de 30 inimigos. Aqui usamos FindWithTag (singular) que para no primeiro match.
+            GameObject fallbackPlayer = GameObject.FindWithTag("Player");
+            if (fallbackPlayer != null && !fallbackPlayer.CompareTag(TAG_POCA))
             {
-                nearestDistance = distance;
-                nearestEntity = playerObject.transform;
+                float distance = Vector3.Distance(transform.position, fallbackPlayer.transform.position);
+                if (distance < nearestDistance)
+                {
+                    nearestDistance = distance;
+                    nearestEntity = fallbackPlayer.transform;
+                }
             }
         }
 
-        // 2. Busca Torres (apenas dentro do allowedRadius para otimizar Physics)
-        Collider[] hitTowers = Physics.OverlapSphere(transform.position, allowedRadius);
-        foreach (Collider col in hitTowers)
+        // 2. Busca Torres (apenas dentro do allowedRadius para otimizar Physics).
+        // OverlapSphereNonAlloc reutiliza o buffer estático — zero alocação por tick.
+        int hitCount = Physics.OverlapSphereNonAlloc(transform.position, allowedRadius, _targetingBuffer);
+        for (int i = 0; i < hitCount; i++)
         {
+            Collider col = _targetingBuffer[i];
+            if (col == null) continue;
+
             TowerController tower = col.GetComponent<TowerController>();
             if (tower != null)
             {
@@ -605,6 +618,24 @@ public class EnemyController : MonoBehaviour
     }
 
     private void SetAggroVisual(bool isActive)
+    {
+        // BUG FIX (Bugs 4 e 5 - 7 Maio 2026): antes SetAggroVisual so rodava local-side no servidor
+        // (porque AI_TickRoutine so eh server-side). Resultado: cliente nunca via o ponto de
+        // exclamacao quando o inimigo o detectava — parecia que o inimigo nao detectava o jogador 2.
+        // Agora o servidor aplica local + broadcast via ClientRpc para sincronizar todos os clientes.
+        SetAggroVisualLocal(isActive);
+
+        if (networkedEnemy != null && networkedEnemy.IsSpawned)
+            networkedEnemy.SetAggroVisualClientRpc(isActive);
+    }
+
+    /// <summary>
+    /// Aplica APENAS o efeito visual do aggro (set active do indicador). Chamado tanto local-side
+    /// (servidor em SetAggroVisual) quanto via ClientRpc broadcast (clientes em SetAggroVisualClientRpc).
+    /// Publico porque NetworkedEnemy chama via GetComponent — EnemyController fica disabled em
+    /// clientes nao-servidor mas metodos publicos podem ser invocados manualmente.
+    /// </summary>
+    public void SetAggroVisualLocal(bool isActive)
     {
         if (aggroIndicatorVisual != null && aggroIndicatorVisual.activeSelf != isActive)
         {

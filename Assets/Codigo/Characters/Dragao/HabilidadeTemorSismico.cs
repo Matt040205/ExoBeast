@@ -55,6 +55,11 @@ public class HabilidadeTemorSismico : Ability
             quemUsou.transform.position,
             AbilityAimUtility.ResolveAimRotation(quemUsou));
 
+        // ATENCAO BUG FIX (Bug 1 - 7 Maio 2026): groundSlashPrefab e demais params visuais agora vivem
+        // no prefab TemorSismico.prefab (SerializedField em TemorSismicoLogic). Os parametros do SO
+        // ainda sao passados como override (server-only) — mas para os clientes verem o visual,
+        // o PREFAB precisa ter os mesmos valores no Inspector. Idealmente os campos visuais devem
+        // ser removidos do SO no futuro para evitar duplicacao (single source of truth no prefab).
         logic.Setup(
             quemUsou,
             range,

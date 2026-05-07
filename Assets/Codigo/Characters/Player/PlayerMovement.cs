@@ -470,6 +470,24 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// BUG FIX (Bug 9 - 7 Maio 2026): forca o modelPivot a apontar imediatamente para a direcao
+    /// horizontal da camera. Usado pelo MeleeCombatSystem para garantir que o ataque sai na
+    /// direcao certa mesmo quando o personagem esta parado e sem aim ativo (caso da Dragao).
+    /// Sem isso, LateUpdate so rotaciona se isAiming || direction.sqrMagnitude > 0.01f, entao
+    /// o melee ficava preso na rotacao do spawn.
+    /// </summary>
+    public void FaceCameraImmediately()
+    {
+        if (!IsOwner) return;
+        if (modelPivot == null || cameraController == null) return;
+
+        float cameraYaw = cameraController.eulerAngles.y;
+        modelPivot.rotation = Quaternion.Euler(0f, cameraYaw, 0f);
+        targetAngle = cameraYaw;        // alinha o targetAngle do SmoothDamp para nao "puxar" de volta
+        netModelYRot.Value = cameraYaw; // replica para remotos
+    }
+
     private void ApplyGravity()
     {
         if (isGrounded && velocity.y < 0)

@@ -271,6 +271,20 @@ public class TowerController : MonoBehaviour
         Vector3 originPoint = firePoint != null ? firePoint.position : (partToRotate != null ? partToRotate.position : transform.position);
         TowerTracerVFX tracer = GetComponentInChildren<TowerTracerVFX>();
 
+        // Em clientes nao-servidor: dano nunca eh aplicado (ProcessDamageInstance sai cedo via HasCombatAuthority).
+        // Pular SphereCastAll/HashSet/ProcessDamageInstance evita CPU + alocacao redundantes em cada cliente
+        // (ate 4 maquinas multiplicando o custo). Mantemos o tracer local como predicao visual.
+        if (!HasCombatAuthority())
+        {
+            if (tracer != null)
+            {
+                Collider enemyCol = targetEnemy.GetComponentInChildren<Collider>();
+                Vector3 endPoint = enemyCol != null ? enemyCol.ClosestPoint(originPoint) : targetEnemy.position;
+                tracer.DrawTracer(originPoint, endPoint);
+            }
+            return;
+        }
+
         PiercingBehavior piercer = GetComponent<PiercingBehavior>();
         if (piercer != null)
         {
@@ -379,17 +393,24 @@ public class TowerController : MonoBehaviour
         partToRotate.rotation = Quaternion.Euler(0f, smoothedRotation.y, 0f);
     }
 
+    // Buffer pre-alocado para Physics.OverlapSphereNonAlloc — evita GC a cada UpdateTarget (2x/s/torre).
+    // 64 colliders cobre cenarios densos de wave; tamanho fixo evita realocacao.
+    private static readonly Collider[] _targetingBuffer = new Collider[64];
+
     void UpdateTarget()
     {
         Vector3 originPoint = partToRotate != null ? partToRotate.position : transform.position;
 
-        Collider[] collidersInRadius = Physics.OverlapSphere(originPoint, CurrentRange);
+        int hitCount = Physics.OverlapSphereNonAlloc(originPoint, CurrentRange, _targetingBuffer);
 
         Transform nearestEnemy = null;
         float shortestDistance = Mathf.Infinity;
 
-        foreach (Collider col in collidersInRadius)
+        for (int i = 0; i < hitCount; i++)
         {
+            Collider col = _targetingBuffer[i];
+            if (col == null) continue;
+
             if (col.CompareTag(enemyTag) || (col.transform.parent != null && col.transform.parent.CompareTag(enemyTag)))
             {
                 EnemyController enemyController = col.GetComponent<EnemyController>();

@@ -156,5 +156,28 @@ namespace ExoBeasts.Multiplayer.Sync
             if (combatInfo != null && combatInfo.attackVfxPrefab != null)
                 GlobalVFXPool.GetVFX(combatInfo.attackVfxPrefab, position, rotation, 2f);
         }
+
+        // BUG FIX (Bug 2b - Coruja Skill 2 PerseguindoPresas - 7 Maio 2026):
+        // Antes, EnemyHealthSystem.ApplyMarkedStatus saia cedo em clientes (sem efeito visual),
+        // entao a marca da Coruja so aparecia no host. Agora o servidor broadcast esse RPC para
+        // todos os clientes aplicarem a troca de material localmente.
+        [ClientRpc]
+        public void ApplyMarkVisualClientRpc(bool marked)
+        {
+            if (localHealth != null)
+                localHealth.ApplyMarkedVisualLocal(marked);
+        }
+
+        // BUG FIX (Bugs 4 e 5 - 7 Maio 2026): broadcast do estado de aggro do inimigo. EnemyController
+        // chama este RPC sempre que servidor seta o aggroIndicator on/off. Sem isso, clientes nao
+        // viam o ponto de exclamacao quando o inimigo detectava algum jogador.
+        [ClientRpc]
+        public void SetAggroVisualClientRpc(bool isActive)
+        {
+            // EnemyController fica disabled em clientes (NetworkedEnemy.OnNetworkSpawn:24),
+            // mas metodos publicos ainda podem ser chamados manualmente.
+            if (enemyController != null)
+                enemyController.SetAggroVisualLocal(isActive);
+        }
     }
 }

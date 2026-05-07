@@ -63,8 +63,13 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
         this.caster = casterNO.gameObject;
         this.anim = caster.GetComponentInChildren<Animator>();
 
+        // BUG FIX (Bug 2 - 7 Maio 2026): proxy.magiaAtualDaCacadora precisa ser setado em TODOS os
+        // clientes, nao so owner+server. O Animator dispara AnimEvent_FireBeam via SendMessage
+        // (animation event chamando o metodo no proxy), entao o proxy precisa ter referencia para
+        // ESTA instancia da CacadoraNoturnaLogic em qualquer cliente que vai ver o beam visual.
+        // Antes: clientes nao-owner viam a animacao mas ShowBeamVisual nunca rodava.
         AnimationEventProxy proxy = caster.GetComponentInChildren<AnimationEventProxy>();
-        if (proxy != null && (casterNO.IsOwner || IsServer))
+        if (proxy != null)
         {
             proxy.magiaAtualDaCacadora = this;
         }

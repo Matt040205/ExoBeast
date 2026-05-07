@@ -19,12 +19,19 @@ public class TemorSismicoLogic : NetworkBehaviour
     private PlayerHealthSystem attackerHealth;
 
     // --- Efeitos Visuais ---
-    private GameObject groundSlashPrefab;
-    private int numberOfSlashes;
-    private float travelSpeed;
-    private float travelTime;
-    private float slowDownRate;
-    private float fadeOutGracePeriod;
+    // BUG FIX (Bug 1 - Sessao 7 Maio 2026): estes campos eram private e setados via Setup() que so
+    // roda no servidor. Em clientes remotos, OnNetworkSpawn().SpawnVisualSlashes() saia cedo porque
+    // groundSlashPrefab == null. Agora sao [SerializeField] preenchidos no prefab TemorSismico.prefab,
+    // entao chegam pelos clientes naturalmente quando o NetworkObject eh spawnado.
+    // ATENCAO GAME DESIGNER: arrastar o GroundSlash prefab no campo "groundSlashPrefab" do componente
+    // TemorSismicoLogic no prefab (mesmo prefab que ja esta atribuido no SO HabilidadeTemorSismico).
+    [Header("Visual (preenchido no prefab — sincroniza para todos os clientes)")]
+    [SerializeField] public GameObject groundSlashPrefab;
+    [SerializeField] public int numberOfSlashes = 3;
+    [SerializeField] public float travelSpeed = 14f;
+    [SerializeField] public float travelTime = 1.5f;
+    [SerializeField] public float slowDownRate = 0.5f;
+    [SerializeField] public float fadeOutGracePeriod = 2.0f;
     private float totalLifeTime;
 
     private class VisualSlash
@@ -47,12 +54,12 @@ public class TemorSismicoLogic : NetworkBehaviour
         float newKnockUpForce,
         float newVulnerabilityMultiplier,
         float newVulnerabilityDuration,
-        GameObject vfxPrefab,
-        int slashesCount,
-        float vfxSpeed,
-        float vfxTravelTime,
-        float vfxSlowRate,
-        float vfxFadeTime)
+        GameObject vfxPrefabOverride = null,
+        int slashesCountOverride = -1,
+        float vfxSpeedOverride = -1f,
+        float vfxTravelTimeOverride = -1f,
+        float vfxSlowRateOverride = -1f,
+        float vfxFadeTimeOverride = -1f)
     {
         range = Mathf.Max(0f, newRange);
         angle = Mathf.Clamp(newAngle, 0f, 360f);
@@ -62,13 +69,18 @@ public class TemorSismicoLogic : NetworkBehaviour
         knockUpForce = Mathf.Max(0f, newKnockUpForce);
         vulnerabilityMultiplier = Mathf.Max(1f, newVulnerabilityMultiplier);
         vulnerabilityDuration = Mathf.Max(0f, newVulnerabilityDuration);
-        
-        groundSlashPrefab = vfxPrefab;
-        numberOfSlashes = Mathf.Max(1, slashesCount);
-        travelSpeed = vfxSpeed;
-        travelTime = vfxTravelTime;
-        slowDownRate = vfxSlowRate;
-        fadeOutGracePeriod = vfxFadeTime;
+
+        // Overrides opcionais — se preenchido pelo SO, sobrescreve o serialized do prefab.
+        // ATENCAO: overrides server-only (Setup so roda no servidor) — para sincronizar nos clientes,
+        // os valores TEM QUE estar nos serialized fields do prefab. Estes overrides so afetam o servidor.
+        if (vfxPrefabOverride != null) groundSlashPrefab = vfxPrefabOverride;
+        if (slashesCountOverride > 0) numberOfSlashes = slashesCountOverride;
+        if (vfxSpeedOverride > 0f) travelSpeed = vfxSpeedOverride;
+        if (vfxTravelTimeOverride > 0f) travelTime = vfxTravelTimeOverride;
+        if (vfxSlowRateOverride >= 0f) slowDownRate = vfxSlowRateOverride;
+        if (vfxFadeTimeOverride > 0f) fadeOutGracePeriod = vfxFadeTimeOverride;
+
+        numberOfSlashes = Mathf.Max(1, numberOfSlashes);
         totalLifeTime = Mathf.Max(2f, travelTime + fadeOutGracePeriod + 0.5f);
 
         isConfigured = true;
@@ -81,6 +93,13 @@ public class TemorSismicoLogic : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+
+        // Em clientes nao-servidor, Setup() nunca eh chamado — entao totalLifeTime nao foi calculado.
+        // Inicializamos com base nos serialized fields (que vieram com o prefab).
+        if (!IsServer)
+        {
+            totalLifeTime = Mathf.Max(2f, travelTime + fadeOutGracePeriod + 0.5f);
+        }
 
         if (IsServer)
         {
