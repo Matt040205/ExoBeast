@@ -23,6 +23,8 @@ namespace ExoBeasts.Multiplayer.GameServer
         private Dictionary<ulong, int> playerCharacterChoices = new Dictionary<ulong, int>();
         private Dictionary<ulong, string> playerUserIds = new Dictionary<ulong, string>();
         private Dictionary<string, ulong> userIdToClientId = new Dictionary<string, ulong>();
+        private readonly List<ulong> invalidPlayerIds = new List<ulong>();
+        private const string TAG_POCA = "Poca";
 
         private void Awake()
         {
@@ -54,7 +56,8 @@ namespace ExoBeasts.Multiplayer.GameServer
 
         public void RegisterPlayer(ulong clientId, GameObject playerObj, int characterIndex = 0)
         {
-            if (!IsServer) return;
+            if (!HasServerAuthority()) return;
+            if (playerObj == null) return;
 
             if (playerObjects.TryGetValue(clientId, out var existing) && existing != null && existing != playerObj)
             {
@@ -74,7 +77,7 @@ namespace ExoBeasts.Multiplayer.GameServer
 
         public void SetPlayerCharacterChoice(ulong clientId, int index)
         {
-            if (!IsServer) return;
+            if (!HasServerAuthority()) return;
             playerCharacterChoices[clientId] = index;
         }
 
@@ -87,7 +90,7 @@ namespace ExoBeasts.Multiplayer.GameServer
 
         public void LinkProductUserId(ulong clientId, string productUserId)
         {
-            if (!IsServer) return;
+            if (!HasServerAuthority()) return;
             playerUserIds[clientId] = productUserId;
             userIdToClientId[productUserId] = clientId;
             Debug.Log($"[PlayerRegistry] Link: ClientId={clientId} ↔ UserId={productUserId}");
@@ -105,7 +108,7 @@ namespace ExoBeasts.Multiplayer.GameServer
 
         public void UnregisterPlayer(ulong clientId)
         {
-            if (!IsServer) return;
+            if (!HasServerAuthority()) return;
 
             if (playerUserIds.TryGetValue(clientId, out string uid))
             {
@@ -119,22 +122,32 @@ namespace ExoBeasts.Multiplayer.GameServer
 
         public GameObject GetPlayerObject(ulong clientId)
         {
+            PruneInvalidPlayers();
             if (playerObjects.TryGetValue(clientId, out GameObject obj))
                 return obj;
             return null;
         }
 
-        public Dictionary<ulong, GameObject> GetAllPlayers() => playerObjects;
+        public Dictionary<ulong, GameObject> GetAllPlayers()
+        {
+            PruneInvalidPlayers();
+            return playerObjects;
+        }
 
-        public int GetPlayerCount() => playerObjects.Count;
+        public int GetPlayerCount()
+        {
+            PruneInvalidPlayers();
+            return playerObjects.Count;
+        }
 
         public Transform GetClosestPlayer(Vector3 position)
         {
             float minDist = float.MaxValue;
             Transform closest = null;
+            PruneInvalidPlayers();
             foreach (var p in playerObjects.Values)
             {
-                if (p == null) continue;
+                if (!IsValidPlayerObject(p)) continue;
                 float dist = Vector3.Distance(position, p.transform.position);
                 if (dist < minDist)
                 {
@@ -143,6 +156,112 @@ namespace ExoBeasts.Multiplayer.GameServer
                 }
             }
             return closest;
+        }
+
+        public static int CollectValidPlayerTransforms(List<Transform> results)
+        {
+            if (results == null)
+                return 0;
+
+            results.Clear();
+            CollectNetworkPlayerObjects(results);
+
+            if (results.Count == 0 && Instance != null)
+                Instance.CollectRegisteredPlayers(results);
+
+            if (results.Count == 0)
+                CollectTaggedPlayers(results);
+
+            return results.Count;
+        }
+
+        public static bool IsValidPlayerObject(GameObject playerObject)
+        {
+            if (playerObject == null || !playerObject.activeInHierarchy || playerObject.CompareTag(TAG_POCA))
+                return false;
+
+            NetworkManager networkManager = NetworkManager.Singleton;
+            if (networkManager != null && networkManager.IsListening &&
+                playerObject.TryGetComponent(out NetworkObject networkObject) &&
+                !networkObject.IsSpawned)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static void CollectNetworkPlayerObjects(List<Transform> results)
+        {
+            NetworkManager networkManager = NetworkManager.Singleton;
+            if (networkManager == null || !networkManager.IsListening)
+                return;
+
+            foreach (NetworkClient client in networkManager.ConnectedClientsList)
+            {
+                NetworkObject playerObject = client.PlayerObject;
+                if (playerObject == null || !IsValidPlayerObject(playerObject.gameObject))
+                    continue;
+
+                AddUnique(results, playerObject.transform);
+            }
+        }
+
+        private void CollectRegisteredPlayers(List<Transform> results)
+        {
+            PruneInvalidPlayers();
+            foreach (GameObject playerObject in playerObjects.Values)
+            {
+                if (IsValidPlayerObject(playerObject))
+                    AddUnique(results, playerObject.transform);
+            }
+        }
+
+        private static void CollectTaggedPlayers(List<Transform> results)
+        {
+            GameObject[] taggedPlayers = GameObject.FindGameObjectsWithTag("Player");
+            foreach (GameObject playerObject in taggedPlayers)
+            {
+                if (IsValidPlayerObject(playerObject))
+                    AddUnique(results, playerObject.transform);
+            }
+        }
+
+        private static void AddUnique(List<Transform> results, Transform candidate)
+        {
+            if (candidate == null || results.Contains(candidate))
+                return;
+
+            results.Add(candidate);
+        }
+
+        private bool HasServerAuthority()
+        {
+            return IsServer || (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer);
+        }
+
+        private void PruneInvalidPlayers()
+        {
+            invalidPlayerIds.Clear();
+
+            foreach (KeyValuePair<ulong, GameObject> entry in playerObjects)
+            {
+                if (!IsValidPlayerObject(entry.Value))
+                    invalidPlayerIds.Add(entry.Key);
+            }
+
+            foreach (ulong clientId in invalidPlayerIds)
+            {
+                playerObjects.Remove(clientId);
+                playerNetworkObjects.Remove(clientId);
+                playerCharacterChoices.Remove(clientId);
+
+                if (playerUserIds.TryGetValue(clientId, out string uid))
+                {
+                    playerUserIds.Remove(clientId);
+                    userIdToClientId.Remove(uid);
+                }
+            }
         }
     }
 }

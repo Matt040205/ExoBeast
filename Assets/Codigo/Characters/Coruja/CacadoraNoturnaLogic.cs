@@ -5,13 +5,8 @@ using Unity.Netcode;
 using Unity.Netcode.Components;
 
 /// <summary>
-/// ── CacadoraNoturnaLogic ─────────────────────────────────
-/// Spawned NetworkObject that fires a damage beam along the owl's forward axis.
-///
-///  ▸ Server spawns, sets NetworkVariables, then despawns after the animation window
-///  ▸ AnimEvent_FireBeam called by Animator on all clients (synced via NetworkAnimator)
-///  ▸ Server applies beam damage; all clients render the visual independently
-/// ─────────────────────────────────────────────────────────
+/// Networked logic for the Owl ultimate. The server owns damage/timing and clients
+/// receive an explicit visual payload so the beam does not depend on animation events.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class CacadoraNoturnaLogic : NetworkBehaviour
@@ -33,25 +28,71 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
     private Animator anim;
     private bool hasAppliedBeamDamage;
     private bool hasShownBeamVisual;
+    private bool hasBeamVisualPayload;
+    private uint visualSequence;
+    private uint lastShownVisualSequence;
+    private Vector3 visualOrigin;
+    private Vector3 visualDirection = Vector3.forward;
+    private Quaternion visualRotation = Quaternion.identity;
+    private float visualRange;
+    private float visualWidth;
+    private float visualPayloadDuration;
+    private ulong visualCasterClientId = ulong.MaxValue;
+    private ulong setupCasterNetworkObjectId = ulong.MaxValue;
+
+    private void Awake()
+    {
+        ConfigureVisualRaycastMask();
+    }
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-
-        LayerMask enemyLayer = LayerMask.GetMask("Enemy");
-        LayerMask playerLayer = LayerMask.GetMask("Player");
-        visualRaycastMask = ~(enemyLayer | playerLayer);
+        ConfigureVisualRaycastMask();
 
         if (effectParticles != null)
             effectParticles.Play();
 
-        // O caster pode chegar antes ou depois do OnNetworkSpawn dependendo do timing de rede.
-        // Registramos o callback para ambos os casos.
         netCaster.OnValueChanged += OnCasterAssigned;
 
-        // Tentar setup imediato (funciona no servidor, onde StartUltimateEffect() jah rodou)
         if (netCaster.Value.TryGet(out NetworkObject casterNO))
             SetupCaster(casterNO);
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        netCaster.OnValueChanged -= OnCasterAssigned;
+        base.OnNetworkDespawn();
+    }
+
+    public void StartUltimateEffect(GameObject casterObject, float damage, float range, float width, float delayBeforeBeam)
+    {
+        if (!IsServer)
+            return;
+
+        caster = casterObject;
+        netDamage.Value = damage;
+        netRange.Value = range;
+        netWidth.Value = width;
+
+        if (casterObject != null && casterObject.TryGetComponent(out NetworkObject casterNetworkObject))
+        {
+            netCaster.Value = new NetworkObjectReference(casterNetworkObject);
+            SetupCaster(casterNetworkObject);
+        }
+
+        uint sequence = ++visualSequence;
+        ulong casterClientId = ResolveCasterClientId(casterObject);
+
+        StartCoroutine(ServerFireBeamAfterDelay(sequence, damage, range, width, delayBeforeBeam, casterClientId));
+        StartCoroutine(ServerDespawnCoroutine(delayBeforeBeam));
+    }
+
+    public void StartOfflineUltimateEffect(GameObject casterObject, float damage, float range, float width, float delayBeforeBeam)
+    {
+        caster = casterObject;
+        ConfigureVisualRaycastMask();
+        StartCoroutine(OfflineFireBeamAfterDelay(damage, range, width, delayBeforeBeam, ResolveCasterClientId(casterObject)));
     }
 
     private void OnCasterAssigned(NetworkObjectReference oldVal, NetworkObjectReference newVal)
@@ -62,143 +103,176 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
 
     private void SetupCaster(NetworkObject casterNO)
     {
-        this.caster = casterNO.gameObject;
-        this.anim = caster.GetComponentInChildren<Animator>();
+        if (casterNO == null)
+            return;
 
-        // BUG FIX (Bug 2 - 7 Maio 2026): proxy.magiaAtualDaCacadora precisa ser setado em TODOS os
-        // clientes, nao so owner+server. O Animator dispara AnimEvent_FireBeam via SendMessage
-        // (animation event chamando o metodo no proxy), entao o proxy precisa ter referencia para
-        // ESTA instancia da CacadoraNoturnaLogic em qualquer cliente que vai ver o beam visual.
-        // Antes: clientes nao-owner viam a animacao mas ShowBeamVisual nunca rodava.
+        bool shouldTriggerAnimation = setupCasterNetworkObjectId != casterNO.NetworkObjectId;
+        setupCasterNetworkObjectId = casterNO.NetworkObjectId;
+
+        caster = casterNO.gameObject;
+        anim = caster.GetComponentInChildren<Animator>();
+
         AnimationEventProxy proxy = caster.GetComponentInChildren<AnimationEventProxy>();
         if (proxy != null)
-        {
             proxy.magiaAtualDaCacadora = this;
-        }
 
-        // Servidor dispara o trigger via NetworkAnimator — replica para todos os clientes
-        if (IsServer && anim != null)
+        if (IsServer && shouldTriggerAnimation && anim != null)
         {
-            var networkAnimator = caster.GetComponentInChildren<NetworkAnimator>();
+            NetworkAnimator networkAnimator = caster.GetComponentInChildren<NetworkAnimator>();
             if (networkAnimator != null) networkAnimator.SetTrigger("CacadoraUltimate");
             else anim.SetTrigger("CacadoraUltimate");
         }
     }
 
-    public override void OnNetworkDespawn()
+    private IEnumerator ServerFireBeamAfterDelay(
+        uint sequence,
+        float damage,
+        float range,
+        float width,
+        float delayBeforeBeam,
+        ulong casterClientId)
     {
-        netCaster.OnValueChanged -= OnCasterAssigned;
-        base.OnNetworkDespawn();
+        yield return new WaitForSeconds(Mathf.Max(0f, delayBeforeBeam));
+
+        ResolveBeamPose(out Vector3 origin, out Vector3 direction, out Quaternion rotation);
+        CacheBeamVisualPayload(origin, direction, rotation, range, width, visualDuration, casterClientId);
+        TryApplyBeamDamageOnce(origin, direction, damage, range, width);
+
+        ForceBeamVisualClientRpc(sequence, origin, direction, rotation, range, width, visualDuration, casterClientId);
     }
 
-    public void StartUltimateEffect(GameObject caster, float damage, float range, float width)
+    private IEnumerator OfflineFireBeamAfterDelay(
+        float damage,
+        float range,
+        float width,
+        float delayBeforeBeam,
+        ulong casterClientId)
     {
-        if (!IsServer) return;
+        yield return new WaitForSeconds(Mathf.Max(0f, delayBeforeBeam));
 
-        this.caster = caster;
-        netDamage.Value = damage;
-        netRange.Value = range;
-        netWidth.Value = width;
-        netCaster.Value = new NetworkObjectReference(caster.GetComponent<NetworkObject>());
+        ResolveBeamPose(out Vector3 origin, out Vector3 direction, out Quaternion rotation);
+        CacheBeamVisualPayload(origin, direction, rotation, range, width, visualDuration, casterClientId);
+        ApplyBeamDamage(origin, direction, damage, range, width);
 
-        StartCoroutine(ServerForceBeamVisualFallback());
-        StartCoroutine(ServerDespawnCoroutine());
+        if (beamVisualPrefab != null)
+            StartCoroutine(ShowBeamVisual(origin, direction, rotation, range, width, visualDuration));
+
+        Destroy(gameObject, visualDuration + 3.0f);
     }
 
-    private IEnumerator ServerForceBeamVisualFallback()
+    private IEnumerator ServerDespawnCoroutine(float delayBeforeBeam)
     {
-        yield return null;
-        ForceBeamVisualClientRpc();
-    }
+        yield return new WaitForSeconds(Mathf.Max(0f, delayBeforeBeam) + visualDuration + 3.0f);
 
-    private IEnumerator ServerDespawnCoroutine()
-    {
-        yield return new WaitForSeconds(visualDuration + 3.0f);
-        if (NetworkObject.IsSpawned)
-        {
+        if (NetworkObject != null && NetworkObject.IsSpawned)
             NetworkObject.Despawn();
-        }
     }
 
     public void AnimEvent_FireBeam()
     {
-        // Called by Animator on all clients because animations are synced via NetworkAnimator
-        TryApplyBeamDamageOnce();
         TryShowBeamVisualLocal();
     }
 
     [ClientRpc]
-    private void ForceBeamVisualClientRpc()
+    private void ForceBeamVisualClientRpc(
+        uint sequence,
+        Vector3 origin,
+        Vector3 direction,
+        Quaternion rotation,
+        float range,
+        float width,
+        float duration,
+        ulong casterClientId)
     {
-        TryShowBeamVisualLocal();
+        TryShowBeamVisualLocal(sequence, origin, direction, rotation, range, width, duration, casterClientId);
     }
 
-    private void TryApplyBeamDamageOnce()
+    private void TryApplyBeamDamageOnce(Vector3 origin, Vector3 direction, float damage, float range, float width)
     {
         if (!IsServer || hasAppliedBeamDamage)
             return;
 
         hasAppliedBeamDamage = true;
-        ApplyBeamDamage();
+        ApplyBeamDamage(origin, direction, damage, range, width);
     }
 
     private void TryShowBeamVisualLocal()
     {
-        if (!IsClient || beamVisualPrefab == null || hasShownBeamVisual)
+        if (!IsClient || beamVisualPrefab == null || hasShownBeamVisual || !hasBeamVisualPayload)
             return;
 
         hasShownBeamVisual = true;
 
-        if (netCaster.Value.TryGet(out NetworkObject casterNO) && casterNO.IsOwner)
-            JuiceEvents.OnCameraShake?.Invoke(transform.forward, ultimateShake.amplitude, ultimateShake.frequency, ultimateShake.duration);
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.LocalClientId == visualCasterClientId)
+            JuiceEvents.OnCameraShake?.Invoke(visualDirection, ultimateShake.amplitude, ultimateShake.frequency, ultimateShake.duration);
 
-        StartCoroutine(ShowBeamVisual());
+        StartCoroutine(ShowBeamVisual(
+            visualOrigin,
+            visualDirection,
+            visualRotation,
+            visualRange,
+            visualWidth,
+            visualPayloadDuration));
     }
 
-    private IEnumerator ShowBeamVisual()
+    private void TryShowBeamVisualLocal(
+        uint sequence,
+        Vector3 origin,
+        Vector3 direction,
+        Quaternion rotation,
+        float range,
+        float width,
+        float duration,
+        ulong casterClientId)
     {
-        Vector3 startPoint = transform.position;
-        Vector3 direction = transform.forward;
+        if (!IsClient || beamVisualPrefab == null || hasShownBeamVisual || lastShownVisualSequence == sequence)
+            return;
 
-        // Fallback: se netRange ainda não replicou no cliente, usa 100m como padrão
-        float beamDistance = netRange.Value > 0.1f ? netRange.Value : 100f;
+        lastShownVisualSequence = sequence;
+        CacheBeamVisualPayload(origin, direction, rotation, range, width, duration, casterClientId);
+        TryShowBeamVisualLocal();
+    }
 
-        Debug.Log($"[ArrowUlt] ShowBeamVisual INICIO - startPoint:{startPoint}, direction:{direction}, beamDistance:{beamDistance}, visualDuration:{visualDuration}");
+    private IEnumerator ShowBeamVisual(
+        Vector3 startPoint,
+        Vector3 direction,
+        Quaternion rotation,
+        float range,
+        float width,
+        float duration)
+    {
+        ConfigureVisualRaycastMask();
 
-        RaycastHit groundHit;
-        if (Physics.Raycast(startPoint, direction, out groundHit, beamDistance, visualRaycastMask))
-        {
+        if (direction.sqrMagnitude <= 0.001f)
+            direction = transform.forward;
+
+        direction.Normalize();
+        float beamDistance = Mathf.Max(0.1f, range);
+
+        if (Physics.Raycast(startPoint, direction, out RaycastHit groundHit, beamDistance, visualRaycastMask))
             beamDistance = groundHit.distance;
-            Debug.Log($"[ArrowUlt] Raycast bateu em algo a {beamDistance}m: {groundHit.collider.name}");
-        }
 
-        GameObject visual = Instantiate(beamVisualPrefab, startPoint, transform.rotation);
+        GameObject visual = Instantiate(beamVisualPrefab, startPoint, rotation);
 
         LineRenderer line = visual.GetComponent<LineRenderer>();
-        bool isLineRendererMode = (line != null);
-
-        Debug.Log($"[ArrowUlt] isLineRendererMode={isLineRendererMode}, beamDistance final={beamDistance}");
-
-        if (isLineRendererMode)
+        if (line != null)
         {
-            // Modo LineRenderer (beam antigo): prende ao pai e desenha a linha
-            visual.transform.SetParent(this.transform);
+            visual.transform.SetParent(transform);
             line.SetPosition(0, Vector3.zero);
             line.SetPosition(1, Vector3.forward * beamDistance);
-            line.startWidth = netWidth.Value;
-            line.endWidth = netWidth.Value;
+            line.startWidth = width;
+            line.endWidth = width;
 
-            // Fade out do LineRenderer
             float elapsedTime = 0f;
             Material lineMaterial = line.material;
             Color originalColor = Color.white;
             if (lineMaterial != null && lineMaterial.HasColor("_Color"))
                 originalColor = lineMaterial.color;
 
-            while (elapsedTime < visualDuration)
+            while (elapsedTime < duration)
             {
                 elapsedTime += Time.deltaTime;
-                float progress = elapsedTime / visualDuration;
+                float progress = elapsedTime / duration;
                 if (lineMaterial != null)
                 {
                     originalColor.a = 1f - progress;
@@ -208,55 +282,116 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
             }
 
             if (visual != null) Destroy(visual);
+            yield break;
         }
-        else
-        {
-            // Modo VFX (flecha voadora): adiciona componente de voo e deixa ele cuidar do movimento
-            float speed = beamDistance / Mathf.Max(visualDuration, 0.1f);
-            Debug.Log($"[ArrowUlt] Modo VFX - speed={speed} m/s, vai voar por {visualDuration}s");
 
-            ArrowMover mover = visual.AddComponent<ArrowMover>();
-            mover.flyDirection = direction;
-            mover.flySpeed = speed;
-            mover.lifetime = visualDuration;
+        float speed = beamDistance / Mathf.Max(duration, 0.1f);
+        FlyForward flyForward = visual.GetComponent<FlyForward>();
+        if (flyForward != null)
+        {
+            flyForward.speed = speed;
+            flyForward.lifetime = duration;
+            Destroy(visual, duration + 0.1f);
+            yield break;
         }
+
+        ArrowMover mover = visual.GetComponent<ArrowMover>();
+        if (mover == null)
+            mover = visual.AddComponent<ArrowMover>();
+
+        mover.flyDirection = direction;
+        mover.flySpeed = speed;
+        mover.lifetime = duration;
     }
 
-    private void ApplyBeamDamage()
+    private void CacheBeamVisualPayload(
+        Vector3 origin,
+        Vector3 direction,
+        Quaternion rotation,
+        float range,
+        float width,
+        float duration,
+        ulong casterClientId)
     {
-        if (!IsServer) return;
+        if (direction.sqrMagnitude <= 0.001f)
+            direction = transform.forward;
 
+        visualOrigin = origin;
+        visualDirection = direction.normalized;
+        visualRotation = rotation;
+        visualRange = range > 0.1f ? range : 100f;
+        visualWidth = width > 0.1f ? width : 3f;
+        visualPayloadDuration = Mathf.Max(0.1f, duration);
+        visualCasterClientId = casterClientId;
+        hasBeamVisualPayload = true;
+    }
+
+    private void ResolveBeamPose(out Vector3 origin, out Vector3 direction, out Quaternion rotation)
+    {
+        GameObject casterObject = caster;
+
+        origin = transform.position;
+        direction = transform.forward;
+
+        if (casterObject != null)
+        {
+            Transform firePoint = casterObject.transform;
+            PlayerShooting shooting = casterObject.GetComponent<PlayerShooting>();
+            if (shooting != null && shooting.firePoint != null)
+                firePoint = shooting.firePoint;
+
+            origin = firePoint.position;
+            direction = AbilityAimUtility.ResolveAimForward(casterObject);
+        }
+
+        if (direction.sqrMagnitude <= 0.001f)
+            direction = transform.forward.sqrMagnitude > 0.001f ? transform.forward : Vector3.forward;
+
+        direction.Normalize();
+        rotation = Quaternion.LookRotation(direction, Vector3.up);
+        transform.SetPositionAndRotation(origin, rotation);
+        Physics.SyncTransforms();
+    }
+
+    private ulong ResolveCasterClientId(GameObject casterObject)
+    {
+        if (casterObject != null && casterObject.TryGetComponent(out NetworkObject casterNetworkObject))
+            return casterNetworkObject.OwnerClientId;
+
+        return ulong.MaxValue;
+    }
+
+    private void ApplyBeamDamage(Vector3 origin, Vector3 direction, float damage, float range, float width)
+    {
         LayerMask enemyLayer = LayerMask.GetMask("Enemy");
-        Vector3 startPoint = transform.position;
-        Vector3 direction = transform.forward;
-
-        RaycastHit[] inimigosAcertados = Physics.SphereCastAll(startPoint, netWidth.Value, direction, netRange.Value, enemyLayer);
+        RaycastHit[] inimigosAcertados = Physics.SphereCastAll(origin, width, direction, range, enemyLayer);
         HashSet<EnemyHealthSystem> damagedEnemies = new HashSet<EnemyHealthSystem>();
 
-        foreach (var hit in inimigosAcertados)
+        foreach (RaycastHit hit in inimigosAcertados)
         {
             EnemyHealthSystem vidaInimigo = hit.collider.GetComponentInParent<EnemyHealthSystem>();
             if (vidaInimigo != null && damagedEnemies.Add(vidaInimigo))
-            {
-                vidaInimigo.TakeDamage(netDamage.Value, 0f, false);
-            }
+                vidaInimigo.TakeDamage(damage, 0f, false);
         }
+    }
+
+    private void ConfigureVisualRaycastMask()
+    {
+        LayerMask enemyLayer = LayerMask.GetMask("Enemy");
+        LayerMask playerLayer = LayerMask.GetMask("Player");
+        visualRaycastMask = ~(enemyLayer | playerLayer);
     }
 }
 
-/// <summary>
-/// Componente simples que faz um GameObject voar em linha reta no Update.
-/// Adicionado em runtime pela CacadoraNoturnaLogic para mover o VFX da flecha.
-/// </summary>
 public class ArrowMover : MonoBehaviour
 {
     [HideInInspector] public Vector3 flyDirection;
     [HideInInspector] public float flySpeed;
     [HideInInspector] public float lifetime = 2f;
 
-    private float timer = 0f;
+    private float timer;
 
-    void Update()
+    private void Update()
     {
         timer += Time.deltaTime;
         if (timer >= lifetime)

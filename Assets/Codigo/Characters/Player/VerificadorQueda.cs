@@ -17,9 +17,6 @@ public class VerificadorQueda : NetworkBehaviour
     [Tooltip("A altura Y em que o jogador sera teleportado de volta.")]
     public float limiteY = -30f;
 
-    private Transform spawnPoint;
-    private CharacterController controller;
-
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -29,13 +26,6 @@ public class VerificadorQueda : NetworkBehaviour
         {
             this.enabled = false;
             return;
-        }
-
-        controller = GetComponent<CharacterController>();
-
-        if (GameSetupManager.Instance != null && GameSetupManager.Instance.spawnPoint != null)
-        {
-            spawnPoint = GameSetupManager.Instance.spawnPoint;
         }
     }
 
@@ -50,15 +40,53 @@ public class VerificadorQueda : NetworkBehaviour
 
     void TeleportarParaSpawn()
     {
-        Vector3 targetPos = (spawnPoint != null) ? spawnPoint.position : Vector3.zero;
-        Quaternion targetRot = (spawnPoint != null) ? spawnPoint.rotation : Quaternion.identity;
+        if (!GameSetupManager.TryResolveRespawnPose("RespawnPoint", out Vector3 targetPos, out Quaternion targetRot))
+        {
+            Debug.LogError($"[VerificadorQueda] Nenhum respawn valido encontrado para '{name}'. Teleporte de queda cancelado para evitar Vector3.zero.");
+            return;
+        }
 
-        // Desativa o controller para permitir mudanca direta de transform
-        controller.enabled = false;
-        transform.position = targetPos;
-        transform.rotation = targetRot;
-        controller.enabled = true;
+        PlayerTeleportService.TeleportLocal(gameObject, targetPos, targetRot);
 
-        // O ClientNetworkTransform replicara esta nova posicao para o servidor e demais clientes
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening && IsSpawned)
+            RequestFallRecoveryServerRpc(targetPos, targetRot);
+    }
+
+    [ServerRpc]
+    private void RequestFallRecoveryServerRpc(Vector3 ownerResolvedPosition, Quaternion ownerResolvedRotation)
+    {
+        if (NetworkObject == null || !NetworkObject.IsSpawned)
+            return;
+
+        Vector3 targetPos = ownerResolvedPosition;
+        Quaternion targetRot = ownerResolvedRotation;
+
+        if (!GameSetupManager.TryResolveRespawnPose("RespawnPoint", out targetPos, out targetRot))
+        {
+            Debug.LogWarning($"[VerificadorQueda] Servidor nao encontrou respawn; usando pose resolvida pelo owner para '{name}'.");
+        }
+
+        PlayerTeleportService.TeleportServerValidated(NetworkObject, targetPos, targetRot);
+
+        if (OwnerClientId == NetworkManager.ServerClientId)
+            return;
+
+        ClientRpcParams targetParams = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] { OwnerClientId }
+            }
+        };
+        ConfirmFallRecoveryClientRpc(targetPos, targetRot, targetParams);
+    }
+
+    [ClientRpc]
+    private void ConfirmFallRecoveryClientRpc(Vector3 serverPosition, Quaternion serverRotation, ClientRpcParams rpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        PlayerTeleportService.TeleportLocal(gameObject, serverPosition, serverRotation);
     }
 }

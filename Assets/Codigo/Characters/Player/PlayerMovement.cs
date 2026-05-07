@@ -559,6 +559,40 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
+    public void ResetMotionAfterTeleport()
+    {
+        velocity = Vector3.zero;
+        direction = Vector3.zero;
+        currentSpeed = 0f;
+        rotationVelocity = 0f;
+        isDashing = false;
+        isFloating = false;
+        floatDuration = 0f;
+        hasDoubleJumped = false;
+        isAboutToLand = false;
+        isGrounded = true;
+
+        StopFootstepSound();
+
+        if (animator != null)
+        {
+            animator.ResetTrigger("Jump");
+            animator.SetBool("isGrounded", true);
+            animator.SetBool("isAboutToLand", true);
+            animator.SetFloat("yVelocity", 0f);
+            animator.SetFloat("MovementSpeed", 0f);
+            animator.SetFloat("AimMoveX", 0f);
+            animator.SetFloat("AimMoveY", 0f);
+        }
+
+        if (IsSpawned && IsOwner)
+        {
+            netIsGrounded.Value = true;
+            netYVelocity.Value = 0f;
+            netMovementSpeed.Value = 0f;
+        }
+    }
+
     public Transform GetModelPivot()
     {
         if (modelPivot == null)

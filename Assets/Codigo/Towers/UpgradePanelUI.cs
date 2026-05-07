@@ -37,6 +37,7 @@ public class UpgradePanelUI : MonoBehaviour
     private CanvasGroup panelCanvasGroup;
     private const int MAX_TOTAL_POINTS = 6;
     private int lastUiStateHash = int.MinValue;
+    private readonly UpgradeTooltip[] pathTooltips = new UpgradeTooltip[3];
 
     void Awake()
     {
@@ -60,6 +61,11 @@ public class UpgradePanelUI : MonoBehaviour
         HidePanel();
     }
 
+    private void OnDestroy()
+    {
+        UnsubscribeFromCurrentBuilding();
+    }
+
     void Update()
     {
         if (currentTower == null || uiPanel == null || !uiPanel.activeInHierarchy)
@@ -74,10 +80,12 @@ public class UpgradePanelUI : MonoBehaviour
 
     public void ShowPanel(TowerController tower)
     {
+        UnsubscribeFromCurrentBuilding();
         currentTower = tower;
         currentNetworkedBuilding = tower != null ? tower.GetComponent<NetworkedBuilding>() : null;
         lastUiStateHash = int.MinValue;
         TryResolveUpgradeTooltipTargets();
+        SubscribeToCurrentBuilding();
         uiPanel.SetActive(true);
 
         if (towerImage != null && currentTower.towerData.characterIcon != null)
@@ -91,6 +99,7 @@ public class UpgradePanelUI : MonoBehaviour
 
     public void HidePanel()
     {
+        UnsubscribeFromCurrentBuilding();
         currentTower = null;
         currentNetworkedBuilding = null;
         lastUiStateHash = int.MinValue;
@@ -150,7 +159,12 @@ public class UpgradePanelUI : MonoBehaviour
 
     void UpdatePathButton(int pathIndex, Button button, TextMeshProUGUI costText, TextMeshProUGUI levelText, bool isFullyUpgraded, int totalPointsSpent, bool canInteractLocally)
     {
+        if (button == null)
+            return;
+
         UpgradeTooltip tooltip = button.GetComponent<UpgradeTooltip>();
+        if (pathIndex >= 0 && pathIndex < pathTooltips.Length)
+            pathTooltips[pathIndex] = tooltip;
 
         if (pathIndex >= currentTower.towerData.upgradePaths.Count || currentTower.towerData.upgradePaths[pathIndex] == null)
         {
@@ -379,6 +393,7 @@ public class UpgradePanelUI : MonoBehaviour
 
         UpdatePanelInfo();
         lastUiStateHash = CaptureUiStateHash();
+        RefreshVisibleTooltip();
     }
 
     private void TryResolveUpgradeTooltipTargets()
@@ -400,6 +415,46 @@ public class UpgradePanelUI : MonoBehaviour
             if (tooltip.descriptionText == null)
                 tooltip.descriptionText = descriptionTarget;
         }
+
+        CachePathTooltips();
+    }
+
+    private void CachePathTooltips()
+    {
+        pathTooltips[0] = upgradeButton1 != null ? upgradeButton1.GetComponent<UpgradeTooltip>() : null;
+        pathTooltips[1] = upgradeButton2 != null ? upgradeButton2.GetComponent<UpgradeTooltip>() : null;
+        pathTooltips[2] = upgradeButton3 != null ? upgradeButton3.GetComponent<UpgradeTooltip>() : null;
+    }
+
+    private void RefreshVisibleTooltip()
+    {
+        foreach (UpgradeTooltip tooltip in pathTooltips)
+        {
+            if (tooltip != null)
+                tooltip.RefreshIfHovered();
+        }
+    }
+
+    private void SubscribeToCurrentBuilding()
+    {
+        if (currentNetworkedBuilding != null)
+        {
+            currentNetworkedBuilding.UpgradeStateApplied -= OnNetworkedBuildingUpgradeStateApplied;
+            currentNetworkedBuilding.UpgradeStateApplied += OnNetworkedBuildingUpgradeStateApplied;
+        }
+    }
+
+    private void UnsubscribeFromCurrentBuilding()
+    {
+        if (currentNetworkedBuilding != null)
+            currentNetworkedBuilding.UpgradeStateApplied -= OnNetworkedBuildingUpgradeStateApplied;
+    }
+
+    private void OnNetworkedBuildingUpgradeStateApplied()
+    {
+        ForceRefreshPanelInfo();
+        if (currentTower != null && uiPanel != null && uiPanel.activeInHierarchy)
+            StartCoroutine(RefreshUIAfterFrame());
     }
 
     private Transform FindChildByNormalizedName(Transform root, string normalizedName)

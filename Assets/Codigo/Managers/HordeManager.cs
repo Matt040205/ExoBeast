@@ -56,6 +56,7 @@ public class HordeManager : NetworkBehaviour
     private int enemiesToSpawnTotal;
     private int enemiesSpawnedCount = 0;
     private Coroutine spawnCoroutine;
+    private readonly List<Transform> playerTargetCandidates = new List<Transform>(4);
 
     // ── Propriedades de acesso transparente (local / rede) ──
     private int CurrentHorde
@@ -127,7 +128,7 @@ public class HordeManager : NetworkBehaviour
             // Espera jogadores com TIMEOUT de 10 segundos
             float timeout = 10f;
             float timer = 0f;
-            while ((PlayerRegistry.Instance == null || PlayerRegistry.Instance.GetPlayerCount() == 0) && timer < timeout)
+            while (GetValidPlayerCount() == 0 && timer < timeout)
             {
                 // Checa a cada segundo se OnNetworkSpawn já assumiu
                 if (hordeStarted) { Debug.Log("[HordeManager] OnNetworkSpawn assumiu durante a espera."); yield break; }
@@ -139,7 +140,7 @@ public class HordeManager : NetworkBehaviour
             if (hordeStarted) yield break;
 
             if (timer >= timeout)
-                Debug.LogWarning("[HordeManager] Timeout esperando PlayerRegistry! Iniciando mesmo assim.");
+                Debug.LogWarning("[HordeManager] Timeout esperando jogadores validos! Iniciando mesmo assim.");
 
             yield return new WaitForSeconds(3f);
             if (hordeStarted) yield break;
@@ -203,7 +204,7 @@ public class HordeManager : NetworkBehaviour
         // Aguarda jogadores com timeout de 10 segundos
         float timeout = 10f;
         float timer = 0f;
-        while ((PlayerRegistry.Instance == null || PlayerRegistry.Instance.GetPlayerCount() == 0) && timer < timeout)
+        while (GetValidPlayerCount() == 0 && timer < timeout)
         {
             if (!IsServer) yield break;
             timer += 1f;
@@ -211,7 +212,7 @@ public class HordeManager : NetworkBehaviour
         }
 
         if (timer >= timeout)
-            Debug.LogWarning("[HordeManager] OnNetworkSpawn: Timeout esperando jogadores!");
+            Debug.LogWarning("[HordeManager] OnNetworkSpawn: Timeout esperando jogadores validos!");
 
         yield return new WaitForSeconds(3f);
         StartNextHorde();
@@ -404,20 +405,17 @@ public class HordeManager : NetworkBehaviour
 
     private Transform GetRandomPlayerTarget()
     {
-        // Tenta via PlayerRegistry (modo rede)
-        if (PlayerRegistry.Instance != null && PlayerRegistry.Instance.GetPlayerCount() > 0)
-        {
-            var players = PlayerRegistry.Instance.GetAllPlayers();
-            var clientIds = new List<ulong>(players.Keys);
-            ulong randomId = clientIds[Random.Range(0, clientIds.Count)];
-            return players[randomId].transform;
-        }
-
-        // Fallback local: busca por tag "Player"
-        GameObject player = GameObject.FindWithTag("Player");
-        if (player != null) return player.transform;
+        PlayerRegistry.CollectValidPlayerTransforms(playerTargetCandidates);
+        if (playerTargetCandidates.Count > 0)
+            return playerTargetCandidates[Random.Range(0, playerTargetCandidates.Count)];
 
         return null;
+    }
+
+    private int GetValidPlayerCount()
+    {
+        PlayerRegistry.CollectValidPlayerTransforms(playerTargetCandidates);
+        return playerTargetCandidates.Count;
     }
 
     // ════════════════════════════════════════════════════

@@ -201,12 +201,30 @@ public class PlayerHealthSystem : NetworkBehaviour
 
     private void FindRespawnPoint()
     {
-        GameObject respawnObject = GameObject.FindWithTag(respawnPointNameOrTag);
-        if (respawnObject == null)
-            respawnObject = GameObject.Find(respawnPointNameOrTag);
+        if (GameSetupManager.TryResolveRespawnTransform(respawnPointNameOrTag, out Transform resolvedRespawnPoint))
+            respawnPoint = resolvedRespawnPoint;
+    }
 
-        if (respawnObject != null)
-            respawnPoint = respawnObject.transform;
+    private bool TryResolveRespawnPose(out Vector3 position, out Quaternion rotation)
+    {
+        if (respawnPoint != null && respawnPoint.gameObject.activeInHierarchy)
+        {
+            position = respawnPoint.position;
+            rotation = respawnPoint.rotation;
+            return true;
+        }
+
+        if (GameSetupManager.TryResolveRespawnTransform(respawnPointNameOrTag, out Transform resolvedRespawnPoint))
+        {
+            respawnPoint = resolvedRespawnPoint;
+            position = resolvedRespawnPoint.position;
+            rotation = resolvedRespawnPoint.rotation;
+            return true;
+        }
+
+        position = transform.position;
+        rotation = transform.rotation;
+        return false;
     }
 
     private void HandleRegeneration()
@@ -245,25 +263,52 @@ public class PlayerHealthSystem : NetworkBehaviour
         if (!IsServer)
             return;
 
-        if (respawnPoint == null)
-            FindRespawnPoint();
-
-        Vector3 spawnPos = respawnPoint != null ? respawnPoint.position : Vector3.zero;
+        if (!TryResolveRespawnPose(out Vector3 spawnPos, out Quaternion spawnRot))
+        {
+            spawnPos = transform.position;
+            spawnRot = transform.rotation;
+            Debug.LogError($"[PlayerHealthSystem] Nenhum respawn valido encontrado para '{name}'. Mantendo posicao atual para evitar Vector3.zero.");
+        }
 
         currentHealth.Value = characterData != null ? characterData.maxHealth : 100f;
         damageMultiplier.Value = 1f;
         speedMultiplier.Value = 1f;
         isCountering = false;
 
-        RespawnClientRpc(spawnPos);
+        if (NetworkObject != null && NetworkObject.IsSpawned)
+        {
+            PlayerTeleportService.TeleportServerValidated(NetworkObject, spawnPos, spawnRot);
+
+            if (OwnerClientId != NetworkManager.ServerClientId)
+            {
+                ClientRpcParams targetParams = new ClientRpcParams
+                {
+                    Send = new ClientRpcSendParams
+                    {
+                        TargetClientIds = new ulong[] { OwnerClientId }
+                    }
+                };
+                RespawnOwnerTeleportClientRpc(spawnPos, spawnRot, targetParams);
+            }
+        }
+        else
+        {
+            PlayerTeleportService.TeleportLocal(gameObject, spawnPos, spawnRot);
+        }
+
+        RespawnVisualClientRpc();
     }
 
     [ClientRpc]
-    private void RespawnClientRpc(Vector3 spawnPosition)
+    private void RespawnOwnerTeleportClientRpc(Vector3 spawnPosition, Quaternion spawnRotation, ClientRpcParams rpcParams = default)
     {
         if (IsOwner)
-            PlayerTeleportService.TeleportLocal(gameObject, spawnPosition, transform.rotation);
+            PlayerTeleportService.TeleportLocal(gameObject, spawnPosition, spawnRotation);
+    }
 
+    [ClientRpc]
+    private void RespawnVisualClientRpc()
+    {
         RestartSpawnMaterializationFlow();
     }
 

@@ -25,50 +25,82 @@ public class HabilidadeCacadoraNoturna : Ability
 
     public override bool Activate(GameObject quemUsou)
     {
-        if (logicVisualPrefab == null) return false;
+        if (logicVisualPrefab == null || quemUsou == null)
+            return false;
 
-        PlayerShooting shootingScript = quemUsou.GetComponent<PlayerShooting>();
-        PlayerMovement movementScript = quemUsou.GetComponent<PlayerMovement>();
+        bool isNetworkSession = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        if (isNetworkSession)
+        {
+            if (!NetworkManager.Singleton.IsServer)
+                return false;
 
-        // modelPivot.rotation agora esta sincronizado via netModelYRot (fix BUG A)
-        Transform modelPivot = (movementScript != null) ? movementScript.GetModelPivot() : quemUsou.transform;
-        Transform firePoint = (shootingScript != null && shootingScript.firePoint != null)
-            ? shootingScript.firePoint
-            : quemUsou.transform;
+            GameObject logicObject = Object.Instantiate(
+                logicVisualPrefab,
+                quemUsou.transform.position,
+                AbilityAimUtility.ResolveAimRotation(quemUsou));
 
-        Vector3 startPoint = firePoint.position;
-        Quaternion spawnRotation = modelPivot.rotation;
+            if (!logicObject.TryGetComponent(out NetworkObject netObj) ||
+                !logicObject.TryGetComponent(out CacadoraNoturnaLogic logic))
+            {
+                Debug.LogError("[HabilidadeCacadoraNoturna] logicVisualPrefab precisa apontar para CacadoraNoturnaLogic.prefab com NetworkObject.");
+                Object.Destroy(logicObject);
+                return false;
+            }
+
+            netObj.Spawn();
+            logic.StartUltimateEffect(quemUsou, damage, range, width, delayTiro);
+            return true;
+        }
+
+        if (logicVisualPrefab.GetComponent<CacadoraNoturnaLogic>() != null)
+        {
+            GameObject logicObject = Object.Instantiate(
+                logicVisualPrefab,
+                quemUsou.transform.position,
+                AbilityAimUtility.ResolveAimRotation(quemUsou));
+
+            CacadoraNoturnaLogic logic = logicObject.GetComponent<CacadoraNoturnaLogic>();
+            if (logic != null)
+                logic.StartOfflineUltimateEffect(quemUsou, damage, range, width, delayTiro);
+
+            return true;
+        }
 
         MonoBehaviour mb = quemUsou.GetComponent<MonoBehaviour>();
         if (mb != null)
-            mb.StartCoroutine(DisparoDelayCoroutine(quemUsou, startPoint, spawnRotation));
+            mb.StartCoroutine(DisparoDelayFallbackCoroutine(quemUsou));
 
-        return true;
+        return mb != null;
     }
 
-    private System.Collections.IEnumerator DisparoDelayCoroutine(GameObject quemUsou, Vector3 startPoint, Quaternion spawnRotation)
+    private IEnumerator DisparoDelayFallbackCoroutine(GameObject quemUsou)
     {
         yield return new WaitForSeconds(delayTiro);
 
+        ResolveBeamPose(quemUsou, out Vector3 startPoint, out Vector3 direction, out Quaternion spawnRotation);
+
         GameObject vfx = Object.Instantiate(logicVisualPrefab, startPoint, spawnRotation);
+        ParticleSystem[] particles = vfx.GetComponentsInChildren<ParticleSystem>();
+        foreach (var p in particles) p.Play();
+        Object.Destroy(vfx, 4.0f);
 
-        if (vfx.TryGetComponent<NetworkObject>(out var netObj))
-        {
-            // Spawnar em rede: todos os clientes verao o VFX
-            netObj.Spawn();
-            CacadoraNoturnaLogic logic = vfx.GetComponent<CacadoraNoturnaLogic>();
-            if (logic != null)
-                logic.StartUltimateEffect(quemUsou, damage, range, width);
-        }
-        else
-        {
-            // Fallback sem NGO (singleplayer)
-            ParticleSystem[] particles = vfx.GetComponentsInChildren<ParticleSystem>();
-            foreach (var p in particles) p.Play();
-            Object.Destroy(vfx, 4.0f);
+        ApplyBeamDamage(startPoint, direction);
+    }
 
-            ApplyBeamDamage(startPoint, spawnRotation * Vector3.forward);
-        }
+    private void ResolveBeamPose(GameObject quemUsou, out Vector3 startPoint, out Vector3 direction, out Quaternion spawnRotation)
+    {
+        Transform firePoint = quemUsou.transform;
+        PlayerShooting shootingScript = quemUsou.GetComponent<PlayerShooting>();
+        if (shootingScript != null && shootingScript.firePoint != null)
+            firePoint = shootingScript.firePoint;
+
+        startPoint = firePoint.position;
+        direction = AbilityAimUtility.ResolveAimForward(quemUsou);
+        if (direction.sqrMagnitude <= 0.001f)
+            direction = quemUsou.transform.forward;
+
+        direction.Normalize();
+        spawnRotation = Quaternion.LookRotation(direction, Vector3.up);
     }
 
     private void ApplyBeamDamage(Vector3 startPoint, Vector3 direction)

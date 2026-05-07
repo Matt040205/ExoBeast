@@ -46,5 +46,9 @@ public static class PlayerTeleportService
 
         if (wasEnabled)
             characterController.enabled = true;
+
+        PlayerMovement movement = player.GetComponent<PlayerMovement>();
+        if (movement != null)
+            movement.ResetMotionAfterTeleport();
     }
 }

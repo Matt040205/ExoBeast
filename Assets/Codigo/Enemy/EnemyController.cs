@@ -63,6 +63,7 @@ public class EnemyController : MonoBehaviour
     
     private Vector3 lastTickPosition;
     private int stuckTickCount;
+    private readonly List<Transform> playerTargetCandidates = new List<Transform>(4);
 
     private const string TAG_POCA = "Poca";
 
@@ -260,38 +261,19 @@ public class EnemyController : MonoBehaviour
         Transform nearestEntity = null;
         float nearestDistance = float.MaxValue;
 
-        // 1. Busca Jogadores via PlayerRegistry (fonte autoritativa server-side).
-        // Em singleplayer (sem NGO), PlayerRegistry pode não existir — caímos no fallback
-        // por tag UMA VEZ apenas (em vez de todo tick) via early return abaixo.
-        if (PlayerRegistry.Instance != null && PlayerRegistry.Instance.GetPlayerCount() > 0)
+        // 1. Busca jogadores pela fonte mais confiavel disponivel:
+        // PlayerObject do NGO -> PlayerRegistry -> tag Player.
+        PlayerRegistry.CollectValidPlayerTransforms(playerTargetCandidates);
+        foreach (Transform player in playerTargetCandidates)
         {
-            foreach (GameObject playerObject in PlayerRegistry.Instance.GetAllPlayers().Values)
-            {
-                if (playerObject == null || !playerObject.activeInHierarchy || playerObject.CompareTag(TAG_POCA))
-                    continue;
+            if (player == null || player.CompareTag(TAG_POCA))
+                continue;
 
-                float distance = GetDistanceToTarget(playerObject.transform);
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearestEntity = playerObject.transform;
-                }
-            }
-        }
-        else
-        {
-            // Fallback singleplayer: registry vazio = não há rede ativa, então cai no FindWithTag.
-            // FindGameObjectsWithTag (plural) percorre toda a hierarchy a cada chamada — 90+ scans/s
-            // em wave de 30 inimigos. Aqui usamos FindWithTag (singular) que para no primeiro match.
-            GameObject fallbackPlayer = GameObject.FindWithTag("Player");
-            if (fallbackPlayer != null && !fallbackPlayer.CompareTag(TAG_POCA))
+            float distance = GetDistanceToTarget(player);
+            if (distance < nearestDistance)
             {
-                float distance = Vector3.Distance(transform.position, fallbackPlayer.transform.position);
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearestEntity = fallbackPlayer.transform;
-                }
+                nearestDistance = distance;
+                nearestEntity = player;
             }
         }
 

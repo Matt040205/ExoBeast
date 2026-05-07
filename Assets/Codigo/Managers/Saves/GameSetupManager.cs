@@ -26,6 +26,93 @@ public class GameSetupManager : NetworkBehaviour
     // o clientId e antes de qualquer await/instanciacao. Evita race entre OnNetworkSpawn (host)
     // e OnClientConnectedCallback disparando para o mesmo clientId na mesma frame.
     private readonly HashSet<ulong> _spawnedClientIds = new HashSet<ulong>();
+    private readonly List<Transform> spawnedPlayerTargets = new List<Transform>(4);
+
+    public static bool TryResolveRespawnPose(string pointNameOrTag, out Vector3 position, out Quaternion rotation)
+    {
+        if (TryResolveRespawnTransform(pointNameOrTag, out Transform resolvedTransform))
+        {
+            position = resolvedTransform.position;
+            rotation = resolvedTransform.rotation;
+            return true;
+        }
+
+        position = Vector3.zero;
+        rotation = Quaternion.identity;
+        return false;
+    }
+
+    public static bool TryResolveRespawnTransform(string pointNameOrTag, out Transform resolvedTransform)
+    {
+        resolvedTransform = null;
+
+        if (Instance != null)
+        {
+            if (IsUsableRespawnTransform(Instance.spawnPoint))
+            {
+                resolvedTransform = Instance.spawnPoint;
+                return true;
+            }
+
+            if (Instance.spawnPoints != null)
+            {
+                foreach (Transform spawnCandidate in Instance.spawnPoints)
+                {
+                    if (!IsUsableRespawnTransform(spawnCandidate))
+                        continue;
+
+                    resolvedTransform = spawnCandidate;
+                    return true;
+                }
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(pointNameOrTag))
+            return false;
+
+        GameObject respawnObject = null;
+        try
+        {
+            respawnObject = GameObject.FindWithTag(pointNameOrTag);
+        }
+        catch (UnityException)
+        {
+            // Nem todas as cenas declaram RespawnPoint como tag; nesses casos usamos nome/path.
+        }
+
+        if (respawnObject == null)
+            respawnObject = GameObject.Find(pointNameOrTag);
+
+        if (respawnObject != null && IsUsableRespawnTransform(respawnObject.transform))
+        {
+            resolvedTransform = respawnObject.transform;
+            return true;
+        }
+
+        Transform[] sceneTransforms = FindObjectsByType<Transform>(
+            FindObjectsInactive.Exclude,
+            FindObjectsSortMode.None);
+
+        foreach (Transform sceneTransform in sceneTransforms)
+        {
+            if (!IsUsableRespawnTransform(sceneTransform))
+                continue;
+
+            string transformName = sceneTransform.name;
+            if (transformName == pointNameOrTag || transformName.StartsWith(pointNameOrTag + "/", System.StringComparison.Ordinal))
+            {
+                resolvedTransform = sceneTransform;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsUsableRespawnTransform(Transform respawnTransform)
+    {
+        return respawnTransform != null && respawnTransform.gameObject.activeInHierarchy;
+    }
 
     private void Awake()
     {
@@ -78,8 +165,11 @@ public class GameSetupManager : NetworkBehaviour
             return;
         }
 
-        if (PlayerRegistry.Instance != null && PlayerRegistry.Instance.GetPlayerObject(clientId) != null)
+        if (HasExistingPlayerObject(clientId))
+        {
+            RefreshEnemyTargetsAfterPlayerRegistration(clientId);
             return;
+        }
 
         GameObject prefabToSpawn = null;
         CharacterBase characterEscolhido = null;
@@ -117,7 +207,7 @@ public class GameSetupManager : NetworkBehaviour
 
         Vector3 pos = Vector3.zero;
         Quaternion rot = Quaternion.identity;
-        int playerIndex = (PlayerRegistry.Instance != null) ? PlayerRegistry.Instance.GetAllPlayers().Count : 0;
+        int playerIndex = GetSpawnedPlayerCount();
 
         if (spawnPoints != null && spawnPoints.Length > 0)
         {
@@ -178,8 +268,9 @@ public class GameSetupManager : NetworkBehaviour
         if (PlayerRegistry.Instance != null)
         {
             PlayerRegistry.Instance.RegisterPlayer(clientId, playerInstance, charIndex);
-            RefreshEnemyTargetsAfterPlayerRegistration(clientId);
         }
+
+        RefreshEnemyTargetsAfterPlayerRegistration(clientId);
 
         Debug.Log($"[GameSetupManager] Spawnou clientId={clientId} como charIndex={charIndex} ({characterEscolhido?.name})");
 
@@ -201,7 +292,25 @@ public class GameSetupManager : NetworkBehaviour
             enemy.RefreshTargetNow();
         }
 
-        Debug.Log($"[GameSetupManager] Targets de {enemies.Length} inimigo(s) atualizados apos registrar clientId={clientId}.");
+        Debug.Log($"[GameSetupManager] Targets de {enemies.Length} inimigo(s) atualizados apos spawn/register clientId={clientId}.");
+    }
+
+    private bool HasExistingPlayerObject(ulong clientId)
+    {
+        if (NetworkManager.Singleton != null &&
+            NetworkManager.Singleton.ConnectedClients.TryGetValue(clientId, out NetworkClient client) &&
+            client.PlayerObject != null)
+        {
+            return PlayerRegistry.IsValidPlayerObject(client.PlayerObject.gameObject);
+        }
+
+        return PlayerRegistry.Instance != null && PlayerRegistry.Instance.GetPlayerObject(clientId) != null;
+    }
+
+    private int GetSpawnedPlayerCount()
+    {
+        PlayerRegistry.CollectValidPlayerTransforms(spawnedPlayerTargets);
+        return spawnedPlayerTargets.Count;
     }
 
     private void ValidateObjectiveHealthSetup()

@@ -7,6 +7,7 @@ namespace ExoBeasts.Multiplayer.Sync
     public class NetworkedBuilding : NetworkBehaviour
     {
         [SerializeField] private TowerController towerController;
+        public event System.Action UpgradeStateApplied;
 
         public NetworkVariable<ulong> BuilderClientId = new NetworkVariable<ulong>(
             0,
@@ -204,6 +205,7 @@ namespace ExoBeasts.Multiplayer.Sync
                 ControlLevel.Value,
                 SupportLevel.Value,
                 TotalCostSpent.Value);
+            UpgradeStateApplied?.Invoke();
         }
 
         private bool CanRequesterModify(ulong senderClientId)

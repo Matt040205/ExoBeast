@@ -16,7 +16,10 @@ namespace ExoBeasts.Managers.Loading
         private const string HIDE_MSG = "HideLoadingScreen";
         private const string LOBBY_SCENE_NAME = "LobbyScene";
         private const string NETWORK_FAILURE_MESSAGE = "Conexao multiplayer perdida. Voltando ao lobby.";
+        private const float LOADING_WATCHDOG_SECONDS = 15f;
         private bool handlingNetworkFailure;
+        private Coroutine loadingWatchdogCoroutine;
+        private string currentLoadingSceneName;
 
         private void Awake()
         {
@@ -90,6 +93,8 @@ namespace ExoBeasts.Managers.Loading
 
         private void OnDestroy()
         {
+            StopLoadingWatchdog();
+
             if (NetworkManager.Singleton != null && NetworkManager.Singleton.SceneManager != null)
             {
                 NetworkManager.Singleton.SceneManager.OnSceneEvent -= OnSceneEvent;
@@ -114,18 +119,33 @@ namespace ExoBeasts.Managers.Loading
             {
                 // Início do carregamento da cena (Disparado para todo mundo)
                 case SceneEventType.Load:
+                    currentLoadingSceneName = sceneEvent.SceneName;
                     if (LoadingScreenUI.Instance != null)
                     {
                         LoadingScreenUI.Instance.Show();
                     }
+                    StartLoadingWatchdog();
                     break;
 
                 // Disparado no Servidor/Host quando TODOS os clientes terminarem de baixar/carregar a cena!
                 // É o "Sinal Verde" oficial do multiplayer.
                 case SceneEventType.LoadEventCompleted:
+                    StopLoadingWatchdog();
                     if (NetworkManager.Singleton.IsServer)
                     {
                         HideLoadingForEveryone();
+                    }
+                    else
+                    {
+                        HideLoadingLocal();
+                    }
+                    break;
+
+                case SceneEventType.LoadComplete:
+                case SceneEventType.SynchronizeComplete:
+                    if (!NetworkManager.Singleton.IsServer)
+                    {
+                        HideLoadingLocal();
                     }
                     break;
             }
@@ -164,6 +184,8 @@ namespace ExoBeasts.Managers.Loading
             if (LoadingScreenUI.Instance != null)
                 LoadingScreenUI.Instance.ForceHide();
 
+            StopLoadingWatchdog();
+
             LobbyManager.TryGetExistingInstance()?.ForceResetRuntimeState(false);
             GameModeManager.ReturnToMultiplayerLobby();
 
@@ -183,6 +205,64 @@ namespace ExoBeasts.Managers.Loading
             global::LobbySceneUI.SetPendingStatusMessage(NETWORK_FAILURE_MESSAGE);
             SceneManager.LoadScene(LOBBY_SCENE_NAME, LoadSceneMode.Single);
             handlingNetworkFailure = false;
+        }
+
+        private void HideLoadingLocal()
+        {
+            StopLoadingWatchdog();
+            if (LoadingScreenUI.Instance != null && LoadingScreenUI.Instance.IsVisible)
+                LoadingScreenUI.Instance.Hide();
+        }
+
+        private void StartLoadingWatchdog()
+        {
+            StopLoadingWatchdog();
+            loadingWatchdogCoroutine = StartCoroutine(LoadingWatchdogCoroutine());
+        }
+
+        private void StopLoadingWatchdog()
+        {
+            if (loadingWatchdogCoroutine != null)
+            {
+                StopCoroutine(loadingWatchdogCoroutine);
+                loadingWatchdogCoroutine = null;
+            }
+        }
+
+        private System.Collections.IEnumerator LoadingWatchdogCoroutine()
+        {
+            float elapsed = 0f;
+            while (elapsed < LOADING_WATCHDOG_SECONDS)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                yield return null;
+
+                if (LoadingScreenUI.Instance == null || !LoadingScreenUI.Instance.IsVisible)
+                {
+                    loadingWatchdogCoroutine = null;
+                    yield break;
+                }
+            }
+
+            loadingWatchdogCoroutine = null;
+
+            if (LoadingScreenUI.Instance == null || !LoadingScreenUI.Instance.IsVisible)
+                yield break;
+
+            NetworkManager nm = NetworkManager.Singleton;
+            bool networkHealthy = nm != null && nm.IsListening && (nm.IsServer || nm.IsClient || nm.IsHost);
+            bool targetSceneLoaded = string.IsNullOrEmpty(currentLoadingSceneName) ||
+                                     SceneManager.GetActiveScene().name == currentLoadingSceneName;
+
+            if (networkHealthy && targetSceneLoaded)
+            {
+                Debug.LogWarning($"[SceneTransitionHandler] Watchdog escondeu loading apos {LOADING_WATCHDOG_SECONDS}s em cena '{SceneManager.GetActiveScene().name}'.");
+                LoadingScreenUI.Instance.ForceHide();
+                yield break;
+            }
+
+            Debug.LogWarning($"[SceneTransitionHandler] Watchdog detectou loading preso. Cena alvo='{currentLoadingSceneName}', cena ativa='{SceneManager.GetActiveScene().name}'.");
+            TryRecoverLoadingFailure("loading watchdog timeout");
         }
 
         private void HideLoadingForEveryone()

@@ -2,14 +2,8 @@ using UnityEngine;
 using Unity.Netcode;
 
 /// <summary>
-/// ── VooGraciosoLogic ─────────────────────────────────────
-/// Componente persistente no prefab do player que gerencia o estado
-/// de "voo gracioso" (Q da Coruja).
-///
-///  ▸ Server: recebe StartEffect(), seta parâmetros e netIsActive = true
-///  ▸ Owner (via OnValueChanged): aplica jumpHeightModifier, floating e bonus de tiro
-///  ▸ Owner/Server monitoram pouso em Update() para resetar netIsActive = false
-/// ─────────────────────────────────────────────────────────
+/// Persistent network logic for Owl skill 1. The owner gets an explicit local
+/// payload so the first cast does not depend on NetworkVariable delivery order.
 /// </summary>
 [RequireComponent(typeof(NetworkObject))]
 public class VooGraciosoLogic : NetworkBehaviour
@@ -27,15 +21,13 @@ public class VooGraciosoLogic : NetworkBehaviour
 
     private PlayerMovement playerMovement;
     private PlayerShooting playerShooting;
+    private float lastLocalHoverVfxTime = -999f;
 
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
 
-        // Componente está no prefab do player — GetComponent é direto e seguro aqui.
-        playerMovement = GetComponent<PlayerMovement>();
-        playerShooting = GetComponent<PlayerShooting>();
-
+        CacheReferences();
         netIsActive.OnValueChanged += OnActiveChanged;
     }
 
@@ -48,21 +40,19 @@ public class VooGraciosoLogic : NetworkBehaviour
     public void StartEffect(GameObject quemUsou, float jumpHeightModifier, float staticAimDuration,
         float bonusDamage, float bonusRadius, CommanderAbilityController controller, Ability ability)
     {
-        // Lógica Zero-Latency: O dono já toca o efeito imediatamente
-        if (IsOwner && hoverVfxPrefab != null)
-        {
-            GlobalVFXPool.GetVFX(hoverVfxPrefab, transform.position, transform.rotation, 2f);
-        }
+        CacheReferences();
 
-        // Se for servidor, aplica estado e faz o broadcast do VFX
+        if (IsOwner)
+            ApplyOwnerEffectLocal(jumpHeightModifier, staticAimDuration, bonusDamage, bonusRadius, true);
+
         if (IsServer)
         {
             ApplyEffectServer(jumpHeightModifier, staticAimDuration, bonusDamage, bonusRadius);
+            SendOwnerEffectToOwner(jumpHeightModifier, staticAimDuration, bonusDamage, bonusRadius);
             PlayHoverVfxClientRpc();
         }
         else
         {
-            // Se for cliente, solicita ao servidor
             RequestStartEffectServerRpc(jumpHeightModifier, staticAimDuration, bonusDamage, bonusRadius);
         }
     }
@@ -71,6 +61,7 @@ public class VooGraciosoLogic : NetworkBehaviour
     private void RequestStartEffectServerRpc(float jumpHeightModifier, float staticAimDuration, float bonusDamage, float bonusRadius)
     {
         ApplyEffectServer(jumpHeightModifier, staticAimDuration, bonusDamage, bonusRadius);
+        SendOwnerEffectToOwner(jumpHeightModifier, staticAimDuration, bonusDamage, bonusRadius);
         PlayHoverVfxClientRpc();
     }
 
@@ -83,50 +74,115 @@ public class VooGraciosoLogic : NetworkBehaviour
         netIsActive.Value = true;
     }
 
+    private void SendOwnerEffectToOwner(float jumpHeightModifier, float staticAimDuration, float bonusDamage, float bonusRadius)
+    {
+        if (!IsServer || NetworkManager.Singleton == null || OwnerClientId == NetworkManager.ServerClientId)
+            return;
+
+        ClientRpcParams ownerOnly = new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new[] { OwnerClientId }
+            }
+        };
+
+        ApplyOwnerVooGraciosoClientRpc(jumpHeightModifier, staticAimDuration, bonusDamage, bonusRadius, ownerOnly);
+    }
+
+    [ClientRpc]
+    private void ApplyOwnerVooGraciosoClientRpc(float jumpHeightModifier, float staticAimDuration, float bonusDamage, float bonusRadius, ClientRpcParams clientRpcParams = default)
+    {
+        if (!IsOwner)
+            return;
+
+        ApplyOwnerEffectLocal(jumpHeightModifier, staticAimDuration, bonusDamage, bonusRadius, true);
+    }
+
     [ClientRpc]
     private void PlayHoverVfxClientRpc()
     {
-        if (IsOwner) return; // O dono já instanciou localmente com zero latency
+        if (IsOwner)
+            return;
 
         if (hoverVfxPrefab != null)
-        {
             GlobalVFXPool.GetVFX(hoverVfxPrefab, transform.position, transform.rotation, 2f);
+    }
+
+    private void CacheReferences()
+    {
+        if (playerMovement == null)
+            playerMovement = GetComponent<PlayerMovement>();
+
+        if (playerShooting == null)
+            playerShooting = GetComponent<PlayerShooting>();
+    }
+
+    private void ApplyOwnerEffectLocal(float jumpHeightModifier, float staticAimDuration, float bonusDamage, float bonusRadius, bool playVfx)
+    {
+        CacheReferences();
+
+        if (playVfx)
+            PlayHoverVfxLocal();
+
+        if (playerMovement != null)
+        {
+            if (jumpHeightModifier > 0f)
+                playerMovement.jumpHeightModifier = jumpHeightModifier;
+
+            if (!playerMovement.isGrounded && staticAimDuration > 0f)
+            {
+                playerMovement.isFloating = true;
+                playerMovement.floatDuration = Mathf.Max(playerMovement.floatDuration, staticAimDuration);
+            }
         }
+
+        if (playerShooting != null && bonusDamage > 0f)
+            playerShooting.SetNextShotBonus(bonusDamage, Mathf.Max(0f, bonusRadius));
+    }
+
+    private void PlayHoverVfxLocal()
+    {
+        if (hoverVfxPrefab == null || Time.time - lastLocalHoverVfxTime < 0.1f)
+            return;
+
+        lastLocalHoverVfxTime = Time.time;
+        GlobalVFXPool.GetVFX(hoverVfxPrefab, transform.position, transform.rotation, 2f);
     }
 
     private void OnActiveChanged(bool oldVal, bool newVal)
     {
-        if (!IsOwner) return;
+        if (!IsOwner)
+            return;
 
         if (newVal)
         {
-            if (playerMovement != null)
-            {
-                playerMovement.jumpHeightModifier = netJumpHeightModifier.Value;
-
-                if (!playerMovement.isGrounded)
-                {
-                    playerMovement.isFloating = true;
-                    playerMovement.floatDuration = netStaticAimDuration.Value;
-                }
-            }
-
-            if (playerShooting != null)
-                playerShooting.SetNextShotBonus(netBonusDamage.Value, netBonusRadius.Value);
+            ApplyOwnerEffectLocal(
+                netJumpHeightModifier.Value,
+                netStaticAimDuration.Value,
+                netBonusDamage.Value,
+                netBonusRadius.Value,
+                false);
         }
         else
         {
+            CacheReferences();
+
             if (playerMovement != null)
             {
                 playerMovement.jumpHeightModifier = 1f;
                 playerMovement.isFloating = false;
+                playerMovement.floatDuration = 0f;
             }
         }
     }
 
     private void Update()
     {
-        if (!netIsActive.Value || playerMovement == null) return;
+        CacheReferences();
+
+        if (!netIsActive.Value || playerMovement == null)
+            return;
 
         if (IsOwner && playerMovement.isGrounded)
             RequestDeactivateServerRpc();
@@ -143,7 +199,9 @@ public class VooGraciosoLogic : NetworkBehaviour
 
     private void Deactivate()
     {
-        if (!IsServer) return;
+        if (!IsServer)
+            return;
+
         netIsActive.Value = false;
     }
 }
