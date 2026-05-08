@@ -67,6 +67,14 @@ namespace ExoBeasts.Multiplayer.Lobby
         private readonly Dictionary<string, LobbyDetails> _detailsCache =
             new Dictionary<string, LobbyDetails>();
 
+        // OPTIMIZATION (Sprint 3 / Item A3 - 2026-05-08): rate-limit + cache de SearchLobbies.
+        // EOS Lobby Service tem rate limit por usuario. Sem cooldown, usuario clicando
+        // "Buscar" repetidamente disparava varias requests simultaneas, desperdicando
+        // banda e aumentando o risco de Result.RateLimited.
+        private const float SEARCH_LOBBIES_COOLDOWN_SECONDS = 2f;
+        private float _lastSearchLobbiesTime = -10f;
+        private List<LobbyInfo> _lastSearchLobbiesResult; // null antes da primeira busca
+
         private ulong _memberStatusHandle;
         private ulong _lobbyUpdateHandle;
         private ulong _memberUpdateHandle;
@@ -265,6 +273,19 @@ namespace ExoBeasts.Multiplayer.Lobby
         public void SearchLobbies(LobbySearchFilter filter)
         {
 #if !EOS_DISABLE
+            // OPTIMIZATION (Sprint 3 / Item A3): rate-limit + cache.
+            // Se ja temos resultado recente, republica do cache sem disparar nova request.
+            // Mantemos copia propria porque algumas UIs guardam a lista recebida e chamam
+            // Clear() antes de buscar de novo; expor a mesma instancia limparia o cache.
+            float elapsed = Time.unscaledTime - _lastSearchLobbiesTime;
+            if (elapsed < SEARCH_LOBBIES_COOLDOWN_SECONDS && _lastSearchLobbiesResult != null)
+            {
+                Debug.Log($"[LobbyManager] SearchLobbies em cooldown ({elapsed:F1}s/{SEARCH_LOBBIES_COOLDOWN_SECONDS}s). " +
+                          $"Republicando cache com {_lastSearchLobbiesResult.Count} lobbies.");
+                OnLobbiesFound?.Invoke(new List<LobbyInfo>(_lastSearchLobbiesResult));
+                return;
+            }
+
             var lobbyInterface = GetLobbyInterface();
             if (lobbyInterface == null) { OnError?.Invoke("EOS nao inicializado"); return; }
 
@@ -361,11 +382,23 @@ namespace ExoBeasts.Multiplayer.Lobby
 
                 searchHandle.Release();
                 Debug.Log($"[LobbyManager] Busca concluida: {results.Count} lobbies encontrados");
+                _lastSearchLobbiesResult = new List<LobbyInfo>(results);
+                _lastSearchLobbiesTime = Time.unscaledTime;
                 OnLobbiesFound?.Invoke(results);
             });
 #else
             OnLobbiesFound?.Invoke(new List<LobbyInfo>());
 #endif
+        }
+
+        /// <summary>
+        /// Invalida o cache de SearchLobbies. A proxima chamada dispara nova request
+        /// mesmo dentro do cooldown; util quando um lobby acabou de ser criado/destruido.
+        /// </summary>
+        public void InvalidateLobbySearchCache()
+        {
+            _lastSearchLobbiesResult = null;
+            _lastSearchLobbiesTime = -10f;
         }
 
         public void JoinLobby(string lobbyId)

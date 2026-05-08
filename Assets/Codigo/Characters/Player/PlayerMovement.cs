@@ -76,8 +76,6 @@ public class PlayerMovement : NetworkBehaviour
     [Header("Network Sync")]
     private NetworkVariable<float> netModelYRot = new NetworkVariable<float>(
         0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-    private NetworkVariable<bool> netIsGrounded = new NetworkVariable<bool>(
-        true, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     private NetworkVariable<float> netMovementSpeed = new NetworkVariable<float>(
         0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
     private NetworkVariable<float> netYVelocity = new NetworkVariable<float>(
@@ -284,16 +282,20 @@ public class PlayerMovement : NetworkBehaviour
             // Remotos: aplicar estado sincronizado ao Animator
             if (animator != null)
             {
-                bool syncedGrounded = netIsGrounded.Value;
+                // OPTIMIZATION (Sprint 3 / Item G3.2 - 2026-05-08): netIsGrounded removido.
+                // Antes: owner escrevia grounded em NetworkVariable todo frame para animacao remota.
+                // Agora: cada cliente deriva grounded localmente com o mesmo SphereCast usado por gameplay.
+                // Sem isso: um bool continuo gerava deltas de rede redundantes por jogador.
+                bool localGrounded = ProbeGrounded(0.35f);
                 float syncedYVel = netYVelocity.Value;
 
-                animator.SetBool("isGrounded", syncedGrounded);
+                animator.SetBool("isGrounded", localGrounded);
                 animator.SetFloat("yVelocity", syncedYVel);
                 animator.SetFloat("MovementSpeed", netMovementSpeed.Value);
 
-                bool aboutToLand = !syncedGrounded && syncedYVel < 0 &&
+                bool aboutToLand = !localGrounded && syncedYVel < 0 &&
                     Physics.Raycast(transform.position, Vector3.down, landingRaycastDistance, groundMask);
-                animator.SetBool("isAboutToLand", syncedGrounded || aboutToLand);
+                animator.SetBool("isAboutToLand", localGrounded || aboutToLand);
             }
             return;
         }
@@ -365,7 +367,6 @@ public class PlayerMovement : NetworkBehaviour
         }
 
         // Publicar estado para remotos
-        netIsGrounded.Value = isGrounded;
         netYVelocity.Value = velocity.y;
     }
 
@@ -491,7 +492,7 @@ public class PlayerMovement : NetworkBehaviour
     public bool IsGroundedNetworkState()
     {
         if (IsSpawned && !IsOwner)
-            return netIsGrounded.Value;
+            return ProbeGrounded(0.35f);
 
         if (controller != null && controller.enabled)
             return controller.isGrounded || isGrounded;
@@ -520,7 +521,6 @@ public class PlayerMovement : NetworkBehaviour
 
         if (IsSpawned && IsOwner)
         {
-            netIsGrounded.Value = false;
             netYVelocity.Value = 0f;
         }
     }
@@ -633,7 +633,6 @@ public class PlayerMovement : NetworkBehaviour
 
         if (IsSpawned && IsOwner)
         {
-            netIsGrounded.Value = true;
             netYVelocity.Value = 0f;
             netMovementSpeed.Value = 0f;
         }
@@ -776,9 +775,6 @@ public class PlayerMovement : NetworkBehaviour
             return true;
 
         if (IsOwner && isGrounded)
-            return true;
-
-        if (!IsOwner && netIsGrounded.Value)
             return true;
 
         return ProbeGrounded(extraGroundProbeDistance);
