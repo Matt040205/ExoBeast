@@ -38,6 +38,8 @@ public class CommanderAbilityController : NetworkBehaviour
     private Vector3 lastAbilityAimOrigin;
     private Vector3 lastAbilityAimDirection = Vector3.forward;
     private bool hasLastAbilityAimPayload;
+    private bool hasOwnerGroundedForAbilityRequest;
+    private bool ownerGroundedForAbilityRequest;
 
     public float CurrentUltimateCharge
     {
@@ -178,7 +180,11 @@ public class CommanderAbilityController : NetworkBehaviour
     private void RequestAbilityActivationWithAim(int abilityIndex)
     {
         CaptureCurrentAimPayload(out Vector3 aimOrigin, out Vector3 aimDirection);
-        RequestActivateAbilityServerRpc(abilityIndex, aimOrigin, aimDirection);
+        RequestActivateAbilityServerRpc(
+            abilityIndex,
+            aimOrigin,
+            aimDirection,
+            CaptureOwnerGroundedForAbilityRequest());
     }
 
     private void RequestUltimateActivationWithAim()
@@ -188,7 +194,11 @@ public class CommanderAbilityController : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void RequestActivateAbilityServerRpc(int abilityIndex, Vector3 aimOrigin, Vector3 aimDirection)
+    private void RequestActivateAbilityServerRpc(
+        int abilityIndex,
+        Vector3 aimOrigin,
+        Vector3 aimDirection,
+        bool ownerGroundedForAbility)
     {
         if (!EnsureCharacterDataInitialized())
             return;
@@ -205,7 +215,18 @@ public class CommanderAbilityController : NetworkBehaviour
         if (abilityCooldowns.ContainsKey(abilityToUse) && abilityCooldowns[abilityToUse] > 0)
             return;
 
-        bool started = abilityToUse.Activate(gameObject);
+        bool started;
+        hasOwnerGroundedForAbilityRequest = true;
+        ownerGroundedForAbilityRequest = ownerGroundedForAbility;
+        try
+        {
+            started = abilityToUse.Activate(gameObject);
+        }
+        finally
+        {
+            hasOwnerGroundedForAbilityRequest = false;
+            ownerGroundedForAbilityRequest = false;
+        }
 
         if (started)
         {
@@ -215,6 +236,18 @@ public class CommanderAbilityController : NetworkBehaviour
             abilityCooldowns[abilityToUse] = abilityToUse.cooldown;
             ActivateAbilityVisualClientRpc(abilityIndex);
         }
+    }
+
+    private bool CaptureOwnerGroundedForAbilityRequest()
+    {
+        PlayerMovement movement = GetComponent<PlayerMovement>();
+        return movement != null && movement.IsGroundedForGameplay(0.75f);
+    }
+
+    internal bool TryGetOwnerGroundedForAbilityRequest(out bool grounded)
+    {
+        grounded = ownerGroundedForAbilityRequest;
+        return hasOwnerGroundedForAbilityRequest;
     }
 
     [ClientRpc]

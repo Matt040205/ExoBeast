@@ -73,18 +73,63 @@ public class PlayerMovement : NetworkBehaviour
     public float floatDuration = 0f;
     public float jumpHeightModifier = 1f;
 
+    private struct PlayerAnimState : INetworkSerializable, System.IEquatable<PlayerAnimState>
+    {
+        // Mantem margem para o buff existente que publica 1.2f no Animator remoto.
+        private const float MaxMovementAnimSpeed = 1.25f;
+        private const float MaxAbsYVelocity = 10f;
+
+        public byte movementSpeed;
+        public byte yVelocity;
+
+        public float MovementSpeed => (movementSpeed / 255f) * MaxMovementAnimSpeed;
+        public float YVelocity => ((yVelocity - 128) / 127f) * MaxAbsYVelocity;
+
+        public static PlayerAnimState FromValues(float movementSpeedValue, float yVelocityValue)
+        {
+            float clampedMovement = Mathf.Clamp(movementSpeedValue, 0f, MaxMovementAnimSpeed);
+            float clampedY = Mathf.Clamp(yVelocityValue, -MaxAbsYVelocity, MaxAbsYVelocity);
+
+            return new PlayerAnimState
+            {
+                movementSpeed = (byte)Mathf.RoundToInt((clampedMovement / MaxMovementAnimSpeed) * 255f),
+                yVelocity = (byte)(Mathf.RoundToInt((clampedY / MaxAbsYVelocity) * 127f) + 128)
+            };
+        }
+
+        public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+        {
+            serializer.SerializeValue(ref movementSpeed);
+            serializer.SerializeValue(ref yVelocity);
+        }
+
+        public bool Equals(PlayerAnimState other)
+        {
+            return movementSpeed == other.movementSpeed && yVelocity == other.yVelocity;
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is PlayerAnimState other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            return (movementSpeed << 8) | yVelocity;
+        }
+    }
+
     [Header("Network Sync")]
     private NetworkVariable<float> netModelYRot = new NetworkVariable<float>(
         0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-    private NetworkVariable<float> netMovementSpeed = new NetworkVariable<float>(
-        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
-    private NetworkVariable<float> netYVelocity = new NetworkVariable<float>(
-        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
+    private NetworkVariable<PlayerAnimState> netAnimState = new NetworkVariable<PlayerAnimState>(
+        PlayerAnimState.FromValues(0f, 0f), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
     private bool jaMoveuTutorial = false;
     private PlayerHealthSystem healthSystem;
     private LocalPlayerInputBridge inputBridge;
     private bool loggedMovementFallbackWithoutCamera;
+    private float currentAnimatorMovementSpeed;
 
     private Vector2 inputMove;
     private bool inputRun;
@@ -287,11 +332,12 @@ public class PlayerMovement : NetworkBehaviour
                 // Agora: cada cliente deriva grounded localmente com o mesmo SphereCast usado por gameplay.
                 // Sem isso: um bool continuo gerava deltas de rede redundantes por jogador.
                 bool localGrounded = ProbeGrounded(0.35f);
-                float syncedYVel = netYVelocity.Value;
+                PlayerAnimState syncedAnimState = netAnimState.Value;
+                float syncedYVel = syncedAnimState.YVelocity;
 
                 animator.SetBool("isGrounded", localGrounded);
                 animator.SetFloat("yVelocity", syncedYVel);
-                animator.SetFloat("MovementSpeed", netMovementSpeed.Value);
+                animator.SetFloat("MovementSpeed", syncedAnimState.MovementSpeed);
 
                 bool aboutToLand = !localGrounded && syncedYVel < 0 &&
                     Physics.Raycast(transform.position, Vector3.down, landingRaycastDistance, groundMask);
@@ -308,7 +354,8 @@ public class PlayerMovement : NetworkBehaviour
         if (PauseControl.isPaused || isDashing)
         {
             if (animator != null && !isDashing) animator.SetFloat("MovementSpeed", 0f);
-            netMovementSpeed.Value = 0f;
+            currentAnimatorMovementSpeed = 0f;
+            SetNetworkAnimState(0f, velocity.y);
             StopFootstepSound();
             return;
         }
@@ -316,7 +363,8 @@ public class PlayerMovement : NetworkBehaviour
         if (BuildManager.isBuildingMode)
         {
             if (animator != null) animator.SetFloat("MovementSpeed", 0f);
-            netMovementSpeed.Value = 0f;
+            currentAnimatorMovementSpeed = 0f;
+            SetNetworkAnimState(0f, velocity.y);
             StopFootstepSound();
             ApplyGravity();
             return;
@@ -367,7 +415,7 @@ public class PlayerMovement : NetworkBehaviour
         }
 
         // Publicar estado para remotos
-        netYVelocity.Value = velocity.y;
+        SetNetworkAnimState(currentAnimatorMovementSpeed, velocity.y);
     }
 
     private void LateUpdate()
@@ -439,7 +487,7 @@ public class PlayerMovement : NetworkBehaviour
                     float animSpeed = (inputRun ? 1.0f : 0.5f) * direction.magnitude;
                     if (healthSystem != null && healthSystem.speedMultiplier.Value > 1.1f) animSpeed *= 1.2f;
                     animator.SetFloat("MovementSpeed", animSpeed, 0.1f, Time.deltaTime);
-                    netMovementSpeed.Value = animSpeed;
+                    currentAnimatorMovementSpeed = animSpeed;
                 }
             }
 
@@ -466,7 +514,7 @@ public class PlayerMovement : NetworkBehaviour
                 animator.SetFloat("AimMoveX", 0f, 0.1f, Time.deltaTime);
                 animator.SetFloat("AimMoveY", 0f, 0.1f, Time.deltaTime);
             }
-            netMovementSpeed.Value = 0f;
+            currentAnimatorMovementSpeed = 0f;
             StopFootstepSound();
         }
     }
@@ -521,7 +569,7 @@ public class PlayerMovement : NetworkBehaviour
 
         if (IsSpawned && IsOwner)
         {
-            netYVelocity.Value = 0f;
+            SetNetworkAnimState(currentAnimatorMovementSpeed, 0f);
         }
     }
 
@@ -633,9 +681,22 @@ public class PlayerMovement : NetworkBehaviour
 
         if (IsSpawned && IsOwner)
         {
-            netYVelocity.Value = 0f;
-            netMovementSpeed.Value = 0f;
+            currentAnimatorMovementSpeed = 0f;
+            SetNetworkAnimState(0f, 0f);
         }
+    }
+
+    private void SetNetworkAnimState(float movementSpeedValue, float yVelocityValue)
+    {
+        if (!IsSpawned || !IsOwner)
+            return;
+
+        // OPTIMIZATION (Sprint 3 / Item G3.3 - 2026-05-08): compacta MovementSpeed
+        // e yVelocity em um unico NetworkVariable de 2 bytes, preservando o modelo
+        // atual de animacao remota sem derivar velocidade por delta de posicao.
+        PlayerAnimState nextState = PlayerAnimState.FromValues(movementSpeedValue, yVelocityValue);
+        if (!netAnimState.Value.Equals(nextState))
+            netAnimState.Value = nextState;
     }
 
     public Transform GetModelPivot()

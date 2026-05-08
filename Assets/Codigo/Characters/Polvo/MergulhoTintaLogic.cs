@@ -91,7 +91,7 @@ public class MergulhoTintaLogic : MonoBehaviour
         }
         isLocalProxy = networkObject != null && networkObject.IsSpawned && !HasServerAuthority;
 
-        if (validateGround && !CheckIfGrounded())
+        if (validateGround && !CanStartDiveFromGround())
         {
             if (abilityScript != null && HasServerAuthority)
                 abilityScript.SetAbilityUsage(sourceAbility, false);
@@ -259,6 +259,30 @@ public class MergulhoTintaLogic : MonoBehaviour
             return hit.collider.gameObject != gameObject;
 
         return false;
+    }
+
+    private bool CanStartDiveFromGround()
+    {
+        // OPTIMIZATION BUGFIX (Sprint 3 / G3.2 - 2026-05-08): o servidor nao
+        // recebe mais netIsGrounded continuo. Para cliente nao-host, confiar no
+        // grounded enviado junto do RPC de habilidade apenas durante esta ativacao.
+        if (IsServerValidatingRemoteOwner() &&
+            abilityScript != null &&
+            abilityScript.TryGetOwnerGroundedForAbilityRequest(out bool ownerGrounded) &&
+            ownerGrounded)
+        {
+            return true;
+        }
+
+        return CheckIfGrounded();
+    }
+
+    private bool IsServerValidatingRemoteOwner()
+    {
+        return HasServerAuthority &&
+               networkObject != null &&
+               networkObject.IsSpawned &&
+               networkObject.OwnerClientId != NetworkManager.ServerClientId;
     }
 
     private PlayerMovement _cachedPlayerMovement;
