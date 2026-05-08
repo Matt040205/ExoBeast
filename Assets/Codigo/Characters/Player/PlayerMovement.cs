@@ -488,6 +488,52 @@ public class PlayerMovement : NetworkBehaviour
         netModelYRot.Value = cameraYaw; // replica para remotos
     }
 
+    public bool IsGroundedNetworkState()
+    {
+        if (IsSpawned && !IsOwner)
+            return netIsGrounded.Value;
+
+        if (controller != null && controller.enabled)
+            return controller.isGrounded || isGrounded;
+
+        return isGrounded;
+    }
+
+    public bool IsAirborneForAbility()
+    {
+        return !IsGroundedNetworkState();
+    }
+
+    public void BeginFloating(float duration, float newJumpHeightModifier)
+    {
+        if (duration <= 0f)
+            return;
+
+        if (newJumpHeightModifier > 0f)
+            jumpHeightModifier = newJumpHeightModifier;
+
+        velocity.y = 0f;
+        isGrounded = false;
+        isFloating = true;
+        floatDuration = Mathf.Max(floatDuration, duration);
+        StopFootstepSound();
+
+        if (IsSpawned && IsOwner)
+        {
+            netIsGrounded.Value = false;
+            netYVelocity.Value = 0f;
+        }
+    }
+
+    public void EndFloating(bool resetJumpModifier = true)
+    {
+        isFloating = false;
+        floatDuration = 0f;
+
+        if (resetJumpModifier)
+            jumpHeightModifier = 1f;
+    }
+
     private void ApplyGravity()
     {
         if (isGrounded && velocity.y < 0)

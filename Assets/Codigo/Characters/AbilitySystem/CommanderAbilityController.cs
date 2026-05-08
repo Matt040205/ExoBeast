@@ -24,6 +24,7 @@ public class CommanderAbilityController : NetworkBehaviour
     private bool passiveEquipped;
 
     public Dictionary<Ability, float> abilityCooldowns = new Dictionary<Ability, float>();
+    private readonly HashSet<Ability> deferredCooldownAbilities = new HashSet<Ability>();
 
     public float ultimateChargeThreshold = 100f;
 
@@ -34,6 +35,9 @@ public class CommanderAbilityController : NetworkBehaviour
     // quando acumular >=1 unidade. Reduz ~30-60 NetworkVariable updates/s para ~1/s
     // durante a carga passiva, sem mudanca visivel no HUD (granularidade ja era 1/threshold).
     private float _pendingPassiveCharge;
+    private Vector3 lastAbilityAimOrigin;
+    private Vector3 lastAbilityAimDirection = Vector3.forward;
+    private bool hasLastAbilityAimPayload;
 
     public float CurrentUltimateCharge
     {
@@ -166,16 +170,30 @@ public class CommanderAbilityController : NetworkBehaviour
         if (inputBridge == null || !inputBridge.isActiveAndEnabled)
             return;
 
-        if (inputBridge.ConsumeAbility1Pressed()) RequestActivateAbilityServerRpc(0);
-        if (inputBridge.ConsumeAbility2Pressed()) RequestActivateAbilityServerRpc(1);
-        if (inputBridge.ConsumeUltimatePressed()) RequestActivateUltimateServerRpc();
+        if (inputBridge.ConsumeAbility1Pressed()) RequestAbilityActivationWithAim(0);
+        if (inputBridge.ConsumeAbility2Pressed()) RequestAbilityActivationWithAim(1);
+        if (inputBridge.ConsumeUltimatePressed()) RequestUltimateActivationWithAim();
+    }
+
+    private void RequestAbilityActivationWithAim(int abilityIndex)
+    {
+        CaptureCurrentAimPayload(out Vector3 aimOrigin, out Vector3 aimDirection);
+        RequestActivateAbilityServerRpc(abilityIndex, aimOrigin, aimDirection);
+    }
+
+    private void RequestUltimateActivationWithAim()
+    {
+        CaptureCurrentAimPayload(out Vector3 aimOrigin, out Vector3 aimDirection);
+        RequestActivateUltimateServerRpc(aimOrigin, aimDirection);
     }
 
     [ServerRpc]
-    private void RequestActivateAbilityServerRpc(int abilityIndex)
+    private void RequestActivateAbilityServerRpc(int abilityIndex, Vector3 aimOrigin, Vector3 aimDirection)
     {
         if (!EnsureCharacterDataInitialized())
             return;
+
+        SetLastAbilityAimPayload(aimOrigin, aimDirection);
 
         Ability abilityToUse = null;
         if (abilityIndex == 0) abilityToUse = characterData.ability1;
@@ -191,6 +209,9 @@ public class CommanderAbilityController : NetworkBehaviour
 
         if (started)
         {
+            if (IsAbilityCooldownDeferred(abilityToUse))
+                return;
+
             abilityCooldowns[abilityToUse] = abilityToUse.cooldown;
             ActivateAbilityVisualClientRpc(abilityIndex);
         }
@@ -424,10 +445,12 @@ public class CommanderAbilityController : NetworkBehaviour
     }
 
     [ServerRpc]
-    private void RequestActivateUltimateServerRpc()
+    private void RequestActivateUltimateServerRpc(Vector3 aimOrigin, Vector3 aimDirection)
     {
         if (!EnsureCharacterDataInitialized())
             return;
+
+        SetLastAbilityAimPayload(aimOrigin, aimDirection);
 
         if (characterData.ultimate == null || CurrentUltimateCharge < 1f)
             return;
@@ -476,16 +499,22 @@ public class CommanderAbilityController : NetworkBehaviour
             return;
 
         if (characterData.ability1 != null && characterData.ability1.name.Contains(keyword))
+        {
+            deferredCooldownAbilities.Remove(characterData.ability1);
             abilityCooldowns[characterData.ability1] = 0f;
+        }
         else if (characterData.ability2 != null && characterData.ability2.name.Contains(keyword))
+        {
+            deferredCooldownAbilities.Remove(characterData.ability2);
             abilityCooldowns[characterData.ability2] = 0f;
+        }
     }
 
     public float GetRemainingCooldownPercent(Ability ability)
     {
         if (ability == null || !abilityCooldowns.ContainsKey(ability) || ability.cooldown <= 0)
             return 0f;
-        return abilityCooldowns[ability] / ability.cooldown;
+        return Mathf.Clamp01(abilityCooldowns[ability] / ability.cooldown);
     }
 
     public void ReduceAllAbilityCooldowns(float reductionAmount)
@@ -504,16 +533,25 @@ public class CommanderAbilityController : NetworkBehaviour
             return;
 
         if (characterData.ability1 != null && abilityCooldowns.ContainsKey(characterData.ability1))
+        {
+            deferredCooldownAbilities.Remove(characterData.ability1);
             abilityCooldowns[characterData.ability1] = 0f;
+        }
 
         if (characterData.ability2 != null && abilityCooldowns.ContainsKey(characterData.ability2))
+        {
+            deferredCooldownAbilities.Remove(characterData.ability2);
             abilityCooldowns[characterData.ability2] = 0f;
+        }
     }
 
     public void ResetCooldown(Ability ability)
     {
         if (ability != null && abilityCooldowns.ContainsKey(ability))
+        {
+            deferredCooldownAbilities.Remove(ability);
             abilityCooldowns[ability] = 0f;
+        }
     }
 
     public void SetAbilityUsage(Ability ability, bool inUse)
@@ -523,6 +561,125 @@ public class CommanderAbilityController : NetworkBehaviour
 
         if (inUse)
             abilityCooldowns[ability] = float.MaxValue;
+    }
+
+    public void DeferAbilityCooldownUntilReleased(Ability ability)
+    {
+        if (ability == null)
+            return;
+
+        abilityCooldowns[ability] = float.MaxValue;
+        deferredCooldownAbilities.Add(ability);
+
+        int abilityIndex = ResolveAbilityIndex(ability);
+        if (CanSendCooldownSync(abilityIndex))
+            SetAbilityInUseClientRpc(abilityIndex);
+    }
+
+    public void StartAbilityCooldown(Ability ability)
+    {
+        if (ability == null)
+            return;
+
+        abilityCooldowns[ability] = ability.cooldown;
+        deferredCooldownAbilities.Remove(ability);
+
+        int abilityIndex = ResolveAbilityIndex(ability);
+        if (CanSendCooldownSync(abilityIndex))
+            SetAbilityCooldownClientRpc(abilityIndex, ability.cooldown);
+    }
+
+    public bool TryGetLastAbilityAim(out Vector3 origin, out Vector3 direction)
+    {
+        origin = lastAbilityAimOrigin;
+        direction = lastAbilityAimDirection;
+        return hasLastAbilityAimPayload && direction.sqrMagnitude > 0.0001f;
+    }
+
+    private void CaptureCurrentAimPayload(out Vector3 origin, out Vector3 direction)
+    {
+        if (AbilityAimUtility.TryResolveAimPose3D(gameObject, out origin, out direction))
+            return;
+
+        origin = transform.position;
+        direction = AbilityAimUtility.ResolveAimForward(gameObject);
+    }
+
+    private void SetLastAbilityAimPayload(Vector3 origin, Vector3 direction)
+    {
+        if (direction.sqrMagnitude <= 0.0001f)
+        {
+            hasLastAbilityAimPayload = false;
+            return;
+        }
+
+        lastAbilityAimOrigin = origin;
+        lastAbilityAimDirection = direction.normalized;
+        hasLastAbilityAimPayload = true;
+    }
+
+    private bool IsAbilityCooldownDeferred(Ability ability)
+    {
+        return ability != null && deferredCooldownAbilities.Contains(ability);
+    }
+
+    private bool CanSendCooldownSync(int abilityIndex)
+    {
+        return abilityIndex >= 0 &&
+               IsServer &&
+               IsSpawned &&
+               NetworkManager.Singleton != null &&
+               NetworkManager.Singleton.IsListening;
+    }
+
+    private int ResolveAbilityIndex(Ability ability)
+    {
+        if (ability == null || !EnsureCharacterDataInitialized())
+            return -1;
+
+        if (ability == characterData.ability1)
+            return 0;
+
+        if (ability == characterData.ability2)
+            return 1;
+
+        if (ability == characterData.ultimate)
+            return 2;
+
+        return -1;
+    }
+
+    private Ability ResolveAbilityByIndex(int abilityIndex)
+    {
+        if (!EnsureCharacterDataInitialized())
+            return null;
+
+        if (abilityIndex == 0)
+            return characterData.ability1;
+
+        if (abilityIndex == 1)
+            return characterData.ability2;
+
+        if (abilityIndex == 2)
+            return characterData.ultimate;
+
+        return null;
+    }
+
+    [ClientRpc]
+    private void SetAbilityInUseClientRpc(int abilityIndex)
+    {
+        Ability ability = ResolveAbilityByIndex(abilityIndex);
+        if (ability != null)
+            abilityCooldowns[ability] = float.MaxValue;
+    }
+
+    [ClientRpc]
+    private void SetAbilityCooldownClientRpc(int abilityIndex, float cooldown)
+    {
+        Ability ability = ResolveAbilityByIndex(abilityIndex);
+        if (ability != null)
+            abilityCooldowns[ability] = Mathf.Max(0f, cooldown);
     }
 
     private bool EnsureCharacterDataInitialized()

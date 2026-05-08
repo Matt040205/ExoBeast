@@ -27,7 +27,7 @@ public class HabilidadeVooGracioso : Ability
             return false;
         }
 
-        if (movement.isGrounded)
+        if (!movement.IsAirborneForAbility())
         {
             Debug.Log("[VooGracioso] Jogador está no chão — habilidade requer estar no ar!");
             return false;

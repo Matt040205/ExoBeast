@@ -185,6 +185,17 @@ public class PlayerHealthSystem : NetworkBehaviour
             currentHealth.Value = Mathf.Min(currentHealth.Value + amount, characterData.maxHealth);
     }
 
+    public bool IsAtFullHealth(float tolerance = 0.01f)
+    {
+        TryResolveCharacterData();
+        return characterData != null && currentHealth.Value >= characterData.maxHealth - tolerance;
+    }
+
+    public bool CanReceiveHealing(float tolerance = 0.01f)
+    {
+        return !IsAtFullHealth(tolerance);
+    }
+
     private IEnumerator RemoveBuffsAfterTime(float duration)
     {
         yield return new WaitForSeconds(duration);

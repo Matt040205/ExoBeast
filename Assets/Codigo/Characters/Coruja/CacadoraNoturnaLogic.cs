@@ -39,6 +39,9 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
     private float visualPayloadDuration;
     private ulong visualCasterClientId = ulong.MaxValue;
     private ulong setupCasterNetworkObjectId = ulong.MaxValue;
+    private bool hasCapturedBeamPose;
+    private Vector3 capturedBeamOrigin;
+    private Vector3 capturedBeamDirection = Vector3.forward;
 
     private void Awake()
     {
@@ -67,10 +70,23 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
 
     public void StartUltimateEffect(GameObject casterObject, float damage, float range, float width, float delayBeforeBeam)
     {
+        StartUltimateEffect(casterObject, damage, range, width, delayBeforeBeam, Vector3.zero, Vector3.zero);
+    }
+
+    public void StartUltimateEffect(
+        GameObject casterObject,
+        float damage,
+        float range,
+        float width,
+        float delayBeforeBeam,
+        Vector3 capturedOrigin,
+        Vector3 capturedDirection)
+    {
         if (!IsServer)
             return;
 
         caster = casterObject;
+        SetCapturedBeamPose(capturedOrigin, capturedDirection);
         netDamage.Value = damage;
         netRange.Value = range;
         netWidth.Value = width;
@@ -90,7 +106,20 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
 
     public void StartOfflineUltimateEffect(GameObject casterObject, float damage, float range, float width, float delayBeforeBeam)
     {
+        StartOfflineUltimateEffect(casterObject, damage, range, width, delayBeforeBeam, Vector3.zero, Vector3.zero);
+    }
+
+    public void StartOfflineUltimateEffect(
+        GameObject casterObject,
+        float damage,
+        float range,
+        float width,
+        float delayBeforeBeam,
+        Vector3 capturedOrigin,
+        Vector3 capturedDirection)
+    {
         caster = casterObject;
+        SetCapturedBeamPose(capturedOrigin, capturedDirection);
         ConfigureVisualRaycastMask();
         StartCoroutine(OfflineFireBeamAfterDelay(damage, range, width, delayBeforeBeam, ResolveCasterClientId(casterObject)));
     }
@@ -330,8 +359,8 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
     {
         GameObject casterObject = caster;
 
-        origin = transform.position;
-        direction = transform.forward;
+        origin = hasCapturedBeamPose ? capturedBeamOrigin : transform.position;
+        direction = hasCapturedBeamPose ? capturedBeamDirection : transform.forward;
 
         if (casterObject != null)
         {
@@ -341,7 +370,9 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
                 firePoint = shooting.firePoint;
 
             origin = firePoint.position;
-            direction = AbilityAimUtility.ResolveAimForward(casterObject);
+
+            if (!hasCapturedBeamPose)
+                direction = AbilityAimUtility.ResolveAimDirection3D(casterObject);
         }
 
         if (direction.sqrMagnitude <= 0.001f)
@@ -351,6 +382,19 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
         rotation = Quaternion.LookRotation(direction, Vector3.up);
         transform.SetPositionAndRotation(origin, rotation);
         Physics.SyncTransforms();
+    }
+
+    private void SetCapturedBeamPose(Vector3 origin, Vector3 direction)
+    {
+        if (direction.sqrMagnitude <= 0.001f)
+        {
+            hasCapturedBeamPose = false;
+            return;
+        }
+
+        capturedBeamOrigin = origin;
+        capturedBeamDirection = direction.normalized;
+        hasCapturedBeamPose = true;
     }
 
     private ulong ResolveCasterClientId(GameObject casterObject)

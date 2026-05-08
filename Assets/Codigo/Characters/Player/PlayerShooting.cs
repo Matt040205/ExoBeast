@@ -583,6 +583,15 @@ public class PlayerShooting : NetworkBehaviour
         return fallbackDirection.sqrMagnitude > 0.0001f ? fallbackDirection.normalized : transform.forward;
     }
 
+    public bool TryGetShotPose(out Vector3 origin, out Vector3 direction)
+    {
+        TryResolveAimingReferences();
+
+        origin = firePoint != null ? firePoint.position : transform.position;
+        direction = GetShotDirection();
+        return direction.sqrMagnitude > 0.0001f;
+    }
+
     private Vector3 GetShotDirection()
     {
         TryResolveAimingReferences();

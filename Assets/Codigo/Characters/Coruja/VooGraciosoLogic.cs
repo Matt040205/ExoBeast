@@ -127,14 +127,10 @@ public class VooGraciosoLogic : NetworkBehaviour
 
         if (playerMovement != null)
         {
-            if (jumpHeightModifier > 0f)
+            if (staticAimDuration > 0f)
+                playerMovement.BeginFloating(staticAimDuration, jumpHeightModifier);
+            else if (jumpHeightModifier > 0f)
                 playerMovement.jumpHeightModifier = jumpHeightModifier;
-
-            if (!playerMovement.isGrounded && staticAimDuration > 0f)
-            {
-                playerMovement.isFloating = true;
-                playerMovement.floatDuration = Mathf.Max(playerMovement.floatDuration, staticAimDuration);
-            }
         }
 
         if (playerShooting != null && bonusDamage > 0f)
@@ -170,9 +166,7 @@ public class VooGraciosoLogic : NetworkBehaviour
 
             if (playerMovement != null)
             {
-                playerMovement.jumpHeightModifier = 1f;
-                playerMovement.isFloating = false;
-                playerMovement.floatDuration = 0f;
+                playerMovement.EndFloating();
             }
         }
     }
@@ -184,10 +178,12 @@ public class VooGraciosoLogic : NetworkBehaviour
         if (!netIsActive.Value || playerMovement == null)
             return;
 
-        if (IsOwner && playerMovement.isGrounded)
+        bool grounded = playerMovement.IsGroundedNetworkState();
+
+        if (IsOwner && grounded)
             RequestDeactivateServerRpc();
 
-        if (IsServer && playerMovement.isGrounded)
+        if (IsServer && grounded)
             Deactivate();
     }
 

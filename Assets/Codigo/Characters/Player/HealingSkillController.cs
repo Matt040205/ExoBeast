@@ -131,8 +131,7 @@ public class HealingSkillController : NetworkBehaviour
         }
 
         // 3. Verifica se o jogador já está com HP máximo
-        if (_healthSystem.characterData != null &&
-            _healthSystem.currentHealth.Value >= _healthSystem.characterData.maxHealth)
+        if (!_healthSystem.CanReceiveHealing())
         {
             Debug.Log("[HealingSkillController] Jogador já está com HP máximo. Cura ignorada.");
             return;

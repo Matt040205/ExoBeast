@@ -95,7 +95,16 @@ public class CameraController : NetworkBehaviour
 
     public Vector3 GetAimDirection()
     {
-        return isAiming ? aimCamera.transform.forward : normalCamera.transform.forward;
+        Transform source = null;
+
+        if (isAiming && aimCamera != null)
+            source = aimCamera.transform;
+        else if (normalCamera != null)
+            source = normalCamera.transform;
+        else if (aimCamera != null)
+            source = aimCamera.transform;
+
+        return source != null ? source.forward : transform.forward;
     }
 
     private void HandleCameraRotation()

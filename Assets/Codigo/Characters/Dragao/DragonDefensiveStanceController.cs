@@ -20,6 +20,8 @@ public class DragonDefensiveStanceController : NetworkBehaviour
     private LocalPlayerInputBridge inputBridge;
     private PlayerInput playerInput;
     private CommanderAbilityController abilityController;
+    private CommanderAbilityController activeAbilityController;
+    private Ability activeAbility;
 
     private Coroutine activeRoutine;
     private Coroutine tauntRoutine;
@@ -82,8 +84,11 @@ public class DragonDefensiveStanceController : NetworkBehaviour
         if (!CanActivateFromGround())
             return false;
 
-        if (abilityController != null)
-            abilityController.SetAbilityUsage(ability, true);
+        activeAbilityController = abilityController != null ? abilityController : this.abilityController;
+        activeAbility = ability;
+
+        if (activeAbilityController != null)
+            activeAbilityController.DeferAbilityCooldownUntilReleased(activeAbility);
 
         tauntRadius = Mathf.Max(0f, newTauntRadius);
         tauntTickInterval = Mathf.Max(0.1f, newTauntTickInterval);
@@ -107,6 +112,9 @@ public class DragonDefensiveStanceController : NetworkBehaviour
     {
         yield return new WaitForSeconds(duration);
         SetActiveState(false);
+        activeAbilityController?.StartAbilityCooldown(activeAbility);
+        activeAbilityController = null;
+        activeAbility = null;
         activeRoutine = null;
     }
 

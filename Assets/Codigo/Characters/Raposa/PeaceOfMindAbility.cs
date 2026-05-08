@@ -18,6 +18,19 @@ public class PeaceOfMindAbility : Ability
 
     public override bool Activate(GameObject quemUsou)
     {
+        PlayerHealthSystem health = quemUsou.GetComponent<PlayerHealthSystem>();
+        if (health == null)
+        {
+            Debug.LogError("PeaceOfMindAbility: PlayerHealthSystem not found on player prefab.");
+            return false;
+        }
+
+        if (!health.CanReceiveHealing())
+        {
+            Debug.Log("[PeaceOfMindAbility] Jogador ja esta com HP maximo. Cura ignorada.");
+            return false;
+        }
+
         // PeaceOfMindLogic must be pre-attached to the player prefab — AddComponent is forbidden on spawned NetworkObjects
         PeaceOfMindLogic ajudante = quemUsou.GetComponent<PeaceOfMindLogic>();
         if (ajudante == null)

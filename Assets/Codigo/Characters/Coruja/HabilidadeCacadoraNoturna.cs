@@ -29,6 +29,8 @@ public class HabilidadeCacadoraNoturna : Ability
             return false;
 
         bool isNetworkSession = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        ResolveBeamPose(quemUsou, out Vector3 startPoint, out Vector3 direction, out Quaternion spawnRotation);
+
         if (isNetworkSession)
         {
             if (!NetworkManager.Singleton.IsServer)
@@ -36,8 +38,8 @@ public class HabilidadeCacadoraNoturna : Ability
 
             GameObject logicObject = Object.Instantiate(
                 logicVisualPrefab,
-                quemUsou.transform.position,
-                AbilityAimUtility.ResolveAimRotation(quemUsou));
+                startPoint,
+                spawnRotation);
 
             if (!logicObject.TryGetComponent(out NetworkObject netObj) ||
                 !logicObject.TryGetComponent(out CacadoraNoturnaLogic logic))
@@ -48,7 +50,7 @@ public class HabilidadeCacadoraNoturna : Ability
             }
 
             netObj.Spawn();
-            logic.StartUltimateEffect(quemUsou, damage, range, width, delayTiro);
+            logic.StartUltimateEffect(quemUsou, damage, range, width, delayTiro, startPoint, direction);
             return true;
         }
 
@@ -56,12 +58,12 @@ public class HabilidadeCacadoraNoturna : Ability
         {
             GameObject logicObject = Object.Instantiate(
                 logicVisualPrefab,
-                quemUsou.transform.position,
-                AbilityAimUtility.ResolveAimRotation(quemUsou));
+                startPoint,
+                spawnRotation);
 
             CacadoraNoturnaLogic logic = logicObject.GetComponent<CacadoraNoturnaLogic>();
             if (logic != null)
-                logic.StartOfflineUltimateEffect(quemUsou, damage, range, width, delayTiro);
+                logic.StartOfflineUltimateEffect(quemUsou, damage, range, width, delayTiro, startPoint, direction);
 
             return true;
         }
@@ -95,7 +97,13 @@ public class HabilidadeCacadoraNoturna : Ability
             firePoint = shootingScript.firePoint;
 
         startPoint = firePoint.position;
-        direction = AbilityAimUtility.ResolveAimForward(quemUsou);
+
+        CommanderAbilityController abilityController = quemUsou.GetComponent<CommanderAbilityController>();
+        if (abilityController != null && abilityController.TryGetLastAbilityAim(out _, out Vector3 capturedDirection))
+            direction = capturedDirection;
+        else if (!AbilityAimUtility.TryResolveAimPose3D(quemUsou, out _, out direction))
+            direction = AbilityAimUtility.ResolveAimForward(quemUsou);
+
         if (direction.sqrMagnitude <= 0.001f)
             direction = quemUsou.transform.forward;
 
