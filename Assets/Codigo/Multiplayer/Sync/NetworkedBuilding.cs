@@ -45,6 +45,7 @@ namespace ExoBeasts.Multiplayer.Sync
             NetworkVariableWritePermission.Server);
 
         private int _lastAppliedSignature = int.MinValue;
+        private Coroutine registerWithBuildManagerRoutine;
 
         private void Awake()
         {
@@ -61,6 +62,8 @@ namespace ExoBeasts.Multiplayer.Sync
 
             if (towerController == null)
                 towerController = GetComponent<TowerController>();
+
+            RegisterWithBuildManager();
 
             DpsLevel.OnValueChanged += OnAnyStateChanged;
             ControlLevel.OnValueChanged += OnAnyStateChanged;
@@ -99,6 +102,48 @@ namespace ExoBeasts.Multiplayer.Sync
                 return true;
 
             return BuilderClientId.Value == NetworkManager.Singleton.LocalClientId;
+        }
+
+        private void RegisterWithBuildManager()
+        {
+            if (BuildManager.Instance != null)
+            {
+                BuildManager.Instance.RegisterNetworkedBuilding(this);
+                if (towerController != null)
+                    BuildManager.Instance.RegisterTower(towerController);
+                return;
+            }
+
+            if (registerWithBuildManagerRoutine == null)
+                registerWithBuildManagerRoutine = StartCoroutine(RegisterWithBuildManagerWhenReady());
+        }
+
+        private System.Collections.IEnumerator RegisterWithBuildManagerWhenReady()
+        {
+            while (BuildManager.Instance == null)
+                yield return null;
+
+            BuildManager.Instance.RegisterNetworkedBuilding(this);
+            if (towerController != null)
+                BuildManager.Instance.RegisterTower(towerController);
+
+            registerWithBuildManagerRoutine = null;
+        }
+
+        private void UnregisterFromBuildManager()
+        {
+            if (registerWithBuildManagerRoutine != null)
+            {
+                StopCoroutine(registerWithBuildManagerRoutine);
+                registerWithBuildManagerRoutine = null;
+            }
+
+            if (BuildManager.Instance == null)
+                return;
+
+            BuildManager.Instance.UnregisterNetworkedBuilding(this);
+            if (towerController != null)
+                BuildManager.Instance.UnregisterTower(towerController);
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -243,12 +288,19 @@ namespace ExoBeasts.Multiplayer.Sync
 
         public override void OnNetworkDespawn()
         {
+            UnregisterFromBuildManager();
             DpsLevel.OnValueChanged -= OnAnyStateChanged;
             ControlLevel.OnValueChanged -= OnAnyStateChanged;
             SupportLevel.OnValueChanged -= OnAnyStateChanged;
             TotalCostSpent.OnValueChanged -= OnAnyStateChanged;
             IsActive.OnValueChanged -= OnActiveChanged;
             base.OnNetworkDespawn();
+        }
+
+        public override void OnDestroy()
+        {
+            UnregisterFromBuildManager();
+            base.OnDestroy();
         }
     }
 }

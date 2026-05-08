@@ -66,6 +66,8 @@ public class BuildManager : NetworkBehaviour
     private readonly Dictionary<int, HashSet<ulong>> authoritativeTrapInstances = new Dictionary<int, HashSet<ulong>>();
     private readonly Dictionary<int, int> pendingTrapPlacements = new Dictionary<int, int>();
     private Dictionary<int, int> syncedTrapCounts;
+    private readonly List<TowerController> activeTowersRegistry = new List<TowerController>(32);
+    private readonly List<NetworkedBuilding> activeBuildingsRegistry = new List<NetworkedBuilding>(32);
 
     private void Awake()
     {
@@ -120,6 +122,8 @@ public class BuildManager : NetworkBehaviour
         if (IsServer && NetworkManager.Singleton != null)
             NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnectedSyncTrapCounts;
 
+        activeTowersRegistry.Clear();
+        activeBuildingsRegistry.Clear();
         syncedTrapCounts = null;
         base.OnNetworkDespawn();
     }
@@ -695,6 +699,44 @@ public class BuildManager : NetworkBehaviour
     }
 
     public bool IsHoldingBuilding => currentBuildGhost != null;
+
+    // OPTIMIZATION (Sprint 3 / Item E3p2 - 2026-05-08): registries ativos
+    // usados por inimigos para targeting sem varrer colliders via Physics.
+    public IReadOnlyList<TowerController> GetActiveTowers() => activeTowersRegistry;
+
+    public IReadOnlyList<NetworkedBuilding> GetActiveBuildings() => activeBuildingsRegistry;
+
+    public void RegisterTower(TowerController tower)
+    {
+        if (tower == null || activeTowersRegistry.Contains(tower))
+            return;
+
+        activeTowersRegistry.Add(tower);
+    }
+
+    public void UnregisterTower(TowerController tower)
+    {
+        if (tower == null)
+            return;
+
+        activeTowersRegistry.Remove(tower);
+    }
+
+    public void RegisterNetworkedBuilding(NetworkedBuilding building)
+    {
+        if (building == null || activeBuildingsRegistry.Contains(building))
+            return;
+
+        activeBuildingsRegistry.Add(building);
+    }
+
+    public void UnregisterNetworkedBuilding(NetworkedBuilding building)
+    {
+        if (building == null)
+            return;
+
+        activeBuildingsRegistry.Remove(building);
+    }
 
     public void SetAvailableTowers(CharacterBase[] equipe)
     {

@@ -1,6 +1,9 @@
 using UnityEngine;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using UnityEngine.SceneManagement;
+using ExoBeasts.Managers;
+using ExoBeasts.Managers.Loading;
 
 namespace ExoBeasts.Multiplayer.Core
 {
@@ -16,6 +19,8 @@ namespace ExoBeasts.Multiplayer.Core
     /// </summary>
     public class NetworkBootstrap : MonoBehaviour
     {
+        private const string MENU_SCENE_NAME = "MenuScene";
+
         [Header("Auto-inicio (para testes)")]
         [Tooltip("Iniciar automaticamente como Host ao entrar na cena")]
         [SerializeField] private bool autoStartHost = false;
@@ -33,6 +38,8 @@ namespace ExoBeasts.Multiplayer.Core
 
         [Tooltip("Porta de rede usada por Host e Client")]
         [SerializeField] private ushort networkPort = 7777;
+
+        private bool returningToMenuAfterHostDisconnect;
 
         private void Awake()
         {
@@ -58,6 +65,8 @@ namespace ExoBeasts.Multiplayer.Core
                 NetworkManager.Singleton.OnServerStarted -= OnServerStarted;
                 NetworkManager.Singleton.OnClientConnectedCallback -= OnClientConnected;
                 NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+                NetworkManager.Singleton.OnClientStopped -= OnClientStopped;
+                NetworkManager.Singleton.OnTransportFailure -= OnTransportFailure;
             }
         }
 
@@ -73,6 +82,8 @@ namespace ExoBeasts.Multiplayer.Core
             NetworkManager.Singleton.OnServerStarted += OnServerStarted;
             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+            NetworkManager.Singleton.OnClientStopped += OnClientStopped;
+            NetworkManager.Singleton.OnTransportFailure += OnTransportFailure;
 
             Debug.Log("[NetworkBootstrap] Callbacks de rede registrados com sucesso.");
         }
@@ -147,6 +158,73 @@ namespace ExoBeasts.Multiplayer.Core
         private void OnClientDisconnected(ulong clientId)
         {
             Debug.Log($"[NetworkBootstrap] Cliente desconectou | ClientId: {clientId}");
+
+            if (clientId == NetworkManager.ServerClientId)
+                TryReturnClientToMenuAfterHostDisconnect("host disconnect callback");
+        }
+
+        private void OnClientStopped(bool wasHost)
+        {
+            if (!wasHost)
+                TryReturnClientToMenuAfterHostDisconnect("client stopped");
+        }
+
+        private void OnTransportFailure()
+        {
+            TryReturnClientToMenuAfterHostDisconnect("transport failure");
+        }
+
+        private void TryReturnClientToMenuAfterHostDisconnect(string reason)
+        {
+            if (returningToMenuAfterHostDisconnect)
+                return;
+
+            if (GameModeManager.CurrentMode != GameMode.Multiplayer)
+                return;
+
+            if (SceneManager.GetActiveScene().name == MENU_SCENE_NAME)
+                return;
+
+            NetworkManager networkManager = NetworkManager.Singleton;
+            if (networkManager != null && (networkManager.IsServer || networkManager.IsHost))
+                return;
+
+            Debug.LogWarning($"[NetworkBootstrap] Host indisponivel ({reason}). Encerrando cliente e voltando para {MENU_SCENE_NAME}.");
+            StartCoroutine(ReturnClientToMenuAfterHostDisconnect());
+        }
+
+        private System.Collections.IEnumerator ReturnClientToMenuAfterHostDisconnect()
+        {
+            returningToMenuAfterHostDisconnect = true;
+
+            if (LoadingScreenUI.Instance != null)
+                LoadingScreenUI.Instance.ForceHide();
+
+            PauseControl.isPaused = false;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+
+            MultiplayerRuntimeReset.ApplyOfflineLocalState();
+
+            NetworkManager networkManager = NetworkManager.Singleton;
+            if (networkManager != null &&
+                (networkManager.IsListening ||
+                 networkManager.IsClient ||
+                 networkManager.IsHost ||
+                 networkManager.IsServer))
+            {
+                networkManager.Shutdown();
+
+                float elapsed = 0f;
+                while (networkManager != null && networkManager.IsListening && elapsed < 2f)
+                {
+                    elapsed += Time.unscaledDeltaTime > 0f ? Time.unscaledDeltaTime : Time.deltaTime;
+                    yield return null;
+                }
+            }
+
+            SceneManager.LoadScene(MENU_SCENE_NAME, LoadSceneMode.Single);
+            returningToMenuAfterHostDisconnect = false;
         }
     }
 }

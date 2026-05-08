@@ -63,6 +63,7 @@ public class TowerController : MonoBehaviour
     private TowerAbilitySystem abilitySystem;
     private NetworkObject networkObject;
     private NetworkedBuilding networkedBuilding;
+    private Coroutine registerWithBuildManagerRoutine;
 
     void Awake()
     {
@@ -87,6 +88,7 @@ public class TowerController : MonoBehaviour
 
         // Removemos UpdateAbilities do Start pois os nÃ­veis comeÃ§am zerados ou definidos pelo AbilitySystem
         InvokeRepeating("UpdateTarget", 0f, 0.5f);
+        RegisterWithBuildManagerIfRuntime();
 
         if (networkedBuilding != null)
             networkedBuilding.RefreshVisualState();
@@ -401,6 +403,9 @@ public class TowerController : MonoBehaviour
     {
         Vector3 originPoint = partToRotate != null ? partToRotate.position : transform.position;
 
+        if (TryUpdateTargetFromEnemyRegistry(originPoint))
+            return;
+
         int hitCount = Physics.OverlapSphereNonAlloc(originPoint, CurrentRange, _targetingBuffer);
 
         Transform nearestEnemy = null;
@@ -438,6 +443,47 @@ public class TowerController : MonoBehaviour
         }
 
         targetEnemy = nearestEnemy;
+    }
+
+    private bool TryUpdateTargetFromEnemyRegistry(Vector3 originPoint)
+    {
+        // OPTIMIZATION (Sprint 3 / Item E3p2 - 2026-05-08): usa o registry do
+        // HordeManager no servidor/host e mantem Physics como fallback em clientes.
+        IReadOnlyList<EnemyController> enemies = HordeManager.GetActiveEnemies();
+        if (enemies == null || enemies.Count == 0)
+            return false;
+
+        Transform nearestEnemy = null;
+        float shortestDistance = Mathf.Infinity;
+
+        for (int i = 0; i < enemies.Count; i++)
+        {
+            EnemyController enemyController = enemies[i];
+            if (enemyController == null || enemyController.IsDead || enemyController.enemyData == null)
+                continue;
+
+            EnemyType enemyType = enemyController.enemyData.enemyType;
+            bool isTargetable = (enemyType == EnemyType.Terrestre) ||
+                                (TargetsFlyingEnemies && enemyType == EnemyType.Voador);
+
+            if (!isTargetable)
+                continue;
+
+            Collider enemyCol = enemyController.GetComponentInChildren<Collider>();
+            Vector3 closestPointOnEnemy = enemyCol != null
+                ? enemyCol.ClosestPoint(originPoint)
+                : enemyController.transform.position;
+            float distanceToSkin = Vector3.Distance(originPoint, closestPointOnEnemy);
+
+            if (distanceToSkin > CurrentRange || distanceToSkin >= shortestDistance)
+                continue;
+
+            shortestDistance = distanceToSkin;
+            nearestEnemy = enemyController.transform;
+        }
+
+        targetEnemy = nearestEnemy;
+        return true;
     }
 
     public void SellTower(float refundPercentage)
@@ -652,6 +698,52 @@ public class TowerController : MonoBehaviour
     {
         Gizmos.color = Color.cyan;
         Gizmos.DrawWireSphere(transform.position, CurrentRange);
+    }
+
+    private void RegisterWithBuildManagerIfRuntime()
+    {
+        if (networkObject != null && !networkObject.IsSpawned)
+            return;
+
+        RegisterWithBuildManager();
+    }
+
+    private void RegisterWithBuildManager()
+    {
+        if (BuildManager.Instance != null)
+        {
+            BuildManager.Instance.RegisterTower(this);
+            return;
+        }
+
+        if (registerWithBuildManagerRoutine == null)
+            registerWithBuildManagerRoutine = StartCoroutine(RegisterWithBuildManagerWhenReady());
+    }
+
+    private System.Collections.IEnumerator RegisterWithBuildManagerWhenReady()
+    {
+        while (BuildManager.Instance == null)
+            yield return null;
+
+        BuildManager.Instance.RegisterTower(this);
+        registerWithBuildManagerRoutine = null;
+    }
+
+    private void UnregisterFromBuildManager()
+    {
+        if (registerWithBuildManagerRoutine != null)
+        {
+            StopCoroutine(registerWithBuildManagerRoutine);
+            registerWithBuildManagerRoutine = null;
+        }
+
+        if (BuildManager.Instance != null)
+            BuildManager.Instance.UnregisterTower(this);
+    }
+
+    private void OnDestroy()
+    {
+        UnregisterFromBuildManager();
     }
 
     private bool HasCombatAuthority()

@@ -57,6 +57,32 @@ public class HordeManager : NetworkBehaviour
     private int enemiesSpawnedCount = 0;
     private Coroutine spawnCoroutine;
     private readonly List<Transform> playerTargetCandidates = new List<Transform>(4);
+    private static readonly List<EnemyController> _activeEnemiesRegistry = new List<EnemyController>(64);
+
+    // OPTIMIZATION (Sprint 3 / Item E3p2 - 2026-05-08): registry de inimigos
+    // ativos para targeting de torres sem Physics.OverlapSphereNonAlloc no servidor.
+    public static IReadOnlyList<EnemyController> GetActiveEnemies() => _activeEnemiesRegistry;
+
+    public static void RegisterEnemy(EnemyController enemy)
+    {
+        if (enemy == null || _activeEnemiesRegistry.Contains(enemy))
+            return;
+
+        _activeEnemiesRegistry.Add(enemy);
+    }
+
+    public static void UnregisterEnemy(EnemyController enemy)
+    {
+        if (enemy == null)
+            return;
+
+        _activeEnemiesRegistry.Remove(enemy);
+    }
+
+    private static void ClearActiveEnemiesRegistry()
+    {
+        _activeEnemiesRegistry.Clear();
+    }
 
     // ── Propriedades de acesso transparente (local / rede) ──
     private int CurrentHorde
@@ -88,7 +114,11 @@ public class HordeManager : NetworkBehaviour
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
+        if (Instance == null)
+        {
+            Instance = this;
+            ClearActiveEnemiesRegistry();
+        }
         else Destroy(gameObject);
     }
 
@@ -192,6 +222,7 @@ public class HordeManager : NetworkBehaviour
     public override void OnNetworkDespawn()
     {
         currentHorde.OnValueChanged -= OnCurrentHordeChanged;
+        ClearActiveEnemiesRegistry();
         base.OnNetworkDespawn();
     }
 

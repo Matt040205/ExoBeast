@@ -101,7 +101,7 @@ public class MergulhoTintaLogic : MonoBehaviour
         }
 
         if (abilityScript != null && HasServerAuthority)
-            abilityScript.SetAbilityUsage(sourceAbility, true);
+            abilityScript.DeferAbilityCooldownUntilReleased(sourceAbility);
 
         this.damage = damage;
         this.radius = radius;
@@ -392,6 +392,7 @@ public class MergulhoTintaLogic : MonoBehaviour
     {
         RestoreLocalPresentation(surfacePosition);
         RefreshEnemyTargets();
+        abilityScript?.StartAbilityCooldown(sourceAbility);
 
         if (abilityScript != null &&
             networkObject != null &&

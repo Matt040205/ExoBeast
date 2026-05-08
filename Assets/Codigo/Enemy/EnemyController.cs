@@ -4,6 +4,7 @@ using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 using ExoBeasts.Multiplayer.GameServer;
+using ExoBeasts.Multiplayer.Sync;
 
 public enum AITargetPriority
 {
@@ -94,6 +95,7 @@ public class EnemyController : MonoBehaviour
         hasTriggeredHalfway = false;
         currentPointIndex = 0;
         IsDead = false;
+        HordeManager.RegisterEnemy(this);
         currentChaseTimer = 0f;
         paintStacks = 0;
         paintStackResetTime = 0f;
@@ -277,41 +279,50 @@ public class EnemyController : MonoBehaviour
             }
         }
 
-        // 2. Busca Torres (apenas dentro do allowedRadius para otimizar Physics).
-        // OverlapSphereNonAlloc reutiliza o buffer estático — zero alocação por tick.
-        int hitCount = Physics.OverlapSphereNonAlloc(transform.position, allowedRadius, _targetingBuffer);
-        for (int i = 0; i < hitCount; i++)
+        // OPTIMIZATION (Sprint 3 / Item E3p2 - 2026-05-08): usa o registry do
+        // BuildManager para targeting de construcoes, mantendo Physics como fallback.
+        bool usePhysicsBuildFallback = !TryEvaluateRegisteredBuildTargets(allowedRadius, ref nearestEntity, ref nearestDistance);
+
+        if (usePhysicsBuildFallback)
         {
-            Collider col = _targetingBuffer[i];
-            if (col == null) continue;
-
-            TowerController tower = col.GetComponent<TowerController>();
-            if (tower != null)
+            // 2. Busca Torres (apenas dentro do allowedRadius para otimizar Physics).
+            // OverlapSphereNonAlloc reutiliza o buffer estatico - zero alocacao por tick.
+            int hitCount = Physics.OverlapSphereNonAlloc(transform.position, allowedRadius, _targetingBuffer);
+            for (int i = 0; i < hitCount; i++)
             {
-                // Ignora torres destruídas que ainda existem na cena (pooling)
-                if (tower.IsDestroyed) continue;
+                Collider col = _targetingBuffer[i];
+                if (col == null) continue;
 
-                float distance = GetDistanceToTarget(col.transform);
-                if (distance < nearestDistance)
+                TowerController tower = col.GetComponent<TowerController>();
+                if (tower != null)
                 {
-                    nearestDistance = distance;
-                    nearestEntity = col.transform;
+                    // Ignora torres destruidas que ainda existem na cena (pooling)
+                    if (tower.IsDestroyed) continue;
+
+                    float distance = GetDistanceToTarget(col.transform);
+                    if (distance < nearestDistance)
+                    {
+                        nearestDistance = distance;
+                        nearestEntity = col.transform;
+                    }
+                    continue;
                 }
-                continue;
+
+                if (col.GetComponent<NetworkedBuilding>() != null)
+                {
+                    float distance = GetDistanceToTarget(col.transform);
+                    if (distance < nearestDistance)
+                    {
+                        nearestDistance = distance;
+                        nearestEntity = col.transform;
+                    }
+                }
             }
 
-            if (col.GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null)
-            {
-                float distance = GetDistanceToTarget(col.transform);
-                if (distance < nearestDistance)
-                {
-                    nearestDistance = distance;
-                    nearestEntity = col.transform;
-                }
-            }
+            // Fim do fallback Physics.
         }
 
-        // 3. Decisão do Alvo
+        // 3. Decisao do Alvo
         if (nearestEntity != null && nearestDistance <= allowedRadius)
         {
             if (target != nearestEntity)
@@ -499,6 +510,7 @@ public class EnemyController : MonoBehaviour
             return;
 
         IsDead = true;
+        HordeManager.UnregisterEnemy(this);
 
         if (aiTickCoroutine != null)
             StopCoroutine(aiTickCoroutine);
@@ -659,10 +671,73 @@ public class EnemyController : MonoBehaviour
         HandleDeath();
     }
 
+    private bool TryEvaluateRegisteredBuildTargets(float allowedRadius, ref Transform nearestEntity, ref float nearestDistance)
+    {
+        BuildManager buildManager = BuildManager.Instance;
+        if (buildManager == null)
+            return false;
+
+        bool registryAvailable = false;
+
+        IReadOnlyList<TowerController> towers = buildManager.GetActiveTowers();
+        if (towers != null && towers.Count > 0)
+        {
+            registryAvailable = true;
+            for (int i = 0; i < towers.Count; i++)
+            {
+                TowerController tower = towers[i];
+                if (tower == null || tower.IsDestroyed)
+                    continue;
+
+                float distance = GetDistanceToTarget(tower.transform);
+                if (distance > allowedRadius || distance >= nearestDistance)
+                    continue;
+
+                nearestDistance = distance;
+                nearestEntity = tower.transform;
+            }
+        }
+
+        IReadOnlyList<NetworkedBuilding> buildings = buildManager.GetActiveBuildings();
+        if (buildings != null && buildings.Count > 0)
+        {
+            registryAvailable = true;
+            for (int i = 0; i < buildings.Count; i++)
+            {
+                NetworkedBuilding building = buildings[i];
+                if (building == null || !building.IsActive.Value)
+                    continue;
+
+                TowerController tower = building.GetComponent<TowerController>();
+                if (tower != null)
+                    continue;
+
+                float distance = GetDistanceToTarget(building.transform);
+                if (distance > allowedRadius || distance >= nearestDistance)
+                    continue;
+
+                nearestDistance = distance;
+                nearestEntity = building.transform;
+            }
+        }
+
+        return registryAvailable;
+    }
+
     private IEnumerator ReturnToPoolAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
         if (EnemyPoolManager.Instance != null)
             EnemyPoolManager.Instance.ReturnToPool(gameObject);
+    }
+
+    private void OnDisable()
+    {
+        HordeManager.UnregisterEnemy(this);
+    }
+
+    private void OnDestroy()
+    {
+        HordeManager.UnregisterEnemy(this);
     }
 }
