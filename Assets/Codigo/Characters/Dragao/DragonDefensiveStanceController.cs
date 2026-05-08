@@ -267,6 +267,17 @@ public class DragonDefensiveStanceController : NetworkBehaviour
     {
         ResolveDependencies();
 
+        // OPTIMIZATION BUGFIX (Sprint 3 / G3.2 - 2026-05-08): em cliente nao-host,
+        // o servidor nao recebe mais grounded continuo via netIsGrounded. Usar o
+        // grounded enviado no RPC de habilidade somente durante esta ativacao.
+        if (IsServerValidatingRemoteOwner() &&
+            abilityController != null &&
+            abilityController.TryGetOwnerGroundedForAbilityRequest(out bool ownerGrounded) &&
+            ownerGrounded)
+        {
+            return true;
+        }
+
         if (playerMovement != null)
             return playerMovement.IsGroundedForGameplay(0.75f);
 
@@ -275,6 +286,15 @@ public class DragonDefensiveStanceController : NetworkBehaviour
             return characterController.isGrounded;
 
         return Physics.Raycast(transform.position + Vector3.up * 0.25f, Vector3.down, 1.0f);
+    }
+
+    private bool IsServerValidatingRemoteOwner()
+    {
+        return NetworkManager.Singleton != null &&
+               NetworkManager.Singleton.IsListening &&
+               IsServer &&
+               IsSpawned &&
+               OwnerClientId != NetworkManager.ServerClientId;
     }
 
     private void UpdateShieldVfxTransform()
