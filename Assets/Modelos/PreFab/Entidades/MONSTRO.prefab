@@ -2000,7 +2000,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   attackRange: 2
-  timeToDamage: 1.5
   towerAuraRadius: 10
   towerAuraDamage: 14
   towerAuraInterval: 3
@@ -2022,7 +2021,7 @@ Animator:
   m_GameObject: {fileID: 366370626998246806}
   m_Enabled: 1
   m_Avatar: {fileID: 9000000, guid: cc1c6686e2c95f94e9797240a75a3630, type: 3}
-  m_Controller: {fileID: 9100000, guid: 5e1a068d131481c4a84dcfc38fde4eb8, type: 2}
+  m_Controller: {fileID: 22100000, guid: 3b7f8c840ae9bb7439a78fe543519d54, type: 2}
   m_CullingMode: 0
   m_UpdateMode: 0
   m_ApplyRootMotion: 0

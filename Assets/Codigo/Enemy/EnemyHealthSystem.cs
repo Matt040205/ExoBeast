@@ -225,8 +225,6 @@ public class EnemyHealthSystem : MonoBehaviour
         if (networkedEnemy != null && !networkedEnemy.IsServer) return;
         markedDamageMultiplier = multiplier;
 
-        // BUG FIX (Bug 2b - 7 Maio 2026): visual estava limitado ao servidor. Agora aplicamos
-        // local + broadcast via ClientRpc para que TODOS os clientes vejam o highlight da marca.
         bool shouldMark = multiplier > 1.0f;
         ApplyMarkedVisualLocal(shouldMark);
 
@@ -240,11 +238,6 @@ public class EnemyHealthSystem : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Aplica apenas o efeito visual da marca (troca de material). Chamado tanto local-side
-    /// (pelo servidor em ApplyMarkedStatus) quanto via ClientRpc para todos os clientes.
-    /// Nao altera markedDamageMultiplier — esse eh server-authoritative em ApplyMarkedStatus.
-    /// </summary>
     public void ApplyMarkedVisualLocal(bool marked)
     {
         if (!HasCachedRenderers()) return;
@@ -364,7 +357,7 @@ public class EnemyHealthSystem : MonoBehaviour
         {
             yield return new WaitForSeconds(1f);
             if (isDead) break;
-            TakeDamage(dps, 1f); 
+            TakeDamage(dps, 1f);
             t += 1f;
         }
     }
@@ -422,7 +415,6 @@ public class EnemyHealthSystem : MonoBehaviour
 
         if (enemyController != null) enemyController.HandleDeath();
 
-        // Tenta acionar o efeito visual em singleplayer (em multiplayer é feito via RPC)
         if (networkedEnemy == null && deathVfxPrefab != null)
         {
             GlobalVFXPool.GetVFX(deathVfxPrefab, transform.position, transform.rotation, 4f);

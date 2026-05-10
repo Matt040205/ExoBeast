@@ -13,7 +13,8 @@ public class EnemyCombatSystem : NetworkBehaviour
 
     [Header("Configuracoes de Combate")]
     public float attackRange = 2f;
-    public float timeToDamage = 2f;
+    [Header("Nota: O tempo do dano agora é controlado pelo Animation Event")]
+    // public float timeToDamage = 2f; -> Removido para delegar a responsabilidade ao Animator.
 
     [Header("Aura de Dano em Torres")]
     public float towerAuraRadius = 10f;
@@ -35,6 +36,9 @@ public class EnemyCombatSystem : NetworkBehaviour
     private Coroutine towerAuraCoroutine;
     private AttackState attackState = AttackState.Idle;
 
+    // Salva o alvo atual para o Animation Event saber quem golpear
+    private Transform targetForAnimationEvent;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -43,7 +47,6 @@ public class EnemyCombatSystem : NetworkBehaviour
 
         if (IsServer)
         {
-            // Re-habilita caso tenha sido desativado em uma vida anterior do pool
             enabled = true;
         }
         else
@@ -54,15 +57,12 @@ public class EnemyCombatSystem : NetworkBehaviour
 
     public void InitializeCombat(EnemyDataSO data, int nivel)
     {
-        // Garante que a referência ao controller existe (essencial para inimigos reciclados do pool)
         if (enemyController == null)
             enemyController = GetComponent<EnemyController>();
 
-        // Re-habilita o componente caso tenha sido desativado em um ciclo anterior
         if (!enabled)
             enabled = true;
 
-        // Em modo rede, apenas o servidor processa combate
         if (NetworkManager.Singleton != null && !NetworkManager.Singleton.IsServer)
         {
             enabled = false;
@@ -101,8 +101,6 @@ public class EnemyCombatSystem : NetworkBehaviour
             return;
         }
 
-        // Se já tem uma coroutine rodando, não interfere —
-        // a coroutine gerencia o próprio ciclo via CanContinueAttacking.
         if (attackCoroutine != null)
         {
             enemyController.HoldAttackPosition();
@@ -112,7 +110,6 @@ public class EnemyCombatSystem : NetworkBehaviour
         if (!IsValidCombatTarget(currentTarget))
             return;
 
-        // Só verifica range para INICIAR um novo ciclo
         if (!enemyController.IsTargetInAttackRange(currentTarget))
             return;
 
@@ -128,19 +125,14 @@ public class EnemyCombatSystem : NetworkBehaviour
         {
             attackState = AttackState.Windup;
 
+            // Salva o alvo para que o AnimationEvent saiba em quem bater quando o frame correto chegar
+            targetForAnimationEvent = trackedTarget;
+
             PlayAttackAnimationClientRpc();
 
-            yield return new WaitForSeconds(timeToDamage);
-
-            // Após o windup, só aborta se o inimigo MORREU.
-            // Se o alvo saiu do range, o golpe sai mesmo assim (commit to attack).
-            if (enemyController == null || enemyController.IsDead)
-                break;
-
-            TriggerAttackVfx(trackedTarget.position);
-            ProcessAttack(trackedTarget);
-
-            attackState = AttackState.Recover;
+            // O dano agora não é processado aqui via tempo (WaitForSeconds). 
+            // O dano ocorrerá via AnimationEvent_ApplyDamage().
+            // Apenas aguardamos o tempo total de recarga (cooldown) para permitir um novo ciclo de ataque.
             float cooldown = enemyData.attackSpeed > 0f ? 1f / enemyData.attackSpeed : 1f;
             yield return new WaitForSeconds(cooldown);
 
@@ -154,13 +146,33 @@ public class EnemyCombatSystem : NetworkBehaviour
             enemyController.ResumeMovement();
     }
 
+    // =======================================================================
+    // MÉTODO CHAMADO PELO ANIMATION EVENT NO FRAME EXATO DO GOLPE
+    // =======================================================================
+    public void AnimationEvent_ApplyDamage()
+    {
+        // Garante que apenas o servidor aplica o dano de verdade na rede
+        if (!IsServer) return;
+
+        if (enemyController == null || enemyController.IsDead || targetForAnimationEvent == null)
+            return;
+
+        // Se o inimigo morre ou for atordoado no meio da animação, você pode colocar checks aqui
+
+        TriggerAttackVfx(targetForAnimationEvent.position);
+        ProcessAttack(targetForAnimationEvent);
+
+        attackState = AttackState.Recover;
+    }
+    // =======================================================================
+
     [ClientRpc]
     private void PlayAttackAnimationClientRpc()
     {
         Animator animator = GetComponentInChildren<Animator>();
         if (animator != null)
         {
-            animator.SetTrigger("doAttack"); // Certifique-se de que o parâmetro na Unity se chama exatamente assim
+            animator.SetTrigger("doAttack");
         }
         else
         {
@@ -177,8 +189,6 @@ public class EnemyCombatSystem : NetworkBehaviour
         if (currentTarget == null)
             return false;
 
-        // Compara o GameObject raiz para não quebrar se o target foi refreshado
-        // para o mesmo jogador (ex: IA tick atualizou a referência)
         GameObject currentRoot = currentTarget.root.gameObject;
         GameObject trackedRoot = trackedTarget.root.gameObject;
         if (currentRoot != trackedRoot)
@@ -187,35 +197,23 @@ public class EnemyCombatSystem : NetworkBehaviour
         if (!IsValidCombatTarget(currentTarget))
             return false;
 
-        // CORREÇÃO: usa IsTargetInAttackRange (não disengageRange que era 3u enquanto
-        // o ataque iniciava a 16u — causava o while sair imediatamente todo frame).
-        // O disengageDistance é para o EnemyController decidir quando PARAR de perseguir,
-        // não para o CombatSystem decidir quando continuar atacando.
         return enemyController.IsTargetInAttackRange(currentTarget);
     }
 
-    /// <summary>
-    /// Verifica se um Transform é um alvo válido de combate,
-    /// subindo e descendo na hierarquia (essencial para CharacterController).
-    /// Rejeita alvos destruídos/mortos mesmo que o objeto ainda exista na cena (pooling).
-    /// </summary>
     private bool IsValidCombatTarget(Transform t)
     {
         if (t == null) return false;
 
-        // Checa jogador: aceita apenas se ainda tem vida
         PlayerHealthSystem playerHealth = t.GetComponentInParent<PlayerHealthSystem>()
             ?? t.GetComponentInChildren<PlayerHealthSystem>();
         if (playerHealth != null)
             return playerHealth.currentHealth.Value > 0f;
 
-        // Checa torre: rejeita se já foi destruída (IsDestroyed = true)
         TowerController tower = t.GetComponentInParent<TowerController>()
             ?? t.GetComponentInChildren<TowerController>();
         if (tower != null)
             return !tower.IsDestroyed;
 
-        // Checa NetworkedBuilding (sem estado de morte próprio — aceita se existir)
         if (t.GetComponentInParent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>() != null) return true;
 
         return false;
@@ -247,15 +245,12 @@ public class EnemyCombatSystem : NetworkBehaviour
         if (enemyController.IsBlinded && Random.value < 0.8f)
             return;
 
-        // Dano imediato do golpe
         DealDamageToTarget(targetTransform);
 
-        // Sangramento: aplicado se o inimigo tiver o componente EnemyBleedAttack
         EnemyBleedAttack bleed = GetComponent<EnemyBleedAttack>();
         if (bleed != null)
             bleed.ApplyBleed(targetTransform);
 
-        // Se for melee, também espalha o dano em área para quem estiver perto
         if (enemyData.enemyType != EnemyType.Voador)
             ApplyDamageInArea(targetTransform);
     }
@@ -268,8 +263,6 @@ public class EnemyCombatSystem : NetworkBehaviour
             return;
         }
 
-        // CharacterController: PlayerHealthSystem pode estar no pai, no próprio objeto ou num filho.
-        // Sempre busca em toda a hierarquia para não depender da estrutura exata do prefab.
         PlayerHealthSystem playerHealth = targetTransform.GetComponent<PlayerHealthSystem>();
         if (playerHealth == null) playerHealth = targetTransform.GetComponentInParent<PlayerHealthSystem>();
         if (playerHealth == null) playerHealth = targetTransform.GetComponentInChildren<PlayerHealthSystem>();
@@ -281,7 +274,6 @@ public class EnemyCombatSystem : NetworkBehaviour
             return;
         }
 
-        // Checa torre
         TowerController tower = targetTransform.GetComponent<TowerController>();
         if (tower == null) tower = targetTransform.GetComponentInParent<TowerController>();
         if (tower == null) tower = targetTransform.GetComponentInChildren<TowerController>();

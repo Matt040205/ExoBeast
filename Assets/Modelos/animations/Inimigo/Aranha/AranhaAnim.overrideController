@@ -1,0 +1,17 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!221 &22100000
+AnimatorOverrideController:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: AranhaAnim
+  m_Controller: {fileID: 9100000, guid: f57cd7f41d53eee409718e234755024e, type: 2}
+  m_Clips:
+  - m_OriginalClip: {fileID: -1162040051910603562, guid: df100b9e19ee71b479b5770a8fabec14, type: 3}
+    m_OverrideClip: {fileID: 7400000, guid: 5f49c4591a53bcf4197dad7ce688b5a6, type: 2}
+  - m_OriginalClip: {fileID: 2147749166272996531, guid: df100b9e19ee71b479b5770a8fabec14, type: 3}
+    m_OverrideClip: {fileID: 7353971468125546148, guid: 9d2be0eb3d0e3814d93fe72e004153b1, type: 3}
+  - m_OriginalClip: {fileID: -3442708973636454903, guid: df100b9e19ee71b479b5770a8fabec14, type: 3}
+    m_OverrideClip: {fileID: 7400000, guid: 90ce8c90ccc83424baf7bedf30e902b4, type: 2}

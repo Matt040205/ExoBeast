@@ -26,7 +26,7 @@ public class EnemyController : MonoBehaviour
 
     [Header("Hysteresis (Tolerância de Combate)")]
     public float disengageDistance = 3.0f;
-    
+
     [Tooltip("Objeto visual (ex: ícone de exclamação) que liga quando o inimigo foca no jogador")]
     public GameObject aggroIndicatorVisual;
 
@@ -61,7 +61,7 @@ public class EnemyController : MonoBehaviour
     private Coroutine tauntCoroutine;
     private Coroutine aiTickCoroutine;
     private Vector3 lastDestinationSet = Vector3.positiveInfinity;
-    
+
     private Vector3 lastTickPosition;
     private int stuckTickCount;
     private readonly List<Transform> playerTargetCandidates = new List<Transform>(4);
@@ -252,8 +252,6 @@ public class EnemyController : MonoBehaviour
         }
     }
 
-    // Buffer pre-alocado para Physics.OverlapSphereNonAlloc — evita GC todo tick.
-    // 64 colliders é generoso para um raio de visão típico de inimigo (findDistance ~15m).
     private static readonly Collider[] _targetingBuffer = new Collider[64];
 
     private void DecideTargetTick()
@@ -263,8 +261,6 @@ public class EnemyController : MonoBehaviour
         Transform nearestEntity = null;
         float nearestDistance = float.MaxValue;
 
-        // 1. Busca jogadores pela fonte mais confiavel disponivel:
-        // PlayerObject do NGO -> PlayerRegistry -> tag Player.
         PlayerRegistry.CollectValidPlayerTransforms(playerTargetCandidates);
         foreach (Transform player in playerTargetCandidates)
         {
@@ -279,14 +275,10 @@ public class EnemyController : MonoBehaviour
             }
         }
 
-        // OPTIMIZATION (Sprint 3 / Item E3p2 - 2026-05-08): usa o registry do
-        // BuildManager para targeting de construcoes, mantendo Physics como fallback.
         bool usePhysicsBuildFallback = !TryEvaluateRegisteredBuildTargets(allowedRadius, ref nearestEntity, ref nearestDistance);
 
         if (usePhysicsBuildFallback)
         {
-            // 2. Busca Torres (apenas dentro do allowedRadius para otimizar Physics).
-            // OverlapSphereNonAlloc reutiliza o buffer estatico - zero alocacao por tick.
             int hitCount = Physics.OverlapSphereNonAlloc(transform.position, allowedRadius, _targetingBuffer);
             for (int i = 0; i < hitCount; i++)
             {
@@ -296,7 +288,6 @@ public class EnemyController : MonoBehaviour
                 TowerController tower = col.GetComponent<TowerController>();
                 if (tower != null)
                 {
-                    // Ignora torres destruidas que ainda existem na cena (pooling)
                     if (tower.IsDestroyed) continue;
 
                     float distance = GetDistanceToTarget(col.transform);
@@ -318,16 +309,12 @@ public class EnemyController : MonoBehaviour
                     }
                 }
             }
-
-            // Fim do fallback Physics.
         }
 
-        // 3. Decisao do Alvo
         if (nearestEntity != null && nearestDistance <= allowedRadius)
         {
             if (target != nearestEntity)
             {
-                // Novo alvo adquirido
                 target = nearestEntity;
                 initialChasePosition = transform.position;
                 currentChaseTimer = 0f;
@@ -335,7 +322,6 @@ public class EnemyController : MonoBehaviour
             }
             else
             {
-                // Mantém perseguição e aplica regras de tempo/distância máxima
                 currentChaseTimer += 0.3f;
                 float distanceTraveled = Vector3.Distance(transform.position, initialChasePosition);
 
@@ -351,7 +337,6 @@ public class EnemyController : MonoBehaviour
         }
         else
         {
-            // Ninguém dentro do allowedRadius
             target = null;
             currentChaseTimer = 0f;
             SetAggroVisual(false);
@@ -394,12 +379,9 @@ public class EnemyController : MonoBehaviour
         }
 
         Vector3 flatPosition = new Vector3(transform.position.x, 0f, transform.position.z);
-        Vector3 flatWaypoint  = new Vector3(waypoint.position.x, 0f, waypoint.position.z);
+        Vector3 flatWaypoint = new Vector3(waypoint.position.x, 0f, waypoint.position.z);
         float distanceToWaypoint = Vector3.Distance(flatPosition, flatWaypoint);
 
-        // Avança para o próximo waypoint apenas quando chegou perto o suficiente do atual.
-        // REMOVIDO: a lógica que comparava distâncias com o próximo ponto causava
-        // skip de waypoints — o inimigo pulava pontos no meio do caminho.
         if (distanceToWaypoint <= 1.2f)
         {
             currentPointIndex++;
@@ -417,8 +399,6 @@ public class EnemyController : MonoBehaviour
         float speedMultiplier = statusController != null ? statusController.SpeedModifier : 1f;
         agent.speed = originalMoveSpeed * speedMultiplier;
 
-        // Durante a patrulha o agente não deve parar antes dos waypoints.
-        // Durante o combate usa attackDistance para parar na distância correta.
         agent.stoppingDistance = isPatrol ? 0f : attackDistance;
 
         if (Vector3.Distance(targetPosition, lastDestinationSet) > 0.5f)
@@ -474,8 +454,6 @@ public class EnemyController : MonoBehaviour
 
     private float GetDistanceToTarget(Transform targetTransform)
     {
-        // Ignora a altura (Y) para não inflar a distância quando o pivot do jogador
-        // está mais alto (ex: no peito) e o inimigo está no chão.
         Vector3 flatSelf = new Vector3(transform.position.x, 0f, transform.position.z);
         Vector3 flatTarget = new Vector3(targetTransform.position.x, 0f, targetTransform.position.z);
         return Vector3.Distance(flatSelf, flatTarget);
@@ -518,14 +496,8 @@ public class EnemyController : MonoBehaviour
         if (anim != null)
         {
             anim.SetBool("isWalking", false);
-            foreach (AnimatorControllerParameter param in anim.parameters)
-            {
-                if (param.name == "isDead" && param.type == AnimatorControllerParameterType.Trigger)
-                {
-                    anim.SetTrigger("isDead");
-                    break;
-                }
-            }
+            // Acionamento direto do trigger que criamos no BaseEnemyController
+            anim.SetTrigger("isDead");
         }
 
         if (agent != null && agent.enabled && agent.isOnNavMesh)
@@ -613,22 +585,12 @@ public class EnemyController : MonoBehaviour
 
     private void SetAggroVisual(bool isActive)
     {
-        // BUG FIX (Bugs 4 e 5 - 7 Maio 2026): antes SetAggroVisual so rodava local-side no servidor
-        // (porque AI_TickRoutine so eh server-side). Resultado: cliente nunca via o ponto de
-        // exclamacao quando o inimigo o detectava — parecia que o inimigo nao detectava o jogador 2.
-        // Agora o servidor aplica local + broadcast via ClientRpc para sincronizar todos os clientes.
         SetAggroVisualLocal(isActive);
 
         if (networkedEnemy != null && networkedEnemy.IsSpawned)
             networkedEnemy.SetAggroVisualClientRpc(isActive);
     }
 
-    /// <summary>
-    /// Aplica APENAS o efeito visual do aggro (set active do indicador). Chamado tanto local-side
-    /// (servidor em SetAggroVisual) quanto via ClientRpc broadcast (clientes em SetAggroVisualClientRpc).
-    /// Publico porque NetworkedEnemy chama via GetComponent — EnemyController fica disabled em
-    /// clientes nao-servidor mas metodos publicos podem ser invocados manualmente.
-    /// </summary>
     public void SetAggroVisualLocal(bool isActive)
     {
         if (aggroIndicatorVisual != null && aggroIndicatorVisual.activeSelf != isActive)
