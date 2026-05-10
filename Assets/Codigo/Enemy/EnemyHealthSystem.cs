@@ -23,6 +23,10 @@ public class EnemyHealthSystem : MonoBehaviour
     public string flashAmountProperty = "_FlashAmount";
     public string flashColorProperty = "_FlashColor";
 
+    [Header("Efeito Dissolve")]
+    public float dissolveDuration = 2f;
+    public string dissolveAmountProperty = "_DissolveAmount";
+
     private Coroutine flashCoroutine;
     private MaterialPropertyBlock propBlock;
 
@@ -157,10 +161,15 @@ public class EnemyHealthSystem : MonoBehaviour
         return false;
     }
 
+    private float currentFlashTime = 0f;
+
     public void ShowHitVisualLocal(float damageAmount, bool isCritical, bool showPopup)
     {
-        if (flashCoroutine != null) StopCoroutine(flashCoroutine);
-        flashCoroutine = StartCoroutine(HitFlashRoutine());
+        currentFlashTime = flashDuration;
+        if (flashCoroutine == null)
+        {
+            flashCoroutine = StartCoroutine(HitFlashRoutine());
+        }
 
         if (showPopup)
         {
@@ -170,22 +179,40 @@ public class EnemyHealthSystem : MonoBehaviour
 
     private IEnumerator HitFlashRoutine()
     {
-        if (enemyRenderer != null)
+        if (HasCachedRenderers())
         {
-            enemyRenderer.GetPropertyBlock(propBlock);
-            propBlock.SetFloat(flashAmountProperty, 1f);
-            propBlock.SetColor(flashColorProperty, flashColor);
-            enemyRenderer.SetPropertyBlock(propBlock);
-
-            yield return new WaitForSeconds(flashDuration);
-
-            if (enemyRenderer != null)
+            foreach (Renderer renderer in enemyRenderers)
             {
-                enemyRenderer.GetPropertyBlock(propBlock);
-                propBlock.SetFloat(flashAmountProperty, 0f);
-                enemyRenderer.SetPropertyBlock(propBlock);
+                if (renderer != null)
+                {
+                    renderer.GetPropertyBlock(propBlock);
+                    propBlock.SetFloat(flashAmountProperty, 1f);
+                    propBlock.SetColor(flashColorProperty, flashColor);
+                    renderer.SetPropertyBlock(propBlock);
+                }
             }
         }
+
+        while (currentFlashTime > 0f)
+        {
+            currentFlashTime -= Time.deltaTime;
+            yield return null;
+        }
+
+        if (HasCachedRenderers())
+        {
+            foreach (Renderer renderer in enemyRenderers)
+            {
+                if (renderer != null)
+                {
+                    renderer.GetPropertyBlock(propBlock);
+                    propBlock.SetFloat(flashAmountProperty, 0f);
+                    renderer.SetPropertyBlock(propBlock);
+                }
+            }
+        }
+
+        flashCoroutine = null;
     }
 
     private void SpawnDamagePopupLocal(int damageAmount, bool isCritical)
@@ -273,12 +300,12 @@ public class EnemyHealthSystem : MonoBehaviour
                 if (renderer == null || originalRendererMaterials.ContainsKey(renderer))
                     continue;
 
-                originalRendererMaterials.Add(renderer, renderer.materials.ToArray());
+                originalRendererMaterials.Add(renderer, renderer.sharedMaterials.ToArray());
             }
         }
 
         if (enemyRenderer != null && originalMaterials == null)
-            originalMaterials = enemyRenderer.materials.ToArray();
+            originalMaterials = enemyRenderer.sharedMaterials.ToArray();
     }
 
     private bool HasCachedRenderers()
@@ -307,7 +334,7 @@ public class EnemyHealthSystem : MonoBehaviour
             for (int i = 0; i < markMats.Length; i++)
                 markMats[i] = material;
 
-            renderer.materials = markMats;
+            renderer.sharedMaterials = markMats;
         }
     }
 
@@ -319,7 +346,7 @@ public class EnemyHealthSystem : MonoBehaviour
         foreach (KeyValuePair<Renderer, Material[]> pair in originalRendererMaterials)
         {
             if (pair.Key != null && pair.Value != null)
-                pair.Key.materials = pair.Value;
+                pair.Key.sharedMaterials = pair.Value;
         }
     }
 
@@ -418,6 +445,47 @@ public class EnemyHealthSystem : MonoBehaviour
         if (networkedEnemy == null && deathVfxPrefab != null)
         {
             GlobalVFXPool.GetVFX(deathVfxPrefab, transform.position, transform.rotation, 4f);
+            TriggerDeathDissolve();
+        }
+    }
+
+    public void TriggerDeathDissolve()
+    {
+        StartCoroutine(DeathDissolveRoutine());
+    }
+
+    private IEnumerator DeathDissolveRoutine()
+    {
+        if (!HasCachedRenderers()) yield break;
+
+        float elapsedTime = 0f;
+
+        while (elapsedTime < dissolveDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float dissolveValue = Mathf.Clamp01(elapsedTime / dissolveDuration);
+
+            foreach (Renderer renderer in enemyRenderers)
+            {
+                if (renderer != null)
+                {
+                    renderer.GetPropertyBlock(propBlock);
+                    propBlock.SetFloat(dissolveAmountProperty, dissolveValue);
+                    renderer.SetPropertyBlock(propBlock);
+                }
+            }
+            yield return null;
+        }
+
+        // Garante que o valor final seja 1 (totalmente dissolvido)
+        foreach (Renderer renderer in enemyRenderers)
+        {
+            if (renderer != null)
+            {
+                renderer.GetPropertyBlock(propBlock);
+                propBlock.SetFloat(dissolveAmountProperty, 1f);
+                renderer.SetPropertyBlock(propBlock);
+            }
         }
     }
 }

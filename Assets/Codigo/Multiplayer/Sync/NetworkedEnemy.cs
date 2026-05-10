@@ -110,7 +110,10 @@ namespace ExoBeasts.Multiplayer.Sync
 
             OnEnemyDiedClientRpc();
 
-            yield return new WaitForSeconds(2f);
+            float despawnDelay = 2f;
+            if (localHealth != null) despawnDelay = localHealth.dissolveDuration + 0.1f;
+
+            yield return new WaitForSeconds(despawnDelay);
 
             var netObj = GetComponent<NetworkObject>();
             if (netObj != null && netObj.IsSpawned)
@@ -130,8 +133,13 @@ namespace ExoBeasts.Multiplayer.Sync
                 anim.SetTrigger("isDead");
             }
 
-            if (localHealth != null && localHealth.deathVfxPrefab != null)
-                GlobalVFXPool.GetVFX(localHealth.deathVfxPrefab, transform.position, transform.rotation, 4f);
+            if (localHealth != null)
+            {
+                if (localHealth.deathVfxPrefab != null)
+                    GlobalVFXPool.GetVFX(localHealth.deathVfxPrefab, transform.position, transform.rotation, 4f);
+                
+                localHealth.TriggerDeathDissolve();
+            }
         }
 
         private void OnDeathStateChanged(bool oldVal, bool newVal)

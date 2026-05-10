@@ -38,6 +38,9 @@ public class EnemyCombatSystem : NetworkBehaviour
 
     // Salva o alvo atual para o Animation Event saber quem golpear
     private Transform targetForAnimationEvent;
+    
+    private float nextAttackTime = 0f;
+    private bool hasDealtDamageThisCycle = false;
 
     public override void OnNetworkSpawn()
     {
@@ -113,31 +116,33 @@ public class EnemyCombatSystem : NetworkBehaviour
         if (!enemyController.IsTargetInAttackRange(currentTarget))
             return;
 
+        if (Time.time < nextAttackTime)
+        {
+            enemyController.HoldAttackPosition();
+            return;
+        }
+
         enemyController.HoldAttackPosition();
         attackCoroutine = StartCoroutine(AttackCycle(currentTarget));
     }
 
     private IEnumerator AttackCycle(Transform initialTarget)
     {
-        Transform trackedTarget = initialTarget;
+        attackState = AttackState.Windup;
 
-        while (CanContinueAttacking(trackedTarget))
-        {
-            attackState = AttackState.Windup;
+        // Salva o alvo para que o AnimationEvent saiba em quem bater quando o frame correto chegar
+        targetForAnimationEvent = initialTarget;
+        hasDealtDamageThisCycle = false;
 
-            // Salva o alvo para que o AnimationEvent saiba em quem bater quando o frame correto chegar
-            targetForAnimationEvent = trackedTarget;
+        PlayAttackAnimationClientRpc();
 
-            PlayAttackAnimationClientRpc();
+        // Calcula o tempo de recarga com base na velocidade de ataque
+        float cooldown = enemyData.attackSpeed > 0f ? 1f / enemyData.attackSpeed : 1f;
+        nextAttackTime = Time.time + cooldown;
 
-            // O dano agora não é processado aqui via tempo (WaitForSeconds). 
-            // O dano ocorrerá via AnimationEvent_ApplyDamage().
-            // Apenas aguardamos o tempo total de recarga (cooldown) para permitir um novo ciclo de ataque.
-            float cooldown = enemyData.attackSpeed > 0f ? 1f / enemyData.attackSpeed : 1f;
-            yield return new WaitForSeconds(cooldown);
-
-            trackedTarget = enemyController.Target;
-        }
+        // O dano ocorrerá via AnimationEvent_ApplyDamage().
+        // Aguardamos o tempo total de recarga (cooldown) para finalizar o ciclo.
+        yield return new WaitForSeconds(cooldown);
 
         attackState = AttackState.Idle;
         attackCoroutine = null;
@@ -154,8 +159,12 @@ public class EnemyCombatSystem : NetworkBehaviour
         // Garante que apenas o servidor aplica o dano de verdade na rede
         if (!IsServer) return;
 
+        if (hasDealtDamageThisCycle) return;
+
         if (enemyController == null || enemyController.IsDead || targetForAnimationEvent == null)
             return;
+
+        hasDealtDamageThisCycle = true;
 
         // Se o inimigo morre ou for atordoado no meio da animação, você pode colocar checks aqui
 
