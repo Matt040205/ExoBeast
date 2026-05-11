@@ -1969,6 +1969,9 @@ MonoBehaviour:
   flashColorProperty: _FlashColor
   dissolveDuration: 2
   dissolveAmountProperty: _DissolveAmount
+  OnDeathDissolveStart:
+    m_PersistentCalls:
+      m_Calls: []
   currentHealth: 0
   isDead: 0
 --- !u!114 &-8987182849631250749

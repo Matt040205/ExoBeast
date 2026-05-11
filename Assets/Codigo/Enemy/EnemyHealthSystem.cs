@@ -27,6 +27,9 @@ public class EnemyHealthSystem : MonoBehaviour
     public float dissolveDuration = 2f;
     public string dissolveAmountProperty = "_DissolveAmount";
 
+    [Header("Evento de Morte (Chamavel por Animation Event)")]
+    public UnityEngine.Events.UnityEvent OnDeathDissolveStart;
+
     private Coroutine flashCoroutine;
     private MaterialPropertyBlock propBlock;
 
@@ -449,14 +452,60 @@ public class EnemyHealthSystem : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Inicia o efeito de dissolve de morte. Pode ser chamado via:
+    /// 1) Codigo direto (como ja era feito)
+    /// 2) UnityEvent no Inspector
+    /// 3) Animation Event dentro de uma animacao de morte
+    /// </summary>
     public void TriggerDeathDissolve()
     {
+        Debug.Log($"[EnemyHealth] TriggerDeathDissolve() chamado em '{gameObject.name}'");
+        OnDeathDissolveStart?.Invoke();
         StartCoroutine(DeathDissolveRoutine());
     }
 
     private IEnumerator DeathDissolveRoutine()
     {
-        if (!HasCachedRenderers()) yield break;
+        if (!HasCachedRenderers())
+        {
+            Debug.LogWarning($"[EnemyHealth] DeathDissolve ABORTADO em '{gameObject.name}': Nenhum Renderer encontrado!");
+            yield break;
+        }
+
+        Debug.Log($"[EnemyHealth] DeathDissolve iniciando em '{gameObject.name}'. " +
+                  $"Renderers: {enemyRenderers.Length}, Propriedade: '{dissolveAmountProperty}', Duracao: {dissolveDuration}s");
+
+        // Cria instancias dos materiais para poder modificar sem afetar o asset original
+        Dictionary<Renderer, Material[]> instanceMaterials = new Dictionary<Renderer, Material[]>();
+        int totalMateriais = 0;
+        int materiaisComPropriedade = 0;
+
+        foreach (Renderer renderer in enemyRenderers)
+        {
+            if (renderer == null) continue;
+            Material[] mats = renderer.materials;
+            instanceMaterials[renderer] = mats;
+
+            foreach (Material mat in mats)
+            {
+                totalMateriais++;
+                bool temProp = mat != null && mat.HasProperty(dissolveAmountProperty);
+                if (temProp) materiaisComPropriedade++;
+
+                Debug.Log($"[EnemyHealth]   Renderer '{renderer.gameObject.name}' -> Material '{(mat != null ? mat.name : "NULL")}' " +
+                          $"| Tem '{dissolveAmountProperty}': {temProp}" +
+                          $" | Shader: {(mat != null ? mat.shader.name : "N/A")}");
+            }
+        }
+
+        Debug.Log($"[EnemyHealth] Total de materiais: {totalMateriais}, Com propriedade '{dissolveAmountProperty}': {materiaisComPropriedade}");
+
+        if (materiaisComPropriedade == 0)
+        {
+            Debug.LogError($"[EnemyHealth] NENHUM material em '{gameObject.name}' tem a propriedade '{dissolveAmountProperty}'! " +
+                           "Verifique o nome no shader (ex: _DissolveAmount, _Dissolve, _Cutoff, _Alpha, etc.)");
+        }
 
         float elapsedTime = 0f;
 
@@ -465,27 +514,29 @@ public class EnemyHealthSystem : MonoBehaviour
             elapsedTime += Time.deltaTime;
             float dissolveValue = Mathf.Clamp01(elapsedTime / dissolveDuration);
 
-            foreach (Renderer renderer in enemyRenderers)
+            foreach (var pair in instanceMaterials)
             {
-                if (renderer != null)
+                if (pair.Key == null) continue;
+                foreach (Material mat in pair.Value)
                 {
-                    renderer.GetPropertyBlock(propBlock);
-                    propBlock.SetFloat(dissolveAmountProperty, dissolveValue);
-                    renderer.SetPropertyBlock(propBlock);
+                    if (mat != null && mat.HasProperty(dissolveAmountProperty))
+                        mat.SetFloat(dissolveAmountProperty, dissolveValue);
                 }
             }
             yield return null;
         }
 
         // Garante que o valor final seja 1 (totalmente dissolvido)
-        foreach (Renderer renderer in enemyRenderers)
+        foreach (var pair in instanceMaterials)
         {
-            if (renderer != null)
+            if (pair.Key == null) continue;
+            foreach (Material mat in pair.Value)
             {
-                renderer.GetPropertyBlock(propBlock);
-                propBlock.SetFloat(dissolveAmountProperty, 1f);
-                renderer.SetPropertyBlock(propBlock);
+                if (mat != null && mat.HasProperty(dissolveAmountProperty))
+                    mat.SetFloat(dissolveAmountProperty, 1f);
             }
         }
+
+        Debug.Log($"[EnemyHealth] DeathDissolve CONCLUIDO em '{gameObject.name}'");
     }
 }

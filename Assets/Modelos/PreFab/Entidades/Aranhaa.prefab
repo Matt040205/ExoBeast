@@ -191,6 +191,10 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8001866522814007648, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: enemyData
+      value: 
+      objectReference: {fileID: 11400000, guid: c2d5ff50d56067b4d964aca900bfe504, type: 2}
+    - target: {fileID: 8001866522814007648, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: deathVfxPrefab
       value: 
       objectReference: {fileID: 1530198455052353034, guid: 1018e202175868c46ac9f72f3cf3b39e, type: 3}

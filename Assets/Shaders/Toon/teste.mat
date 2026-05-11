@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!114 &-564250298291013054
+--- !u!114 &-8303627166769435560
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: outline
+  m_Name: teste
   m_Shader: {fileID: -6465566751694194690, guid: 9b583ee99aa07114ba8d6c4047520ec3, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -63,7 +63,7 @@ Material:
     - _QueueOffset: 0
     - _SrcBlend: 1
     - _Surface: 0
-    - _Thinkness: 0.0042
+    - _Thinkness: 0
     - _ZTest: 4
     - _ZWrite: 1
     - _ZWriteControl: 0
