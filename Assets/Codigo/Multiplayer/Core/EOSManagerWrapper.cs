@@ -187,18 +187,20 @@ namespace ExoBeasts.Multiplayer.Core
                 return;
             }
 
-            eosConfig.LoadCredentialsFromFile();
+            EnsureStreamingAssetsConfigs();
+
+            eosConfig.LoadCredentials();
 
             if (!eosConfig.ValidateCredentials())
             {
-                string error = "Credenciais EOS invalidas ou incompletas";
+                string error = "Credenciais EOS invalidas ou incompletas. Verifique variaveis de ambiente ou EOSCredentials.json.";
                 Debug.LogError($"[EOSManagerWrapper] {error}");
                 _initializationInProgress = false;
                 OnInitializationFailed?.Invoke(error);
                 return;
             }
 
-            ApplyCredentialsToPlayEveryWare();
+            LogSafeCredentialInfo();
 
             // Busca o MonoBehaviour do EOSManager INCLUINDO componentes desabilitados.
             // Motivo: o PlayEveryWare desabilita a si mesmo em Awake() quando detecta
@@ -300,11 +302,27 @@ namespace ExoBeasts.Multiplayer.Core
             OnEOSInitialized?.Invoke();
         }
 
-        // O PlayEveryWare usa seu proprio sistema de config em StreamingAssets
-        private void ApplyCredentialsToPlayEveryWare()
+        private void EnsureStreamingAssetsConfigs()
+        {
+            string eosDir = System.IO.Path.Combine(Application.streamingAssetsPath, "EOS");
+            string productConfig = System.IO.Path.Combine(eosDir, "eos_product_config.json");
+            string windowsConfig = System.IO.Path.Combine(eosDir, "eos_windows_config.json");
+
+            if (System.IO.File.Exists(productConfig) && System.IO.File.Exists(windowsConfig))
+                return;
+
+            Debug.LogWarning("[EOSManagerWrapper] Configs EOS ausentes em StreamingAssets/EOS/. " +
+                "No Editor, rode Tools > ExoBeasts > Generate EOS Config. " +
+                "Em build, verifique que o IPreprocessBuild rodou corretamente.");
+        }
+
+        private void LogSafeCredentialInfo()
         {
             if (eosConfig == null) return;
-            Debug.Log("[EOSManagerWrapper] Credenciais carregadas do arquivo externo");
+            string clientIdMasked = !string.IsNullOrEmpty(eosConfig.ClientId) && eosConfig.ClientId.Length > 8
+                ? eosConfig.ClientId.Substring(0, 8) + "..."
+                : "***";
+            Debug.Log($"[EOSManagerWrapper] EOS config carregado — ProductId: {eosConfig.ProductId}, ClientId: {clientIdMasked}");
         }
 #endif
 

@@ -94,5 +94,13 @@ EOSCredentials.json
 .env
 **/.env
 
+# EOS Plugin configs (gerados automaticamente pelo EOSConfigGenerator, contem credenciais)
+Assets/StreamingAssets/EOS/eos_product_config.json
+Assets/StreamingAssets/EOS/eos_windows_config.json
+Assets/StreamingAssets/EOS/EpicOnlineServicesConfig.json
+
+# ScriptableObject com credenciais baked (gerado em runtime)
+Assets/Resources/EOSConfig_Main.asset
+
 # Arquivos temporarios do Claude
 tmpclaude-*

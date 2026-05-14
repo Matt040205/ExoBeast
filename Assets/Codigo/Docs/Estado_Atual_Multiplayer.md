@@ -15,7 +15,19 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - `Assets/Codigo/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
 - `Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
 
-## Ultima atualizacao: blindagem do fluxo de startup, lobby e play direto (2026-04-30)
+## Ultima atualizacao: refactor do sistema de credenciais EOS (2026-05-13)
+
+- A "gambiarra" do sistema de credenciais foi removida. Tres scripts redundantes (`EOSConfigSetup.cs`, `EOSConfigImporter.cs`, `EOSBuildProcessor.cs`) foram deletados e substituidos por um unico componente: `Assets/Editor/EOSConfigGenerator.cs`.
+- Quatro arquivos com `ClientSecret` em texto plano foram removidos do indice git (`eos_product_config.json`, `eos_windows_config.json`, `EpicOnlineServicesConfig.json`, `EOSConfig_Main.asset`) e adicionados ao `.gitignore`. As copias locais foram preservadas para nao quebrar o desenvolvimento.
+- Nova cadeia de prioridade para carregar credenciais: variaveis de ambiente (`EOS_*`) -> `EOSCredentials.json` na raiz -> `StreamingAssets/EOS/*.json` (fallback runtime).
+- `EOSConfigGenerator` roda automaticamente: pre-build via `IPreprocessBuildWithReport` (callbackOrder = -100), play mode via `EditorApplication.playModeStateChanged`, e tem menu `Tools > ExoBeasts > Generate EOS Config`.
+- `EOSConfig.cs` (ScriptableObject) marcou todos os campos de credencial com `[NonSerialized]`. Resultado: o `.asset` nao persiste mais secrets.
+- `EOSManagerWrapper.cs` chama `LoadCredentials()` (renomeado de `LoadCredentialsFromFile`) e mascara `ClientId` nos logs; `ClientSecret` nunca aparece em log.
+- Pos-refactor, o Unity MCP `read_console` confirmou compilacao sem erros relacionados a EOS. Validacao funcional (Play Mode e build standalone) ainda pendente.
+- Documentacao atualizada: `Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md` cobre as tres formas de fornecer credenciais (env vars, JSON, template) com exemplos de CI/CD.
+- Template versionado criado em `EOSCredentials.json.template` na raiz do projeto.
+
+## Atualizacao anterior: blindagem do fluxo de startup, lobby e play direto (2026-04-30)
 
 - O fluxo de entrada foi endurecido para nao depender de estado residual entre singleplayer, multiplayer e Play direto.
 - `MenuManager` agora rebinds os botoes `Singleplayer` e `Multiplayer` por nome se o Inspector perder as referencias, e sempre sobrescreve listeners antigos da cena.

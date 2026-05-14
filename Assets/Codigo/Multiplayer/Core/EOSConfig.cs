@@ -1,108 +1,146 @@
 using UnityEngine;
+using System;
+using System.IO;
 
 namespace ExoBeasts.Multiplayer.Core
 {
-    /// <summary>
-    /// ── EOSConfig ────────────────────────────────────────
-    /// ScriptableObject com credenciais e configuracoes do EOS.
-    ///
-    ///  ▸ Credenciais carregadas de EOSCredentials.json (externo ao Git)
-    ///  ▸ LoadCredentialsFromFile(): popula campos em runtime
-    ///  ▸ ValidateCredentials(): verifica campos obrigatorios
-    ///  ▸ ClearCredentials(): limpa da memoria ao encerrar
-    ///  ▸ Criar via: Assets > Create > Multiplayer > EOS Config
-    /// ─────────────────────────────────────────────────────
-    /// </summary>
     [CreateAssetMenu(fileName = "EOSConfig", menuName = "Multiplayer/EOS Config")]
     public class EOSConfig : ScriptableObject
     {
         [Header("Identificadores do Produto")]
-        [Tooltip("ID do produto no Epic Developer Portal")]
-        public string ProductId = "";
+        [Tooltip("Carregado em runtime — nao baked no asset")]
+        [NonSerialized] public string ProductId = "";
 
-        [Tooltip("ID do Sandbox (Development, Staging, Live)")]
-        public string SandboxId = "";
-
-        [Tooltip("ID do Deployment")]
-        public string DeploymentId = "";
+        [NonSerialized] public string SandboxId = "";
+        [NonSerialized] public string DeploymentId = "";
 
         [Header("Credenciais do Cliente")]
-        [Tooltip("Client ID - Sera carregado de arquivo externo")]
-        public string ClientId = "";
-
-        [Tooltip("Client Secret - Sera carregado de arquivo externo")]
-        public string ClientSecret = "";
+        [NonSerialized] public string ClientId = "";
+        [NonSerialized] public string ClientSecret = "";
 
         [Header("Configuracoes de Jogo")]
-        [Tooltip("Chave de criptografia (64 caracteres hex)")]
-        public string EncryptionKey = "";
+        [NonSerialized] public string EncryptionKey = "";
 
-        [Header("Configuracoes de Arquivo")]
-        [Tooltip("Caminho do arquivo de credenciais (relativo ao projeto)")]
-        public string credentialsFilePath = "EOSCredentials.json";
+        private const string CREDENTIALS_FILE = "EOSCredentials.json";
 
-        public void LoadCredentialsFromFile()
+        public void LoadCredentials()
         {
-            // Clones MPPM têm Application.dataPath apontando para Library/VP/{vpId}/Assets
-            // em vez da raiz real do projeto. Precisamos subir 4 níveis para chegar em PI3D/.
-            string dataParent = MppmHelper.IsClone
-                ? System.IO.Path.Combine(Application.dataPath, "..", "..", "..", "..")
-                : System.IO.Path.Combine(Application.dataPath, "..");
-
-            string filePath = System.IO.Path.GetFullPath(
-                System.IO.Path.Combine(dataParent, credentialsFilePath));
-
-            // Fallback 1: StreamingAssets (funciona em builds se o arquivo foi copiado)
-            if (!System.IO.File.Exists(filePath))
+            if (TryLoadFromEnvironment())
             {
-                string streamingPath = System.IO.Path.Combine(
-                    Application.streamingAssetsPath, credentialsFilePath);
-                if (System.IO.File.Exists(streamingPath))
-                {
-                    filePath = streamingPath;
-                    Debug.Log($"[EOSConfig] Usando credenciais de StreamingAssets: {filePath}");
-                }
-            }
-
-            if (!System.IO.File.Exists(filePath))
-            {
-                // Fallback 2: usar credenciais já serializadas no ScriptableObject (baked no Inspector)
-                if (ValidateCredentials())
-                {
-                    Debug.Log("[EOSConfig] Arquivo externo nao encontrado, usando credenciais baked no ScriptableObject.");
-                    return;
-                }
-
-                Debug.LogError($"[EOSConfig] Arquivo de credenciais nao encontrado: {filePath}");
-                Debug.LogError("[EOSConfig] Crie o arquivo EOSCredentials.json na raiz do projeto, " +
-                               "ou preencha os campos diretamente no Inspector do EOSConfig asset!");
+                Debug.Log("[EOSConfig] Credenciais carregadas de variaveis de ambiente.");
                 return;
             }
 
+            if (TryLoadFromFile())
+            {
+                Debug.Log("[EOSConfig] Credenciais carregadas de EOSCredentials.json.");
+                return;
+            }
+
+            if (TryLoadFromStreamingAssets())
+            {
+                Debug.Log("[EOSConfig] Credenciais carregadas de StreamingAssets/EOS/.");
+                return;
+            }
+
+            Debug.LogError(
+                "[EOSConfig] Nenhuma fonte de credenciais encontrada!\n" +
+                "  Opcao A: defina variaveis de ambiente (EOS_PRODUCT_ID, EOS_CLIENT_ID, etc.)\n" +
+                "  Opcao B: crie EOSCredentials.json na raiz do projeto\n" +
+                "  Opcao C: gere configs via menu Tools > ExoBeasts > Generate EOS Config");
+        }
+
+        private bool TryLoadFromEnvironment()
+        {
+            string productId = Environment.GetEnvironmentVariable("EOS_PRODUCT_ID");
+            string clientId = Environment.GetEnvironmentVariable("EOS_CLIENT_ID");
+
+            if (string.IsNullOrEmpty(productId) || string.IsNullOrEmpty(clientId))
+                return false;
+
+            ProductId = productId;
+            SandboxId = Environment.GetEnvironmentVariable("EOS_SANDBOX_ID") ?? "";
+            DeploymentId = Environment.GetEnvironmentVariable("EOS_DEPLOYMENT_ID") ?? "";
+            ClientId = clientId;
+            ClientSecret = Environment.GetEnvironmentVariable("EOS_CLIENT_SECRET") ?? "";
+            EncryptionKey = Environment.GetEnvironmentVariable("EOS_ENCRYPTION_KEY") ?? "";
+            return true;
+        }
+
+        private bool TryLoadFromFile()
+        {
+            string dataParent = MppmHelper.IsClone
+                ? Path.Combine(Application.dataPath, "..", "..", "..", "..")
+                : Path.Combine(Application.dataPath, "..");
+
+            string filePath = Path.GetFullPath(Path.Combine(dataParent, CREDENTIALS_FILE));
+
+            if (!File.Exists(filePath))
+                return false;
+
+            return ParseCredentialsFile(filePath);
+        }
+
+        private bool TryLoadFromStreamingAssets()
+        {
+            string eosDir = Path.Combine(Application.streamingAssetsPath, "EOS");
+            string productConfigPath = Path.Combine(eosDir, "eos_product_config.json");
+            string windowsConfigPath = Path.Combine(eosDir, "eos_windows_config.json");
+
+            if (!File.Exists(productConfigPath) || !File.Exists(windowsConfigPath))
+                return false;
+
             try
             {
-                string json = System.IO.File.ReadAllText(filePath);
-                EOSCredentials credentials = JsonUtility.FromJson<EOSCredentials>(json);
+                string productJson = File.ReadAllText(productConfigPath);
+                var productData = JsonUtility.FromJson<ProductConfigMinimal>(productJson);
 
-                ProductId = credentials.ProductId;
-                SandboxId = credentials.SandboxId;
-                DeploymentId = credentials.DeploymentId;
-                ClientId = credentials.ClientId;
-                ClientSecret = credentials.ClientSecret;
-                EncryptionKey = credentials.EncryptionKey;
+                ProductId = productData.ProductId ?? "";
 
-                Debug.Log("[EOSConfig] Credenciais carregadas com sucesso!");
+                if (productData.Clients != null && productData.Clients.Length > 0)
+                {
+                    ClientId = productData.Clients[0].Value?.ClientId ?? "";
+                    ClientSecret = productData.Clients[0].Value?.ClientSecret ?? "";
+                }
+
+                string windowsJson = File.ReadAllText(windowsConfigPath);
+                var windowsData = JsonUtility.FromJson<WindowsConfigMinimal>(windowsJson);
+
+                SandboxId = windowsData.deployment?.SandboxId?.Value ?? "";
+                DeploymentId = windowsData.deployment?.DeploymentId ?? "";
+
+                return ValidateCredentials(silent: true);
             }
-            catch (System.Exception e)
+            catch (Exception e)
             {
-                Debug.LogError($"[EOSConfig] Erro ao carregar credenciais: {e.Message}");
-                // Fallback: se o parse falhou mas temos credenciais baked, usa elas
-                if (ValidateCredentials())
-                    Debug.LogWarning("[EOSConfig] Usando credenciais baked como fallback apos erro de parse.");
+                Debug.LogWarning($"[EOSConfig] Erro ao ler StreamingAssets/EOS: {e.Message}");
+                return false;
             }
         }
 
-        public bool ValidateCredentials()
+        private bool ParseCredentialsFile(string filePath)
+        {
+            try
+            {
+                string json = File.ReadAllText(filePath);
+                var credentials = JsonUtility.FromJson<EOSCredentials>(json);
+
+                ProductId = credentials.ProductId ?? "";
+                SandboxId = credentials.SandboxId ?? "";
+                DeploymentId = credentials.DeploymentId ?? "";
+                ClientId = credentials.ClientId ?? "";
+                ClientSecret = credentials.ClientSecret ?? "";
+                EncryptionKey = credentials.EncryptionKey ?? "";
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[EOSConfig] Erro ao ler credenciais: {e.Message}");
+                return false;
+            }
+        }
+
+        public bool ValidateCredentials(bool silent = false)
         {
             bool isValid = !string.IsNullOrEmpty(ProductId) &&
                           !string.IsNullOrEmpty(SandboxId) &&
@@ -110,9 +148,9 @@ namespace ExoBeasts.Multiplayer.Core
                           !string.IsNullOrEmpty(ClientId) &&
                           !string.IsNullOrEmpty(ClientSecret);
 
-            if (!isValid)
+            if (!isValid && !silent)
             {
-                Debug.LogError("[EOSConfig] Credenciais incompletas! Execute LoadCredentialsFromFile()");
+                Debug.LogError("[EOSConfig] Credenciais incompletas! Verifique a fonte de credenciais.");
             }
 
             return isValid;
@@ -126,11 +164,10 @@ namespace ExoBeasts.Multiplayer.Core
             ClientId = "";
             ClientSecret = "";
             EncryptionKey = "";
-            Debug.Log("[EOSConfig] Credenciais limpas da memoria");
         }
     }
 
-    [System.Serializable]
+    [Serializable]
     public class EOSCredentials
     {
         public string ProductId;
@@ -139,5 +176,45 @@ namespace ExoBeasts.Multiplayer.Core
         public string ClientId;
         public string ClientSecret;
         public string EncryptionKey;
+    }
+
+    [Serializable]
+    internal class ProductConfigMinimal
+    {
+        public string ProductId;
+        public ClientEntry[] Clients;
+
+        [Serializable]
+        internal class ClientEntry
+        {
+            public string Name;
+            public ClientValue Value;
+        }
+
+        [Serializable]
+        internal class ClientValue
+        {
+            public string ClientId;
+            public string ClientSecret;
+        }
+    }
+
+    [Serializable]
+    internal class WindowsConfigMinimal
+    {
+        public DeploymentEntry deployment;
+
+        [Serializable]
+        internal class DeploymentEntry
+        {
+            public SandboxIdEntry SandboxId;
+            public string DeploymentId;
+        }
+
+        [Serializable]
+        internal class SandboxIdEntry
+        {
+            public string Value;
+        }
     }
 }
