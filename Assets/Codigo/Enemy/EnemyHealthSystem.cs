@@ -23,6 +23,13 @@ public class EnemyHealthSystem : MonoBehaviour
     public string flashAmountProperty = "_FlashAmount";
     public string flashColorProperty = "_FlashColor";
 
+    [Header("Efeito Dissolve")]
+    public float dissolveDuration = 2f;
+    public string dissolveAmountProperty = "_DissolveAmount";
+
+    [Header("Evento de Morte (Chamavel por Animation Event)")]
+    public UnityEngine.Events.UnityEvent OnDeathDissolveStart;
+
     private Coroutine flashCoroutine;
     private MaterialPropertyBlock propBlock;
 
@@ -157,10 +164,15 @@ public class EnemyHealthSystem : MonoBehaviour
         return false;
     }
 
+    private float currentFlashTime = 0f;
+
     public void ShowHitVisualLocal(float damageAmount, bool isCritical, bool showPopup)
     {
-        if (flashCoroutine != null) StopCoroutine(flashCoroutine);
-        flashCoroutine = StartCoroutine(HitFlashRoutine());
+        currentFlashTime = flashDuration;
+        if (flashCoroutine == null)
+        {
+            flashCoroutine = StartCoroutine(HitFlashRoutine());
+        }
 
         if (showPopup)
         {
@@ -170,22 +182,40 @@ public class EnemyHealthSystem : MonoBehaviour
 
     private IEnumerator HitFlashRoutine()
     {
-        if (enemyRenderer != null)
+        if (HasCachedRenderers())
         {
-            enemyRenderer.GetPropertyBlock(propBlock);
-            propBlock.SetFloat(flashAmountProperty, 1f);
-            propBlock.SetColor(flashColorProperty, flashColor);
-            enemyRenderer.SetPropertyBlock(propBlock);
-
-            yield return new WaitForSeconds(flashDuration);
-
-            if (enemyRenderer != null)
+            foreach (Renderer renderer in enemyRenderers)
             {
-                enemyRenderer.GetPropertyBlock(propBlock);
-                propBlock.SetFloat(flashAmountProperty, 0f);
-                enemyRenderer.SetPropertyBlock(propBlock);
+                if (renderer != null)
+                {
+                    renderer.GetPropertyBlock(propBlock);
+                    propBlock.SetFloat(flashAmountProperty, 1f);
+                    propBlock.SetColor(flashColorProperty, flashColor);
+                    renderer.SetPropertyBlock(propBlock);
+                }
             }
         }
+
+        while (currentFlashTime > 0f)
+        {
+            currentFlashTime -= Time.deltaTime;
+            yield return null;
+        }
+
+        if (HasCachedRenderers())
+        {
+            foreach (Renderer renderer in enemyRenderers)
+            {
+                if (renderer != null)
+                {
+                    renderer.GetPropertyBlock(propBlock);
+                    propBlock.SetFloat(flashAmountProperty, 0f);
+                    renderer.SetPropertyBlock(propBlock);
+                }
+            }
+        }
+
+        flashCoroutine = null;
     }
 
     private void SpawnDamagePopupLocal(int damageAmount, bool isCritical)
@@ -225,8 +255,6 @@ public class EnemyHealthSystem : MonoBehaviour
         if (networkedEnemy != null && !networkedEnemy.IsServer) return;
         markedDamageMultiplier = multiplier;
 
-        // BUG FIX (Bug 2b - 7 Maio 2026): visual estava limitado ao servidor. Agora aplicamos
-        // local + broadcast via ClientRpc para que TODOS os clientes vejam o highlight da marca.
         bool shouldMark = multiplier > 1.0f;
         ApplyMarkedVisualLocal(shouldMark);
 
@@ -240,11 +268,6 @@ public class EnemyHealthSystem : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Aplica apenas o efeito visual da marca (troca de material). Chamado tanto local-side
-    /// (pelo servidor em ApplyMarkedStatus) quanto via ClientRpc para todos os clientes.
-    /// Nao altera markedDamageMultiplier — esse eh server-authoritative em ApplyMarkedStatus.
-    /// </summary>
     public void ApplyMarkedVisualLocal(bool marked)
     {
         if (!HasCachedRenderers()) return;
@@ -280,12 +303,12 @@ public class EnemyHealthSystem : MonoBehaviour
                 if (renderer == null || originalRendererMaterials.ContainsKey(renderer))
                     continue;
 
-                originalRendererMaterials.Add(renderer, renderer.materials.ToArray());
+                originalRendererMaterials.Add(renderer, renderer.sharedMaterials.ToArray());
             }
         }
 
         if (enemyRenderer != null && originalMaterials == null)
-            originalMaterials = enemyRenderer.materials.ToArray();
+            originalMaterials = enemyRenderer.sharedMaterials.ToArray();
     }
 
     private bool HasCachedRenderers()
@@ -314,7 +337,7 @@ public class EnemyHealthSystem : MonoBehaviour
             for (int i = 0; i < markMats.Length; i++)
                 markMats[i] = material;
 
-            renderer.materials = markMats;
+            renderer.sharedMaterials = markMats;
         }
     }
 
@@ -326,7 +349,7 @@ public class EnemyHealthSystem : MonoBehaviour
         foreach (KeyValuePair<Renderer, Material[]> pair in originalRendererMaterials)
         {
             if (pair.Key != null && pair.Value != null)
-                pair.Key.materials = pair.Value;
+                pair.Key.sharedMaterials = pair.Value;
         }
     }
 
@@ -364,7 +387,7 @@ public class EnemyHealthSystem : MonoBehaviour
         {
             yield return new WaitForSeconds(1f);
             if (isDead) break;
-            TakeDamage(dps, 1f); 
+            TakeDamage(dps, 1f);
             t += 1f;
         }
     }
@@ -422,10 +445,98 @@ public class EnemyHealthSystem : MonoBehaviour
 
         if (enemyController != null) enemyController.HandleDeath();
 
-        // Tenta acionar o efeito visual em singleplayer (em multiplayer é feito via RPC)
         if (networkedEnemy == null && deathVfxPrefab != null)
         {
             GlobalVFXPool.GetVFX(deathVfxPrefab, transform.position, transform.rotation, 4f);
+            TriggerDeathDissolve();
         }
+    }
+
+    /// <summary>
+    /// Inicia o efeito de dissolve de morte. Pode ser chamado via:
+    /// 1) Codigo direto (como ja era feito)
+    /// 2) UnityEvent no Inspector
+    /// 3) Animation Event dentro de uma animacao de morte
+    /// </summary>
+    public void TriggerDeathDissolve()
+    {
+        Debug.Log($"[EnemyHealth] TriggerDeathDissolve() chamado em '{gameObject.name}'");
+        OnDeathDissolveStart?.Invoke();
+        StartCoroutine(DeathDissolveRoutine());
+    }
+
+    private IEnumerator DeathDissolveRoutine()
+    {
+        if (!HasCachedRenderers())
+        {
+            Debug.LogWarning($"[EnemyHealth] DeathDissolve ABORTADO em '{gameObject.name}': Nenhum Renderer encontrado!");
+            yield break;
+        }
+
+        Debug.Log($"[EnemyHealth] DeathDissolve iniciando em '{gameObject.name}'. " +
+                  $"Renderers: {enemyRenderers.Length}, Propriedade: '{dissolveAmountProperty}', Duracao: {dissolveDuration}s");
+
+        // Cria instancias dos materiais para poder modificar sem afetar o asset original
+        Dictionary<Renderer, Material[]> instanceMaterials = new Dictionary<Renderer, Material[]>();
+        int totalMateriais = 0;
+        int materiaisComPropriedade = 0;
+
+        foreach (Renderer renderer in enemyRenderers)
+        {
+            if (renderer == null) continue;
+            Material[] mats = renderer.materials;
+            instanceMaterials[renderer] = mats;
+
+            foreach (Material mat in mats)
+            {
+                totalMateriais++;
+                bool temProp = mat != null && mat.HasProperty(dissolveAmountProperty);
+                if (temProp) materiaisComPropriedade++;
+
+                Debug.Log($"[EnemyHealth]   Renderer '{renderer.gameObject.name}' -> Material '{(mat != null ? mat.name : "NULL")}' " +
+                          $"| Tem '{dissolveAmountProperty}': {temProp}" +
+                          $" | Shader: {(mat != null ? mat.shader.name : "N/A")}");
+            }
+        }
+
+        Debug.Log($"[EnemyHealth] Total de materiais: {totalMateriais}, Com propriedade '{dissolveAmountProperty}': {materiaisComPropriedade}");
+
+        if (materiaisComPropriedade == 0)
+        {
+            Debug.LogError($"[EnemyHealth] NENHUM material em '{gameObject.name}' tem a propriedade '{dissolveAmountProperty}'! " +
+                           "Verifique o nome no shader (ex: _DissolveAmount, _Dissolve, _Cutoff, _Alpha, etc.)");
+        }
+
+        float elapsedTime = 0f;
+
+        while (elapsedTime < dissolveDuration)
+        {
+            elapsedTime += Time.deltaTime;
+            float dissolveValue = Mathf.Clamp01(elapsedTime / dissolveDuration);
+
+            foreach (var pair in instanceMaterials)
+            {
+                if (pair.Key == null) continue;
+                foreach (Material mat in pair.Value)
+                {
+                    if (mat != null && mat.HasProperty(dissolveAmountProperty))
+                        mat.SetFloat(dissolveAmountProperty, dissolveValue);
+                }
+            }
+            yield return null;
+        }
+
+        // Garante que o valor final seja 1 (totalmente dissolvido)
+        foreach (var pair in instanceMaterials)
+        {
+            if (pair.Key == null) continue;
+            foreach (Material mat in pair.Value)
+            {
+                if (mat != null && mat.HasProperty(dissolveAmountProperty))
+                    mat.SetFloat(dissolveAmountProperty, 1f);
+            }
+        }
+
+        Debug.Log($"[EnemyHealth] DeathDissolve CONCLUIDO em '{gameObject.name}'");
     }
 }

@@ -5,11 +5,10 @@ using System.Collections.Generic;
 using Unity.Netcode;
 
 /// <summary>
-/// ── UINotificationManager ──────────────────────────────────
+/// UINotificationManager
 /// Gerencia os textos de alerta de horda globalmente.
 /// Escuta os EnemyEvents locais no Servidor e repassa aos Clientes.
-/// Conta com um sistema de Debounce para evitar Spam de Eventos.
-/// ───────────────────────────────────────────────────────────
+/// Conta com um sistema de Fila + Debounce para evitar Spam de Eventos.
 /// </summary>
 public class UINotificationManager : NetworkBehaviour
 {
@@ -19,17 +18,21 @@ public class UINotificationManager : NetworkBehaviour
     [Tooltip("Arraste o TextMeshProUGUI da sua HUD de Ingame aqui.")]
     public TextMeshProUGUI notificationText;
     
-    [Header("Tempos de Exibição")]
+    [Header("Tempos de Exibicao")]
     public float fadeDuration = 0.5f;
-    public float displayDuration = 3f;
+    public float displayDuration = 2f;
 
     [Header("Controle de Spam (Debounce)")]
-    [Tooltip("Tempo mínimo em segundos antes que a mesma mensagem possa ser repetida.")]
+    [Tooltip("Tempo minimo em segundos antes que a mesma mensagem possa ser repetida.")]
     public float messageCooldown = 3f;
 
-    private Coroutine activeFadeRoutine;
+    private Coroutine queueCoroutine;
     
-    // Dicionário para registrar o Time.time em que cada mensagem foi exibida pela última vez
+    // Fila de notificacoes para exibir uma de cada vez
+    private Queue<(string message, Color color)> notificationQueue = new Queue<(string, Color)>();
+    private bool isShowingNotification = false;
+    
+    // Dicionario para registrar o Time.time em que cada mensagem foi exibida pela ultima vez
     private Dictionary<string, float> lastMessageTimes = new Dictionary<string, float>();
 
     private void Awake()
@@ -62,40 +65,63 @@ public class UINotificationManager : NetworkBehaviour
     }
 
     // ════════════════════════════════════════════════════
+    //  RESOLUCAO DE NOME DO CAMINHO
+    // ════════════════════════════════════════════════════
+
+    private string GetPathName(int pathIndex)
+    {
+        // EnemyController envia pathIndex + 1, entao precisamos subtrair 1 para acessar o indice correto
+        int realIndex = pathIndex - 1;
+
+        if (HordeManager.Instance != null &&
+            HordeManager.Instance.spawnPaths != null &&
+            realIndex >= 0 &&
+            realIndex < HordeManager.Instance.spawnPaths.Count)
+        {
+            string nome = HordeManager.Instance.spawnPaths[realIndex].pathName;
+            if (!string.IsNullOrEmpty(nome))
+                return nome;
+        }
+        return $"Caminho {pathIndex}";
+    }
+
+    // ════════════════════════════════════════════════════
     //  GATILHOS DOS OBSERVERS (Rodam no Servidor/Host/Single)
     // ════════════════════════════════════════════════════
 
     private void TriggerSpawnNotification(int pathIndex)
     {
-        string msg = $"Inimigos nascendo [Caminho {pathIndex}]";
+        string pathName = GetPathName(pathIndex);
+        string msg = $"Inimigos nascendo [{pathName}]";
         if (!CanSendMessage(msg)) return;
 
         if (IsServer) NotifyUIClientRpc(msg, Color.yellow);
-        else if (IsLocalFallback()) ShowNotificationLocal(msg, Color.yellow);
+        else if (IsLocalFallback()) EnqueueNotification(msg, Color.yellow);
     }
 
     private void TriggerHalfwayNotification(int pathIndex)
     {
-        string msg = $"Inimigos na metade do caminho [Caminho {pathIndex}]";
+        string pathName = GetPathName(pathIndex);
+        string msg = $"Inimigos na metade do caminho [{pathName}]";
         if (!CanSendMessage(msg)) return;
 
         // Laranja vibrante
         Color orangeColor = new Color(1f, 0.647f, 0f); 
         
         if (IsServer) NotifyUIClientRpc(msg, orangeColor);
-        else if (IsLocalFallback()) ShowNotificationLocal(msg, orangeColor);
+        else if (IsLocalFallback()) EnqueueNotification(msg, orangeColor);
     }
 
     private void TriggerBaseNotification()
     {
-        string msg = "Inimigos atingiram a base";
+        string msg = "Inimigos atingiram a base!";
         if (!CanSendMessage(msg)) return;
 
         if (IsServer) NotifyUIClientRpc(msg, Color.red);
-        else if (IsLocalFallback()) ShowNotificationLocal(msg, Color.red);
+        else if (IsLocalFallback()) EnqueueNotification(msg, Color.red);
     }
 
-    // Função central de Debounce (Cooldown)
+    // Funcao central de Debounce (Cooldown)
     private bool CanSendMessage(string message)
     {
         if (lastMessageTimes.TryGetValue(message, out float lastTime))
@@ -106,7 +132,7 @@ public class UINotificationManager : NetworkBehaviour
             }
         }
         
-        // Atualiza ou insere o novo tempo no Dicionário
+        // Atualiza ou insere o novo tempo no Dicionario
         lastMessageTimes[message] = Time.time;
         return true;
     }
@@ -117,30 +143,55 @@ public class UINotificationManager : NetworkBehaviour
     }
 
     // ════════════════════════════════════════════════════
-    //  REDE E VISUAL (Rodam localmente em CADA tela)
+    //  REDE E FILA DE NOTIFICACOES
     // ════════════════════════════════════════════════════
 
     [ClientRpc]
     private void NotifyUIClientRpc(string message, Color messageColor)
     {
-        ShowNotificationLocal(message, messageColor);
+        EnqueueNotification(message, messageColor);
     }
 
-    private void ShowNotificationLocal(string message, Color messageColor)
+    /// <summary>
+    /// Adiciona uma notificacao na fila. Se nenhuma estiver sendo exibida, comeca a processar.
+    /// </summary>
+    private void EnqueueNotification(string message, Color color)
     {
-        if (notificationText == null) return;
+        notificationQueue.Enqueue((message, color));
 
-        if (activeFadeRoutine != null) StopCoroutine(activeFadeRoutine);
-        activeFadeRoutine = StartCoroutine(FadeRoutine(message, messageColor));
+        if (!isShowingNotification)
+        {
+            if (queueCoroutine != null) StopCoroutine(queueCoroutine);
+            queueCoroutine = StartCoroutine(ProcessNotificationQueue());
+        }
+    }
+
+    /// <summary>
+    /// Processa a fila, exibindo cada notificacao por displayDuration segundos antes de passar para a proxima.
+    /// </summary>
+    private IEnumerator ProcessNotificationQueue()
+    {
+        isShowingNotification = true;
+
+        while (notificationQueue.Count > 0)
+        {
+            var (message, color) = notificationQueue.Dequeue();
+            yield return StartCoroutine(FadeRoutine(message, color));
+        }
+
+        isShowingNotification = false;
+        queueCoroutine = null;
     }
 
     public void ShowLocalNotification(string message, Color messageColor)
     {
-        ShowNotificationLocal(message, messageColor);
+        EnqueueNotification(message, messageColor);
     }
 
     private IEnumerator FadeRoutine(string message, Color targetColor)
     {
+        if (notificationText == null) yield break;
+
         notificationText.text = message;
         
         // Cor base no alfa 0

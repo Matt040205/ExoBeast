@@ -2,6 +2,7 @@ using UnityEngine;
 using TMPro;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine.SceneManagement;
 using Unity.Netcode;
 using ExoBeasts.Multiplayer.GameServer;
@@ -56,6 +57,13 @@ public class HordeManager : NetworkBehaviour
     private int enemiesToSpawnTotal;
     private int enemiesSpawnedCount = 0;
     private Coroutine spawnCoroutine;
+
+    [Header("Fase de Preparacao")]
+    public float prepTimeFirstWave = 60f;
+    public float prepTimeBetweenWaves = 30f;
+
+    // Lista pre-sorteada de inimigos para a proxima onda (inimigo + indice do caminho)
+    private List<(EnemyDataSO enemy, int pathIndex)> preGeneratedWaveList = new List<(EnemyDataSO, int)>();
     private readonly List<Transform> playerTargetCandidates = new List<Transform>(4);
     private static readonly List<EnemyController> _activeEnemiesRegistry = new List<EnemyController>(64);
 
@@ -176,7 +184,7 @@ public class HordeManager : NetworkBehaviour
             if (hordeStarted) yield break;
 
             hordeStarted = true;
-            StartNextHorde();
+            yield return StartCoroutine(PreparationPhaseFlow(true));
         }
         else if (!ngoClient)
         {
@@ -189,7 +197,7 @@ public class HordeManager : NetworkBehaviour
             if (hordeStarted) yield break;
 
             hordeStarted = true;
-            StartNextHorde();
+            yield return StartCoroutine(PreparationPhaseFlow(true));
         }
         else
         {
@@ -246,7 +254,7 @@ public class HordeManager : NetworkBehaviour
             Debug.LogWarning("[HordeManager] OnNetworkSpawn: Timeout esperando jogadores validos!");
 
         yield return new WaitForSeconds(3f);
-        StartNextHorde();
+        yield return StartCoroutine(PreparationPhaseFlow(true));
     }
 
     // ════════════════════════════════════════════════════
@@ -314,16 +322,137 @@ public class HordeManager : NetworkBehaviour
         }
         else
         {
-            StartCoroutine(WaitAndStartNextWave());
+            StartCoroutine(PreparationPhaseFlow(false));
         }
     }
 
-    private IEnumerator WaitAndStartNextWave()
+    // ════════════════════════════════════════════════════
+    //  FASE DE PREPARACAO
+    // ════════════════════════════════════════════════════
+
+    private IEnumerator PreparationPhaseFlow(bool isFirstWave)
     {
-        Debug.Log($"[HordeManager] Próxima horda em {timeBetweenWaves}s...");
-        yield return new WaitForSeconds(timeBetweenWaves);
+        if (!HasAuthority) yield break;
+
+        // 1) Pre-sorteia os inimigos da proxima onda
+        PreGenerateNextWave();
+
+        // 2) Monta o texto de anuncio
+        string titulo = isFirstWave ? "Fase de Preparacao" : "Proxima Onda";
+        string listaInimigos = BuildAnnouncementText(preGeneratedWaveList);
+        float prepTime = isFirstWave ? prepTimeFirstWave : prepTimeBetweenWaves;
+
+        Debug.Log($"[HordeManager] {titulo}: {listaInimigos} | Preparacao: {prepTime}s");
+
+        // 3) Manda o anuncio para todos os clientes (e local)
+        if (IsLocalMode)
+        {
+            ShowAnnouncerLocally(titulo, listaInimigos, prepTime);
+        }
+        else
+        {
+            ShowPreparationPhaseClientRpc(titulo, listaInimigos, prepTime);
+        }
+
+        // 4) Espera o tempo de preparacao
+        yield return new WaitForSeconds(prepTime);
+
+        // 5) Esconde o anuncio
+        if (IsLocalMode)
+        {
+            HideAnnouncerLocally();
+        }
+        else
+        {
+            HidePreparationPhaseClientRpc();
+        }
+
+        // 6) Inicia a onda usando a lista pre-gerada
         if (HasAuthority) StartNextHorde();
     }
+
+    private void PreGenerateNextWave()
+    {
+        preGeneratedWaveList.Clear();
+
+        if (enemyTypes == null || enemyTypes.Length == 0) return;
+        if (spawnPaths == null || spawnPaths.Count == 0) return;
+
+        int total = Random.Range(enemiesPerHordeMin, enemiesPerHordeMax + 1);
+
+        for (int i = 0; i < total; i++)
+        {
+            int typeIndex = Random.Range(0, enemyTypes.Length);
+            int pathIndex = Random.Range(0, spawnPaths.Count);
+            EnemyDataSO enemyData = enemyTypes[typeIndex];
+            if (enemyData != null)
+                preGeneratedWaveList.Add((enemyData, pathIndex));
+        }
+    }
+
+    private string BuildAnnouncementText(List<(EnemyDataSO enemy, int pathIndex)> lista)
+    {
+        if (lista == null || lista.Count == 0) return "Nenhum inimigo";
+
+        // Agrupa por caminho, depois conta cada tipo de inimigo dentro do caminho
+        var porCaminho = new Dictionary<string, Dictionary<string, int>>();
+
+        foreach (var entry in lista)
+        {
+            string nomeCaminho = "Caminho";
+            if (entry.pathIndex >= 0 && entry.pathIndex < spawnPaths.Count)
+            {
+                string pn = spawnPaths[entry.pathIndex].pathName;
+                if (!string.IsNullOrEmpty(pn)) nomeCaminho = pn;
+            }
+
+            if (!porCaminho.ContainsKey(nomeCaminho))
+                porCaminho[nomeCaminho] = new Dictionary<string, int>();
+
+            string nomeInimigo = entry.enemy != null ? entry.enemy.name : "Desconhecido";
+            if (!porCaminho[nomeCaminho].ContainsKey(nomeInimigo))
+                porCaminho[nomeCaminho][nomeInimigo] = 0;
+            porCaminho[nomeCaminho][nomeInimigo]++;
+        }
+
+        // Monta o texto: "Ponte: 2x Aranha, 1x Aguia | Esgoto: 3x Escorpiao"
+        var partes = new List<string>();
+        foreach (var caminho in porCaminho)
+        {
+            string inimigos = string.Join(", ", caminho.Value.Select(kv => $"{kv.Value}x {kv.Key}"));
+            partes.Add($"{caminho.Key}: {inimigos}");
+        }
+
+        return string.Join("\n", partes);
+    }
+
+    private void ShowAnnouncerLocally(string titulo, string listaInimigos, float duracao)
+    {
+        if (WaveAnnouncerUI.Instance != null)
+            WaveAnnouncerUI.Instance.ShowAnnouncement(titulo, listaInimigos, duracao);
+    }
+
+    private void HideAnnouncerLocally()
+    {
+        if (WaveAnnouncerUI.Instance != null)
+            WaveAnnouncerUI.Instance.Hide();
+    }
+
+    [ClientRpc]
+    private void ShowPreparationPhaseClientRpc(string titulo, string listaInimigos, float duracao)
+    {
+        ShowAnnouncerLocally(titulo, listaInimigos, duracao);
+    }
+
+    [ClientRpc]
+    private void HidePreparationPhaseClientRpc()
+    {
+        HideAnnouncerLocally();
+    }
+
+    // ════════════════════════════════════════════════════
+    //  INICIO DA ONDA
+    // ════════════════════════════════════════════════════
 
     private void StartNextHorde()
     {
@@ -332,13 +461,11 @@ public class HordeManager : NetworkBehaviour
         CurrentHorde++;
         WaveActive = true;
 
-        enemiesToSpawnTotal = Random.Range(enemiesPerHordeMin, enemiesPerHordeMax + 1);
+        enemiesToSpawnTotal = preGeneratedWaveList.Count;
         enemiesSpawnedCount = 0;
         EnemiesRemaining = enemiesToSpawnTotal;
 
-        Debug.Log($"[HordeManager] Iniciando Horda {CurrentHorde} com {enemiesToSpawnTotal} inimigos! " +
-                  $"Tipos disponíveis: {(enemyTypes != null ? enemyTypes.Length : 0)}" +
-                  (enemyTypes != null ? $" [{string.Join(", ", System.Array.ConvertAll(enemyTypes, e => e != null ? e.name : "NULL"))}]" : ""));
+        Debug.Log($"[HordeManager] Iniciando Horda {CurrentHorde} com {enemiesToSpawnTotal} inimigos!");
 
         if (spawnCoroutine != null) StopCoroutine(spawnCoroutine);
         spawnCoroutine = StartCoroutine(SpawnEnemiesOverTime());
@@ -366,21 +493,36 @@ public class HordeManager : NetworkBehaviour
 
     private void SpawnSingleEnemy()
     {
-        if (spawnPaths == null || spawnPaths.Count == 0 || enemyTypes == null || enemyTypes.Length == 0) return;
+        if (spawnPaths == null || spawnPaths.Count == 0) return;
 
-        int pathIndex = GetRandomPathIndex();
+        // Consome da lista pre-gerada se disponivel, senao sorteia
+        EnemyDataSO enemyData;
+        int pathIndex;
+        if (preGeneratedWaveList.Count > 0)
+        {
+            var entry = preGeneratedWaveList[0];
+            preGeneratedWaveList.RemoveAt(0);
+            enemyData = entry.enemy;
+            pathIndex = entry.pathIndex;
+        }
+        else if (enemyTypes != null && enemyTypes.Length > 0)
+        {
+            enemyData = enemyTypes[Random.Range(0, enemyTypes.Length)];
+            pathIndex = GetRandomPathIndex();
+        }
+        else
+        {
+            return;
+        }
+
         SpawnPath selectedPath = spawnPaths[pathIndex];
-
         if (selectedPath.spawnPoint == null) return;
-
-        int enemyTypeIndex = Random.Range(0, enemyTypes.Length);
-        EnemyDataSO enemyData = enemyTypes[enemyTypeIndex];
 
         if (enemyData == null || enemyData.enemyPrefab == null)
         {
             // Prefab null em build significa referência quebrada de prefab variant no ScriptableObject.
             // Decrementar para não travar a onda (esse slot nunca terá inimigo para matar).
-            Debug.LogError($"[HordeManager] enemyTypes[{enemyTypeIndex}] é null ou sem prefab em runtime! " +
+            Debug.LogError($"[HordeManager] enemyData '{enemyData?.name}' é null ou sem prefab em runtime! " +
                            "Re-arraste o prefab no Inspector do ScriptableObject e no DefaultNetworkPrefabs.");
             ResolveFailedSpawnSlot();
             return;
@@ -409,7 +551,7 @@ public class HordeManager : NetworkBehaviour
 
         if (newEnemy == null)
         {
-            Debug.LogError($"[HordeManager] Spawn retornou null para tipo '{enemyData.name}' (índice {enemyTypeIndex}). " +
+            Debug.LogError($"[HordeManager] Spawn retornou null para tipo '{enemyData.name}'. " +
                            "Verifique o DefaultNetworkPrefabs e o registro do EnemyPoolManager.");
             ResolveFailedSpawnSlot();
             return;

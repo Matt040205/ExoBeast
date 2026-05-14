@@ -153,6 +153,8 @@ Material:
     - _Surface: 0
     - _WorkflowMode: 1
     - _ZWrite: 1
+    - _dissolveamount: 0
+    - _dissolvescale: 40
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
@@ -164,5 +166,6 @@ Material:
     - _ShadowColor: {r: 0, g: 0.40026736, b: 1, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _Tiling: {r: 1, g: 1, b: 0, a: 0}
+    - _dissolveColor: {r: 0.0504183, g: 0.2118204, b: 0.9716981, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
