@@ -9,7 +9,7 @@ public class UIPoolManager : MonoBehaviour
     public DamagePopup damagePopupPrefab;
     public MagicStar magicStarPrefab;
 
-    [Header("Configurações do Pool")]
+    [Header("Configuraï¿½ï¿½es do Pool")]
     public int initialPopupCount = 30;
     public int initialStarCount = 60;
 
@@ -68,6 +68,26 @@ public class UIPoolManager : MonoBehaviour
         popup.transform.position = position;
         popup.gameObject.SetActive(true);
         popup.Setup(damageAmount, isCritical);
+
+        return popup;
+    }
+
+    public DamagePopup SpawnTextPopup(Vector3 position, string text, Color color)
+    {
+        DamagePopup popup;
+
+        if (popupPool.Count > 0)
+        {
+            popup = popupPool.Dequeue();
+        }
+        else
+        {
+            popup = Instantiate(damagePopupPrefab, poolContainer);
+        }
+
+        popup.transform.position = position;
+        popup.gameObject.SetActive(true);
+        popup.SetupText(text, color);
 
         return popup;
     }

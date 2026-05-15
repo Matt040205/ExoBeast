@@ -63,14 +63,15 @@ public class EnemyBleedAttack : NetworkBehaviour
     private IEnumerator BleedRoutine(PlayerHealthSystem health)
     {
         float elapsed = 0f;
+        int targetGeneration = health.SpawnGeneration;
 
         while (elapsed < bleedDuration)
         {
             yield return new WaitForSeconds(bleedTickInterval);
             elapsed += bleedTickInterval;
 
-            // Checa se o jogador ainda existe
-            if (health == null || health.gameObject == null)
+            // Checa se o jogador ainda existe e se é a mesma "vida" (cancela se ele morreu/respawnou)
+            if (health == null || health.gameObject == null || health.SpawnGeneration != targetGeneration)
                 yield break;
 
             // Aplica o tick de sangramento (sem attacker, pois é DoT)

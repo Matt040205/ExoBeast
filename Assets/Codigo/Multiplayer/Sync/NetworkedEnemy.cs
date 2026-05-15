@@ -11,6 +11,10 @@ namespace ExoBeasts.Multiplayer.Sync
         public NetworkVariable<float> NetworkHealth = new NetworkVariable<float>(100f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
         public NetworkVariable<bool> IsDead = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
+        [Header("Escudo de Rede")]
+        public NetworkVariable<float> NetworkShield = new NetworkVariable<float>(0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+        public NetworkVariable<bool> IsShielded = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
         private EnemyController enemyController;
         private NavMeshAgent navMeshAgent;
         private EnemyHealthSystem localHealth;
@@ -25,6 +29,7 @@ namespace ExoBeasts.Multiplayer.Sync
             if (navMeshAgent != null) navMeshAgent.enabled = IsServer;
 
             IsDead.OnValueChanged += OnDeathStateChanged;
+            IsShielded.OnValueChanged += OnShieldStateChanged;
         }
 
         [ServerRpc(RequireOwnership = false)]
@@ -154,6 +159,7 @@ namespace ExoBeasts.Multiplayer.Sync
         public override void OnNetworkDespawn()
         {
             IsDead.OnValueChanged -= OnDeathStateChanged;
+            IsShielded.OnValueChanged -= OnShieldStateChanged;
             base.OnNetworkDespawn();
         }
 
@@ -186,6 +192,55 @@ namespace ExoBeasts.Multiplayer.Sync
             // mas metodos publicos ainda podem ser chamados manualmente.
             if (enemyController != null)
                 enemyController.SetAggroVisualLocal(isActive);
+        }
+
+        // === SISTEMA DE ESCUDO ===
+
+        private void OnShieldStateChanged(bool oldVal, bool newVal)
+        {
+            if (localHealth != null)
+                localHealth.SetShieldVisual(newVal);
+        }
+
+        /// <summary>
+        /// Mostra popup "Imune" no cliente que atirou.
+        /// </summary>
+        public void TriggerImmunePopup(DamageContext damageContext)
+        {
+            if (!IsServer) return;
+
+            if (damageContext.FeedbackMode == DamageFeedbackMode.AllObservers)
+            {
+                ShowImmunePopupClientRpc();
+                return;
+            }
+
+            ClientRpcParams popupParams = new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams
+                {
+                    TargetClientIds = new ulong[] { damageContext.AttackerClientId }
+                }
+            };
+            ShowImmunePopupClientRpc(popupParams);
+        }
+
+        [ClientRpc]
+        private void ShowImmunePopupClientRpc(ClientRpcParams clientRpcParams = default)
+        {
+            if (localHealth != null)
+                localHealth.SpawnImmunePopupLocal();
+        }
+
+        [ClientRpc]
+        public void OnShieldBrokenClientRpc()
+        {
+            if (localHealth != null)
+                localHealth.SetShieldVisual(false);
+
+            // Opcional: VFX de escudo quebrando
+            // if (localHealth != null && localHealth.deathVfxPrefab != null)
+            //     GlobalVFXPool.GetVFX(shieldBreakVfx, transform.position, transform.rotation, 2f);
         }
     }
 }

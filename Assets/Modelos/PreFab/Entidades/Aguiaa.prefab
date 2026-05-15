@@ -98,7 +98,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8987182849631250749, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 876944576
+      value: 802658817
       objectReference: {fileID: 0}
     - target: {fileID: -6925019414044004627, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: visualEffect
@@ -248,6 +248,14 @@ PrefabInstance:
       propertyPath: deathVfxPrefab
       value: 
       objectReference: {fileID: 1530198455052353034, guid: 1018e202175868c46ac9f72f3cf3b39e, type: 3}
+    - target: {fileID: 8001866522814007648, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: startWithShield
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8001866522814007648, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: shieldVisualObject
+      value: 
+      objectReference: {fileID: 5583234005298755404, guid: cfed48cc0370679449f1767503d390a2, type: 3}
     - target: {fileID: 8902707751699061829, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_Height
       value: 2.1123195

@@ -368,11 +368,13 @@ public class TowerController : MonoBehaviour
         PlayerHealthSystem attackerHealth = null;
         NetworkGameplayResolver.TryResolveAttackerFromBuilding(this, out attackerClientId, out attackerHealth);
 
+        // Torres marcam IsFromTower = true para poder quebrar escudos de inimigos
+        DamageContext damageContext = new DamageContext(attackerClientId, isCritical, DamageFeedbackMode.AllObservers, isFromTower: true);
+
         bool enemyDied = healthSystem.ApplyAuthoritativeDamage(
             damageToDeal,
             currentArmorPenetration,
-            isCritical,
-            attackerClientId,
+            damageContext,
             attackerHealth);
 
         if (enemyDied) OnEnemyKilled?.Invoke(healthSystem);
@@ -684,11 +686,13 @@ public class TowerController : MonoBehaviour
         PlayerHealthSystem attackerHealth = null;
         NetworkGameplayResolver.TryResolveAttackerFromBuilding(this, out attackerClientId, out attackerHealth);
 
+        // Torres marcam IsFromTower = true para poder quebrar escudos de inimigos
+        DamageContext damageContext = new DamageContext(attackerClientId, isCritical, DamageFeedbackMode.AllObservers, isFromTower: true);
+
         bool enemyDied = target.ApplyAuthoritativeDamage(
             damageToDeal,
             currentArmorPenetration,
-            isCritical,
-            attackerClientId,
+            damageContext,
             attackerHealth);
         if (enemyDied) OnEnemyKilled?.Invoke(target);
         if (isCritical) OnCriticalHit?.Invoke(target);

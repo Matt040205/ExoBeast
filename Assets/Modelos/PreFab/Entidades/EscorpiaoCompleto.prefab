@@ -110,7 +110,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8987182849631250749, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 733047146
+      value: 3597747980
       objectReference: {fileID: 0}
     - target: {fileID: 2759551096013480, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_PropertySheet.m_Vector3f.m_Array.Array.data[0].m_Value.y
@@ -228,6 +228,14 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 8001866522814007648, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: startWithShield
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8001866522814007648, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+      propertyPath: shieldVisualObject
+      value: 
+      objectReference: {fileID: 5583234005298755404, guid: cfed48cc0370679449f1767503d390a2, type: 3}
     - target: {fileID: 8001866522814007648, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: dissolveAmountProperty
       value: _DissolveAmount

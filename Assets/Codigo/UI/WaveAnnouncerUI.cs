@@ -46,7 +46,7 @@ public class WaveAnnouncerUI : MonoBehaviour
             announcerPanel.SetActive(true);
 
         if (titleText != null)
-            titleText.text = titulo;
+            titleText.text = titulo + "\n<size=50%><color=#FFFF00>Pressione [P] para Pular</color></size>";
 
         if (enemyListText != null)
             enemyListText.text = listaInimigos;

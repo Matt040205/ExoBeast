@@ -42,6 +42,12 @@ public class PlayerHealthSystem : NetworkBehaviour
     private Transform respawnPoint;
     private Coroutine buffCoroutine;
     private Coroutine spawnMaterializationCoroutine;
+    private float lastRespawnTime = -999f;
+
+    /// <summary>
+    /// Incrementado a cada morte/respawn. Utilizado para cancelar DoTs (Sangramento, etc) que pertenciam à vida anterior.
+    /// </summary>
+    public int SpawnGeneration { get; private set; } = 0;
 
     [Header("Configuracao de Respawn")]
     public string respawnPointNameOrTag = "RespawnPoint";
@@ -79,6 +85,7 @@ public class PlayerHealthSystem : NetworkBehaviour
         if (IsOwner)
             StartCoroutine(WaitAndRegisterHUD());
 
+        lastRespawnTime = Time.time;
         RestartSpawnMaterializationFlow();
     }
 
@@ -133,6 +140,13 @@ public class PlayerHealthSystem : NetworkBehaviour
     {
         if (!IsServer)
             return;
+
+        // Invulnerabilidade pós-respawn (I-frames) durante o holograma
+        if (Time.time - lastRespawnTime < tempoDeSpawn)
+        {
+            Debug.Log($"[PlayerHealthSystem] Dano ignorado. '{gameObject.name}' esta com invulnerabilidade de respawn.");
+            return;
+        }
 
         DamageRequest request = new DamageRequest(damage, attacker, isMelee, attackerClientId);
         DamageResponse response = DamageResponse.PassThrough(damage);
@@ -285,6 +299,16 @@ public class PlayerHealthSystem : NetworkBehaviour
         damageMultiplier.Value = 1f;
         speedMultiplier.Value = 1f;
         isCountering = false;
+        
+        if (buffCoroutine != null)
+        {
+            StopCoroutine(buffCoroutine);
+            buffCoroutine = null;
+        }
+        isBuffed = false;
+
+        SpawnGeneration++;
+        lastRespawnTime = Time.time; // Ativa os i-frames pro respawn
 
         if (NetworkObject != null && NetworkObject.IsSpawned)
         {

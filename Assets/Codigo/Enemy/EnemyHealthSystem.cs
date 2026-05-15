@@ -43,6 +43,17 @@ public class EnemyHealthSystem : MonoBehaviour
     private float markedDamageMultiplier = 1f;
     private float vulnerabilityMultiplier = 1f;
 
+    [Header("Escudo de Inimigo")]
+    [Tooltip("Se ativado, este inimigo nasce com escudo. Somente Torres podem destrui-lo.")]
+    public bool startWithShield = false;
+    [Tooltip("Vida maxima do escudo.")]
+    public float maxShield = 50f;
+    [Tooltip("GameObject visual do escudo (ex: uma esfera translucida). Sera ativado/desativado automaticamente.")]
+    public GameObject shieldVisualObject;
+
+    [HideInInspector] public float currentShield;
+    [HideInInspector] public bool hasShield;
+
     private EnemyController enemyController;
     private NetworkedEnemy networkedEnemy;
     private bool isMarked = false;
@@ -70,6 +81,19 @@ public class EnemyHealthSystem : MonoBehaviour
         markedDamageMultiplier = 1f;
         vulnerabilityMultiplier = 1f;
 
+        // Inicializa o Escudo
+        if (startWithShield)
+        {
+            currentShield = maxShield;
+            hasShield = true;
+        }
+        else
+        {
+            currentShield = 0f;
+            hasShield = false;
+        }
+        SetShieldVisual(hasShield);
+
         RestoreOriginalMaterialsOnAllRenderers();
         ClearPropertyBlocksOnAllRenderers();
         isMarked = false;
@@ -78,6 +102,8 @@ public class EnemyHealthSystem : MonoBehaviour
         {
             networkedEnemy.NetworkHealth.Value = currentHealth;
             networkedEnemy.IsDead.Value = false;
+            networkedEnemy.NetworkShield.Value = currentShield;
+            networkedEnemy.IsShielded.Value = hasShield;
         }
     }
 
@@ -139,6 +165,57 @@ public class EnemyHealthSystem : MonoBehaviour
 
         if (networkedEnemy != null && networkedEnemy.IsSpawned && !networkedEnemy.IsServer) return false;
         if (isDead) return false;
+
+        // === SISTEMA DE ESCUDO ===
+        // Se o inimigo tem escudo e o dano NAO veio de uma Torre, bloqueia completamente
+        if (hasShield && !damageContext.IsFromTower)
+        {
+            // Mostra popup "Imune" para o jogador que atirou
+            if (networkedEnemy != null)
+            {
+                networkedEnemy.TriggerImmunePopup(damageContext);
+            }
+            else
+            {
+                SpawnImmunePopupLocal();
+            }
+            return false;
+        }
+
+        // Se o dano veio de uma Torre e o inimigo tem escudo, o dano vai pro escudo primeiro
+        if (hasShield && damageContext.IsFromTower)
+        {
+            float damageToShield = Mathf.Min(damage, currentShield);
+            currentShield -= damageToShield;
+            damage -= damageToShield;
+
+            if (currentShield <= 0f)
+            {
+                currentShield = 0f;
+                hasShield = false;
+                SetShieldVisual(false);
+
+                if (networkedEnemy != null)
+                {
+                    networkedEnemy.NetworkShield.Value = 0f;
+                    networkedEnemy.IsShielded.Value = false;
+                    networkedEnemy.OnShieldBrokenClientRpc();
+                }
+            }
+            else if (networkedEnemy != null)
+            {
+                networkedEnemy.NetworkShield.Value = currentShield;
+            }
+
+            // Se todo o dano foi absorvido pelo escudo, nao precisa aplicar na vida
+            if (damage <= 0f)
+            {
+                if (networkedEnemy != null)
+                    networkedEnemy.TriggerHitVisual(damageToShield, damageContext);
+                return false;
+            }
+        }
+        // === FIM SISTEMA DE ESCUDO ===
 
         float damageWithMark = damage * markedDamageMultiplier * vulnerabilityMultiplier;
         float armorToIgnore = baseArmor * armorPenetration;
@@ -223,6 +300,25 @@ public class EnemyHealthSystem : MonoBehaviour
         Vector3 spawnPos = popupSpawnPoint != null ? popupSpawnPoint.position : transform.position + Vector3.up * 1.5f;
         if (UIPoolManager.Instance != null)
             UIPoolManager.Instance.SpawnDamagePopup(spawnPos, damageAmount, isCritical);
+    }
+
+    /// <summary>
+    /// Mostra o texto "Imune" no local do popup de dano (chamado localmente no cliente).
+    /// </summary>
+    public void SpawnImmunePopupLocal()
+    {
+        Vector3 spawnPos = popupSpawnPoint != null ? popupSpawnPoint.position : transform.position + Vector3.up * 1.5f;
+        if (UIPoolManager.Instance != null)
+            UIPoolManager.Instance.SpawnTextPopup(spawnPos, "Imune", new Color(0.4f, 0.7f, 1f, 1f));
+    }
+
+    /// <summary>
+    /// Ativa ou desativa o visual do escudo (bolha, esfera, etc).
+    /// </summary>
+    public void SetShieldVisual(bool active)
+    {
+        if (shieldVisualObject != null)
+            shieldVisualObject.SetActive(active);
     }
 
     public void ApplyArmorShred(float percentage, int maxStacks)

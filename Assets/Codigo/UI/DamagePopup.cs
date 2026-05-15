@@ -13,17 +13,17 @@ public class DamagePopup : MonoBehaviour
     private float disappearTimer;
     private float lifetime;
 
-    [Header("Configurações de Animação")]
+    [Header("Configuraï¿½ï¿½es de Animaï¿½ï¿½o")]
     public float moveYSpeed = 5f;
     public float gravity = 8f;
     public float scatterForce = 2f;
     public float disappearTimerBase = 1f;
     public float disappearSpeed = 3f;
 
-    [Header("Ordem de Renderização")]
+    [Header("Ordem de Renderizaï¿½ï¿½o")]
     public int sortingOrder = 2005;
 
-    [Header("Escala por Distância")]
+    [Header("Escala por Distï¿½ncia")]
     public bool useDistanceScaling = true;
     public float referenceDistance = 10f;
     public float maxScaleMultiplier = 4f;
@@ -102,6 +102,31 @@ public class DamagePopup : MonoBehaviour
                 UIPoolManager.Instance.SpawnMagicStar(transform.position);
             }
         }
+    }
+
+    /// <summary>
+    /// Exibe um texto customizado (ex: "Imune") em vez de um numero de dano.
+    /// Usa a mesma animacao de popup, sem estrelas.
+    /// </summary>
+    public void SetupText(string text, Color color)
+    {
+        UpdateCameraReference();
+
+        lifetime = 0f;
+        disappearTimer = disappearTimerBase;
+        transform.localScale = Vector3.zero;
+
+        textMesh.SetText(text);
+        textMesh.fontSize = 5;
+
+        textColor = color;
+        textColor.a = 1f;
+        textMesh.color = textColor;
+        textMesh.fontSharedMaterial.SetColor("_UnderlayColor", new Color(0, 0, 0, 0.5f));
+
+        float randomX = Random.Range(-1f, 1f) * scatterForce;
+        float randomZ = Random.Range(-1f, 1f) * scatterForce;
+        moveVector = new Vector3(randomX, moveYSpeed, randomZ);
     }
 
     private void Update()

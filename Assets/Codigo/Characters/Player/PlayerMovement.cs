@@ -668,8 +668,14 @@ public class PlayerMovement : NetworkBehaviour
 
         StopFootstepSound();
 
+        if (modelPivot != null)
+        {
+            modelPivot.localPosition = Vector3.zero;
+        }
+
         if (animator != null)
         {
+            animator.Rebind(); // Força o Animator a recalcular posição (corrige o bug do Rig ficar no lugar)
             animator.ResetTrigger("Jump");
             animator.SetBool("isGrounded", true);
             animator.SetBool("isAboutToLand", true);

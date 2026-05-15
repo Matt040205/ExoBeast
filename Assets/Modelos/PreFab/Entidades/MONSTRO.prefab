@@ -1977,6 +1977,11 @@ MonoBehaviour:
       m_Calls: []
   currentHealth: 0
   isDead: 0
+  startWithShield: 1
+  maxShield: 50
+  shieldVisualObject: {fileID: 5583234005298755404, guid: cfed48cc0370679449f1767503d390a2, type: 3}
+  currentShield: 0
+  hasShield: 0
 --- !u!114 &-8987182849631250749
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1989,7 +1994,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 2925722161
+  GlobalObjectIdHash: 4044046207
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -2112,6 +2117,10 @@ MonoBehaviour:
   NetworkHealth:
     m_InternalValue: 100
   IsDead:
+    m_InternalValue: 0
+  NetworkShield:
+    m_InternalValue: 0
+  IsShielded:
     m_InternalValue: 0
 --- !u!114 &8487683371603754112
 MonoBehaviour:

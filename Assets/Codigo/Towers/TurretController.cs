@@ -115,12 +115,14 @@ public class TurretController : MonoBehaviour
             PlayerHealthSystem attackerHealth = null;
             NetworkGameplayResolver.TryResolveAttackerFromBuilding(this, out attackerClientId, out attackerHealth);
 
+            // Torretas tambem marcam IsFromTower = true para poder quebrar escudos
+            DamageContext damageContext = new DamageContext(attackerClientId, false, DamageFeedbackMode.AllObservers, isFromTower: true);
+
             // Aplica o dano e verifica se o inimigo morreu
             bool isDead = healthSystem.ApplyAuthoritativeDamage(
                 damagePerShot,
                 0f,
-                false,
-                attackerClientId,
+                damageContext,
                 attackerHealth);
 
             if (isDead)

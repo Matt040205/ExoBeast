@@ -61,6 +61,7 @@ public class HordeManager : NetworkBehaviour
     [Header("Fase de Preparacao")]
     public float prepTimeFirstWave = 60f;
     public float prepTimeBetweenWaves = 30f;
+    private bool isPreparing = false;
 
     // Lista pre-sorteada de inimigos para a proxima onda (inimigo + indice do caminho)
     private List<(EnemyDataSO enemy, int pathIndex)> preGeneratedWaveList = new List<(EnemyDataSO, int)>();
@@ -136,6 +137,24 @@ public class HordeManager : NetworkBehaviour
     {
         // Inicia detecção robusta com 1 frame de atraso (para NGO finalizar inicialização)
         StartCoroutine(InitializeHordeSystem());
+    }
+
+    private void Update()
+    {
+        if (isPreparing && Input.GetKeyDown(KeyCode.P))
+        {
+            if (HasAuthority)
+                isPreparing = false;
+            else if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsClient)
+                SkipPreparationServerRpc();
+        }
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SkipPreparationServerRpc()
+    {
+        if (isPreparing)
+            isPreparing = false;
     }
 
     private IEnumerator InitializeHordeSystem()
@@ -354,8 +373,15 @@ public class HordeManager : NetworkBehaviour
             ShowPreparationPhaseClientRpc(titulo, listaInimigos, prepTime);
         }
 
-        // 4) Espera o tempo de preparacao
-        yield return new WaitForSeconds(prepTime);
+        // 4) Espera o tempo de preparacao ou ate pularem com P
+        isPreparing = true;
+        float elapsed = 0f;
+        while (elapsed < prepTime && isPreparing)
+        {
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+        isPreparing = false;
 
         // 5) Esconde o anuncio
         if (IsLocalMode)
