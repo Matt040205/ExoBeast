@@ -1,3 +1,5 @@
+> **Archived cheat sheet.** Original filename: `git_commands_multiplayer.txt`, captured on 2026-01-15. Notes from the initial creation of the multiplayer branch. Kept for historical context; the branching strategy described below is no longer in use (the multiplayer work has since been merged into `main`).
+
 # ========================================
 # Comandos Git - Branch Multiplayer
 # ========================================

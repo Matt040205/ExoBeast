@@ -1,3 +1,5 @@
+> **Archived working document.** Original filename: `message.txt`, captured on 2026-04-13. Snapshot of the bug analysis written during a multiplayer debugging session. Kept for historical context; not maintained, and superseded by the canonical state document at [Assets/Codigo/Docs/Estado_Atual_Multiplayer.md](../../../Assets/Codigo/Docs/Estado_Atual_Multiplayer.md).
+
 # Correção de Bugs Multiplayer - ExoBeasts
 
 ## Contexto
