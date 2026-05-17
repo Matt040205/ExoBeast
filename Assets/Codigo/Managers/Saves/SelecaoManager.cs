@@ -134,8 +134,16 @@ public class SelecaoManager : NetworkBehaviour
 
         todosOsPersonagens = new List<CharacterBase>(GameDataManager.Instance.personagensDoJogador);
 
-        // GameDataManager.Instance.RestaurarSelecao();
-        GameDataManager.Instance.LimparSelecao();
+        // Se está voltando da cena de Rastros, mantemos a seleção e resetamos a flag.
+        // Caso contrário, limpamos a seleção (por exemplo, quando vindo do Menu).
+        if (GameDataManager.Instance.vindoDeRastros)
+        {
+            GameDataManager.Instance.vindoDeRastros = false;
+        }
+        else
+        {
+            GameDataManager.Instance.LimparSelecao();
+        }
         
         ConfigurarBotoesPrincipais();
         CriarGridEquipe();
@@ -689,6 +697,7 @@ public class SelecaoManager : NetworkBehaviour
         if (personagemEmVisualizacao != null && GameDataManager.Instance != null)
         {
             GameDataManager.Instance.personagemParaRastros = personagemEmVisualizacao;
+            GameDataManager.Instance.vindoDeRastros = true;
             UnityEngine.SceneManagement.SceneManager.LoadScene("Rastros");
         }
     }

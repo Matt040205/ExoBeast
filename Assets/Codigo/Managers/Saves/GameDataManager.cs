@@ -53,6 +53,7 @@ public class GameDataManager : MonoBehaviour
     [Header("Estado Atual")]
     public CharacterBase[] equipeSelecionada = new CharacterBase[8];
     public CharacterBase personagemParaRastros;
+    public bool vindoDeRastros = false;
 
     [Header("Progresso dos Tutoriais")]
     public List<string> tutoriaisConcluidos = new List<string>();
