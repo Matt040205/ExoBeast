@@ -65,8 +65,8 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: d328bbc9ddd44314c8b6022472cfe6c9, type: 3}
-  m_Type: 0
+  m_Sprite: {fileID: 21300000, guid: 80ce29549a3dc8f41b3b800ac7ed95d9, type: 3}
+  m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
@@ -74,7 +74,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 10
 --- !u!1 &4505573074217239907
 GameObject:
   m_ObjectHideFlags: 0
@@ -289,6 +289,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   imagemDoPersonagem: {fileID: 8481578772973974194}
   iconeSinalMais: {fileID: 7422513648071065130}
+  molduraDeFundo: {fileID: 0}
 --- !u!114 &3047064705392757409
 MonoBehaviour:
   m_ObjectHideFlags: 0
