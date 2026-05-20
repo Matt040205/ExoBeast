@@ -32,6 +32,7 @@ public class SelecaoManager : NetworkBehaviour
 
     [Header("UI Principal")]
     public GameObject slotEquipePrefab;
+    public GameObject slotComandantePrefab;
     public Transform gridEquipeContainer;
     public Button botaoJogar;
     public Toggle togglePronto;
@@ -211,7 +212,20 @@ public class SelecaoManager : NetworkBehaviour
 
         for (int i = 0; i < 8; i++)
         {
-            GameObject obj = Instantiate(slotEquipePrefab, gridEquipeContainer);
+            bool isCommanderSlot = false;
+            for (int p = 0; p < totalJogadores; p++)
+            {
+                var slotsForPlayer = ObterSlotsDoJogador(totalJogadores, p);
+                if (slotsForPlayer != null && slotsForPlayer.Count > 0 && slotsForPlayer[0] == i)
+                {
+                    isCommanderSlot = true;
+                    break;
+                }
+            }
+
+            GameObject prefabParaInstanciar = (isCommanderSlot && slotComandantePrefab != null) ? slotComandantePrefab : slotEquipePrefab;
+            GameObject obj = Instantiate(prefabParaInstanciar, gridEquipeContainer);
+            
             SlotEquipeUI ui = obj.GetComponent<SlotEquipeUI>();
             int idx = i;
             obj.GetComponent<Button>().onClick.AddListener(() => OnSlotClicked(idx));
