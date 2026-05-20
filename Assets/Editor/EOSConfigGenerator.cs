@@ -167,8 +167,8 @@ namespace ExoBeasts.Multiplayer.Editor
             if (string.IsNullOrEmpty(creds.ClientSecret))
                 return "ClientSecret ausente" + SourceHint(creds);
 
-            if (!string.IsNullOrEmpty(creds.EncryptionKey) && creds.EncryptionKey.Length != 64)
-                return $"EncryptionKey deve ter 64 caracteres hex (encontrado: {creds.EncryptionKey.Length})";
+            if (!IsValidEncryptionKey(creds.EncryptionKey))
+                return $"EncryptionKey deve ter 64 caracteres hex (encontrado: {creds.EncryptionKey?.Length ?? 0})";
 
             return null;
         }
@@ -207,7 +207,8 @@ namespace ExoBeasts.Multiplayer.Editor
             ""Name"": ""DefaultClient"",
             ""Value"": {{
                 ""ClientId"": ""{Escape(creds.ClientId)}"",
-                ""ClientSecret"": ""{Escape(creds.ClientSecret)}""
+                ""ClientSecret"": ""{Escape(creds.ClientSecret)}"",
+                ""encryptionKey"": ""{Escape(creds.EncryptionKey)}""
             }}
         }}
     ],
@@ -248,7 +249,8 @@ namespace ExoBeasts.Multiplayer.Editor
     }},
     ""clientCredentials"": {{
         ""ClientId"": ""{Escape(creds.ClientId)}"",
-        ""ClientSecret"": ""{Escape(creds.ClientSecret)}""
+        ""ClientSecret"": ""{Escape(creds.ClientSecret)}"",
+        ""encryptionKey"": ""{Escape(creds.EncryptionKey)}""
     }},
     ""isServer"": false,
     ""platformOptionsFlags"": ""None"",
@@ -270,6 +272,8 @@ namespace ExoBeasts.Multiplayer.Editor
             string json = $@"{{
     ""deploymentID"": ""{Escape(creds.DeploymentId)}"",
     ""clientID"": ""{Escape(creds.ClientId)}"",
+    ""clientSecret"": ""{Escape(creds.ClientSecret)}"",
+    ""encryptionKey"": ""{Escape(creds.EncryptionKey)}"",
     ""tickBudgetInMilliseconds"": 0,
     ""taskNetworkTimeoutSeconds"": 0.0,
     ""platformOptionsFlags"": ""None"",
@@ -290,6 +294,24 @@ namespace ExoBeasts.Multiplayer.Editor
                 .Replace("\n", "\\n")
                 .Replace("\r", "\\r")
                 .Replace("\t", "\\t");
+        }
+
+        private static bool IsValidEncryptionKey(string value)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length != 64)
+                return false;
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                bool isHex = (c >= '0' && c <= '9') ||
+                             (c >= 'a' && c <= 'f') ||
+                             (c >= 'A' && c <= 'F');
+                if (!isHex)
+                    return false;
+            }
+
+            return true;
         }
 
         private static void LogSafeCredentialInfo(EOSCredentialData creds)

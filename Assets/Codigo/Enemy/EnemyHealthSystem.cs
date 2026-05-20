@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Netcode;
 using ExoBeasts.Multiplayer.Sync;
 
 public class EnemyHealthSystem : MonoBehaviour
@@ -73,7 +74,10 @@ public class EnemyHealthSystem : MonoBehaviour
     {
         if (enemyData == null) return;
 
-        currentHealth = enemyData.GetHealth(level);
+        int connectedPlayerCount = GetConnectedPlayerCountForScaling();
+        currentHealth = EnemyMultiplayerScaling.ApplyHealthScaling(
+            enemyData.GetHealth(level),
+            connectedPlayerCount);
         baseArmor = enemyData.GetArmor(level);
         currentArmorModifier = 0f;
         armorShredStacks = 0;
@@ -105,6 +109,15 @@ public class EnemyHealthSystem : MonoBehaviour
             networkedEnemy.NetworkShield.Value = currentShield;
             networkedEnemy.IsShielded.Value = hasShield;
         }
+    }
+
+    private static int GetConnectedPlayerCountForScaling()
+    {
+        NetworkManager networkManager = NetworkManager.Singleton;
+        if (networkManager == null || !networkManager.IsListening || !networkManager.IsServer)
+            return 1;
+
+        return Mathf.Max(1, networkManager.ConnectedClientsIds.Count);
     }
 
     public bool TakeDamage(float damage, float armorPenetration = 0f, bool isCritical = false, ulong attackerId = 0)
@@ -634,5 +647,27 @@ public class EnemyHealthSystem : MonoBehaviour
         }
 
         Debug.Log($"[EnemyHealth] DeathDissolve CONCLUIDO em '{gameObject.name}'");
+    }
+}
+
+public static class EnemyMultiplayerScaling
+{
+    public static float GetHealthMultiplier(int playerCount)
+    {
+        if (playerCount <= 1)
+            return 1f;
+
+        if (playerCount == 2)
+            return 1.3f;
+
+        if (playerCount == 3)
+            return 1.5f;
+
+        return 1.7f;
+    }
+
+    public static float ApplyHealthScaling(float health, int playerCount)
+    {
+        return health * GetHealthMultiplier(playerCount);
     }
 }

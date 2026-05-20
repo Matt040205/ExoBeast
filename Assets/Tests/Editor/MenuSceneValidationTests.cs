@@ -66,7 +66,7 @@ public class MenuSceneValidationTests
 
     private static void WithMenuScene(System.Action<MonoBehaviour, Button, Button> assertion)
     {
-        SceneSetup[] originalSetup = EditorSceneManager.GetSceneManagerSetup();
+        SceneSetup[] originalSetup = CaptureOriginalSceneSetup();
 
         try
         {
@@ -85,7 +85,7 @@ public class MenuSceneValidationTests
         }
         finally
         {
-            EditorSceneManager.RestoreSceneManagerSetup(originalSetup);
+            RestoreOriginalSceneSetup(originalSetup);
         }
     }
 
@@ -101,5 +101,29 @@ public class MenuSceneValidationTests
         return scene.GetRootGameObjects()
             .SelectMany(root => root.GetComponentsInChildren<T>(true))
             .ToArray();
+    }
+
+    private static void RestoreOriginalSceneSetup(SceneSetup[] originalSetup)
+    {
+        if (originalSetup != null && originalSetup.Length > 0)
+        {
+            EditorSceneManager.RestoreSceneManagerSetup(originalSetup);
+            return;
+        }
+
+        EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+    }
+
+    private static SceneSetup[] CaptureOriginalSceneSetup()
+    {
+        try
+        {
+            return EditorSceneManager.GetSceneManagerSetup();
+        }
+        catch (System.ArgumentException)
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            return new SceneSetup[0];
+        }
     }
 }

@@ -143,15 +143,7 @@ namespace ExoBeasts.Multiplayer.Core
 
         private void Start()
         {
-            if (eosConfig == null)
-            {
-                eosConfig = Resources.Load<EOSConfig>("EOSConfig_Main");
-                if (eosConfig == null)
-                {
-                    Debug.LogWarning("[EOSManagerWrapper] EOSConfig nao encontrado. Atribua via Inspector ou crie em Resources/EOSConfig_Main");
-                }
-            }
-
+            EnsureEOSConfigLoaded();
             Initialize();
         }
 
@@ -176,11 +168,13 @@ namespace ExoBeasts.Multiplayer.Core
 #if !EOS_DISABLE
             Debug.Log("[EOSManagerWrapper] Iniciando inicializacao do EOS SDK...");
 
+            EnsureEOSConfigLoaded();
+
             if (eosConfig == null)
             {
                 // A7 audit: antes, null era silenciosamente aceito e a inicializacao continuava
                 // com credenciais vazias, causando falhas opacas downstream.
-                string error = "EOSConfig nao encontrado em Resources/EOSConfig_Main. Crie o asset ou atribua via Inspector.";
+                string error = "Nao foi possivel criar/carregar EOSConfig.";
                 Debug.LogError($"[EOSManagerWrapper] {error}");
                 _initializationInProgress = false;
                 OnInitializationFailed?.Invoke(error);
@@ -248,6 +242,20 @@ namespace ExoBeasts.Multiplayer.Core
 #else
             Debug.LogWarning("[EOSManagerWrapper] EOS esta desabilitado (EOS_DISABLE definido)");
 #endif
+        }
+
+        private void EnsureEOSConfigLoaded()
+        {
+            if (eosConfig != null)
+                return;
+
+            eosConfig = Resources.Load<EOSConfig>("EOSConfig_Main");
+            if (eosConfig != null)
+                return;
+
+            eosConfig = ScriptableObject.CreateInstance<EOSConfig>();
+            eosConfig.name = "EOSConfig_Runtime";
+            Debug.Log("[EOSManagerWrapper] EOSConfig_Main nao encontrado em Resources; usando EOSConfig runtime.");
         }
 
 #if !EOS_DISABLE

@@ -77,10 +77,10 @@ public class SelecaoManager : NetworkBehaviour
 
     [Header("Cores dos Jogadores")]
     public Color[] coresPorJogador = new Color[] {
-        new Color(0.2f, 0.6f, 1f, 1f), // P1 Azul
-        new Color(1f, 0.4f, 0.4f, 1f), // P2 Vermelho
-        new Color(0.4f, 1f, 0.4f, 1f), // P3 Verde
-        new Color(1f, 1f, 0.4f, 1f)    // P4 Amarelo
+        new Color(0.9764706f, 0.5921569f, 0.9803922f, 1f), // P1 #F997FA
+        new Color(0.5921569f, 0.8352941f, 0.9803922f, 1f), // P2 #97D5FA
+        new Color(0.6980392f, 0.9803922f, 0.5921569f, 1f), // P3 #B2FA97
+        new Color(0.9803922f, 0.9098039f, 0.5921569f, 1f)  // P4 #FAE897
     };
 
     private bool _isReady = false;

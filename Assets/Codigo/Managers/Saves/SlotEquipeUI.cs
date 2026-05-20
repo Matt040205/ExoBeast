@@ -44,5 +44,17 @@ public class SlotEquipeUI : MonoBehaviour
         {
             molduraDeFundo.color = corDoPlayer;
         }
+
+        Image[] imagens = GetComponentsInChildren<Image>(true);
+        foreach (Image imagem in imagens)
+        {
+            if (imagem == null)
+                continue;
+
+            if (imagem.gameObject.name == "BordaOverlay" || imagem.gameObject.name == "CoroaOverlay")
+            {
+                imagem.color = corDoPlayer;
+            }
+        }
     }
 }

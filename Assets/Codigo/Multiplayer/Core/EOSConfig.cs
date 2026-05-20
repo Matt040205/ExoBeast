@@ -101,6 +101,7 @@ namespace ExoBeasts.Multiplayer.Core
                 {
                     ClientId = productData.Clients[0].Value?.ClientId ?? "";
                     ClientSecret = productData.Clients[0].Value?.ClientSecret ?? "";
+                    EncryptionKey = productData.Clients[0].Value?.GetEncryptionKey() ?? "";
                 }
 
                 string windowsJson = File.ReadAllText(windowsConfigPath);
@@ -108,6 +109,11 @@ namespace ExoBeasts.Multiplayer.Core
 
                 SandboxId = windowsData.deployment?.SandboxId?.Value ?? "";
                 DeploymentId = windowsData.deployment?.DeploymentId ?? "";
+                string windowsEncryptionKey = windowsData.clientCredentials?.GetEncryptionKey() ?? "";
+                if (!string.IsNullOrEmpty(windowsEncryptionKey))
+                {
+                    EncryptionKey = windowsEncryptionKey;
+                }
 
                 return ValidateCredentials(silent: true);
             }
@@ -146,7 +152,8 @@ namespace ExoBeasts.Multiplayer.Core
                           !string.IsNullOrEmpty(SandboxId) &&
                           !string.IsNullOrEmpty(DeploymentId) &&
                           !string.IsNullOrEmpty(ClientId) &&
-                          !string.IsNullOrEmpty(ClientSecret);
+                          !string.IsNullOrEmpty(ClientSecret) &&
+                          IsValidEncryptionKey(EncryptionKey);
 
             if (!isValid && !silent)
             {
@@ -164,6 +171,24 @@ namespace ExoBeasts.Multiplayer.Core
             ClientId = "";
             ClientSecret = "";
             EncryptionKey = "";
+        }
+
+        private static bool IsValidEncryptionKey(string value)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length != 64)
+                return false;
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                char c = value[i];
+                bool isHex = (c >= '0' && c <= '9') ||
+                             (c >= 'a' && c <= 'f') ||
+                             (c >= 'A' && c <= 'F');
+                if (!isHex)
+                    return false;
+            }
+
+            return true;
         }
     }
 
@@ -196,6 +221,13 @@ namespace ExoBeasts.Multiplayer.Core
         {
             public string ClientId;
             public string ClientSecret;
+            public string EncryptionKey;
+            public string encryptionKey;
+
+            public string GetEncryptionKey()
+            {
+                return !string.IsNullOrEmpty(EncryptionKey) ? EncryptionKey : encryptionKey;
+            }
         }
     }
 
@@ -203,6 +235,7 @@ namespace ExoBeasts.Multiplayer.Core
     internal class WindowsConfigMinimal
     {
         public DeploymentEntry deployment;
+        public ClientCredentialsEntry clientCredentials;
 
         [Serializable]
         internal class DeploymentEntry
@@ -215,6 +248,18 @@ namespace ExoBeasts.Multiplayer.Core
         internal class SandboxIdEntry
         {
             public string Value;
+        }
+
+        [Serializable]
+        internal class ClientCredentialsEntry
+        {
+            public string EncryptionKey;
+            public string encryptionKey;
+
+            public string GetEncryptionKey()
+            {
+                return !string.IsNullOrEmpty(EncryptionKey) ? EncryptionKey : encryptionKey;
+            }
         }
     }
 }
