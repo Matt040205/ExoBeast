@@ -4,6 +4,7 @@ using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
 using System;
 using System.IO;
+using ExoBeasts.Multiplayer.Core;
 
 namespace ExoBeasts.Multiplayer.Editor
 {
@@ -124,7 +125,15 @@ namespace ExoBeasts.Multiplayer.Editor
         {
             creds = new EOSCredentialData();
 
-            string projectRoot = Path.GetDirectoryName(Application.dataPath);
+            // BUG FIX (2026-05-21): em clones MPPM, Application.dataPath aponta para a copia
+            // virtual em %LocalAppData%\Unity\Editor\MultiplayerPlayMode\... — nao para a raiz
+            // do projeto original onde EOSCredentials.json reside. Replicamos o pattern
+            // ja validado em Assets/Codigo/Multiplayer/Core/EOSConfig.cs:72-76 (TryLoadFromFile
+            // do runtime). Sem isso, Play Mode no Player 2 do MPPM bloqueia com
+            // "Nenhuma fonte de credenciais EOS encontrada".
+            string projectRoot = MppmHelper.IsClone
+                ? Path.GetFullPath(Path.Combine(Application.dataPath, "..", "..", "..", ".."))
+                : Path.GetDirectoryName(Application.dataPath);
             string filePath = Path.Combine(projectRoot, CREDENTIALS_FILE);
 
             if (!File.Exists(filePath))
