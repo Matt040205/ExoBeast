@@ -936,6 +936,10 @@ PrefabInstance:
       propertyPath: m_text
       value: Carregando  0%
       objectReference: {fileID: 0}
+    - target: {fileID: 674172519318082342, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
+      propertyPath: m_fontColorGradientPreset
+      value: 
+      objectReference: {fileID: 11400000, guid: becdf247bd5147249b42e0b878895a5f, type: 2}
     - target: {fileID: 687168587643402281, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
       propertyPath: m_Pivot.x
       value: 0
@@ -1036,6 +1040,14 @@ PrefabInstance:
       propertyPath: m_Name
       value: LoadingScreen_Prefab
       objectReference: {fileID: 0}
+    - target: {fileID: 7642340125812151122, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: b2305ca8ba3fc7a47b4857f49aa4cbda, type: 3}
+    - target: {fileID: 8619210453736335274, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
+      propertyPath: m_Sprite
+      value: 
+      objectReference: {fileID: 21300000, guid: 538b45d08a965d54794faefdf0e1c365, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -7736,37 +7748,6 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!1 &1601876394
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1601876395}
-  m_Layer: 0
-  m_Name: GameObject
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1601876395
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1601876394}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 727.9949, y: 318.86612, z: 1.3792064}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1632905768
 GameObject:
   m_ObjectHideFlags: 0
@@ -10429,4 +10410,3 @@ SceneRoots:
   - {fileID: 1535294861}
   - {fileID: 92410442}
   - {fileID: 1252822645}
-  - {fileID: 1601876395}
