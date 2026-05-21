@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using System.Collections;
 
 public class ExitConfirmation : MonoBehaviour
@@ -13,7 +13,10 @@ public class ExitConfirmation : MonoBehaviour
 
     void Start()
     {
-        // Configura posições
+#if UNITY_EDITOR
+        if (ExoBeasts.Multiplayer.Core.MppmHelper.IsClone && confirmationPanel == null) { gameObject.SetActive(false); return; }
+#endif
+        // Configura posiï¿½ï¿½es
         hiddenPosition = new Vector3(0, -Screen.height / 2 - 200, 0);
         visiblePosition = Vector3.zero;
 
