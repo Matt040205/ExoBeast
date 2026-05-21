@@ -3256,6 +3256,7 @@ MonoBehaviour:
   slotEscolhaPrefab: {fileID: 5887390853914384219, guid: 01bc6ec0bdc2e2f4cbdf26b68a2090e8, type: 3}
   gridEscolhaContainer: {fileID: 885901113}
   botaoVoltarDaEscolha: {fileID: 1526568676}
+  lockIcon: {fileID: 21300000, guid: f47b3516ebec1bb4597683cc32afea94, type: 3}
   imagemDetalhes: {fileID: 418711715}
   nomeDetalhes: {fileID: 203793293}
   textoStatusPadrao: {fileID: 1530632256}
@@ -6006,6 +6007,8 @@ MonoBehaviour:
   - {fileID: 0}
   personagemParaRastros: {fileID: 0}
   vindoDeRastros: 0
+  personagensDesbloqueados:
+  - Naoyoshi
   tutoriaisConcluidos: []
   totalDeJogadores: 1
 --- !u!4 &1252822645

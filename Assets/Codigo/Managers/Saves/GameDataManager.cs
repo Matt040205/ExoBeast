@@ -28,6 +28,7 @@ public class FullSaveData
     public List<string> tutorials = new List<string>();
     public List<CharacterSaveData> characters = new List<CharacterSaveData>();
     public string[] teamSelection = new string[8]; // nome do CharacterBase em cada slot ("" = vazio)
+    public List<string> unlockedCharacters = new List<string>();
 }
 
 /// <summary>
@@ -54,6 +55,9 @@ public class GameDataManager : MonoBehaviour
     public CharacterBase[] equipeSelecionada = new CharacterBase[8];
     public CharacterBase personagemParaRastros;
     public bool vindoDeRastros = false;
+
+    [Header("Personagens Desbloqueados (SinglePlayer)")]
+    public List<string> personagensDesbloqueados = new List<string> { "Naoyoshi" };
 
     [Header("Progresso dos Tutoriais")]
     public List<string> tutoriaisConcluidos = new List<string>();
@@ -121,6 +125,7 @@ public class GameDataManager : MonoBehaviour
     {
         FullSaveData data = new FullSaveData();
         data.tutorials = new List<string>(tutoriaisConcluidos);
+        data.unlockedCharacters = new List<string>(personagensDesbloqueados);
 
         foreach (var kvp in loadedCharacterData)
         {
@@ -180,6 +185,16 @@ public class GameDataManager : MonoBehaviour
                 string json = File.ReadAllText(saveFilePath);
                 FullSaveData data = JsonUtility.FromJson<FullSaveData>(json);
                 tutoriaisConcluidos = data.tutorials;
+                
+                if (data.unlockedCharacters != null && data.unlockedCharacters.Count > 0)
+                {
+                    personagensDesbloqueados = new List<string>(data.unlockedCharacters);
+                }
+                else
+                {
+                    personagensDesbloqueados = new List<string> { "Naoyoshi" };
+                }
+
                 loadedCharacterData.Clear();
                 foreach (var charData in data.characters)
                 {
@@ -250,6 +265,7 @@ public class GameDataManager : MonoBehaviour
             File.Delete(saveFilePath);
             tutoriaisConcluidos.Clear();
             loadedCharacterData.Clear();
+            personagensDesbloqueados = new List<string> { "Naoyoshi" };
             Debug.Log("Save apagado!");
         }
     }

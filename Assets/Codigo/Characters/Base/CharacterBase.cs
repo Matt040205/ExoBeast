@@ -46,6 +46,7 @@ public class CharacterBase : ScriptableObject
 
     [Header("Type Settings")]
     public bool isCommander = true;
+    public bool desbloqueadoComandantePadrao = false;
     public Sprite characterIcon;
     public GameObject commanderPrefab;
     public GameObject towerPrefab;

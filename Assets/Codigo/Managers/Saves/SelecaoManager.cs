@@ -54,6 +54,9 @@ public class SelecaoManager : NetworkBehaviour
     public Transform gridEscolhaContainer;
     public Button botaoVoltarDaEscolha;
 
+    [Header("Locked Characters System")]
+    public Sprite lockIcon;
+
     [Header("Detalhes")]
     public Image imagemDetalhes;
     public TextMeshProUGUI nomeDetalhes;
@@ -665,6 +668,9 @@ public class SelecaoManager : NetworkBehaviour
     { 
         slotSendoEditado = i; 
         
+        bool isSingleplayer = (GameModeManager.CurrentMode == GameMode.Singleplayer);
+        bool isCommanderSlot = (slotsPermitidos.Count > 0 && i == slotsPermitidos[0]);
+
         // Atualiza a disponibilidade e as cores dos botões de seleção
         foreach(var kvp in botoesDeEscolha)
         {
@@ -687,15 +693,56 @@ public class SelecaoManager : NetworkBehaviour
                 }
             }
 
-            if (jaSelecionadoEmOutroSlot)
+            string cleanCharName = p.name.Replace("(Clone)", "");
+            bool isUnlocked = p.desbloqueadoComandantePadrao || (GameDataManager.Instance != null && GameDataManager.Instance.personagensDesbloqueados.Contains(cleanCharName));
+            bool isLocked = isSingleplayer && isCommanderSlot && !isUnlocked;
+
+            Transform cadeadoTransform = btn.transform.Find("Cadeado");
+
+            if (isLocked)
             {
+                if (cadeadoTransform == null && lockIcon != null)
+                {
+                    GameObject cadeadoGo = new GameObject("Cadeado", typeof(RectTransform));
+                    cadeadoGo.transform.SetParent(btn.transform, false);
+                    
+                    RectTransform rect = cadeadoGo.GetComponent<RectTransform>();
+                    rect.anchorMin = Vector2.zero;
+                    rect.anchorMax = Vector2.one;
+                    rect.sizeDelta = Vector2.zero; // Stretch para cobrir o botão
+                    
+                    Image img = cadeadoGo.AddComponent<Image>();
+                    img.sprite = lockIcon;
+                    img.color = Color.white;
+                    
+                    cadeadoTransform = cadeadoGo.transform;
+                }
+                
+                if (cadeadoTransform != null)
+                {
+                    cadeadoTransform.gameObject.SetActive(true);
+                }
+                
                 btn.interactable = false;
-                btn.image.color = new Color(0.3f, 0.3f, 0.3f, 1f); // Preto/cinza escuro
+                btn.image.color = new Color(0.2f, 0.2f, 0.2f, 0.8f); // Escurece o ícone do personagem
             }
             else
             {
-                btn.interactable = true;
-                btn.image.color = Color.white; // Original/limpo
+                if (cadeadoTransform != null)
+                {
+                    cadeadoTransform.gameObject.SetActive(false);
+                }
+
+                if (jaSelecionadoEmOutroSlot)
+                {
+                    btn.interactable = false;
+                    btn.image.color = new Color(0.3f, 0.3f, 0.3f, 1f); // Preto/cinza escuro
+                }
+                else
+                {
+                    btn.interactable = true;
+                    btn.image.color = Color.white; // Original/limpo
+                }
             }
         }
 
