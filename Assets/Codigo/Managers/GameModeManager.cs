@@ -2,6 +2,7 @@ using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.SceneManagement;
 using System.Collections;
+using System.Text;
 using ExoBeasts.Multiplayer.Core;
 
 namespace ExoBeasts.Managers
@@ -106,8 +107,103 @@ namespace ExoBeasts.Managers
             }
             else if (!IsNetworkSession)
             {
-                SceneManager.LoadScene(sceneName);
+                LoadLocalSceneMppmSafe(sceneName);
             }
+        }
+
+        // BUG FIX (2026-05-21): Unity 6 + MPPM v1.6.3 tem bug onde clones falham ao resolver
+        // cenas via SceneManager.LoadScene(name) usando shared scene list, mesmo com a cena
+        // listada em EditorBuildSettings. Workaround: resolver build index via SceneUtility
+        // e usar LoadScene(index). Mantemos fallback por path completo para evitar ambiguidade
+        // quando ha listas de cenas divergentes no Build Profiles/MPPM.
+        // Sintoma sem este fix: clones MPPM travam no MenuScene ao clicar "Multiplayer" com
+        // erro "Scene 'X' couldn't be loaded because it has not been added to the active build
+        // profile or shared scene list".
+        private static void LoadLocalSceneMppmSafe(string sceneName)
+        {
+            string scenePath = GetScenePath(sceneName);
+            int buildIndex = UnityEngine.SceneManagement.SceneUtility.GetBuildIndexByScenePath(scenePath);
+            if (buildIndex >= 0)
+            {
+                SceneManager.LoadScene(buildIndex);
+                return;
+            }
+
+#if UNITY_EDITOR
+            if (TryLoadSceneInEditorPlayMode(scenePath))
+            {
+                return;
+            }
+#endif
+
+            Debug.LogWarning(
+                $"[GameModeManager] Cena '{sceneName}' nao resolveu via build index para path '{scenePath}'.\n" +
+                "Build scenes visiveis para este processo:\n" +
+                GetBuildSceneListForLog() +
+                "\nTentando carregar por path completo (fallback).");
+            SceneManager.LoadScene(scenePath);
+        }
+
+#if UNITY_EDITOR
+        private static bool TryLoadSceneInEditorPlayMode(string scenePath)
+        {
+            if (!Application.isEditor || !Application.isPlaying)
+            {
+                return false;
+            }
+
+            try
+            {
+                Debug.LogWarning(
+                    $"[GameModeManager] Cena '{scenePath}' nao esta disponivel na lista de build deste processo.\n" +
+                    "Carregando via EditorSceneManager.LoadSceneInPlayMode para contornar Build Profiles vazio em MPPM.");
+                UnityEditor.SceneManagement.EditorSceneManager.LoadSceneInPlayMode(
+                    scenePath,
+                    new LoadSceneParameters(LoadSceneMode.Single));
+                return true;
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogError(
+                    $"[GameModeManager] Falha ao carregar '{scenePath}' via EditorSceneManager.LoadSceneInPlayMode: {exception.Message}");
+                return false;
+            }
+        }
+#endif
+
+        private static string GetScenePath(string sceneName)
+        {
+            if (sceneName.StartsWith("Assets/") && sceneName.EndsWith(".unity"))
+            {
+                return sceneName;
+            }
+
+            return "Assets/Scenes/" + sceneName + ".unity";
+        }
+
+        private static string GetBuildSceneListForLog()
+        {
+            int sceneCount = SceneManager.sceneCountInBuildSettings;
+            if (sceneCount <= 0)
+            {
+                return "  (nenhuma cena em build settings)";
+            }
+
+            StringBuilder builder = new StringBuilder();
+            for (int i = 0; i < sceneCount; i++)
+            {
+                builder.Append("  ")
+                    .Append(i)
+                    .Append(": ")
+                    .Append(UnityEngine.SceneManagement.SceneUtility.GetScenePathByBuildIndex(i));
+
+                if (i < sceneCount - 1)
+                {
+                    builder.AppendLine();
+                }
+            }
+
+            return builder.ToString();
         }
 
         private void QueueSceneTransition(GameMode targetMode, string sceneName)
@@ -127,7 +223,7 @@ namespace ExoBeasts.Managers
 
             CurrentMode = targetMode;
             _sceneTransitionRoutine = null;
-            SceneManager.LoadScene(sceneName);
+            LoadLocalSceneMppmSafe(sceneName);
         }
     }
 }

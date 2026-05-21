@@ -1154,6 +1154,34 @@ namespace ExoBeasts.Multiplayer.Lobby
                 yield break;
             }
 
+            // BUG FIX (2026-05-21): pre-validar que a cena resolve via build index ANTES de
+            // chamar nm.SceneManager.LoadScene. Em MPPM clones, EditorBuildSettings pode estar
+            // dessincronizado entre o original e o clone — o servidor pode resolver mas o
+            // cliente nao. Sem este check, o cliente fica preso em loading ate o watchdog
+            // de 15s do SceneTransitionHandler disparar.
+            // Pareado com BuildSceneListGuard (Editor-time) e SceneManager.VerifySceneBeforeLoading (runtime).
+            string scenePathForValidation = sceneName.StartsWith("Assets/") && sceneName.EndsWith(".unity")
+                ? sceneName
+                : "Assets/Scenes/" + sceneName + ".unity";
+            int validationIndex = SceneUtility.GetBuildIndexByScenePath(scenePathForValidation);
+            if (validationIndex < 0)
+            {
+                Debug.LogError(
+                    $"[LobbyManager] Cena '{sceneName}' nao resolve via SceneUtility.GetBuildIndexByScenePath('{scenePathForValidation}'). " +
+                    "Build Settings provavelmente dessincronizadas. " +
+                    "No Editor, executar Tools > ExoBeasts > Repair Build Scene List.");
+                OnError?.Invoke($"Cena '{sceneName}' nao esta na Build Settings deste processo");
+                yield break;
+            }
+            Debug.Log($"[LobbyManager] Cena '{sceneName}' resolve para buildIndex={validationIndex}. Prosseguindo com LoadScene via NGO.");
+
+            // BUG FIX (2026-05-21): registrar VerifySceneBeforeLoading no NGO SceneManager
+            // para diagnostico — em cada cliente, este callback dispara antes do load real.
+            // Se retornar false, o NGO aborta o load do lado do cliente, evitando o estado
+            // pendurado que dispara o watchdog. Aqui sempre retornamos true (sem bloqueio),
+            // mas logamos o nome+index recebidos para confirmar que a entrega via rede esta OK.
+            nm.SceneManager.VerifySceneBeforeLoading = OnVerifySceneBeforeLoading;
+
             var status = nm.SceneManager.LoadScene(sceneName, LoadSceneMode.Single);
             if (status != SceneEventProgressStatus.Started)
             {
@@ -1161,6 +1189,37 @@ namespace ExoBeasts.Multiplayer.Lobby
                                "Verifique Build Settings e EnableSceneManagement=true no NetworkManager.");
                 OnError?.Invoke($"Falha ao carregar cena '{sceneName}': {status}");
             }
+        }
+
+        /// <summary>
+        /// VerifySceneBeforeLoading do NGO 1.12: dispara em cada peer (host e clientes)
+        /// quando um SceneEventType.Load chega via rede. Retornar false aborta o load no
+        /// peer atual com erro claro em vez de deixar o Unity falhar silenciosamente.
+        ///
+        /// Diagnostico para MPPM: se em um clone este callback dispara com sceneName valido
+        /// mas o LoadSceneAsync subsequente falha, confirma que o problema esta na lista de
+        /// cenas do clone (EditorBuildSettings dessincronizadas) e nao no payload de rede.
+        /// </summary>
+        private static bool OnVerifySceneBeforeLoading(int sceneIndex, string sceneName, LoadSceneMode loadSceneMode)
+        {
+            string activeScenePath = SceneUtility.GetScenePathByBuildIndex(sceneIndex);
+            bool isResolvable = !string.IsNullOrEmpty(activeScenePath);
+            Debug.Log(
+                $"[LobbyManager.VerifySceneBeforeLoading] sceneIndex={sceneIndex} | " +
+                $"sceneName='{sceneName}' | mode={loadSceneMode} | " +
+                $"resolvedPath='{activeScenePath}' | isResolvable={isResolvable} | " +
+                $"sceneCountInBuild={SceneManager.sceneCountInBuildSettings}");
+
+            if (!isResolvable)
+            {
+                Debug.LogError(
+                    $"[LobbyManager.VerifySceneBeforeLoading] Abortando load: sceneIndex={sceneIndex} " +
+                    $"nao resolve para nenhum path neste processo. Provavel desync EditorBuildSettings em MPPM clone. " +
+                    $"Total cenas neste processo: {SceneManager.sceneCountInBuildSettings}.");
+                return false;
+            }
+
+            return true;
         }
 
         private void RegisterNotifications()

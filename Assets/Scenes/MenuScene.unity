@@ -15683,56 +15683,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a2597ec50dffac4782ecb70fc9e4d13, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!1 &272498660
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 272498662}
-  - component: {fileID: 272498661}
-  m_Layer: 0
-  m_Name: LobbyUIManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &272498661
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 272498660}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 500bb5369fb0f4547b16b3966e317e6b, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  painelSelecao: {fileID: 0}
-  painelLobby: {fileID: 0}
-  posSelecaoCentro: {x: 0, y: 0}
-  posSelecaoLado: {x: -400, y: 0}
-  posLobbyEscondido: {x: 1200, y: 0}
-  posLobbyVisivel: {x: 450, y: 0}
---- !u!4 &272498662
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 272498660}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 977.46106, y: 155.00996, z: -202.69228}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &284698830
 GameObject:
   m_ObjectHideFlags: 0
@@ -62161,5 +62111,4 @@ SceneRoots:
   - {fileID: 194328520}
   - {fileID: 1161203026}
   - {fileID: 1914953225}
-  - {fileID: 272498662}
   - {fileID: 490154936}

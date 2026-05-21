@@ -11,6 +11,17 @@ public class MenuSceneValidationTests
 {
     private const string MenuScenePath = "Assets/Scenes/MenuScene.unity";
     private const string SupportedLobbyScenePath = "Assets/Scenes/LobbyScene.unity";
+    private static readonly string[] CanonicalScenePaths =
+    {
+        "Assets/Scenes/MenuScene.unity",
+        "Assets/Scenes/EscolherPersonagem.unity",
+        SupportedLobbyScenePath,
+        "Assets/Scenes/Rastros.unity",
+        "Assets/Scenes/CenaMapaTeste.unity",
+        "Assets/Scenes/Lose.unity",
+        "Assets/Scenes/Win.unity",
+        "Assets/Scenes/CenaMapaNOVO.unity"
+    };
 
     [Test]
     public void MenuManagerHasSerializedMainMenuButtons()
@@ -64,13 +75,50 @@ public class MenuSceneValidationTests
         Assert.That(normalizedPath, Is.EqualTo(expectedPath));
     }
 
+    [Test]
+    public void CanonicalScenesAreEnabledAndOrderedInBuildSettings()
+    {
+        AssertCanonicalSceneList(EditorBuildSettings.globalScenes, "EditorBuildSettings.globalScenes");
+        AssertCanonicalSceneList(EditorBuildSettings.scenes, "EditorBuildSettings.scenes");
+    }
+
+    [Test]
+    public void LobbySceneResolvesToBuildIndex()
+    {
+        int buildIndex = SceneUtility.GetBuildIndexByScenePath(SupportedLobbyScenePath);
+
+        Assert.That(buildIndex, Is.GreaterThanOrEqualTo(0),
+            "LobbyScene precisa resolver para build index no Play Mode e nos clones MPPM.");
+    }
+
+    [Test]
+    public void LobbySceneJoinButtonsDoNotLetChildTextStealRaycasts()
+    {
+        WithScene(SupportedLobbyScenePath, scene =>
+        {
+            string[] guardedButtonNames = { "EntrarLobby", "LobbyPublico" };
+
+            foreach (string buttonName in guardedButtonNames)
+            {
+                Button button = GetAllButtons(scene).FirstOrDefault(candidate => candidate.gameObject.name == buttonName);
+                Assert.That(button, Is.Not.Null, $"Botao '{buttonName}' nao encontrado na LobbyScene.");
+
+                string[] raycastLabels = button.GetComponentsInChildren<Graphic>(true)
+                    .Where(IsTextGraphic)
+                    .Where(graphic => graphic.raycastTarget)
+                    .Select(graphic => GetHierarchyPath(graphic.transform))
+                    .ToArray();
+
+                Assert.That(raycastLabels, Is.Empty,
+                    $"Textos filhos de '{buttonName}' nao podem receber raycast, pois expandem a area clicavel do botao: {string.Join(", ", raycastLabels)}");
+            }
+        });
+    }
+
     private static void WithMenuScene(System.Action<MonoBehaviour, Button, Button> assertion)
     {
-        SceneSetup[] originalSetup = CaptureOriginalSceneSetup();
-
-        try
+        WithScene(MenuScenePath, scene =>
         {
-            Scene scene = EditorSceneManager.OpenScene(MenuScenePath, OpenSceneMode.Single);
             MonoBehaviour menuManager = scene.GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<MonoBehaviour>(true))
                 .FirstOrDefault(component => component != null && component.GetType().Name == "MenuManager");
@@ -82,6 +130,17 @@ public class MenuSceneValidationTests
             Assert.That(multiplayerButton, Is.Not.Null, "Botao 'Multiplayer' nao encontrado na MenuScene.");
 
             assertion(menuManager, singleplayerButton, multiplayerButton);
+        });
+    }
+
+    private static void WithScene(string scenePath, System.Action<Scene> assertion)
+    {
+        SceneSetup[] originalSetup = CaptureOriginalSceneSetup();
+
+        try
+        {
+            Scene scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            assertion(scene);
         }
         finally
         {
@@ -96,11 +155,37 @@ public class MenuSceneValidationTests
             .ToArray();
     }
 
+    private static void AssertCanonicalSceneList(EditorBuildSettingsScene[] scenes, string listName)
+    {
+        Assert.That(scenes, Is.Not.Null, $"{listName} nao pode ser null.");
+        Assert.That(scenes.Length, Is.EqualTo(CanonicalScenePaths.Length),
+            $"{listName} precisa ter exatamente a lista canonica de cenas.");
+
+        for (int i = 0; i < CanonicalScenePaths.Length; i++)
+        {
+            Assert.That(scenes[i].enabled, Is.True, $"{listName}[{i}] precisa estar habilitada.");
+            Assert.That(scenes[i].path, Is.EqualTo(CanonicalScenePaths[i]), $"{listName}[{i}] fora da ordem canonica.");
+        }
+    }
+
     private static T[] GetAllComponents<T>(Scene scene) where T : Component
     {
         return scene.GetRootGameObjects()
             .SelectMany(root => root.GetComponentsInChildren<T>(true))
             .ToArray();
+    }
+
+    private static bool IsTextGraphic(Graphic graphic)
+    {
+        string typeName = graphic.GetType().FullName;
+        return typeName == "TMPro.TextMeshProUGUI" || typeName == "UnityEngine.UI.Text";
+    }
+
+    private static string GetHierarchyPath(Transform transform)
+    {
+        return string.Join("/", transform.GetComponentsInParent<Transform>(true)
+            .Reverse()
+            .Select(parent => parent.gameObject.name));
     }
 
     private static void RestoreOriginalSceneSetup(SceneSetup[] originalSetup)

@@ -93,6 +93,7 @@ public class LobbySceneUI : MonoBehaviour
         _lobby = LobbyManager.Instance;
         _auth  = EOSAuthenticator.Instance;
         AutoDetectElements();
+        DisableButtonLabelRaycasts();
     }
 
     private void Start()
@@ -135,6 +136,7 @@ public class LobbySceneUI : MonoBehaviour
         if (nickField      == null) nickField      = FindIn<TMP_InputField>("DigitarNick");
         if (lobbyNameField == null) lobbyNameField = FindIn<TMP_InputField>("DigitarNomeSala");
         if (joinIdField    == null) joinIdField    = FindIn<TMP_InputField>("ProcurarLobbyID");
+        if (joinIdField    == null) joinIdField    = FindIn<TMP_InputField>("PrcurarLobbyID");
 
         // Texto
         if (maxPlayersText == null) maxPlayersText = FindIn<TMP_Text>("MaxJogadores");
@@ -174,6 +176,17 @@ public class LobbySceneUI : MonoBehaviour
         foreach (var t in GetComponentsInChildren<Transform>(true))
             if (t.gameObject.name.Trim() == goName.Trim()) return t.gameObject;
         return null;
+    }
+
+    private void DisableButtonLabelRaycasts()
+    {
+        foreach (var button in GetComponentsInChildren<Button>(true))
+        {
+            foreach (var label in button.GetComponentsInChildren<TMP_Text>(true))
+            {
+                label.raycastTarget = false;
+            }
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────
