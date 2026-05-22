@@ -9,6 +9,16 @@ namespace ExoBeasts.Multiplayer.Core
     public static class PartySlotLayout
     {
         private static readonly int[] AllSlots = { 0, 1, 2, 3, 4, 5, 6, 7 };
+        private static readonly string[] CharacterDisplayNameValues = { "Coruja", "Samurai" };
+
+        public static IReadOnlyList<string> CharacterDisplayNames => CharacterDisplayNameValues;
+
+        public static string GetCharacterDisplayName(int characterIndex)
+        {
+            return characterIndex >= 0 && characterIndex < CharacterDisplayNameValues.Length
+                ? CharacterDisplayNameValues[characterIndex]
+                : characterIndex.ToString();
+        }
 
         public static List<int> GetSlots(int totalPlayers, int playerIndex)
         {

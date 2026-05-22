@@ -79,8 +79,6 @@ public class LobbySceneUI : MonoBehaviour
     private bool   _isCreatingLobby = false;
     private Coroutine _createTimeoutCoroutine;
 
-    private static readonly string[] _charNames = { "Coruja", "Samurai" };
-
     private LobbyManager     _lobby;
     private EOSAuthenticator _auth;
 
@@ -196,11 +194,11 @@ public class LobbySceneUI : MonoBehaviour
     private void WireButtons()
     {
         // Auth
-        WireBtn("BtnLogin",       Login);
+        LobbyButtonBinder.WireBtn(this, "BtnLogin",       Login);
 
         // Navegação
-        WireBtn("BtnCriarHost",     AbrirModoHost);
-        WireBtn("BtnVoltarHost",    VoltarParaMenu);
+        LobbyButtonBinder.WireBtn(this, "BtnCriarHost",     AbrirModoHost);
+        LobbyButtonBinder.WireBtn(this, "BtnVoltarHost",    VoltarParaMenu);
 
         // Criar Lobby (busca resiliente dentro do painel diretamente, ignorando espaços no nome do painel)
         if (painelCriarLobby != null)
@@ -226,34 +224,34 @@ public class LobbySceneUI : MonoBehaviour
         }
         
         // Mantem suporte a nomes corretos se arrumados
-        WireBtn("-",              () => AlterarMaxPlayers(-1));
-        WireBtn("+",              () => AlterarMaxPlayers(+1));
-        WireBtn("'-'",            () => AlterarMaxPlayers(-1));
-        WireBtn("'+'",            () => AlterarMaxPlayers(+1));
+        LobbyButtonBinder.WireBtn(this, "-",              () => AlterarMaxPlayers(-1));
+        LobbyButtonBinder.WireBtn(this, "+",              () => AlterarMaxPlayers(+1));
+        LobbyButtonBinder.WireBtn(this, "'-'",            () => AlterarMaxPlayers(-1));
+        LobbyButtonBinder.WireBtn(this, "'+'",            () => AlterarMaxPlayers(+1));
 
         // Entrar por ID (está no painel Lobby)
-        WireBtn("BtnEntrarId",    EntrarPorId);
-        WireBtn("EntrarId",       EntrarPorId);
-        WireBtn("EntrarLobby",    EntrarPorId);
+        LobbyButtonBinder.WireBtn(this, "BtnEntrarId",    EntrarPorId);
+        LobbyButtonBinder.WireBtn(this, "EntrarId",       EntrarPorId);
+        LobbyButtonBinder.WireBtn(this, "EntrarLobby",    EntrarPorId);
 
         // Buscar salas públicas (está no painel Lobby)
-        WireBtn("BtnBuscarSalas", BuscarSalas);
-        WireBtn("BuscarSalas",    BuscarSalas);
-        WireBtn("LobbyPublico",   BuscarSalas);
-        WireBtn("LobbyPulbico",   BuscarSalas);  // nome real na cena (typo)
+        LobbyButtonBinder.WireBtn(this, "BtnBuscarSalas", BuscarSalas);
+        LobbyButtonBinder.WireBtn(this, "BuscarSalas",    BuscarSalas);
+        LobbyButtonBinder.WireBtn(this, "LobbyPublico",   BuscarSalas);
+        LobbyButtonBinder.WireBtn(this, "LobbyPulbico",   BuscarSalas);  // nome real na cena (typo)
 
         // Sala
-        WireBtn("Copiar",         CopiarId);
-        WireBtn("SairLobby",      SairDaSala);
-        WireBtn("BtnSairLobby",   SairDaSala);
-        WireBtn("BtnIniciarPartida", IniciarPartida);
-        WireBtn("IniciarPartida",    IniciarPartida);
+        LobbyButtonBinder.WireBtn(this, "Copiar",         CopiarId);
+        LobbyButtonBinder.WireBtn(this, "SairLobby",      SairDaSala);
+        LobbyButtonBinder.WireBtn(this, "BtnSairLobby",   SairDaSala);
+        LobbyButtonBinder.WireBtn(this, "BtnIniciarPartida", IniciarPartida);
+        LobbyButtonBinder.WireBtn(this, "IniciarPartida",    IniciarPartida);
 
         // Voltar ao menu principal (sai da LobbyScene completamente)
-        WireBtn("BtnVoltarMenuPrincipal", IrParaMenuPrincipal);
-        WireBtn("VoltarMenuPrincipal",    IrParaMenuPrincipal);
-        WireBtn("BtnMenu",                IrParaMenuPrincipal);
-        WireBtn("BackMenu",               IrParaMenuPrincipal);  // nome real na cena
+        LobbyButtonBinder.WireBtn(this, "BtnVoltarMenuPrincipal", IrParaMenuPrincipal);
+        LobbyButtonBinder.WireBtn(this, "VoltarMenuPrincipal",    IrParaMenuPrincipal);
+        LobbyButtonBinder.WireBtn(this, "BtnMenu",                IrParaMenuPrincipal);
+        LobbyButtonBinder.WireBtn(this, "BackMenu",               IrParaMenuPrincipal);  // nome real na cena
 
         // Inspector refs diretos
         if (btnLogin != null) { btnLogin.onClick = new Button.ButtonClickedEvent(); btnLogin.onClick.AddListener(Login); }
@@ -267,48 +265,6 @@ public class LobbySceneUI : MonoBehaviour
         }
     }
 
-    private void WireBtn(string goName, Action handler)
-    {
-        foreach (var b in GetComponentsInChildren<Button>(true))
-        {
-            if (b.gameObject.name.Trim() != goName.Trim()) continue;
-            // Cria um novo evento limpando tudo o que possa estar erradamente "injetado" no Inspecionar! (o GetPersistent não impede mais o código)
-            b.onClick = new Button.ButtonClickedEvent();
-            b.onClick.AddListener(() => handler());
-        }
-    }
-
-    private void WireBtnByPath(string path, Action handler)
-    {
-        var tr = transform.Find(path);
-        if (tr != null)
-        {
-            Debug.Log($"[LobbySceneUI] SUCESSO ao encontrar e mapear o botao via path: {path}");
-            var b = tr.GetComponent<Button>();
-            if (b != null)
-            {
-                // Substitui o UnityEvent por completo (ignora Inspecionar zoado)
-                b.onClick = new Button.ButtonClickedEvent();
-                b.onClick.AddListener(() => handler());
-            }
-        }
-        else
-        {
-            Debug.LogError($"[LobbySceneUI] FALHA FATAL: Nao achou o botao no path '{path}'");
-        }
-    }
-
-    private void WireBtnInParent(string parentName, string btnName, Action handler)
-    {
-        var parent = FindGO(parentName);
-        if (parent == null) return;
-        foreach (var b in parent.GetComponentsInChildren<Button>(true))
-        {
-            if (b.gameObject.name.Trim() != btnName.Trim()) continue;
-            b.onClick = new Button.ButtonClickedEvent();
-            b.onClick.AddListener(() => handler());
-        }
-    }
 
     // ──────────────────────────────────────────────────────────────────────
     // API pública — botões do Inspector chamam estes
@@ -420,7 +376,7 @@ public class LobbySceneUI : MonoBehaviour
     public void SelecionarPersonagem(int idx)
     {
         _lobby?.SelectCharacter(idx);
-        SetStatus($"Personagem: {(idx < _charNames.Length ? _charNames[idx] : idx.ToString())}");
+        SetStatus($"Personagem: {PartySlotLayout.GetCharacterDisplayName(idx)}");
     }
 
     public void IniciarPartida()
@@ -613,8 +569,7 @@ public class LobbySceneUI : MonoBehaviour
                 bool amHost = lobby != null && m.productUserId == lobby.hostProductUserId;
 
                 string charTag = m.selectedCharacterIndex >= 0
-                    && m.selectedCharacterIndex < _charNames.Length
-                    ? $" [{_charNames[m.selectedCharacterIndex]}]" : "";
+                    ? $" [{PartySlotLayout.GetCharacterDisplayName(m.selectedCharacterIndex)}]" : "";
                 string tags = charTag
                     + (amHost  ? " [Host]" : "")
                     + (m.isReady ? " ✓"   : "")

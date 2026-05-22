@@ -1,8 +1,6 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
-using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using Unity.Services.Relay;
@@ -141,6 +139,11 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         public bool CreateLobby(LobbySettings settings)
         {
+            return CreateLobbyEos(settings);
+        }
+
+        private bool CreateLobbyEos(LobbySettings settings)
+        {
 #if !EOS_DISABLE
             var lobbyInterface = GetLobbyInterface();
             if (lobbyInterface == null) { OnError?.Invoke("EOS nao inicializado"); return false; }
@@ -278,6 +281,11 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         public void SearchLobbies(LobbySearchFilter filter)
         {
+            SearchLobbiesEos(filter);
+        }
+
+        private void SearchLobbiesEos(LobbySearchFilter filter)
+        {
 #if !EOS_DISABLE
             // OPTIMIZATION (Sprint 3 / Item A3): rate-limit + cache.
             // Se ja temos resultado recente, republica do cache sem disparar nova request.
@@ -408,6 +416,11 @@ namespace ExoBeasts.Multiplayer.Lobby
         }
 
         public void JoinLobby(string lobbyId)
+        {
+            JoinLobbyEos(lobbyId);
+        }
+
+        private void JoinLobbyEos(string lobbyId)
         {
 #if !EOS_DISABLE
             var lobbyInterface = GetLobbyInterface();
@@ -549,6 +562,11 @@ namespace ExoBeasts.Multiplayer.Lobby
         {
             if (!_isInLobby) { Debug.LogWarning("[LobbyManager] Nao esta em um lobby"); return; }
 
+            LeaveLobbyEos();
+        }
+
+        private void LeaveLobbyEos()
+        {
 #if !EOS_DISABLE
             var lobbyInterface = GetLobbyInterface();
             if (lobbyInterface == null) { OnError?.Invoke("EOS nao inicializado"); return; }
@@ -639,6 +657,11 @@ namespace ExoBeasts.Multiplayer.Lobby
         {
             if (!_isInLobby || _currentLobby == null) return;
 
+            SetMemberAttributeEos(key, value);
+        }
+
+        private void SetMemberAttributeEos(string key, string value)
+        {
 #if !EOS_DISABLE
             // A5 audit: todos os caminhos de falha agora propagam OnError para UI,
             // em vez de so logar silenciosamente. Antes, o toggle Ready / selecao de
@@ -698,6 +721,9 @@ namespace ExoBeasts.Multiplayer.Lobby
             {
                 if (!scheduled) mod.Release();
             }
+#else
+            Debug.LogWarning($"[LobbyManager] SetMemberAttribute('{key}') ignorado: EOS desabilitado");
+            OnError?.Invoke($"Nao foi possivel sincronizar '{key}': EOS desabilitado");
 #endif
         }
 
@@ -919,24 +945,7 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         public static string GetLocalIpAddress()
         {
-            try
-            {
-                foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
-                {
-                    if (ni.OperationalStatus != OperationalStatus.Up) continue;
-                    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback) continue;
-                    foreach (var addr in ni.GetIPProperties().UnicastAddresses)
-                    {
-                        if (addr.Address.AddressFamily == AddressFamily.InterNetwork)
-                            return addr.Address.ToString();
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                Debug.LogWarning($"[LobbyManager] Nao foi possivel obter IP local: {e.Message}");
-            }
-            return "127.0.0.1";
+            return NetworkAddressHelper.GetLocalIpAddress();
         }
 
         public bool IsInLobby() => _isInLobby;

@@ -272,7 +272,7 @@ namespace ExoBeasts.Multiplayer.GameServer
 
             if (string.IsNullOrEmpty(relayJoinCode))
             {
-                localIp = LobbyManager.GetLocalIpAddress();
+                localIp = NetworkAddressHelper.GetLocalIpAddress();
                 transport.SetConnectionData("0.0.0.0", port);
                 port = transport.ConnectionData.Port;
                 Debug.Log($"[MatchSessionLauncher][DBG] Fallback IP direto: listen 0.0.0.0:{port}, publicando: {localIp}");
@@ -334,7 +334,7 @@ namespace ExoBeasts.Multiplayer.GameServer
                 string relayCodeToPublish = !string.IsNullOrEmpty(relayJoinCode) ? relayJoinCode : NO_RELAY_CODE;
                 AddStringAttr(mod, LobbyAttributes.RELAY_CODE, relayCodeToPublish, LobbyAttributeVisibility.Public);
 
-                string publishIp = localIp ?? LobbyManager.GetLocalIpAddress();
+                string publishIp = localIp ?? NetworkAddressHelper.GetLocalIpAddress();
                 AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, publishIp, LobbyAttributeVisibility.Public);
                 AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, port, LobbyAttributeVisibility.Public);
                 AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.InGame.ToString(), LobbyAttributeVisibility.Public);

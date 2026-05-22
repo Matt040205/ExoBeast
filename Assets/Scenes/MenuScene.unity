@@ -5162,7 +5162,6 @@ GameObject:
   - component: {fileID: 103263292}
   - component: {fileID: 103263291}
   - component: {fileID: 103263293}
-  - component: {fileID: 103263294}
   m_Layer: 0
   m_Name: MenuManager
   m_TagString: Untagged
@@ -5226,18 +5225,6 @@ MonoBehaviour:
   delayBetweenElements: 0.5
   fadeDuration: 3
   hideOnStart: 1
---- !u!114 &103263294
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 103263290}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 53237e2c058fbd64798d25b5a8582d15, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
 --- !u!1 &108761420
 GameObject:
   m_ObjectHideFlags: 0
@@ -10575,7 +10562,6 @@ Transform:
   - {fileID: 1529592467}
   - {fileID: 234190649}
   - {fileID: 805062160}
-  - {fileID: 1590758537}
   - {fileID: 69882945}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
