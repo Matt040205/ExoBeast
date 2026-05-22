@@ -247,14 +247,14 @@ namespace ExoBeasts.Multiplayer.Lobby
             bool scheduled = false;
             try
             {
-                AddStringAttr(mod, LobbyAttributes.LOBBY_NAME, settings.lobbyName, LobbyAttributeVisibility.Public);
-                AddStringAttr(mod, LobbyAttributes.MAP_NAME, settings.mapName, LobbyAttributeVisibility.Public);
-                AddInt64Attr(mod, LobbyAttributes.MAX_PLAYERS, settings.maxPlayers, LobbyAttributeVisibility.Public);
-                AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.WaitingForPlayers.ToString(), LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddStringAttr(mod, LobbyAttributes.LOBBY_NAME, settings.lobbyName, LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddStringAttr(mod, LobbyAttributes.MAP_NAME, settings.mapName, LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddInt64Attr(mod, LobbyAttributes.MAX_PLAYERS, settings.maxPlayers, LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.WaitingForPlayers.ToString(), LobbyAttributeVisibility.Public);
                 // Campos reservados para StartMatch — clientes observam RELAY_CODE e SERVER_ADDRESS
-                AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, "", LobbyAttributeVisibility.Public);
-                AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, DEFAULT_PORT, LobbyAttributeVisibility.Public);
-                AddStringAttr(mod, LobbyAttributes.RELAY_CODE, "", LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, "", LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, DEFAULT_PORT, LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddStringAttr(mod, LobbyAttributes.RELAY_CODE, "", LobbyAttributeVisibility.Public);
 
                 var updateOpts = new UpdateLobbyOptions { LobbyModificationHandle = mod };
                 lobbyInterface.UpdateLobby(ref updateOpts, null, (ref UpdateLobbyCallbackInfo info) =>
@@ -699,7 +699,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             bool scheduled = false;
             try
             {
-                AddStringMemberAttr(mod, key, value, LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddStringMemberAttr(mod, key, value, LobbyAttributeVisibility.Public);
 
                 var updateOpts = new UpdateLobbyOptions { LobbyModificationHandle = mod };
                 lobbyInterface.UpdateLobby(ref updateOpts, null, (ref UpdateLobbyCallbackInfo info) =>
@@ -882,37 +882,6 @@ namespace ExoBeasts.Multiplayer.Lobby
             onResult?.Invoke(result);
         }
 
-#if !EOS_DISABLE
-        private static void AddStringAttr(LobbyModification mod, string key, string value, LobbyAttributeVisibility vis)
-        {
-            var opts = new LobbyModificationAddAttributeOptions
-            {
-                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsUtf8 = value } },
-                Visibility = vis,
-            };
-            mod.AddAttribute(ref opts);
-        }
-
-        private static void AddInt64Attr(LobbyModification mod, string key, long value, LobbyAttributeVisibility vis)
-        {
-            var opts = new LobbyModificationAddAttributeOptions
-            {
-                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsInt64 = value } },
-                Visibility = vis,
-            };
-            mod.AddAttribute(ref opts);
-        }
-
-        private static void AddStringMemberAttr(LobbyModification mod, string key, string value, LobbyAttributeVisibility vis)
-        {
-            var opts = new LobbyModificationAddMemberAttributeOptions
-            {
-                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsUtf8 = value } },
-                Visibility = vis,
-            };
-            mod.AddMemberAttribute(ref opts);
-        }
-#endif
 
         internal void ClearLobbyState()
         {

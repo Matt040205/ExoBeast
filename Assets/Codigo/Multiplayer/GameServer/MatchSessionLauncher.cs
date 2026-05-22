@@ -332,12 +332,12 @@ namespace ExoBeasts.Multiplayer.GameServer
             try
             {
                 string relayCodeToPublish = !string.IsNullOrEmpty(relayJoinCode) ? relayJoinCode : NO_RELAY_CODE;
-                AddStringAttr(mod, LobbyAttributes.RELAY_CODE, relayCodeToPublish, LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddStringAttr(mod, LobbyAttributes.RELAY_CODE, relayCodeToPublish, LobbyAttributeVisibility.Public);
 
                 string publishIp = localIp ?? NetworkAddressHelper.GetLocalIpAddress();
-                AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, publishIp, LobbyAttributeVisibility.Public);
-                AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, port, LobbyAttributeVisibility.Public);
-                AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.InGame.ToString(), LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddStringAttr(mod, LobbyAttributes.SERVER_ADDRESS, publishIp, LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddInt64Attr(mod, LobbyAttributes.SERVER_PORT, port, LobbyAttributeVisibility.Public);
+                EosLobbyModHelper.AddStringAttr(mod, LobbyAttributes.LOBBY_STATE, LobbyState.InGame.ToString(), LobbyAttributeVisibility.Public);
 
                 Debug.Log($"[MatchSessionLauncher] Publicando atributos: RELAY_CODE='{relayCodeToPublish}' | SERVER_ADDRESS='{publishIp}' | PORT={port}");
 
@@ -746,25 +746,6 @@ namespace ExoBeasts.Multiplayer.GameServer
             }
         }
 
-        private static void AddStringAttr(LobbyModification mod, string key, string value, LobbyAttributeVisibility vis)
-        {
-            var opts = new LobbyModificationAddAttributeOptions
-            {
-                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsUtf8 = value } },
-                Visibility = vis,
-            };
-            mod.AddAttribute(ref opts);
-        }
-
-        private static void AddInt64Attr(LobbyModification mod, string key, long value, LobbyAttributeVisibility vis)
-        {
-            var opts = new LobbyModificationAddAttributeOptions
-            {
-                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsInt64 = value } },
-                Visibility = vis,
-            };
-            mod.AddAttribute(ref opts);
-        }
 #endif
     }
 }

@@ -15,7 +15,16 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - `Assets/Codigo/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
 - `Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
 
-## Ultima atualizacao: refactor do sistema de credenciais EOS (2026-05-13)
+## Ultima atualizacao: Sprint 7 — ready flow + extraçao helpers EOS (2026-05-22)
+
+- `LobbySceneUI` agora implementa o fluxo de ready state corretamente: botao "Pronto"/"BtnPronto"/"BtnReady"/"Ready" (qualquer um desses nomes no hierarquia) dispara `ToggleReady()`, que chama `_lobby.SetReady(!_isReady)` e atualiza o visual do botao (texto e cor).
+- `_isReady` e resetado para `false` ao criar ou entrar em uma sala, garantindo que o player sempre comeca como nao-pronto em cada novo lobby.
+- O botao "Iniciar Partida" do host so fica interagivel quando `AllMembersReady()` retornar `true` — agora isso e alcancavel.
+- Extraido `Core/EosLobbyModHelper.cs`: helper interno com `AddStringAttr`, `AddInt64Attr` e `AddStringMemberAttr`. Eliminada a duplicacao que existia em `LobbyManager.cs` e `MatchSessionLauncher.cs` (cada um tinha copia privada identica dos mesmos metodos).
+- `LobbyManager` e `MatchSessionLauncher` agora delegam para `EosLobbyModHelper`.
+- Sprint 6 (2026-05-22): removidos `LobbyPlaceholderUI.cs` e `MenuLobbyPanel.cs` (UI OnGUI de teste substituida pelo `LobbySceneUI` Canvas); adicionados `LobbyButtonBinder`, `NetworkAddressHelper`, `PartySlotLayout`, `LobbyMembershipService.cs.meta`.
+
+## Ultima atualizacao anterior: refactor do sistema de credenciais EOS (2026-05-13)
 
 - A "gambiarra" do sistema de credenciais foi removida. Tres scripts redundantes (`EOSConfigSetup.cs`, `EOSConfigImporter.cs`, `EOSBuildProcessor.cs`) foram deletados e substituidos por um unico componente: `Assets/Editor/EOSConfigGenerator.cs`.
 - Quatro arquivos com `ClientSecret` em texto plano foram removidos do indice git (`eos_product_config.json`, `eos_windows_config.json`, `EpicOnlineServicesConfig.json`, `EOSConfig_Main.asset`) e adicionados ao `.gitignore`. As copias locais foram preservadas para nao quebrar o desenvolvimento.

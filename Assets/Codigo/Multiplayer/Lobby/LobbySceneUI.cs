@@ -200,6 +200,12 @@ public class LobbySceneUI : MonoBehaviour
         LobbyButtonBinder.WireBtn(this, "BtnCriarHost",     AbrirModoHost);
         LobbyButtonBinder.WireBtn(this, "BtnVoltarHost",    VoltarParaMenu);
 
+        // Ready — suporta vários nomes possíveis no Designer
+        LobbyButtonBinder.WireBtn(this, "BtnPronto",  ToggleReady);
+        LobbyButtonBinder.WireBtn(this, "Pronto",     ToggleReady);
+        LobbyButtonBinder.WireBtn(this, "BtnReady",   ToggleReady);
+        LobbyButtonBinder.WireBtn(this, "Ready",      ToggleReady);
+
         // Criar Lobby (busca resiliente dentro do painel diretamente, ignorando espaços no nome do painel)
         if (painelCriarLobby != null)
         {
@@ -397,6 +403,29 @@ public class LobbySceneUI : MonoBehaviour
         SetStatus("ID copiado para a área de transferência!");
     }
 
+    public void ToggleReady()
+    {
+        _isReady = !_isReady;
+        _lobby?.SetReady(_isReady);
+        AtualizarBotaoReady();
+        AtualizarBotaoIniciar();
+        SetStatus(_isReady ? "Pronto! Aguardando os outros..." : "Aguardando...");
+    }
+
+    private void AtualizarBotaoReady()
+    {
+        if (painelJogadores == null) return;
+        foreach (var btn in painelJogadores.GetComponentsInChildren<Button>(true))
+        {
+            string n = btn.gameObject.name.Trim();
+            if (n != "BtnPronto" && n != "Pronto" && n != "BtnReady" && n != "Ready") continue;
+            var txt = btn.GetComponentInChildren<TMP_Text>();
+            if (txt != null) txt.text = _isReady ? "✓ Pronto" : "Ficar Pronto";
+            var img = btn.GetComponent<UnityEngine.UI.Image>();
+            if (img != null) img.color = _isReady ? new Color(0.2f, 0.7f, 0.2f, 1f) : new Color(0.8f, 0.8f, 0.8f, 1f);
+        }
+    }
+
     public void AbrirModoHost()    => SetState(State.HostConfig);
     public void VoltarParaMenu()   => SetState(State.LobbyMenu);
 
@@ -418,22 +447,27 @@ public class LobbySceneUI : MonoBehaviour
         _isCreatingLobby = false;
         CancelCreateTimeout();
         _lobbyId = lobby.lobbyId; _lobbyNome = lobby.lobbyName;
+        _isReady = false; // nova sala — host começa como não-pronto
         SetState(State.Sala);
         AtualizarInfoSala();
-        SetStatus($"Sala '{lobby.lobbyName}' criada!");
+        AtualizarBotaoReady();
+        SetStatus($"Sala '{lobby.lobbyName}' criada! Clique 'Ficar Pronto' para liberar o início.");
     }
 
     private void OnLobbyJoined(LobbyInfo lobby)
     {
         _lobbyId = lobby.lobbyId; _lobbyNome = lobby.lobbyName;
+        _isReady = false; // entrou numa sala existente — começa como não-pronto
         SetState(State.Sala);
         AtualizarInfoSala();
-        SetStatus($"Entrou em '{lobby.lobbyName}'");
+        AtualizarBotaoReady();
+        SetStatus($"Entrou em '{lobby.lobbyName}'. Clique 'Ficar Pronto' quando estiver pronto.");
     }
 
     private void OnLobbyLeft()
     {
         _lobbyId = ""; _lobbyNome = "";
+        _isReady = false;
         SetState(State.LobbyMenu);
         SetStatus("Saiu da sala.");
     }
@@ -447,7 +481,9 @@ public class LobbySceneUI : MonoBehaviour
 
     private void OnMemberEvento(LobbyMember _)
     {
-        if (_state == State.Sala) AtualizarSlots();
+        if (_state != State.Sala) return;
+        AtualizarSlots();
+        AtualizarBotaoIniciar();
     }
 
     private void OnErro(string err)
@@ -502,7 +538,11 @@ public class LobbySceneUI : MonoBehaviour
         if (nickField != null) nickField.gameObject.SetActive(inMenu);
         if (btnLogin  != null) btnLogin.gameObject.SetActive(inMenu);
 
-        if (inSala) AtualizarSlots();
+        if (inSala)
+        {
+            AtualizarSlots();
+            AtualizarBotaoReady();
+        }
     }
 
     private void AtualizarInfoSala()
