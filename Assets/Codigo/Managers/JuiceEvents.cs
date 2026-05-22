@@ -31,4 +31,8 @@ public static class JuiceEvents
 {
     // Direction, Amplitude, Frequency, Duration
     public static Action<Vector3, float, float, float> OnCameraShake;
+
+    // Disparado quando uma torre é destruída em combate (não quando vendida).
+    // Argumento: nome exibível da torre (ex: "Polvo", "Arqueira").
+    public static Action<string> OnTowerDied;
 }

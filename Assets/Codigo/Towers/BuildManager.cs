@@ -54,6 +54,10 @@ public class BuildManager : NetworkBehaviour
     [Header("Dono Local")]
     public static bool isBuildingMode = false;
 
+    [Header("Efeitos da Câmera / Ambiente")]
+    [Tooltip("Objeto da Fog (Neblina) para desativar durante a construção e reativar ao sair.")]
+    public GameObject fogObject;
+
     private GameObject currentBuildGhost;
     private GameObject selectedBuildablePrefab;
     private object selectedBuildableData;
@@ -280,6 +284,12 @@ public class BuildManager : NetworkBehaviour
     void ToggleBuildMode(bool state)
     {
         if (TopDownCameraManager.Instance != null) TopDownCameraManager.Instance.ToggleTopDownView(state);
+
+        // Desativa ou reativa a Fog dependendo do estado do modo de construção
+        if (fogObject != null)
+        {
+            fogObject.SetActive(!state);
+        }
 
         if (!state)
         {

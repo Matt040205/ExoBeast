@@ -54,6 +54,7 @@ public class UINotificationManager : NetworkBehaviour
         EnemyEvents.OnEnemySpawned += TriggerSpawnNotification;
         EnemyEvents.OnEnemyHalfway += TriggerHalfwayNotification;
         EnemyEvents.OnEnemyReachedBase += TriggerBaseNotification;
+        JuiceEvents.OnTowerDied += TriggerTowerDeathNotification;
     }
 
     public override void OnDestroy()
@@ -62,6 +63,7 @@ public class UINotificationManager : NetworkBehaviour
         EnemyEvents.OnEnemySpawned -= TriggerSpawnNotification;
         EnemyEvents.OnEnemyHalfway -= TriggerHalfwayNotification;
         EnemyEvents.OnEnemyReachedBase -= TriggerBaseNotification;
+        JuiceEvents.OnTowerDied -= TriggerTowerDeathNotification;
     }
 
     // ════════════════════════════════════════════════════
@@ -119,6 +121,16 @@ public class UINotificationManager : NetworkBehaviour
 
         if (IsServer) NotifyUIClientRpc(msg, Color.red);
         else if (IsLocalFallback()) EnqueueNotification(msg, Color.red);
+    }
+
+    private void TriggerTowerDeathNotification(string towerName)
+    {
+        string msg = $"⚡ {towerName} foi destruída!";
+        // Vermelho vivo, diferenciado das notificações de inimigo
+        Color deathColor = new Color(1f, 0.2f, 0.2f);
+
+        if (IsServer) NotifyUIClientRpc(msg, deathColor);
+        else if (IsLocalFallback()) EnqueueNotification(msg, deathColor);
     }
 
     // Funcao central de Debounce (Cooldown)
