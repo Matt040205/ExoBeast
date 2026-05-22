@@ -15,7 +15,16 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - `Assets/Codigo/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
 - `Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
 
-## Ultima atualizacao: Sprint 7 — ready flow + extraçao helpers EOS (2026-05-22)
+## Ultima atualizacao: Sprint 8 — integracao final + doc sync (2026-05-22)
+
+- Sincronizado o doc canonico com o estado real do codigo apos Sprints 4–7:
+  - `LobbyPlaceholderUI.cs` e `MenuLobbyPanel.cs` removidos da lista de arquivos ativos (foram deletados no Sprint 6).
+  - `LobbyUIManager.cs` requalificado como tombstone `#if UNITY_EDITOR [Obsolete]`, nao e UI de producao.
+  - Adicionados a "Arquivos atuais": `LobbyNotificationDispatcher.cs` (S4), `MatchSessionLauncher.cs` (S3), `LobbyMembershipService.cs` (S5), `LobbyButtonBinder.cs` (S6), `NetworkAddressHelper.cs` (S6), `PartySlotLayout.cs` (S6), `EosLobbyModHelper.cs` (S7).
+- Fluxo de integracao final confirmado funcional: `CriarSala(mapName="EscolherPersonagem")` → host clica "Iniciar Partida" (habilitado apenas quando `AllMembersReady()`) → `MatchSessionLauncher.LaunchHostCoroutine` publica `SERVER_ADDRESS`/`RELAY_CODE`/`LOBBY_STATE=InGame` → clientes detectam via `OnLobbyAttributeUpdated` → `ConnectAsClient*` → `WaitForAllClientsAndLoadScene("EscolherPersonagem")` → NGO carrega cena para todos.
+- Ready chain remota confirmada: membro remoto clica Pronto → EOS propaga → `OnMemberAttributeChanged` → `member.isReady = true` (mutacao in-place) → `InvokeOnMemberUpdated` → `AtualizarBotaoIniciar` → `AllMembersReady()` retorna true → botao host fica interagivel.
+
+## Ultima atualizacao anterior: Sprint 7 — ready flow + extraçao helpers EOS (2026-05-22)
 
 - `LobbySceneUI` agora implementa o fluxo de ready state corretamente: botao "Pronto"/"BtnPronto"/"BtnReady"/"Ready" (qualquer um desses nomes no hierarquia) dispara `ToggleReady()`, que chama `_lobby.SetReady(!_isReady)` e atualiza o visual do botao (texto e cor).
 - `_isReady` e resetado para `false` ao criar ou entrar em uma sala, garantindo que o player sempre comeca como nao-pronto em cada novo lobby.
@@ -210,9 +219,9 @@ Login EOS -> criar/entrar lobby -> ready + personagem -> StartMatch
 
 ## UIs e testes atuais
 
-- `LobbySceneUI.cs` e a interface canonica de lobby em Canvas.
-- `LobbyUIManager.cs` e `LobbyPlaceholderUI.cs` continuam como superficies de teste e debug.
-- `MenuLobbyPanel.cs` serve como painel simples para testes de menu.
+- `LobbySceneUI.cs` e a interface canonica de lobby em Canvas (Sprint 6+).
+- `LobbyUIManager.cs` e um tombstone `#if UNITY_EDITOR` marcado `[Obsolete]` — nao e UI real, impede CS2001 em clones MPPM antigos.
+- `LobbyPlaceholderUI.cs` e `MenuLobbyPanel.cs` foram DELETADOS no Sprint 6 (substituidos por `LobbySceneUI`).
 - `EOSAuthTest.unity` valida apenas autenticacao.
 - `Network Test.unity` valida Host/Client direto sem EOS Lobby.
 - `LobbyScene.unity` valida auth + lobby + inicio de partida.
@@ -229,12 +238,19 @@ Login EOS -> criar/entrar lobby -> ready + personagem -> StartMatch
 - `Core/CharacterChoiceCache.cs`
 - `Core/PlayerIdentityBridge.cs`
 - `Core/UGSBootstrap.cs`
+- `Core/PartySlotLayout.cs`          ← Sprint 6: layout dinamico de slots por numero de jogadores
+- `Core/NetworkAddressHelper.cs`     ← Sprint 6: deteccao de IP local isolada
+- `Core/EosLobbyModHelper.cs`        ← Sprint 7: helpers EOS extraidos de LobbyManager e MatchSessionLauncher
 - `Auth/EOSAuthenticator.cs`
 - `Auth/SessionManager.cs`
 - `Lobby/LobbyData.cs`
 - `Lobby/LobbyManager.cs`
 - `Lobby/LobbySceneUI.cs`
-- `Lobby/LobbyUIManager.cs`
+- `Lobby/LobbyUIManager.cs`          ← tombstone #if UNITY_EDITOR [Obsolete]; nao e UI real
+- `Lobby/LobbyMembershipService.cs`  ← Sprint 5: gestao de membros extraida de LobbyManager
+- `Lobby/LobbyNotificationDispatcher.cs` ← Sprint 4: notificacoes EOS extraidas de LobbyManager
+- `Lobby/LobbyButtonBinder.cs`       ← Sprint 6: wiring de botoes por nome de GameObject
+- `GameServer/MatchSessionLauncher.cs` ← Sprint 3: orquestracao de StartHost/StartClient
 - `GameServer/GameServerManager.cs`
 - `GameServer/MatchManager.cs`
 - `GameServer/PlayerRegistry.cs`
@@ -242,8 +258,6 @@ Login EOS -> criar/entrar lobby -> ready + personagem -> StartMatch
 - `Sync/ServerAuthoritativeProjectile.cs`
 - `Testing/EOSAuthTest.cs`
 - `Testing/NetworkConnectionTest.cs`
-- `Testing/LobbyPlaceholderUI.cs`
-- `Testing/MenuLobbyPanel.cs`
 
 ## Nao usar como atual
 
