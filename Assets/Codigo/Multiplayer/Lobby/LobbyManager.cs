@@ -75,9 +75,13 @@ namespace ExoBeasts.Multiplayer.Lobby
         private float _lastSearchLobbiesTime = -10f;
         private List<LobbyInfo> _lastSearchLobbiesResult; // null antes da primeira busca
 
-        private ulong _memberStatusHandle;
-        private ulong _lobbyUpdateHandle;
-        private ulong _memberUpdateHandle;
+        private LobbyNotificationDispatcher _dispatcher;
+
+        internal void InvokeOnMemberJoined(LobbyMember m) => OnMemberJoined?.Invoke(m);
+        internal void InvokeOnMemberLeft(LobbyMember m) => OnMemberLeft?.Invoke(m);
+        internal void InvokeOnMemberUpdated(LobbyMember m) => OnMemberUpdated?.Invoke(m);
+        internal void InvokeOnLobbyLeft() => OnLobbyLeft?.Invoke();
+        internal void InvokeOnError(string e) => OnError?.Invoke(e);
 
         // Cache do EOSManagerWrapper para evitar lazy-create em OnDestroy
         private Core.EOSManagerWrapper _eosCache;
@@ -101,17 +105,18 @@ namespace ExoBeasts.Multiplayer.Lobby
         {
             // EOS pode ainda nao estar inicializado (init assincrona via coroutine no EOSManagerWrapper)
             _eosCache = Core.EOSManagerWrapper.Instance;
+            _dispatcher = new LobbyNotificationDispatcher(this);
             if (_eosCache.IsInitialized)
-                RegisterNotifications();
+                _dispatcher.RegisterNotifications();
             else
-                _eosCache.OnEOSInitialized += RegisterNotifications;
+                _eosCache.OnEOSInitialized += _dispatcher.RegisterNotifications;
         }
 
         private void OnDestroy()
         {
-            if (_eosCache != null)
-                _eosCache.OnEOSInitialized -= RegisterNotifications;
-            UnregisterNotifications();
+            if (_eosCache != null && _dispatcher != null)
+                _eosCache.OnEOSInitialized -= _dispatcher.RegisterNotifications;
+            _dispatcher?.UnregisterNotifications();
             ReleaseDetailCache();
         }
 
@@ -123,7 +128,7 @@ namespace ExoBeasts.Multiplayer.Lobby
                 ?.GetLobbyInterface();
         }
 
-        private ProductUserId GetLocalUserId()
+        internal ProductUserId GetLocalUserId()
         {
             // TRAVA DE SEGURANÇA: Se o ID estiver vazio, retorna nulo para não quebrar a SDK
             string userIdStr = SessionManager.Instance?.GetUserId();
@@ -468,7 +473,7 @@ namespace ExoBeasts.Multiplayer.Lobby
                     {
                         PopulateMembersFromDetails(freshDetails, lobbyInfo.hostProductUserId);
                         // [SYNC-FIX] Verificar atributos imediatamente após o join (proativo)
-                        ProcessLobbyAttributes(freshDetails);
+                        _dispatcher?.ProcessLobbyAttributes(freshDetails);
                         freshDetails.Release();
                     }
                     else
@@ -736,7 +741,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         /// Retorna o indice do personagem escolhido pelo jogador local,
         /// lendo do proprio slot em _members. Fallback: 0.
         /// </summary>
-        private int GetMyCharacterIndex()
+        internal int GetMyCharacterIndex()
         {
             string myUid = SessionManager.Instance?.GetUserId();
             if (!string.IsNullOrEmpty(myUid) &&
@@ -792,9 +797,18 @@ namespace ExoBeasts.Multiplayer.Lobby
 
             // Segurança: apenas o host do lobby EOS pode disparar StartMatch.
             string myUid = SessionManager.Instance?.GetUserId() ?? "";
-            if (!string.IsNullOrEmpty(myUid) && _currentLobby != null && _currentLobby.hostProductUserId != myUid)
+            if (string.IsNullOrEmpty(myUid))
+            {
+                const string message = "Usuario nao autenticado. Faca login antes de iniciar a partida.";
+                Debug.LogError("[LobbyManager] StartMatch abortado: sessao local sem ProductUserId");
+                OnError?.Invoke(message);
+                return;
+            }
+
+            if (_currentLobby != null && _currentLobby.hostProductUserId != myUid)
             {
                 Debug.LogError($"[LobbyManager] Abortado: Player local ({myUid}) nao e o host da sala ({_currentLobby.hostProductUserId})");
+                OnError?.Invoke("Apenas o host da sala pode iniciar a partida.");
                 return;
             }
 
@@ -808,379 +822,6 @@ namespace ExoBeasts.Multiplayer.Lobby
             );
         }
 
-
-        private void RegisterNotifications()
-        {
-#if !EOS_DISABLE
-            var lobbyInterface = GetLobbyInterface();
-            if (lobbyInterface == null) return;
-
-            var memberOpts = new AddNotifyLobbyMemberStatusReceivedOptions();
-            _memberStatusHandle = lobbyInterface.AddNotifyLobbyMemberStatusReceived(
-                ref memberOpts, null, OnMemberStatusChanged);
-
-            var updateOpts = new AddNotifyLobbyUpdateReceivedOptions();
-            _lobbyUpdateHandle = lobbyInterface.AddNotifyLobbyUpdateReceived(
-                ref updateOpts, null, OnLobbyAttributeUpdated);
-
-            var memberUpdateOpts = new AddNotifyLobbyMemberUpdateReceivedOptions();
-            _memberUpdateHandle = lobbyInterface.AddNotifyLobbyMemberUpdateReceived(
-                ref memberUpdateOpts, null, OnMemberAttributeChanged);
-
-            Debug.Log("[LobbyManager] Notificacoes EOS registradas");
-#endif
-        }
-
-        private void UnregisterNotifications()
-        {
-#if !EOS_DISABLE
-            var lobbyInterface = GetLobbyInterface();
-            if (lobbyInterface == null) return;
-
-            if (_memberStatusHandle != 0)
-                lobbyInterface.RemoveNotifyLobbyMemberStatusReceived(_memberStatusHandle);
-            if (_lobbyUpdateHandle != 0)
-                lobbyInterface.RemoveNotifyLobbyUpdateReceived(_lobbyUpdateHandle);
-            if (_memberUpdateHandle != 0)
-                lobbyInterface.RemoveNotifyLobbyMemberUpdateReceived(_memberUpdateHandle);
-#endif
-        }
-
-#if !EOS_DISABLE
-        private void OnMemberStatusChanged(ref LobbyMemberStatusReceivedCallbackInfo info)
-        {
-            if (!_isInLobby || _currentLobby == null) return;
-            if (info.LobbyId != _currentLobby.lobbyId) return;
-
-            string userId = info.TargetUserId?.ToString() ?? "";
-
-            switch (info.CurrentStatus)
-            {
-                case LobbyMemberStatus.Joined:
-                    if (!_members.Exists(m => m.productUserId == userId))
-                    {
-                        // Tentar ler o DISPLAY_NAME do atributo de membro (definido pelo cliente ao entrar)
-                        // Pode nao estar disponivel imediatamente — fallback para ID curto
-                        string displayName = ReadMemberDisplayName(info.LobbyId, userId);
-                        if (string.IsNullOrEmpty(displayName))
-                            displayName = userId.Length > 8 ? $"Jogador_{userId.Substring(0, 8)}" : userId;
-
-                        var member = new LobbyMember(userId, displayName);
-                        _members.Add(member);
-                        OnMemberJoined?.Invoke(member);
-                    }
-                    Debug.Log($"[LobbyManager] Membro entrou: {userId}");
-                    break;
-
-                case LobbyMemberStatus.Left:
-                case LobbyMemberStatus.Disconnected:
-                case LobbyMemberStatus.Kicked:
-                    var leaving = _members.Find(m => m.productUserId == userId);
-                    if (leaving != null)
-                    {
-                        _members.Remove(leaving);
-                        OnMemberLeft?.Invoke(leaving);
-                    }
-                    Debug.Log($"[LobbyManager] Membro saiu ({info.CurrentStatus}): {userId}");
-                    break;
-
-                case LobbyMemberStatus.Closed:
-                    Debug.Log("[LobbyManager] Lobby fechado pelo host");
-                    ClearLobbyState();
-                    OnLobbyLeft?.Invoke();
-                    break;
-            }
-        }
-
-        // Chamado quando atributos de UM MEMBRO mudam (ex: IS_READY, CHARACTER_INDEX)
-        private void OnMemberAttributeChanged(ref LobbyMemberUpdateReceivedCallbackInfo info)
-        {
-            if (ExoBeasts.Managers.GameModeManager.CurrentMode != ExoBeasts.Managers.GameMode.Multiplayer)
-            {
-                CancelPendingClientConnect();
-                return;
-            }
-
-            if (!_isInLobby || _currentLobby == null) return;
-            if (info.LobbyId != _currentLobby.lobbyId) return;
-
-            string userId = info.TargetUserId?.ToString() ?? "";
-            var member = _members.Find(m => m.productUserId == userId);
-            if (member == null) return;
-
-            var lobbyInterface = GetLobbyInterface();
-            if (lobbyInterface == null) return;
-
-            var detailsOpts = new CopyLobbyDetailsHandleOptions
-            {
-                LobbyId = info.LobbyId,
-                LocalUserId = GetLocalUserId(),
-            };
-
-            if (lobbyInterface.CopyLobbyDetailsHandle(ref detailsOpts, out var details) != Result.Success)
-                return;
-
-            bool oldReady = member.isReady;
-            string oldDisplayName = member.displayName;
-
-            // A1 audit: try/finally garante release mesmo se CopyMemberAttributeByKey
-            // lancar exceptionalmente. Antes, o Release() podia ficar inalcancavel.
-            try
-            {
-                var readyOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
-                {
-                    TargetUserId = info.TargetUserId,
-                    AttrKey = MemberAttributes.IS_READY,
-                };
-                if (details.CopyMemberAttributeByKey(ref readyOpts, out var readyAttr) == Result.Success && readyAttr.HasValue)
-                    bool.TryParse(readyAttr.Value.Data?.Value.AsUtf8, out member.isReady);
-
-                // Atualizar displayName silenciosamente se ainda era um ID curto (fallback)
-                var nameOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
-                {
-                    TargetUserId = info.TargetUserId,
-                    AttrKey = MemberAttributes.DISPLAY_NAME,
-                };
-                if (details.CopyMemberAttributeByKey(ref nameOpts, out var nameAttr) == Result.Success && nameAttr.HasValue)
-                {
-                    string newName = nameAttr.Value.Data?.Value.AsUtf8 ?? "";
-                    if (!string.IsNullOrEmpty(newName))
-                        member.displayName = newName;
-                }
-
-                var charOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
-                {
-                    TargetUserId = info.TargetUserId,
-                    AttrKey = MemberAttributes.CHARACTER_INDEX,
-                };
-                if (details.CopyMemberAttributeByKey(ref charOpts, out var charAttr) == Result.Success && charAttr.HasValue)
-                {
-                    string charVal = charAttr.Value.Data?.Value.AsUtf8 ?? "";
-                    if (int.TryParse(charVal, out int charIdx))
-                        member.selectedCharacterIndex = charIdx;
-                }
-
-                // [SYNC-FIX] Verificar se a partida já começou (proativo)
-                ProcessLobbyAttributes(details);
-            }
-            finally
-            {
-                details.Release();
-            }
-
-            // Notifica UI quando isReady ou displayName muda.
-            // displayName chega assíncrono (SetMemberAttribute após join) — deve re-renderizar.
-            if (member.isReady != oldReady || member.displayName != oldDisplayName)
-            {
-                Debug.Log($"[LobbyManager] Membro atualizado: {userId} | isReady={member.isReady} | nome={member.displayName}");
-                OnMemberUpdated?.Invoke(member);
-            }
-        }
-
-        // Chamado quando atributos do lobby mudam (clientes detectam SERVER_ADDRESS aqui)
-        private void OnLobbyAttributeUpdated(ref LobbyUpdateReceivedCallbackInfo info)
-        {
-            if (ExoBeasts.Managers.GameModeManager.CurrentMode != ExoBeasts.Managers.GameMode.Multiplayer)
-            {
-                CancelPendingClientConnect();
-                return;
-            }
-
-            Debug.Log($"[LobbyManager][DBG] OnLobbyAttributeUpdated — LobbyId={info.LobbyId} | _isInLobby={_isInLobby} | currentLobby={_currentLobby?.lobbyId ?? "null"}");
-
-            if (!_isInLobby || _currentLobby == null)
-            {
-                Debug.LogWarning("[LobbyManager][DBG] Ignorado: nao esta em lobby ou _currentLobby nulo");
-                return;
-            }
-            if (info.LobbyId != _currentLobby.lobbyId)
-            {
-                Debug.LogWarning($"[LobbyManager][DBG] Ignorado: LobbyId nao corresponde ({info.LobbyId} != {_currentLobby.lobbyId})");
-                return;
-            }
-
-            Debug.Log($"[LobbyManager] Notificacao de atributo recebida para Lobby {info.LobbyId}. Verificando estado da rede...");
-
-            var lobbyInterface = GetLobbyInterface();
-            var detailsOpts = new CopyLobbyDetailsHandleOptions
-            {
-                LobbyId = info.LobbyId,
-                LocalUserId = GetLocalUserId(),
-            };
-
-            var copyResult = lobbyInterface.CopyLobbyDetailsHandle(ref detailsOpts, out var details);
-            if (copyResult != Result.Success)
-            {
-                Debug.LogError($"[LobbyManager][DBG] CopyLobbyDetailsHandle falhou: {copyResult}");
-                return;
-            }
-
-            try
-            {
-                ProcessLobbyAttributes(details);
-            }
-            finally
-            {
-                details.Release();
-            }
-        }
-
-        /// <summary>
-        /// [SYNC-FIX] Extrai atributos de rede do lobby e inicia conexão se STATE=InGame.
-        /// Centralizado para ser chamado por notificações e proativamente no Join.
-        /// </summary>
-        private void ProcessLobbyAttributes(LobbyDetails details)
-        {
-            if (details == null) return;
-
-            if (ExoBeasts.Managers.GameModeManager.CurrentMode != ExoBeasts.Managers.GameMode.Multiplayer)
-            {
-                CancelPendingClientConnect();
-                return;
-            }
-
-            // O host do lobby EOS nunca conecta como cliente NGO.
-            string _myUid = SessionManager.Instance?.GetUserId() ?? "";
-            if (!string.IsNullOrEmpty(_myUid) && _currentLobby != null && _currentLobby.hostProductUserId == _myUid)
-            {
-                return;
-            }
-
-            // Ja conectado como cliente ativo num jogo real — nao reconectar.
-            // IsConnectedClient so vira true apos handshake completo com o servidor.
-            // IsHost=true sozinho NAO bloqueia: pode ser um StartHost() do MenuScene que
-            // precisa ser derrubado — ConnectClientCoroutine faz o Shutdown() antes de StartClient().
-            if (NetworkManager.Singleton != null &&
-                NetworkManager.Singleton.IsClient &&
-                !NetworkManager.Singleton.IsHost &&
-                NetworkManager.Singleton.IsConnectedClient)
-            {
-                return;
-            }
-
-            // Verificar LOBBY_STATE
-            var stateAttrOpts = new LobbyDetailsCopyAttributeByKeyOptions { AttrKey = LobbyAttributes.LOBBY_STATE };
-            if (details.CopyAttributeByKey(ref stateAttrOpts, out var stateAttr) == Result.Success && stateAttr.HasValue)
-            {
-                string stateStr = stateAttr.Value.Data?.Value.AsUtf8 ?? "";
-                if (stateStr != LobbyState.InGame.ToString() && stateStr != "Starting")
-                {
-                    // Se não está em InGame ou Starting, ignora (ainda esperando)
-                    return;
-                }
-                Debug.Log($"[LobbyManager][DBG] Lobby em estado '{stateStr}' — processando dados de conexão...");
-            }
-
-            // Verificar RELAY_CODE primeiro
-            var relayAttrOpts = new LobbyDetailsCopyAttributeByKeyOptions { AttrKey = LobbyAttributes.RELAY_CODE };
-            var relayAttrResult = details.CopyAttributeByKey(ref relayAttrOpts, out var relayAttr);
-            if (relayAttrResult == Result.Success && relayAttr.HasValue)
-            {
-                string relayCode = relayAttr.Value.Data?.Value.AsUtf8 ?? "";
-                if (ExoBeasts.Multiplayer.GameServer.MatchSessionLauncher.IsUsableRelayCode(relayCode))
-                {
-                    Debug.Log($"[LobbyManager] Conectando via Relay: {relayCode}");
-                    int myChar = GetMyCharacterIndex();
-                    ExoBeasts.Multiplayer.GameServer.MatchSessionLauncher.Instance.ConnectAsClientViaRelay(
-                        relayCode, myChar, (err) => OnError?.Invoke(err));
-                    return;
-                }
-                else if (!string.IsNullOrEmpty(relayCode))
-                {
-                    Debug.Log("[LobbyManager] RELAY_CODE sentinel/invalidado. Usando fallback SERVER_ADDRESS.");
-                }
-            }
-
-            // Fallback: SERVER_ADDRESS
-            var addrAttrOpts = new LobbyDetailsCopyAttributeByKeyOptions { AttrKey = LobbyAttributes.SERVER_ADDRESS };
-            var addrResult = details.CopyAttributeByKey(ref addrAttrOpts, out var addrAttr);
-            if (addrResult == Result.Success && addrAttr.HasValue)
-            {
-                string serverAddress = addrAttr.Value.Data?.Value.AsUtf8 ?? "";
-                if (!string.IsNullOrEmpty(serverAddress))
-                {
-                    ushort port = ExoBeasts.Multiplayer.GameServer.MatchSessionLauncher.DEFAULT_PORT;
-                    addrAttrOpts.AttrKey = LobbyAttributes.SERVER_PORT;
-                    if (details.CopyAttributeByKey(ref addrAttrOpts, out var portAttr) == Result.Success && portAttr.HasValue)
-                        port = (ushort)(portAttr.Value.Data?.Value.AsInt64 ?? ExoBeasts.Multiplayer.GameServer.MatchSessionLauncher.DEFAULT_PORT);
-
-                    Debug.Log($"[LobbyManager] Conectando via IP: {serverAddress}:{port}");
-                    int myChar = GetMyCharacterIndex();
-                    ExoBeasts.Multiplayer.GameServer.MatchSessionLauncher.Instance.ConnectAsClientViaIp(
-                        serverAddress, port, myChar, (err) => OnError?.Invoke(err));
-                }
-            }
-        }
-
-
-
-#endif
-
-#if !EOS_DISABLE
-        private static void AddStringAttr(LobbyModification mod, string key, string value, LobbyAttributeVisibility vis)
-        {
-            var opts = new LobbyModificationAddAttributeOptions
-            {
-                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsUtf8 = value } },
-                Visibility = vis,
-            };
-            mod.AddAttribute(ref opts);
-        }
-
-        private static void AddInt64Attr(LobbyModification mod, string key, long value, LobbyAttributeVisibility vis)
-        {
-            var opts = new LobbyModificationAddAttributeOptions
-            {
-                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsInt64 = value } },
-                Visibility = vis,
-            };
-            mod.AddAttribute(ref opts);
-        }
-
-        private static void AddStringMemberAttr(LobbyModification mod, string key, string value, LobbyAttributeVisibility vis)
-        {
-            var opts = new LobbyModificationAddMemberAttributeOptions
-            {
-                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsUtf8 = value } },
-                Visibility = vis,
-            };
-            mod.AddMemberAttribute(ref opts);
-        }
-
-        private string ReadMemberDisplayName(string lobbyId, string userId)
-        {
-            var lobbyInterface = GetLobbyInterface();
-            if (lobbyInterface == null) return "";
-
-            var detailsOpts = new CopyLobbyDetailsHandleOptions
-            {
-                LobbyId = lobbyId,
-                LocalUserId = GetLocalUserId(),
-            };
-
-            if (lobbyInterface.CopyLobbyDetailsHandle(ref detailsOpts, out var details) != Result.Success)
-                return "";
-
-            // A3 audit: try/finally protege Release contra exceptions em CopyMemberAttributeByKey
-            // ou ProductUserId.FromString.
-            try
-            {
-                var attrOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
-                {
-                    TargetUserId = ProductUserId.FromString(userId),
-                    AttrKey = MemberAttributes.DISPLAY_NAME,
-                };
-
-                if (details.CopyMemberAttributeByKey(ref attrOpts, out var attr) == Result.Success && attr.HasValue)
-                    return attr.Value.Data?.Value.AsUtf8 ?? "";
-
-                return "";
-            }
-            finally
-            {
-                details.Release();
-            }
-        }
 
         // EOS nao emite Joined para membros preexistentes — itera manualmente
         private void PopulateMembersFromDetails(LobbyDetails details, string hostUserId)
@@ -1258,9 +899,40 @@ namespace ExoBeasts.Multiplayer.Lobby
 
             onResult?.Invoke(result);
         }
+
+#if !EOS_DISABLE
+        private static void AddStringAttr(LobbyModification mod, string key, string value, LobbyAttributeVisibility vis)
+        {
+            var opts = new LobbyModificationAddAttributeOptions
+            {
+                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsUtf8 = value } },
+                Visibility = vis,
+            };
+            mod.AddAttribute(ref opts);
+        }
+
+        private static void AddInt64Attr(LobbyModification mod, string key, long value, LobbyAttributeVisibility vis)
+        {
+            var opts = new LobbyModificationAddAttributeOptions
+            {
+                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsInt64 = value } },
+                Visibility = vis,
+            };
+            mod.AddAttribute(ref opts);
+        }
+
+        private static void AddStringMemberAttr(LobbyModification mod, string key, string value, LobbyAttributeVisibility vis)
+        {
+            var opts = new LobbyModificationAddMemberAttributeOptions
+            {
+                Attribute = new AttributeData { Key = key, Value = new AttributeDataValue { AsUtf8 = value } },
+                Visibility = vis,
+            };
+            mod.AddMemberAttribute(ref opts);
+        }
 #endif
 
-        private void ClearLobbyState()
+        internal void ClearLobbyState()
         {
             CancelPendingClientConnect();
             _isInLobby = false;
@@ -1314,6 +986,47 @@ namespace ExoBeasts.Multiplayer.Lobby
         public bool IsInLobby() => _isInLobby;
         public LobbyInfo GetCurrentLobby() => _currentLobby;
         public List<LobbyMember> GetMembers() => GetOrderedMembers();
+
+        internal LobbyMember FindMutableMember(string productUserId)
+        {
+            if (string.IsNullOrEmpty(productUserId))
+                return null;
+
+            return _members.Find(member => member.productUserId == productUserId);
+        }
+
+        internal bool TryAddMemberFromNotification(LobbyMember member)
+        {
+            if (member == null || string.IsNullOrEmpty(member.productUserId))
+                return false;
+
+            if (FindMutableMember(member.productUserId) != null)
+                return false;
+
+            if (_currentLobby != null && member.productUserId == _currentLobby.hostProductUserId)
+                member.isHost = true;
+
+            _members.Add(member);
+            RefreshCurrentPlayerCountFromMembers();
+            return true;
+        }
+
+        internal LobbyMember TryRemoveMemberFromNotification(string productUserId)
+        {
+            var member = FindMutableMember(productUserId);
+            if (member == null)
+                return null;
+
+            _members.Remove(member);
+            RefreshCurrentPlayerCountFromMembers();
+            return member;
+        }
+
+        internal void RefreshCurrentPlayerCountFromMembers()
+        {
+            if (_currentLobby != null)
+                _currentLobby.currentPlayers = _members.Count;
+        }
 
         public List<LobbyMember> GetOrderedMembers()
         {

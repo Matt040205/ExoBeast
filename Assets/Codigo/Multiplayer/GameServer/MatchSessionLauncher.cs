@@ -7,6 +7,7 @@ using Unity.Services.Relay.Models;
 using UnityEngine.SceneManagement;
 using ExoBeasts.Multiplayer.Core;
 using ExoBeasts.Multiplayer.Lobby;
+using ExoBeasts.Multiplayer.Auth;
 
 #if !EOS_DISABLE
 using Epic.OnlineServices;
@@ -58,6 +59,21 @@ namespace ExoBeasts.Multiplayer.GameServer
                    !string.Equals(relayCode, NO_RELAY_CODE, System.StringComparison.Ordinal);
         }
 
+        private static bool TryGetActiveLobby(string expectedLobbyId, out LobbyInfo activeLobby)
+        {
+            activeLobby = null;
+
+            if (string.IsNullOrEmpty(expectedLobbyId))
+                return false;
+
+            var lobbyManager = LobbyManager.TryGetExistingInstance();
+            if (lobbyManager == null || !lobbyManager.IsInLobby())
+                return false;
+
+            activeLobby = lobbyManager.GetCurrentLobby();
+            return activeLobby != null && activeLobby.lobbyId == expectedLobbyId;
+        }
+
         public void CancelPendingConnect()
         {
             if (_pendingClientConnect != null)
@@ -106,12 +122,42 @@ namespace ExoBeasts.Multiplayer.GameServer
         }
 
         private System.Collections.IEnumerator LaunchHostCoroutine(
-            NetworkManager nm, 
-            string mapOverride, 
-            LobbyInfo currentLobby, 
+            NetworkManager nm,
+            string mapOverride,
+            LobbyInfo currentLobby,
             int computedHostCharIndex,
             System.Action<string> onError)
         {
+            if (currentLobby == null || string.IsNullOrEmpty(currentLobby.lobbyId))
+            {
+                Debug.LogError("[MatchSessionLauncher] LaunchAsHost abortado: lobby atual nulo ou sem lobbyId.");
+                onError?.Invoke("Lobby atual invalido para iniciar partida");
+                yield break;
+            }
+
+            string lobbyId = currentLobby.lobbyId;
+            string lobbyHostProductUserId = currentLobby.hostProductUserId;
+            string fallbackMapName = currentLobby.mapName;
+            int maxPlayers = currentLobby.maxPlayers > 0 ? currentLobby.maxPlayers : 1;
+
+#if !EOS_DISABLE
+            var lobbyInterface = GetLobbyInterface();
+            if (lobbyInterface == null)
+            {
+                Debug.LogError("[MatchSessionLauncher] LaunchAsHost abortado: EOS LobbyInterface indisponivel.");
+                onError?.Invoke("EOS nao inicializado");
+                yield break;
+            }
+
+            var localUserId = GetLocalUserId(lobbyHostProductUserId);
+            if (localUserId == null || !localUserId.IsValid())
+            {
+                Debug.LogError("[MatchSessionLauncher] LaunchAsHost abortado: LocalUserId EOS invalido.");
+                onError?.Invoke("Usuario EOS invalido para iniciar partida");
+                yield break;
+            }
+#endif
+
             if (nm.IsListening || nm.IsHost || nm.IsClient || nm.IsServer)
             {
                 Debug.LogWarning($"[MatchSessionLauncher] NGO ja estava em execucao (IsListening={nm.IsListening}, IsHost={nm.IsHost}, IsClient={nm.IsClient}). Shutdown antes de reiniciar...");
@@ -191,7 +237,7 @@ namespace ExoBeasts.Multiplayer.GameServer
 
             if (UGSBootstrap.Instance != null && UGSBootstrap.Instance.IsReady)
             {
-                var allocTask = RelayService.Instance.CreateAllocationAsync(currentLobby.maxPlayers - 1);
+                var allocTask = RelayService.Instance.CreateAllocationAsync(maxPlayers - 1);
                 yield return new WaitUntil(() => allocTask.IsCompleted);
                 if (!allocTask.IsFaulted && allocTask.Result != null)
                 {
@@ -233,6 +279,12 @@ namespace ExoBeasts.Multiplayer.GameServer
             }
 #endif
 
+            if (!TryGetActiveLobby(lobbyId, out _))
+            {
+                Debug.LogWarning($"[MatchSessionLauncher] StartMatch cancelado antes do StartHost: lobby '{lobbyId}' nao esta mais ativo.");
+                yield break;
+            }
+
             CancelPendingConnect();
 
             if (nm.IsListening || nm.IsClient || nm.IsHost || nm.IsServer)
@@ -261,16 +313,18 @@ namespace ExoBeasts.Multiplayer.GameServer
             Debug.Log($"[MatchSessionLauncher] Host NGO ativo. Publicando no lobby: {localIp}:{port}");
 
 #if !EOS_DISABLE
-            var lobbyInterface = GetLobbyInterface();
             var modOpts = new UpdateLobbyModificationOptions
             {
-                LocalUserId = GetLocalUserId(),
-                LobbyId = currentLobby.lobbyId,
+                LocalUserId = localUserId,
+                LobbyId = lobbyId,
             };
 
-            if (lobbyInterface.UpdateLobbyModification(ref modOpts, out var mod) != Result.Success)
+            var modificationResult = lobbyInterface.UpdateLobbyModification(ref modOpts, out var mod);
+            if (modificationResult != Result.Success)
             {
-                Debug.LogError("[MatchSessionLauncher] Falha ao obter LobbyModification para StartMatch");
+                Debug.LogError($"[MatchSessionLauncher] Falha ao obter LobbyModification para StartMatch: {modificationResult}");
+                onError?.Invoke($"Falha ao preparar lobby para iniciar partida: {modificationResult}");
+                nm.Shutdown();
                 yield break;
             }
 
@@ -294,16 +348,27 @@ namespace ExoBeasts.Multiplayer.GameServer
                     mod.Release();
                     if (info.ResultCode == Result.Success)
                     {
-                        string sceneName = !string.IsNullOrEmpty(capturedMapOverride) ? capturedMapOverride : currentLobby.mapName;
-                        int expectedPlayers = currentLobby.currentPlayers > 0 ? currentLobby.currentPlayers : 1;
+                        if (!TryGetActiveLobby(lobbyId, out var activeLobby))
+                        {
+                            Debug.LogWarning($"[MatchSessionLauncher] UpdateLobby retornou apos o lobby '{lobbyId}' deixar de estar ativo. Abortando carregamento da partida.");
+                            if (nm != null && nm.IsHost)
+                                nm.Shutdown();
+                            return;
+                        }
+
+                        string sceneName = !string.IsNullOrEmpty(capturedMapOverride) ? capturedMapOverride : activeLobby.mapName;
+                        if (string.IsNullOrEmpty(sceneName))
+                            sceneName = fallbackMapName;
+
+                        int expectedPlayers = activeLobby.currentPlayers > 0 ? activeLobby.currentPlayers : 1;
                         Debug.Log($"[MatchSessionLauncher] Atributos publicados. Aguardando {expectedPlayers} jogador(es) conectarem ao NGO antes de carregar '{sceneName}'...");
-                        StartCoroutine(WaitForAllClientsAndLoadScene(sceneName, expectedPlayers, onError));
+                        StartCoroutine(WaitForAllClientsAndLoadScene(sceneName, expectedPlayers, lobbyId, onError));
                     }
                     else
                     {
                         Debug.LogError($"[MatchSessionLauncher] Falha ao publicar endereco: {info.ResultCode}");
                         onError?.Invoke($"Falha ao iniciar partida: {info.ResultCode}");
-                        NetworkManager.Singleton.Shutdown();
+                        NetworkManager.Singleton?.Shutdown();
                     }
                 });
                 scheduled = true;
@@ -322,12 +387,19 @@ namespace ExoBeasts.Multiplayer.GameServer
         /// Timeout de 25s como fallback para nao travar o host se um client desconectar.
         /// </summary>
         private System.Collections.IEnumerator WaitForAllClientsAndLoadScene(
-            string sceneName, int expectedPlayerCount, System.Action<string> onError)
+            string sceneName, int expectedPlayerCount, string lobbyId, System.Action<string> onError)
         {
             var nm = NetworkManager.Singleton;
             if (nm == null || !nm.IsHost)
             {
                 Debug.LogWarning("[MatchSessionLauncher] WaitForAllClientsAndLoadScene abortado na entrada: nao e Host.");
+                yield break;
+            }
+
+            if (!TryGetActiveLobby(lobbyId, out _))
+            {
+                Debug.LogWarning($"[MatchSessionLauncher] WaitForAllClientsAndLoadScene abortado: lobby '{lobbyId}' nao esta mais ativo.");
+                nm.Shutdown();
                 yield break;
             }
 
@@ -354,6 +426,13 @@ namespace ExoBeasts.Multiplayer.GameServer
                     if (nm == null || !nm.IsHost)
                     {
                         Debug.LogWarning("[MatchSessionLauncher] WaitForAllClientsAndLoadScene cancelado: nao e mais Host.");
+                        yield break;
+                    }
+
+                    if (!TryGetActiveLobby(lobbyId, out _))
+                    {
+                        Debug.LogWarning($"[MatchSessionLauncher] WaitForAllClientsAndLoadScene cancelado: lobby '{lobbyId}' foi limpo ou trocado.");
+                        nm.Shutdown();
                         yield break;
                     }
 
@@ -390,6 +469,13 @@ namespace ExoBeasts.Multiplayer.GameServer
             if (nm == null || !nm.IsHost)
             {
                 Debug.LogWarning("[MatchSessionLauncher] WaitForAllClientsAndLoadScene abortado antes do LoadScene: host inativo.");
+                yield break;
+            }
+
+            if (!TryGetActiveLobby(lobbyId, out _))
+            {
+                Debug.LogWarning($"[MatchSessionLauncher] LoadScene abortado: lobby '{lobbyId}' nao esta mais ativo.");
+                nm.Shutdown();
                 yield break;
             }
 
@@ -630,7 +716,35 @@ namespace ExoBeasts.Multiplayer.GameServer
 
 #if !EOS_DISABLE
         private LobbyInterface GetLobbyInterface() => EOSManager.Instance.GetEOSPlatformInterface()?.GetLobbyInterface();
-        private ProductUserId GetLocalUserId() => EOSManager.Instance.GetProductUserId();
+
+        private ProductUserId GetLocalUserId(string hostProductUserId)
+        {
+            string userIdStr = SessionManager.Instance?.GetUserId();
+
+            if (!string.IsNullOrEmpty(userIdStr) &&
+                !string.IsNullOrEmpty(hostProductUserId) &&
+                hostProductUserId != userIdStr)
+            {
+                Debug.LogError($"[MatchSessionLauncher] Usuario local ({userIdStr}) nao e host do lobby ({hostProductUserId}).");
+                return null;
+            }
+
+            if (string.IsNullOrEmpty(userIdStr))
+                userIdStr = hostProductUserId;
+
+            if (string.IsNullOrEmpty(userIdStr))
+                return null;
+
+            try
+            {
+                return ProductUserId.FromString(userIdStr);
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogError($"[MatchSessionLauncher] ProductUserId local invalido: {exception.Message}");
+                return null;
+            }
+        }
 
         private static void AddStringAttr(LobbyModification mod, string key, string value, LobbyAttributeVisibility vis)
         {
