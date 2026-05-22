@@ -61,7 +61,7 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         private LobbyInfo _currentLobby;
         private bool _isInLobby;
-        private List<LobbyMember> _members = new List<LobbyMember>();
+        internal LobbyMembershipService _membershipService;
 
         // EOS exige LobbyDetails handle para JoinLobby, nao apenas string ID
         private readonly Dictionary<string, LobbyDetails> _detailsCache =
@@ -105,6 +105,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         {
             // EOS pode ainda nao estar inicializado (init assincrona via coroutine no EOSManagerWrapper)
             _eosCache = Core.EOSManagerWrapper.Instance;
+            _membershipService = new LobbyMembershipService(this);
             _dispatcher = new LobbyNotificationDispatcher(this);
             if (_eosCache.IsInitialized)
                 _dispatcher.RegisterNotifications();
@@ -198,8 +199,8 @@ namespace ExoBeasts.Multiplayer.Lobby
 
                 SetLobbyAttributes(lobbyId, settings, () =>
                 {
-                    _members.Clear();
-                    _members.Add(new LobbyMember(
+                    _membershipService.Clear();
+                    _membershipService.AddMember(new LobbyMember(
                         SessionManager.Instance.GetUserId(),
                         SessionManager.Instance.GetDisplayName(),
                         host: true));
@@ -460,7 +461,7 @@ namespace ExoBeasts.Multiplayer.Lobby
                 PopulateLobbyInfoFromDetails(lobbyId, details, lobbyInfo =>
                 {
                     _currentLobby = lobbyInfo;
-                    _members.Clear();
+                    _membershipService.Clear();
 
                     // O handle 'details' veio da busca e nao contem lista de membros.
                     // Apos o join, busca um handle fresco via CopyLobbyDetailsHandle.
@@ -471,7 +472,7 @@ namespace ExoBeasts.Multiplayer.Lobby
                     };
                     if (GetLobbyInterface()?.CopyLobbyDetailsHandle(ref freshOpts, out var freshDetails) == Result.Success)
                     {
-                        PopulateMembersFromDetails(freshDetails, lobbyInfo.hostProductUserId);
+                        _membershipService.PopulateMembersFromDetails(freshDetails, lobbyInfo.hostProductUserId);
                         // [SYNC-FIX] Verificar atributos imediatamente após o join (proativo)
                         _dispatcher?.ProcessLobbyAttributes(freshDetails);
                         freshDetails.Release();
@@ -479,7 +480,7 @@ namespace ExoBeasts.Multiplayer.Lobby
                     else
                     {
                         Debug.LogWarning("[LobbyManager] CopyLobbyDetailsHandle falhou pos-join, adicionando jogador local manualmente");
-                        _members.Add(new LobbyMember(
+                        _membershipService.AddMember(new LobbyMember(
                             SessionManager.Instance.GetUserId(),
                             SessionManager.Instance.GetDisplayName()));
                     }
@@ -705,7 +706,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             string myUid = SessionManager.Instance?.GetUserId();
             if (!string.IsNullOrEmpty(myUid))
             {
-                var me = _members.Find(m => m.productUserId == myUid);
+                var me = _membershipService.FindMutableMember(myUid);
                 if (me != null)
                 {
                     me.isReady = ready;
@@ -725,7 +726,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             string myUid = SessionManager.Instance?.GetUserId();
             if (!string.IsNullOrEmpty(myUid))
             {
-                var me = _members.Find(m => m.productUserId == myUid);
+                var me = _membershipService.FindMutableMember(myUid);
                 if (me != null)
                 {
                     me.selectedCharacterIndex = characterIndex;
@@ -823,51 +824,6 @@ namespace ExoBeasts.Multiplayer.Lobby
         }
 
 
-        // EOS nao emite Joined para membros preexistentes — itera manualmente
-        private void PopulateMembersFromDetails(LobbyDetails details, string hostUserId)
-        {
-            string localUserId = SessionManager.Instance.GetUserId();
-
-            var countOpts = new LobbyDetailsGetMemberCountOptions();
-            uint count = details.GetMemberCount(ref countOpts);
-
-            for (uint i = 0; i < count; i++)
-            {
-                var byIndexOpts = new LobbyDetailsGetMemberByIndexOptions { MemberIndex = i };
-                var memberId = details.GetMemberByIndex(ref byIndexOpts);
-                if (memberId == null) continue;
-
-                string userId = memberId.ToString();
-                bool isHost = userId == hostUserId;
-                string displayName;
-
-                // Jogador local: usa nome da sessao (mais confiavel que o atributo ainda nao definido)
-                if (userId == localUserId)
-                {
-                    displayName = SessionManager.Instance.GetDisplayName();
-                }
-                else
-                {
-                    var attrOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
-                    {
-                        TargetUserId = memberId,
-                        AttrKey = MemberAttributes.DISPLAY_NAME,
-                    };
-                    displayName = "";
-                    if (details.CopyMemberAttributeByKey(ref attrOpts, out var attr) == Result.Success && attr.HasValue)
-                        displayName = attr.Value.Data?.Value.AsUtf8 ?? "";
-                }
-
-                if (string.IsNullOrEmpty(displayName))
-                    displayName = isHost ? "Host" : (userId.Length > 8 ? $"Jogador_{userId.Substring(0, 8)}" : userId);
-
-                if (!_members.Exists(m => m.productUserId == userId))
-                    _members.Add(new LobbyMember(userId, displayName, host: isHost));
-            }
-
-            Debug.Log($"[LobbyManager] Membros carregados da sala: {_members.Count}");
-        }
-
         private static void PopulateLobbyInfoFromDetails(string lobbyId, LobbyDetails details, Action<LobbyInfo> onResult)
         {
             var result = new LobbyInfo { lobbyId = lobbyId };
@@ -937,7 +893,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             CancelPendingClientConnect();
             _isInLobby = false;
             _currentLobby = null;
-            _members.Clear();
+            _membershipService.Clear();
 
             var session = SessionManager.TryGetExistingInstance();
             if (session != null)
@@ -985,75 +941,29 @@ namespace ExoBeasts.Multiplayer.Lobby
 
         public bool IsInLobby() => _isInLobby;
         public LobbyInfo GetCurrentLobby() => _currentLobby;
-        public List<LobbyMember> GetMembers() => GetOrderedMembers();
+        public List<LobbyMember> GetMembers() => _membershipService.GetMembers();
 
         internal LobbyMember FindMutableMember(string productUserId)
         {
-            if (string.IsNullOrEmpty(productUserId))
-                return null;
-
-            return _members.Find(member => member.productUserId == productUserId);
+            return _membershipService.FindMutableMember(productUserId);
         }
 
         internal bool TryAddMemberFromNotification(LobbyMember member)
         {
-            if (member == null || string.IsNullOrEmpty(member.productUserId))
-                return false;
-
-            if (FindMutableMember(member.productUserId) != null)
-                return false;
-
-            if (_currentLobby != null && member.productUserId == _currentLobby.hostProductUserId)
-                member.isHost = true;
-
-            _members.Add(member);
-            RefreshCurrentPlayerCountFromMembers();
-            return true;
+            return _membershipService.TryAddMemberFromNotification(member);
         }
 
         internal LobbyMember TryRemoveMemberFromNotification(string productUserId)
         {
-            var member = FindMutableMember(productUserId);
-            if (member == null)
-                return null;
-
-            _members.Remove(member);
-            RefreshCurrentPlayerCountFromMembers();
-            return member;
+            return _membershipService.TryRemoveMemberFromNotification(productUserId);
         }
 
         internal void RefreshCurrentPlayerCountFromMembers()
         {
-            if (_currentLobby != null)
-                _currentLobby.currentPlayers = _members.Count;
+            _membershipService.RefreshCurrentPlayerCountFromMembers();
         }
 
-        public List<LobbyMember> GetOrderedMembers()
-        {
-            List<LobbyMember> orderedMembers = new List<LobbyMember>(_members);
-            orderedMembers.Sort(CompareLobbyMembers);
-            return orderedMembers;
-        }
-
-        public int GetCanonicalMemberIndex(string productUserId)
-        {
-            if (string.IsNullOrEmpty(productUserId))
-                return -1;
-
-            return GetOrderedMembers().FindIndex(member => member.productUserId == productUserId);
-        }
-
-        private static int CompareLobbyMembers(LobbyMember left, LobbyMember right)
-        {
-            bool leftIsHost = left != null && left.isHost;
-            bool rightIsHost = right != null && right.isHost;
-
-            if (leftIsHost != rightIsHost)
-                return leftIsHost ? -1 : 1;
-
-            string leftId = left?.productUserId ?? string.Empty;
-            string rightId = right?.productUserId ?? string.Empty;
-            return string.Compare(leftId, rightId, StringComparison.Ordinal);
-        }
+        public List<LobbyMember> GetOrderedMembers() => _membershipService.GetOrderedMembers();
+        public int GetCanonicalMemberIndex(string productUserId) => _membershipService.GetCanonicalMemberIndex(productUserId);
     }
 }

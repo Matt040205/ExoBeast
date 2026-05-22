@@ -85,7 +85,7 @@ namespace ExoBeasts.Multiplayer.Lobby
                     {
                         // Tentar ler o DISPLAY_NAME do atributo de membro (definido pelo cliente ao entrar)
                         // Pode nao estar disponivel imediatamente — fallback para ID curto
-                        string displayName = ReadMemberDisplayName(info.LobbyId, userId);
+                        string displayName = _lobbyManager._membershipService.ReadMemberDisplayName(info.LobbyId, userId);
                         if (string.IsNullOrEmpty(displayName))
                             displayName = userId.Length > 8 ? $"Jogador_{userId.Substring(0, 8)}" : userId;
 
@@ -356,45 +356,6 @@ namespace ExoBeasts.Multiplayer.Lobby
                     ExoBeasts.Multiplayer.GameServer.MatchSessionLauncher.Instance.ConnectAsClientViaIp(
                         serverAddress, port, myChar, (err) => _lobbyManager.InvokeOnError(err));
                 }
-            }
-        }
-
-        private string ReadMemberDisplayName(string lobbyId, string userId)
-        {
-            var lobbyInterface = GetLobbyInterface();
-            if (lobbyInterface == null) return "";
-
-            var localUserId = _lobbyManager.GetLocalUserId();
-            if (localUserId == null || !localUserId.IsValid())
-                return "";
-
-            var detailsOpts = new CopyLobbyDetailsHandleOptions
-            {
-                LobbyId = lobbyId,
-                LocalUserId = localUserId,
-            };
-
-            if (lobbyInterface.CopyLobbyDetailsHandle(ref detailsOpts, out var details) != Result.Success)
-                return "";
-
-            // A3 audit: try/finally protege Release contra exceptions em CopyMemberAttributeByKey
-            // ou ProductUserId.FromString.
-            try
-            {
-                var attrOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
-                {
-                    TargetUserId = ProductUserId.FromString(userId),
-                    AttrKey = MemberAttributes.DISPLAY_NAME,
-                };
-
-                if (details.CopyMemberAttributeByKey(ref attrOpts, out var attr) == Result.Success && attr.HasValue)
-                    return attr.Value.Data?.Value.AsUtf8 ?? "";
-
-                return "";
-            }
-            finally
-            {
-                details.Release();
             }
         }
 
