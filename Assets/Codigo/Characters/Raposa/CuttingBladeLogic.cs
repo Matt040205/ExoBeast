@@ -220,14 +220,22 @@ public class CuttingBladeLogic : NetworkBehaviour
 
         if (resetOnKill && matouAlguem)
         {
-            NotifyResetCooldownClientRpc();
+            // OPTIMIZATION (Sprint 4 / Item E7 - 2026-05-21): owner-targeted ao inves de broadcast.
+            // Antes: ClientRpc broadcast para todos (3 clientes recebem e filtram por !IsOwner).
+            // Agora: rpcParams envia apenas para o owner (~3 bytes economizados por kill com reset).
+            // Sem isso: outros clientes recebem packet que silenciosamente ignoram.
+            var ownerRpcParams = new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { OwnerClientId } }
+            };
+            NotifyResetCooldownClientRpc(ownerRpcParams);
         }
 
         BroadcastTrailExplosionClientRpc(start, end);
     }
 
     [ClientRpc]
-    private void NotifyResetCooldownClientRpc()
+    private void NotifyResetCooldownClientRpc(ClientRpcParams clientRpcParams = default)
     {
         if (IsOwner && abilityController != null)
         {

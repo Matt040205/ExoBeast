@@ -303,12 +303,21 @@ namespace ExoBeasts.Multiplayer.GameServer
 
             Debug.Log($"[MatchSessionLauncher] Tentando StartHost: transport={transport.Protocol}, approval={nm.NetworkConfig.ConnectionApproval}");
 
+            // BUG FIX MPPM (2026-05-22): logar estado nativo vs managed das scenes antes de Start*.
+            // Em clones MPPM, SceneManager.sceneCountInBuildSettings pode retornar lista incompleta
+            // mesmo com EditorBuildSettings.scenes correto, causando HashToBuildIndex parcial no NGO.
+            NetworkSceneTableFixer.ForceNativeSync("StartHost");
+            NetworkSceneTableFixer.LogPreStart("StartHost");
+
             if (!nm.StartHost())
             {
                 Debug.LogError($"[MatchSessionLauncher] StartHost retornou false.");
                 onError?.Invoke("Falha ao iniciar Host NGO");
                 yield break;
             }
+
+            // Força repopular HashToBuildIndex via reflection imediatamente após Start.
+            NetworkSceneTableFixer.EnsureHashTablePopulated(nm, "StartHost");
 
             Debug.Log($"[MatchSessionLauncher] Host NGO ativo. Publicando no lobby: {localIp}:{port}");
 
@@ -527,8 +536,31 @@ namespace ExoBeasts.Multiplayer.GameServer
         /// </summary>
         private static bool OnVerifySceneBeforeLoading(int sceneIndex, string sceneName, LoadSceneMode loadSceneMode)
         {
-            string activeScenePath = SceneUtility.GetScenePathByBuildIndex(sceneIndex);
+            string activeScenePath = string.Empty;
+            try
+            {
+                activeScenePath = SceneUtility.GetScenePathByBuildIndex(sceneIndex);
+            }
+            catch (System.ArgumentException)
+            {
+                // Fix defensivo: Em MPPM clones com build settings dessincronizadas, o index nativo pode ser invalido.
+                // Ignoramos a excecao nativa para nao travar a maquina de estados do NGO.
+            }
+
             bool isResolvable = !string.IsNullOrEmpty(activeScenePath);
+
+#if UNITY_EDITOR
+            // Tenta usar o fallback de MPPM caso a API nativa falhe
+            if (!isResolvable && NetworkManager.Singleton != null)
+            {
+                if (ExoBeasts.Multiplayer.Core.NetworkSceneTableFixer.TryGetFallbackScenePath(sceneName, out string fallbackPath))
+                {
+                    activeScenePath = fallbackPath;
+                    isResolvable = true;
+                }
+            }
+#endif
+
             Debug.Log(
                 $"[MatchSessionLauncher.VerifySceneBeforeLoading] sceneIndex={sceneIndex} | " +
                 $"sceneName='{sceneName}' | mode={loadSceneMode} | " +
@@ -537,11 +569,10 @@ namespace ExoBeasts.Multiplayer.GameServer
 
             if (!isResolvable)
             {
-                Debug.LogError(
-                    $"[MatchSessionLauncher.VerifySceneBeforeLoading] Abortando load: sceneIndex={sceneIndex} " +
-                    $"nao resolve para nenhum path neste processo. Provavel desync EditorBuildSettings em MPPM clone. " +
-                    $"Total cenas neste processo: {SceneManager.sceneCountInBuildSettings}.");
-                return false;
+                Debug.LogWarning(
+                    $"[MatchSessionLauncher.VerifySceneBeforeLoading] sceneIndex={sceneIndex} " +
+                    $"nao resolveu nativamente. Permitindo carregamento continuar como fallback para MPPM clone.");
+                return true; // Retornar false travaria o cliente na cena atual
             }
 
             return true;
@@ -614,13 +645,24 @@ namespace ExoBeasts.Multiplayer.GameServer
             nmClient.NetworkConfig.ConnectionData = System.BitConverter.GetBytes(myCharIndex);
             Debug.Log($"[MatchSessionLauncher] Enviando charIndex={myCharIndex} no payload de conexao");
 
+            // BUG FIX MPPM (2026-05-22): ver NetworkSceneTableFixer e comentário no StartHost.
+            NetworkSceneTableFixer.ForceNativeSync("StartClient");
+            NetworkSceneTableFixer.LogPreStart("StartClient");
+
             bool clientStarted = nmClient.StartClient();
             Debug.Log($"[MatchSessionLauncher][DBG] StartClient retornou: {clientStarted} | IsClient={nmClient.IsClient} | IsListening={nmClient.IsListening}");
             if (!clientStarted)
             {
                 Debug.LogError($"[MatchSessionLauncher] StartClient retornou false. IsListening={nmClient.IsListening}, IsClient={nmClient.IsClient}");
                 onError?.Invoke("Falha ao iniciar Client NGO");
+                yield break;
             }
+
+            // CRÍTICO: regenerar HashToBuildIndex ANTES do primeiro Update do NGO processar
+            // o SceneEventType.Synchronize que o servidor manda imediatamente após StartClient.
+            // Se a tabela ficou parcial no construtor de NetworkSceneManager, o cliente lança
+            // exception ao tentar resolver LobbyScene/EscolherPersonagem hash → buildIndex.
+            NetworkSceneTableFixer.EnsureHashTablePopulated(nmClient, "StartClient");
         }
 
         private System.Collections.IEnumerator ConnectClientViaRelayCoroutine(
@@ -708,10 +750,19 @@ namespace ExoBeasts.Multiplayer.GameServer
             nmClient.NetworkConfig.ConnectionData = System.BitConverter.GetBytes(myCharIndex);
             Debug.Log($"[MatchSessionLauncher] Relay configurado. Enviando charIndex={myCharIndex}. Iniciando StartClient...");
 
+            // BUG FIX MPPM (2026-05-22): ver NetworkSceneTableFixer.
+            NetworkSceneTableFixer.ForceNativeSync("StartClient(Relay)");
+            NetworkSceneTableFixer.LogPreStart("StartClient(Relay)");
+
             bool clientStarted = nmClient.StartClient();
             Debug.Log($"[MatchSessionLauncher] StartClient (Relay) retornou: {clientStarted}");
             if (!clientStarted)
+            {
                 onError?.Invoke("Falha ao iniciar Client NGO via Relay");
+                yield break;
+            }
+
+            NetworkSceneTableFixer.EnsureHashTablePopulated(nmClient, "StartClient(Relay)");
         }
 
 #if !EOS_DISABLE

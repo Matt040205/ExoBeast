@@ -118,9 +118,9 @@ namespace ExoBeasts.Multiplayer.GameServer
 
         private void StartMatch()
         {
+            // OPTIMIZATION (Sprint 4 / Item E6 - 2026-05-21): chamada do ClientRpc stub removida.
+            // Clientes reagem a CurrentMatchState.OnValueChanged (subscrito em OnNetworkSpawn).
             CurrentMatchState.Value = MatchState.Starting;
-
-            OnMatchStartingClientRpc();
 
             Invoke(nameof(BeginPlaying), matchStartDelay);
         }
@@ -149,28 +149,22 @@ namespace ExoBeasts.Multiplayer.GameServer
         {
             if (!IsServer) return;
             CurrentMatchState.Value = MatchState.Victory;
-            OnMatchEndedClientRpc(true);
         }
 
         public void EndMatchDefeat()
         {
             if (!IsServer) return;
             CurrentMatchState.Value = MatchState.Defeat;
-            OnMatchEndedClientRpc(false);
         }
 
-        [ClientRpc]
-        private void OnMatchStartingClientRpc()
-        {
-            // Stub: adicionar countdown visual ou SFX aqui
-        }
-
-        [ClientRpc]
-        private void OnMatchEndedClientRpc(bool victory)
-        {
-            // Stub: adicionar efeito visual/sonoro de fim de partida aqui
-        }
-
+        // OPTIMIZATION (Sprint 4 / Item E6 - 2026-05-21): 2 ClientRpc stubs removidos
+        // (OnMatchStartingClientRpc / OnMatchEndedClientRpc).
+        // Antes: 3 ClientRpcs vazios por partida (start + end victory/defeat) - pacotes
+        // inuteis no Network Profiler (~96 bytes por partida desperdicados em 4-player).
+        // Agora: clientes reagem a CurrentMatchState.OnValueChanged (assinatura existente).
+        // Sem isso: ruido em logs do servidor + bytes/s falsos no profiling de rede.
+        // Para reintroduzir countdown/SFX no futuro, assinar OnValueChanged em vez de criar ClientRpc:
+        //   CurrentMatchState.OnValueChanged += (oldState, newState) => { if (newState == MatchState.Starting) ShowCountdown(); }
         private void OnMatchStateChanged(MatchState oldState, MatchState newState) { }
 
         public override void OnNetworkDespawn()

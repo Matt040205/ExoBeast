@@ -58,6 +58,13 @@ public class RenderTerrainMap : MonoBehaviour
 
     void OnEnable()
     {
+#if UNITY_EDITOR
+        if (UnityEditor.BuildPipeline.isBuildingPlayer)
+        {
+            return;
+        }
+#endif
+
         // reset bounds
         bounds = new Bounds(transform.position, Vector3.zero);
         tempTex = new RenderTexture(resolution, resolution, 24);

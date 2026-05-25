@@ -151,6 +151,8 @@ public class UIManager : MonoBehaviour
 
     public void ShowHUD()
     {
+        EnsurePanelHierarchyActive(hudPanel);
+
         if (hudPanel != null)
             hudPanel.SetActive(true);
 
@@ -163,6 +165,9 @@ public class UIManager : MonoBehaviour
 
     public void ShowPauseMenu(bool show)
     {
+        if (show)
+            EnsurePanelHierarchyActive(pausePanel);
+
         if (pausePanel != null)
             pausePanel.SetActive(show);
 
@@ -182,6 +187,9 @@ public class UIManager : MonoBehaviour
 
     public void ShowBuildUI(bool show)
     {
+        if (show)
+            EnsurePanelHierarchyActive(buildPanel);
+
         if (buildPanel != null)
             buildPanel.SetActive(show);
 
@@ -316,5 +324,25 @@ public class UIManager : MonoBehaviour
         return string.IsNullOrEmpty(value)
             ? string.Empty
             : value.Replace(" ", string.Empty).Trim().ToLowerInvariant();
+    }
+
+    private void EnsurePanelHierarchyActive(GameObject panel)
+    {
+        if (panel == null)
+            return;
+
+        Transform parent = panel.transform.parent;
+        while (parent != null)
+        {
+            if (!parent.gameObject.activeSelf)
+            {
+                Debug.LogWarning(
+                    $"[UIManager] Reativando '{parent.name}' para exibir painel '{panel.name}'.",
+                    parent.gameObject);
+                parent.gameObject.SetActive(true);
+            }
+
+            parent = parent.parent;
+        }
     }
 }

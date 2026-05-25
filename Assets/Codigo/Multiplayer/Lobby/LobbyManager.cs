@@ -87,6 +87,19 @@ namespace ExoBeasts.Multiplayer.Lobby
         // Coroutine de conexao cliente em andamento — cancelada se StartMatch for chamado no host
 
 
+        // OPTIMIZATION (Sprint 4 / Item A6 - 2026-05-21): debounce de SetMemberAttribute.
+        // EOS Lobby Service tem rate limit (~30 calls/min). UI hesitante (jogador trocando
+        // personagem rapidamente) disparava varios UpdateLobbyMember consecutivos.
+        // Antes: cada SetMemberAttribute -> chamada EOS imediata.
+        // Agora: chamadas para mesma key dentro de 250ms colapsam em uma unica call com ultimo valor.
+        // Sem isso: ate 5 EOS calls por hesitacao tipica, risco de Result.RateLimited e
+        // callbacks redundantes em outros clientes.
+        // Dictionary<key, Coroutine> garante que cada atributo (IS_READY, CHARACTER_INDEX, ...)
+        // tem seu proprio debounce — trocar Ready nao reseta timer da troca de personagem.
+        private const float SET_MEMBER_ATTRIBUTE_DEBOUNCE_SECONDS = 0.25f;
+        private readonly Dictionary<string, string> _pendingMemberAttributes = new Dictionary<string, string>();
+        private readonly Dictionary<string, Coroutine> _memberAttributeDebounceCoroutines = new Dictionary<string, Coroutine>();
+
         private const ushort DEFAULT_PORT = 7777;
         private const string BUCKET_ID = "ExoBeasts";
         private const string NO_RELAY_CODE = "__NO_RELAY__";
@@ -117,6 +130,15 @@ namespace ExoBeasts.Multiplayer.Lobby
                 _eosCache.OnEOSInitialized -= _dispatcher.RegisterNotifications;
             _dispatcher?.UnregisterNotifications();
             ReleaseDetailCache();
+
+            // OPTIMIZATION (Sprint 4 / Item A6): cancela coroutines de debounce pendentes
+            // tambem em OnDestroy (cobre destruicao sem passar por LeaveLobby/ClearLobbyState).
+            foreach (var kvp in _memberAttributeDebounceCoroutines)
+            {
+                if (kvp.Value != null) StopCoroutine(kvp.Value);
+            }
+            _memberAttributeDebounceCoroutines.Clear();
+            _pendingMemberAttributes.Clear();
         }
 
 #if !EOS_DISABLE
@@ -211,8 +233,9 @@ namespace ExoBeasts.Multiplayer.Lobby
                     SessionManager.Instance.SetCurrentLobby(lobbyId);
                     OnLobbyCreated?.Invoke(_currentLobby);
 
-                    SetMemberAttribute(MemberAttributes.DISPLAY_NAME,
-                                       SessionManager.Instance.GetDisplayName());
+                    // OPTIMIZATION (Sprint 4 / Item A6): inicializacao usa variante imediata (sem debounce).
+                    SetMemberAttributeImmediate(MemberAttributes.DISPLAY_NAME,
+                                                SessionManager.Instance.GetDisplayName());
                 });
             });
             return true;
@@ -503,8 +526,9 @@ namespace ExoBeasts.Multiplayer.Lobby
 
                     // Publicar nome de exibicao como atributo de membro
                     // para que o host e outros membros possam ler via CopyMemberAttributeByKey
-                    SetMemberAttribute(MemberAttributes.DISPLAY_NAME,
-                                       SessionManager.Instance.GetDisplayName());
+                    // OPTIMIZATION (Sprint 4 / Item A6): inicializacao usa variante imediata (sem debounce).
+                    SetMemberAttributeImmediate(MemberAttributes.DISPLAY_NAME,
+                                                SessionManager.Instance.GetDisplayName());
                 });
             });
 #endif
@@ -650,12 +674,51 @@ namespace ExoBeasts.Multiplayer.Lobby
         }
 
         /// <summary>
-        /// Define um atributo do jogador local no lobby atual.
+        /// API publica - debounce de 250ms. Chamadas rapidas para a mesma key colapsam em uma.
+        /// Para chamada imediata (inicializacao do lobby), use SetMemberAttributeImmediate.
         /// Ex: IS_READY=True, CHARACTER_INDEX=2
         /// </summary>
         public void SetMemberAttribute(string key, string value)
         {
+            // OPTIMIZATION (Sprint 4 / Item A6 - 2026-05-21): debounce. Ver comentario nos campos privados.
             if (!_isInLobby || _currentLobby == null) return;
+
+#if UNITY_EDITOR
+            Debug.Log($"[LobbyManager] SetMemberAttribute (debounced) key={key} value={value}");
+#endif
+
+            _pendingMemberAttributes[key] = value;
+
+            if (_memberAttributeDebounceCoroutines.TryGetValue(key, out var existing) && existing != null)
+                StopCoroutine(existing);
+
+            _memberAttributeDebounceCoroutines[key] = StartCoroutine(DebouncedSubmitMemberAttribute(key));
+        }
+
+        private System.Collections.IEnumerator DebouncedSubmitMemberAttribute(string key)
+        {
+            yield return new WaitForSeconds(SET_MEMBER_ATTRIBUTE_DEBOUNCE_SECONDS);
+
+            string pendingValue = null;
+            bool hasPending = _pendingMemberAttributes.TryGetValue(key, out pendingValue);
+            _pendingMemberAttributes.Remove(key);
+            _memberAttributeDebounceCoroutines.Remove(key);
+
+            if (hasPending)
+                SetMemberAttributeImmediate(key, pendingValue);
+        }
+
+        /// <summary>
+        /// Variante imediata. Usada internamente pela coroutine de debounce + chamadas
+        /// de inicializacao (CreateLobby, JoinLobby) que NAO devem ser debounced.
+        /// </summary>
+        private void SetMemberAttributeImmediate(string key, string value)
+        {
+            if (!_isInLobby || _currentLobby == null) return;
+
+#if UNITY_EDITOR
+            Debug.Log($"[LobbyManager] SetMemberAttributeImmediate -> EOS call: key={key} value={value}");
+#endif
 
             SetMemberAttributeEos(key, value);
         }
@@ -886,6 +949,15 @@ namespace ExoBeasts.Multiplayer.Lobby
         internal void ClearLobbyState()
         {
             CancelPendingClientConnect();
+            // OPTIMIZATION (Sprint 4 / Item A6): cancela coroutines de debounce pendentes ao
+            // sair/limpar o lobby. Evita que uma chamada agendada dispare apos _currentLobby == null.
+            foreach (var kvp in _memberAttributeDebounceCoroutines)
+            {
+                if (kvp.Value != null) StopCoroutine(kvp.Value);
+            }
+            _memberAttributeDebounceCoroutines.Clear();
+            _pendingMemberAttributes.Clear();
+
             _isInLobby = false;
             _currentLobby = null;
             _membershipService.Clear();

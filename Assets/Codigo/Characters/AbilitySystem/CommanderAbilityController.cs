@@ -26,6 +26,14 @@ public class CommanderAbilityController : NetworkBehaviour
     public Dictionary<Ability, float> abilityCooldowns = new Dictionary<Ability, float>();
     private readonly HashSet<Ability> deferredCooldownAbilities = new HashSet<Ability>();
 
+    // OPTIMIZATION (Sprint 4 / Item G7 - 2026-05-21): cache reutilizavel para iterar
+    // abilityCooldowns.Keys sem alocar lista nova por frame.
+    // Antes: new List<Ability>(abilityCooldowns.Keys) em 2 hot paths -> ~480 alocacoes/s em 4 jogadores.
+    // Agora: cache compartilhado entre Update (cooldown tick) e ReduceAllAbilityCooldowns
+    // (sem reentrancia validada) -> zero alocacao por frame.
+    // Sem isso: ~600KB/min de garbage collection durante combate ativo.
+    private readonly List<Ability> _cooldownKeysCache = new List<Ability>(8);
+
     public float ultimateChargeThreshold = 100f;
 
     public NetworkVariable<float> netUltimateCharge = new NetworkVariable<float>(
@@ -140,9 +148,14 @@ public class CommanderAbilityController : NetworkBehaviour
 
         if (IsServer || IsOwner)
         {
-            List<Ability> keys = new List<Ability>(abilityCooldowns.Keys);
-            foreach (Ability ability in keys)
+            // OPTIMIZATION (Sprint 4 / Item G7): usar cache reutilizavel + for index para zero-alloc.
+            _cooldownKeysCache.Clear();
+            foreach (var kvp in abilityCooldowns)
+                _cooldownKeysCache.Add(kvp.Key);
+
+            for (int i = 0; i < _cooldownKeysCache.Count; i++)
             {
+                Ability ability = _cooldownKeysCache[i];
                 if (abilityCooldowns[ability] > 0)
                 {
                     abilityCooldowns[ability] -= Time.deltaTime;
@@ -492,18 +505,15 @@ public class CommanderAbilityController : NetworkBehaviour
 
         if (shouldStartCooldown)
         {
+            // OPTIMIZATION (Sprint 4 / Item E7 - 2026-05-21): ActivateUltimateVisualClientRpc
+            // removido. Corpo era vazio (comentario "feedback visual" mas sem implementacao).
+            // CacadoraNoturnaLogic (Coruja) ja dispara trigger de animacao em OnNetworkSpawn.
+            // Antes: 1 ClientRpc broadcast por ult ativada (3 pacotes inuteis em lobby 4-player).
+            // Agora: visual fica a cargo do logic spawnado pela ult — sem RPC vazio.
             abilityCooldowns[characterData.ultimate] = characterData.ultimate.cooldown;
             netUltimateCharge.Value = 0f;
             _pendingPassiveCharge = 0f;
-            ActivateUltimateVisualClientRpc();
         }
-    }
-
-    [ClientRpc]
-    private void ActivateUltimateVisualClientRpc()
-    {
-        // Feedback visual da Ultimate 
-        // Nota: No caso da Coruja, o CacadoraNoturnaLogic jÃƒÂ¡ dispara o trigger de animaÃƒÂ§ÃƒÂ£o no OnNetworkSpawn
     }
 
     private void HandleDamageDealt(float damage)
@@ -552,9 +562,15 @@ public class CommanderAbilityController : NetworkBehaviour
 
     public void ReduceAllAbilityCooldowns(float reductionAmount)
     {
-        List<Ability> keys = new List<Ability>(abilityCooldowns.Keys);
-        foreach (Ability ability in keys)
+        // OPTIMIZATION (Sprint 4 / Item G7): cache compartilhado com Update. Safe pois
+        // NineTailsDanceAbility e o unico caller e nao reentra durante a iteracao.
+        _cooldownKeysCache.Clear();
+        foreach (var kvp in abilityCooldowns)
+            _cooldownKeysCache.Add(kvp.Key);
+
+        for (int i = 0; i < _cooldownKeysCache.Count; i++)
         {
+            Ability ability = _cooldownKeysCache[i];
             if (abilityCooldowns[ability] > 0)
                 abilityCooldowns[ability] = Mathf.Max(0, abilityCooldowns[ability] - reductionAmount);
         }

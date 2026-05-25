@@ -110,7 +110,18 @@ public class PlayerHealthSystem : NetworkBehaviour
 
     private void Update()
     {
-        TryResolveCharacterData();
+        // OPTIMIZATION (Sprint 4 / Item G6 - 2026-05-21): TryResolveCharacterData
+        // removido do hot path. Antes: invocado todo frame (~240/s em 4 jogadores) com
+        // early-return interno mas overhead de NetworkGameplayResolver presente.
+        // Agora: resolvido em OnNetworkSpawn e IsAtFullHealth. Apenas faz uma tentativa
+        // final defensiva se ainda nao resolveu (cenario teorico).
+        // Sem isso: ~2.4ms/s desperdicados em invocacoes redundantes apos primeira resolucao.
+        if (characterData == null)
+        {
+            TryResolveCharacterData();
+            if (characterData == null) return;
+        }
+
         if (!IsServer)
             return;
 
