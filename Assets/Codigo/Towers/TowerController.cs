@@ -550,21 +550,25 @@ public class TowerController : MonoBehaviour
             else
             {
                 currentHealth = 0;
-                DestroyTower();
+                DestroyTower(isKilledInCombat: true);
             }
         }
     }
 
-    private void DestroyTower()
+    private void DestroyTower(bool isKilledInCombat = false)
     {
         IsDestroyed = true;
         targetEnemy = null;
+
+        // Notifica o pop-up apenas quando a torre é destruída em combate (não quando vendida).
+        if (isKilledInCombat && towerData != null)
+            JuiceEvents.OnTowerDied?.Invoke(towerData.name);
 
         if (TowerSelectionManager.Instance != null)
         {
             TowerSelectionManager.Instance.DeselectAll();
         }
-        // Ao invÃ©s de Destruir o GameObject (que quebra os scripts de Reviver), nÃ³s apenas escondemos a torre visualmente
+        // Ao invés de Destruir o GameObject (que quebra os scripts de Reviver), nós apenas escondemos a torre visualmente
         foreach (Renderer r in GetComponentsInChildren<Renderer>()) 
         {
             r.enabled = false;
