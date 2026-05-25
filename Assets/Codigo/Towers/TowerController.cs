@@ -18,10 +18,12 @@ public class TowerController : MonoBehaviour
     [SerializeField] private Material materialToon;
     [SerializeField] private Material materialOutline;
     private bool isMaterializing = false;
+    public bool IsMaterializing => isMaterializing;
 
     [Header("Visual e AnimaÃ§Ã£o")]
     public Animator animator;
     public string shootTrigger = "Attack";
+    [SerializeField] private bool playAttackAnimation = true;
     public string towerModeBool = "IsTower";
     public Vector3 rotationOffset;
 
@@ -63,12 +65,14 @@ public class TowerController : MonoBehaviour
     private TowerAbilitySystem abilitySystem;
     private NetworkObject networkObject;
     private NetworkedBuilding networkedBuilding;
+    private DragonPatrolBehavior dragonPatrol;
     private Coroutine registerWithBuildManagerRoutine;
 
     void Awake()
     {
         networkObject = GetComponent<NetworkObject>();
         networkedBuilding = GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedBuilding>();
+        dragonPatrol = GetComponent<DragonPatrolBehavior>();
     }
 
     void Start()
@@ -87,7 +91,8 @@ public class TowerController : MonoBehaviour
         StartCoroutine(SpawnMaterializationFlow());
 
         // Removemos UpdateAbilities do Start pois os nÃ­veis comeÃ§am zerados ou definidos pelo AbilitySystem
-        InvokeRepeating("UpdateTarget", 0f, 0.5f);
+        if (HasCombatAuthority())
+            InvokeRepeating("UpdateTarget", 0f, 0.5f);
         RegisterWithBuildManagerIfRuntime();
 
         if (networkedBuilding != null)
@@ -250,9 +255,15 @@ public class TowerController : MonoBehaviour
 
     void Update()
     {
+        if (!HasCombatAuthority()) return;
         if (IsDestroyed) return;
         if (isMaterializing) return;
         if (targetEnemy == null) return;
+        if (!IsTargetAllowedByMovementLeash(targetEnemy))
+        {
+            targetEnemy = null;
+            return;
+        }
 
         if (partToRotate != null) RotateTowardsTarget();
 
@@ -266,26 +277,17 @@ public class TowerController : MonoBehaviour
 
     public void Shoot()
     {
+        if (!HasCombatAuthority()) return;
         if (isMaterializing) return;
         if (targetEnemy == null) return;
-        if (animator != null) animator.SetTrigger(shootTrigger);
-
-        Vector3 originPoint = firePoint != null ? firePoint.position : (partToRotate != null ? partToRotate.position : transform.position);
-        TowerTracerVFX tracer = GetComponentInChildren<TowerTracerVFX>();
-
-        // Em clientes nao-servidor: dano nunca eh aplicado (ProcessDamageInstance sai cedo via HasCombatAuthority).
-        // Pular SphereCastAll/HashSet/ProcessDamageInstance evita CPU + alocacao redundantes em cada cliente
-        // (ate 4 maquinas multiplicando o custo). Mantemos o tracer local como predicao visual.
-        if (!HasCombatAuthority())
+        if (!IsTargetAllowedByMovementLeash(targetEnemy))
         {
-            if (tracer != null)
-            {
-                Collider enemyCol = targetEnemy.GetComponentInChildren<Collider>();
-                Vector3 endPoint = enemyCol != null ? enemyCol.ClosestPoint(originPoint) : targetEnemy.position;
-                tracer.DrawTracer(originPoint, endPoint);
-            }
+            targetEnemy = null;
             return;
         }
+
+        Vector3 originPoint = firePoint != null ? firePoint.position : (partToRotate != null ? partToRotate.position : transform.position);
+        Vector3 visualEndPoint = GetTargetHitPoint(targetEnemy, originPoint);
 
         PiercingBehavior piercer = GetComponent<PiercingBehavior>();
         if (piercer != null)
@@ -298,15 +300,15 @@ public class TowerController : MonoBehaviour
             int maxHits = 1 + piercer.enemiesToPierce;
             HashSet<EnemyHealthSystem> processed = new HashSet<EnemyHealthSystem>();
 
-            EnemyHealthSystem primary = targetEnemy.GetComponent<EnemyHealthSystem>();
-            if (primary != null)
+            EnemyHealthSystem primary = ResolveEnemyHealth(targetEnemy);
+            if (primary != null && !primary.isDead)
             {
                 ProcessDamageInstance(primary);
                 hitsDone++;
                 processed.Add(primary);
             }
 
-            Vector3 finalHitPosition = targetEnemy.position;
+            Vector3 finalHitPosition = visualEndPoint;
 
             foreach (var hit in hits)
             {
@@ -314,36 +316,54 @@ public class TowerController : MonoBehaviour
                 EnemyHealthSystem ehs = hit.collider.GetComponentInParent<EnemyHealthSystem>();
                 if (ehs == null) ehs = hit.collider.GetComponent<EnemyHealthSystem>();
 
-                if (ehs != null && !processed.Contains(ehs) && !ehs.isDead)
+                if (ehs != null && !processed.Contains(ehs) && !ehs.isDead && IsTargetAllowedByMovementLeash(ehs.transform))
                 {
                     ProcessDamageInstance(ehs);
                     hitsDone++;
                     processed.Add(ehs);
-                    finalHitPosition = ehs.transform.position;
+                    finalHitPosition = GetTargetHitPoint(ehs.transform, originPoint);
                 }
             }
 
-            if (tracer != null)
-            {
-                tracer.DrawTracer(originPoint, finalHitPosition);
-            }
+            PlayAttackVisualForObservers(originPoint, finalHitPosition);
         }
         else
         {
-            EnemyHealthSystem healthSystem = targetEnemy.GetComponent<EnemyHealthSystem>();
+            EnemyHealthSystem healthSystem = ResolveEnemyHealth(targetEnemy);
             if (healthSystem != null) 
             {
                 ProcessDamageInstance(healthSystem);
-
-                if (tracer != null)
-                {
-                    // Usa ClosestPoint para que o rastro bata na borda do inimigo e não atravesse até o centro
-                    Collider enemyCol = targetEnemy.GetComponentInChildren<Collider>();
-                    Vector3 endPoint = enemyCol != null ? enemyCol.ClosestPoint(originPoint) : targetEnemy.position;
-                    
-                    tracer.DrawTracer(originPoint, endPoint);
-                }
+                PlayAttackVisualForObservers(originPoint, GetTargetHitPoint(targetEnemy, originPoint));
             }
+        }
+    }
+
+    public void PlayAttackVisualLocal(Vector3 originPoint, Vector3 endPoint)
+    {
+        if (animator == null)
+            animator = GetComponentInChildren<Animator>();
+
+        if (partToRotate != null)
+            RotatePartTowards(endPoint);
+
+        if (playAttackAnimation && animator != null)
+            animator.SetTrigger(shootTrigger);
+
+        TowerTracerVFX tracer = GetComponentInChildren<TowerTracerVFX>(true);
+        if (tracer != null)
+            tracer.DrawTracer(originPoint, endPoint);
+    }
+
+    private void PlayAttackVisualForObservers(Vector3 originPoint, Vector3 endPoint)
+    {
+        PlayAttackVisualLocal(originPoint, endPoint);
+
+        if (networkedBuilding != null &&
+            NetworkManager.Singleton != null &&
+            NetworkManager.Singleton.IsListening &&
+            NetworkManager.Singleton.IsServer)
+        {
+            networkedBuilding.BroadcastTowerAttackVisualClientRpc(originPoint, endPoint);
         }
     }
 
@@ -384,7 +404,18 @@ public class TowerController : MonoBehaviour
 
     void RotateTowardsTarget()
     {
-        Vector3 direction = targetEnemy.position - transform.position;
+        if (targetEnemy == null)
+            return;
+
+        RotatePartTowards(targetEnemy.position);
+    }
+
+    private void RotatePartTowards(Vector3 targetPosition)
+    {
+        if (partToRotate == null)
+            return;
+
+        Vector3 direction = targetPosition - transform.position;
         direction.y = 0;
 
         if (direction == Vector3.zero) return;
@@ -403,6 +434,12 @@ public class TowerController : MonoBehaviour
 
     void UpdateTarget()
     {
+        if (!HasCombatAuthority())
+        {
+            targetEnemy = null;
+            return;
+        }
+
         Vector3 originPoint = partToRotate != null ? partToRotate.position : transform.position;
 
         if (TryUpdateTargetFromEnemyRegistry(originPoint))
@@ -424,6 +461,7 @@ public class TowerController : MonoBehaviour
                 if (enemyController == null) enemyController = col.GetComponentInParent<EnemyController>();
 
                 if (enemyController == null || enemyController.enemyData == null) continue;
+                if (!IsTargetAllowedByMovementLeash(enemyController.transform)) continue;
 
                 EnemyType enemyType = enemyController.enemyData.enemyType;
 
@@ -438,7 +476,7 @@ public class TowerController : MonoBehaviour
                     if (distanceToSkin < shortestDistance)
                     {
                         shortestDistance = distanceToSkin;
-                        nearestEnemy = col.transform;
+                        nearestEnemy = enemyController.transform;
                     }
                 }
             }
@@ -463,6 +501,8 @@ public class TowerController : MonoBehaviour
             EnemyController enemyController = enemies[i];
             if (enemyController == null || enemyController.IsDead || enemyController.enemyData == null)
                 continue;
+            if (!IsTargetAllowedByMovementLeash(enemyController.transform))
+                continue;
 
             EnemyType enemyType = enemyController.enemyData.enemyType;
             bool isTargetable = (enemyType == EnemyType.Terrestre) ||
@@ -486,6 +526,40 @@ public class TowerController : MonoBehaviour
 
         targetEnemy = nearestEnemy;
         return true;
+    }
+
+    private bool IsTargetAllowedByMovementLeash(Transform candidate)
+    {
+        if (candidate == null)
+            return false;
+
+        if (dragonPatrol == null)
+            return true;
+
+        return dragonPatrol.IsTargetInsidePatrolLeash(candidate);
+    }
+
+    private EnemyHealthSystem ResolveEnemyHealth(Transform candidate)
+    {
+        if (candidate == null)
+            return null;
+
+        EnemyHealthSystem healthSystem = candidate.GetComponent<EnemyHealthSystem>();
+        if (healthSystem == null)
+            healthSystem = candidate.GetComponentInParent<EnemyHealthSystem>();
+        if (healthSystem == null)
+            healthSystem = candidate.GetComponentInChildren<EnemyHealthSystem>();
+
+        return healthSystem;
+    }
+
+    private Vector3 GetTargetHitPoint(Transform candidate, Vector3 originPoint)
+    {
+        if (candidate == null)
+            return originPoint;
+
+        Collider enemyCol = candidate.GetComponentInChildren<Collider>();
+        return enemyCol != null ? enemyCol.ClosestPoint(originPoint) : candidate.position;
     }
 
     public void SellTower(float refundPercentage)
@@ -756,7 +830,7 @@ public class TowerController : MonoBehaviour
 
     private bool HasCombatAuthority()
     {
-        if (networkObject == null || !networkObject.IsSpawned || NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
             return true;
 
         return NetworkManager.Singleton.IsServer;

@@ -1,135 +1,358 @@
+using System.Collections.Generic;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.AI;
 
 /// <summary>
-/// Dá à torre do Dragão a capacidade física de patrulhar 
-/// num vasto raio em torno do ponto de spawn, detectando inimigos 
-/// de longe e caminhando até o curto alcance Melee.
+/// Movimenta a Torre Dragao como um ator server-authoritative.
+/// Ela patrulha a partir do ponto de spawn e nunca persegue fora desse leash.
 /// </summary>
 [RequireComponent(typeof(NavMeshAgent))]
 public class DragonPatrolBehavior : MonoBehaviour
 {
-    [Header("Movimentação")]
+    private enum PatrolState
+    {
+        Idle,
+        Chasing,
+        Attacking,
+        Returning
+    }
+
+    [Header("Movimentacao")]
     public float moveSpeed = 4f;
-    public float patrolVisionRadius = 15f; 
+    public float patrolVisionRadius = 15f;
+
+    [SerializeField] private float homeArrivalDistance = 0.5f;
+    [SerializeField] private float leashTolerance = 0.15f;
+
+    private static readonly Collider[] patrolBuffer = new Collider[96];
 
     private Vector3 homePosition;
+    private bool homePositionInitialized;
     private NavMeshAgent agent;
     private TowerController tower;
+    private Transform currentTarget;
+    private PatrolState state = PatrolState.Idle;
+    private float lastKnownTowerRange = -1f;
 
-    void Start()
+    void Awake()
     {
         tower = GetComponent<TowerController>();
         agent = GetComponent<NavMeshAgent>();
-        homePosition = transform.position;
+    }
 
-        if (agent != null)
+    void Start()
+    {
+        DisableNavMeshObstacles();
+
+        if (!HasPatrolAuthority())
         {
-            // Validação de NavMesh: Se a torre foi construída em um Node sem NavMesh (ex: quadrado rosa fora da malha)
-            // o agente iria teleportar pro ponto válido mais próximo (ex: o rio/rua).
-            // Para evitar o teleporte bizarro, desligamos o agente se não houver NavMesh perto.
-            NavMeshHit hit;
-            if (NavMesh.SamplePosition(homePosition, out hit, 2.0f, NavMesh.AllAreas))
-            {
-                agent.Warp(hit.position);
-                agent.speed = moveSpeed;
-                agent.stoppingDistance = (tower != null ? tower.CurrentRange * 0.8f : 1.5f); 
-            }
-            else
-            {
-                Debug.LogWarning($"[DragonPatrol] Construído muito longe do NavMesh! Desativando patrulha na torre {gameObject.name}.");
+            if (agent != null)
                 agent.enabled = false;
-            }
+
+            enabled = false;
+            return;
         }
+
+        InitializeAgentAtHome();
     }
 
     void Update()
     {
-        if (tower == null || agent == null || !agent.isOnNavMesh) return;
+        if (!HasPatrolAuthority())
+            return;
 
-        Transform chaseTarget = tower.TargetEnemy;
+        if (tower == null || agent == null || !agent.enabled || !agent.isOnNavMesh)
+            return;
 
-        // Se o alvo morreu ou sumiu, anula para nao seguir para o Pooling
-        if (chaseTarget != null)
+        if (tower.IsDestroyed || tower.IsMaterializing)
         {
-            EnemyHealthSystem ehsTarget = chaseTarget.GetComponent<EnemyHealthSystem>();
-            if (ehsTarget != null && ehsTarget.isDead)
-            {
-                chaseTarget = null;
-            }
-            else if (!chaseTarget.gameObject.activeInHierarchy)
-            {
-                chaseTarget = null;
-            }
+            currentTarget = null;
+            SetState(PatrolState.Idle);
+            StopAgent();
+            return;
         }
 
-        // Se o Tower nao achou ninguem porque esta muito longe, o Radar de Patrulha procura
-        if (chaseTarget == null)
+        UpdateStoppingDistance();
+        RefreshTarget();
+        TickState();
+    }
+
+    public bool IsTargetInsidePatrolLeash(Transform candidate)
+    {
+        if (candidate == null || !candidate.gameObject.activeInHierarchy)
+            return false;
+
+        Vector3 leashCenter = homePositionInitialized ? homePosition : transform.position;
+        Vector3 closestPoint = GetClosestPoint(candidate, leashCenter);
+        return Vector3.Distance(leashCenter, closestPoint) <= patrolVisionRadius + leashTolerance;
+    }
+
+    private void InitializeAgentAtHome()
+    {
+        if (agent == null)
+            return;
+
+        homePosition = transform.position;
+        homePositionInitialized = true;
+
+        if (!NavMesh.SamplePosition(homePosition, out NavMeshHit hit, 2.0f, NavMesh.AllAreas))
         {
-            Collider[] colliders = Physics.OverlapSphere(homePosition, patrolVisionRadius);
-            float shortestDist = Mathf.Infinity;
+            Debug.LogWarning($"[DragonPatrol] Construido muito longe do NavMesh. Patrulha desativada em {gameObject.name}.");
+            agent.enabled = false;
+            return;
+        }
 
-            foreach (var col in colliders)
+        agent.Warp(hit.position);
+        homePosition = hit.position;
+        agent.speed = moveSpeed;
+        agent.autoBraking = true;
+        UpdateStoppingDistance(force: true);
+        SetState(PatrolState.Idle);
+    }
+
+    private void DisableNavMeshObstacles()
+    {
+        foreach (NavMeshObstacle obstacle in GetComponentsInChildren<NavMeshObstacle>(true))
+            obstacle.enabled = false;
+    }
+
+    private void RefreshTarget()
+    {
+        if (IsValidTarget(currentTarget))
+            return;
+
+        currentTarget = null;
+
+        Transform towerTarget = tower != null ? tower.TargetEnemy : null;
+        if (IsValidTarget(towerTarget))
+        {
+            currentTarget = towerTarget;
+            return;
+        }
+
+        currentTarget = FindNearestValidTarget();
+    }
+
+    private Transform FindNearestValidTarget()
+    {
+        Transform bestTarget = null;
+        float bestDistance = Mathf.Infinity;
+
+        IReadOnlyList<EnemyController> enemies = HordeManager.GetActiveEnemies();
+        if (enemies != null && enemies.Count > 0)
+        {
+            for (int i = 0; i < enemies.Count; i++)
             {
-                if (col.CompareTag("Enemy"))
+                EnemyController enemy = enemies[i];
+                if (enemy == null || !IsValidTarget(enemy.transform))
+                    continue;
+
+                float distance = Vector3.Distance(transform.position, GetClosestPoint(enemy.transform, transform.position));
+                if (distance < bestDistance)
                 {
-                    EnemyHealthSystem ehs = col.GetComponent<EnemyHealthSystem>();
-                    if (ehs != null && ehs.isDead) continue; 
-
-                    // Ignorar inimigos voadores se a torre não puder atingi-los
-                    if (tower != null && !tower.TargetsFlyingEnemies)
-                    {
-                        EnemyController ec = col.GetComponent<EnemyController>();
-                        if (ec != null && ec.enemyData != null && ec.enemyData.enemyType == EnemyType.Voador)
-                        {
-                            continue;
-                        }
-                    }
-
-                    float d = Vector3.Distance(homePosition, col.transform.position);
-                    if (d < shortestDist)
-                    {
-                        shortestDist = d;
-                        chaseTarget = col.transform;
-                    }
+                    bestDistance = distance;
+                    bestTarget = enemy.transform;
                 }
             }
+
+            return bestTarget;
         }
 
-        // Deixa a TowerController cuidar da rotação fina se tiver alvo
-        agent.updateRotation = (chaseTarget == null);
-
-        float dragonDistToHome = Vector3.Distance(homePosition, transform.position);
-
-        if (chaseTarget != null)
+        int hitCount = Physics.OverlapSphereNonAlloc(homePosition, patrolVisionRadius, patrolBuffer);
+        for (int i = 0; i < hitCount; i++)
         {
-            // Se o dragao foi longe demais da base, forca a volta
-            if (dragonDistToHome > patrolVisionRadius) 
+            Collider col = patrolBuffer[i];
+            patrolBuffer[i] = null;
+
+            if (col == null)
+                continue;
+
+            Transform candidate = ResolveEnemyTransform(col.transform);
+            if (!IsValidTarget(candidate))
+                continue;
+
+            float distance = Vector3.Distance(transform.position, GetClosestPoint(candidate, transform.position));
+            if (distance < bestDistance)
             {
-                agent.SetDestination(homePosition);
+                bestDistance = distance;
+                bestTarget = candidate;
+            }
+        }
+
+        return bestTarget;
+    }
+
+    private void TickState()
+    {
+        float distanceToHome = Vector3.Distance(transform.position, homePosition);
+
+        if (currentTarget == null)
+        {
+            if (distanceToHome > homeArrivalDistance)
+            {
+                SetState(PatrolState.Returning);
+                MoveTo(homePosition);
             }
             else
             {
-                agent.SetDestination(chaseTarget.position);
+                SetState(PatrolState.Idle);
+                StopAgent();
             }
+
+            return;
         }
-        else
+
+        float targetDistance = Vector3.Distance(transform.position, GetClosestPoint(currentTarget, transform.position));
+        if (targetDistance <= tower.CurrentRange)
         {
-            // Voltar base
-            if (dragonDistToHome > 0.5f)
-            {
-                agent.SetDestination(homePosition);
-            }
-            else
-            {
-                agent.ResetPath(); // Para evitar andar no mesmo lugar
-            }
+            SetState(PatrolState.Attacking);
+            StopAgent();
+            FaceTarget(currentTarget);
+            return;
         }
+
+        SetState(PatrolState.Chasing);
+        MoveTo(currentTarget.position);
+    }
+
+    private void MoveTo(Vector3 destination)
+    {
+        if (agent == null || !agent.enabled || !agent.isOnNavMesh)
+            return;
+
+        agent.isStopped = false;
+        agent.updateRotation = state != PatrolState.Attacking;
+        agent.SetDestination(destination);
+    }
+
+    private void StopAgent()
+    {
+        if (agent == null || !agent.enabled || !agent.isOnNavMesh)
+            return;
+
+        agent.isStopped = true;
+        agent.ResetPath();
+    }
+
+    private void FaceTarget(Transform target)
+    {
+        if (target == null)
+            return;
+
+        Vector3 direction = target.position - transform.position;
+        direction.y = 0f;
+        if (direction.sqrMagnitude <= 0.0001f)
+            return;
+
+        transform.rotation = Quaternion.RotateTowards(
+            transform.rotation,
+            Quaternion.LookRotation(direction),
+            Time.deltaTime * 540f);
+    }
+
+    private bool IsValidTarget(Transform candidate)
+    {
+        if (candidate == null || !candidate.gameObject.activeInHierarchy)
+            return false;
+
+        if (!IsTargetInsidePatrolLeash(candidate))
+            return false;
+
+        EnemyHealthSystem health = ResolveEnemyHealth(candidate);
+        if (health == null || health.isDead)
+            return false;
+
+        EnemyController enemy = ResolveEnemyController(candidate);
+        if (enemy == null || enemy.IsDead || enemy.enemyData == null)
+            return false;
+
+        EnemyType enemyType = enemy.enemyData.enemyType;
+        return enemyType == EnemyType.Terrestre || (tower != null && tower.TargetsFlyingEnemies && enemyType == EnemyType.Voador);
+    }
+
+    private Transform ResolveEnemyTransform(Transform candidate)
+    {
+        if (candidate == null)
+            return null;
+
+        EnemyController controller = ResolveEnemyController(candidate);
+        if (controller != null)
+            return controller.transform;
+
+        EnemyHealthSystem health = ResolveEnemyHealth(candidate);
+        return health != null ? health.transform : candidate;
+    }
+
+    private EnemyController ResolveEnemyController(Transform candidate)
+    {
+        if (candidate == null)
+            return null;
+
+        EnemyController controller = candidate.GetComponent<EnemyController>();
+        if (controller == null)
+            controller = candidate.GetComponentInParent<EnemyController>();
+        if (controller == null)
+            controller = candidate.GetComponentInChildren<EnemyController>();
+
+        return controller;
+    }
+
+    private EnemyHealthSystem ResolveEnemyHealth(Transform candidate)
+    {
+        if (candidate == null)
+            return null;
+
+        EnemyHealthSystem health = candidate.GetComponent<EnemyHealthSystem>();
+        if (health == null)
+            health = candidate.GetComponentInParent<EnemyHealthSystem>();
+        if (health == null)
+            health = candidate.GetComponentInChildren<EnemyHealthSystem>();
+
+        return health;
+    }
+
+    private Vector3 GetClosestPoint(Transform candidate, Vector3 origin)
+    {
+        if (candidate == null)
+            return origin;
+
+        Collider col = candidate.GetComponentInChildren<Collider>();
+        return col != null ? col.ClosestPoint(origin) : candidate.position;
+    }
+
+    private void UpdateStoppingDistance(bool force = false)
+    {
+        if (agent == null || tower == null)
+            return;
+
+        if (!force && Mathf.Approximately(lastKnownTowerRange, tower.CurrentRange))
+            return;
+
+        lastKnownTowerRange = tower.CurrentRange;
+        agent.stoppingDistance = Mathf.Max(0.35f, tower.CurrentRange * 0.8f);
+    }
+
+    private void SetState(PatrolState nextState)
+    {
+        if (state == nextState)
+            return;
+
+        state = nextState;
+    }
+
+    private bool HasPatrolAuthority()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+            return true;
+
+        return NetworkManager.Singleton.IsServer;
     }
 
     void OnDrawGizmosSelected()
     {
         Gizmos.color = Color.yellow;
-        Gizmos.DrawWireSphere(Application.isPlaying ? homePosition : transform.position, patrolVisionRadius);
+        Vector3 center = Application.isPlaying && homePositionInitialized ? homePosition : transform.position;
+        Gizmos.DrawWireSphere(center, patrolVisionRadius);
     }
 }

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
 using Unity.Netcode;
@@ -1371,5 +1372,18 @@ public static class RuntimeBuildableSanitizer
 
         foreach (Collider colliderComponent in buildableInstance.GetComponentsInChildren<Collider>(true))
             colliderComponent.enabled = false;
+
+        bool hasDragonPatrol = buildableInstance.GetComponentInChildren<DragonPatrolBehavior>(true) != null;
+        if (!hasDragonPatrol)
+            return;
+
+        foreach (DragonPatrolBehavior patrol in buildableInstance.GetComponentsInChildren<DragonPatrolBehavior>(true))
+            patrol.enabled = false;
+
+        foreach (NavMeshAgent agent in buildableInstance.GetComponentsInChildren<NavMeshAgent>(true))
+            agent.enabled = false;
+
+        foreach (NavMeshObstacle obstacle in buildableInstance.GetComponentsInChildren<NavMeshObstacle>(true))
+            obstacle.enabled = false;
     }
 }

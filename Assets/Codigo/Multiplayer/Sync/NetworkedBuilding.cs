@@ -277,6 +277,19 @@ namespace ExoBeasts.Multiplayer.Sync
         }
 
         [ClientRpc]
+        public void BroadcastTowerAttackVisualClientRpc(Vector3 originPoint, Vector3 endPoint)
+        {
+            if (IsServer)
+                return;
+
+            if (towerController == null)
+                towerController = GetComponent<TowerController>();
+
+            if (towerController != null)
+                towerController.PlayAttackVisualLocal(originPoint, endPoint);
+        }
+
+        [ClientRpc]
         public void BroadcastShieldVisualStateClientRpc(ulong targetNetId, bool isActive)
         {
             var shieldBehavior = GetComponent<DragonShieldGeneratorBehavior>();
