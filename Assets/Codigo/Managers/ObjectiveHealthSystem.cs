@@ -3,6 +3,7 @@ using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using FMODUnity;
 
 public class ObjectiveHealthSystem : NetworkBehaviour
 {
@@ -16,6 +17,9 @@ public class ObjectiveHealthSystem : NetworkBehaviour
         NetworkVariableWritePermission.Server);
 
     public event Action OnHealthChanged;
+
+    [Header("FMOD - Sons")]
+    [EventRef] public string somBaseAtacada;
 
     private bool isDead;
     private float localHealth;
@@ -116,8 +120,14 @@ public class ObjectiveHealthSystem : NetworkBehaviour
         }
         else
         {
+            float oldHealth = localHealth;
             localHealth = Mathf.Max(localHealth - damage, 0f);
             PublishHealthSnapshot();
+
+            if (localHealth < oldHealth)
+            {
+                PlayBaseAttackedSound();
+            }
 
             if (localHealth <= 0f)
                 Die();
@@ -128,6 +138,19 @@ public class ObjectiveHealthSystem : NetworkBehaviour
     {
         localHealth = Mathf.Clamp(newValue, 0f, maxHealth);
         PublishHealthSnapshot();
+
+        if (newValue < oldValue)
+        {
+            PlayBaseAttackedSound();
+        }
+    }
+
+    private void PlayBaseAttackedSound()
+    {
+        if (!string.IsNullOrEmpty(somBaseAtacada))
+        {
+            RuntimeManager.PlayOneShot(somBaseAtacada, transform.position);
+        }
     }
 
     private void RestartInitialSyncRepublish()

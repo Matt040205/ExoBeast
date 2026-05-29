@@ -4,6 +4,7 @@ using System.Linq;
 using System.Collections.Generic;
 using Unity.Netcode;
 using ExoBeasts.Multiplayer.Sync;
+using FMODUnity;
 
 public class TowerController : MonoBehaviour
 {
@@ -26,6 +27,9 @@ public class TowerController : MonoBehaviour
     [SerializeField] private bool playAttackAnimation = true;
     public string towerModeBool = "IsTower";
     public Vector3 rotationOffset;
+
+    [Header("FMOD - Sons")]
+    [EventRef] public string somTiro;
 
     [Header("ConfiguraÃ§Ãµes de IA")]
     [SerializeField] private string enemyTag = "Enemy";
@@ -352,6 +356,11 @@ public class TowerController : MonoBehaviour
         TowerTracerVFX tracer = GetComponentInChildren<TowerTracerVFX>(true);
         if (tracer != null)
             tracer.DrawTracer(originPoint, endPoint);
+
+        if (!string.IsNullOrEmpty(somTiro))
+        {
+            RuntimeManager.PlayOneShot(somTiro, originPoint);
+        }
     }
 
     private void PlayAttackVisualForObservers(Vector3 originPoint, Vector3 endPoint)

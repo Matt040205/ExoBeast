@@ -1,6 +1,7 @@
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
+using FMODUnity;
 
 public class EnemyCombatSystem : NetworkBehaviour
 {
@@ -23,6 +24,9 @@ public class EnemyCombatSystem : NetworkBehaviour
 
     [Header("Efeitos Visuais")]
     public GameObject attackVfxPrefab;
+
+    [Header("FMOD - Sons")]
+    [EventRef] public string eventoAtaque;
 
     [Header("Referencias")]
     public Transform attackPoint;
@@ -186,6 +190,11 @@ public class EnemyCombatSystem : NetworkBehaviour
         else
         {
             Debug.LogWarning("[EnemyCombatSystem] Animator nao encontrado no inimigo para tocar animacao de ataque.");
+        }
+
+        if (!string.IsNullOrEmpty(eventoAtaque))
+        {
+            RuntimeManager.PlayOneShot(eventoAtaque, transform.position);
         }
     }
 

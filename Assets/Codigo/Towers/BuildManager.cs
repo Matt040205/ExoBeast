@@ -59,6 +59,9 @@ public class BuildManager : NetworkBehaviour
     [Tooltip("Objeto da Fog (Neblina) para desativar durante a construção e reativar ao sair.")]
     public GameObject fogObject;
 
+    [Header("FMOD - Sons")]
+    [EventRef] public string somConstrucao;
+
     private GameObject currentBuildGhost;
     private GameObject selectedBuildablePrefab;
     private object selectedBuildableData;
@@ -694,6 +697,11 @@ public class BuildManager : NetworkBehaviour
         if (TutorialManager.Instance != null)
         {
             TutorialManager.Instance.TriggerTutorial("RETURN_TO_COMMANDER");
+        }
+
+        if (!string.IsNullOrEmpty(somConstrucao))
+        {
+            RuntimeManager.PlayOneShot(somConstrucao, pos);
         }
 
         StartCoroutine(UpdateUIAfterSpawn());
