@@ -14,7 +14,39 @@ using UnityEngine.InputSystem;
 /// </summary>
 public class PauseControl : MonoBehaviour
 {
-    public static bool isPaused = false;
+    private static bool _isPaused = false;
+    public static bool isPaused
+    {
+        get { return _isPaused; }
+        set
+        {
+            _isPaused = value;
+            
+            bool isSingleplayer = true;
+            if (ExoBeasts.Managers.GameModeManager.HasInstance)
+            {
+                isSingleplayer = (ExoBeasts.Managers.GameModeManager.CurrentMode == ExoBeasts.Managers.GameMode.Singleplayer);
+            }
+            else
+            {
+                // Fallback caso o GameModeManager não esteja na cena
+                isSingleplayer = !ExoBeasts.Managers.GameModeManager.IsNetworkSession;
+            }
+
+            Debug.Log($"[PauseControl Debug] isPaused mudou para: {_isPaused} | Modo Singleplayer: {isSingleplayer} | CurrentMode: {(ExoBeasts.Managers.GameModeManager.HasInstance ? ExoBeasts.Managers.GameModeManager.CurrentMode.ToString() : "N/A")} | IsNetworkSession: {ExoBeasts.Managers.GameModeManager.IsNetworkSession}");
+
+            if (isSingleplayer)
+            {
+                Time.timeScale = _isPaused ? 0f : 1f;
+                Debug.Log($"[PauseControl Debug] Time.timeScale definido para: {Time.timeScale}");
+            }
+            else
+            {
+                // Em multiplayer real cooperativo, mantemos 1f para não desincronizar
+                Time.timeScale = 1f;
+            }
+        }
+    }
     private static PauseControl activeInstance;
 
     public KeyCode teclaPausePrincipal = KeyCode.Escape;
@@ -29,6 +61,7 @@ public class PauseControl : MonoBehaviour
             return;
         }
         activeInstance = this;
+        isPaused = false; // Força inicialização limpa e define timeScale = 1f
     }
 
     void OnDestroy()
