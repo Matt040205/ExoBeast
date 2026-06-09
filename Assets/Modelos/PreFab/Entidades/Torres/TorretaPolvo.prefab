@@ -137,6 +137,7 @@ GameObject:
   - component: {fileID: 1705559470143370394}
   - component: {fileID: 3129137730661931646}
   - component: {fileID: 4457858481867723824}
+  - component: {fileID: -8358111898368900478}
   m_Layer: 8
   m_Name: TorretaPolvo
   m_TagString: Untagged
@@ -233,6 +234,7 @@ MonoBehaviour:
   rotationOffset: {x: 0, y: 0, z: 0}
   somTiro: 
   enemyTag: Enemy
+  attackSpeedMultiplier: 1
   IsInvulnerable: 0
 --- !u!114 &-205302558624587401
 MonoBehaviour:
@@ -260,7 +262,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 2831531947
+  GlobalObjectIdHash: 127251062
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -446,6 +448,18 @@ NavMeshObstacle:
   m_CarveOnlyStationary: 1
   m_Center: {x: 0, y: 0, z: 0}
   m_TimeToStationary: 0.5
+--- !u!114 &-8358111898368900478
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3448483011433730354}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2a2e24f026a7b9a418abf4db13a9629b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &5701473633542325358
 GameObject:
   m_ObjectHideFlags: 0

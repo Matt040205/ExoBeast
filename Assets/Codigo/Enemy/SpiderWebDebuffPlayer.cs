@@ -2,8 +2,12 @@ using UnityEngine;
 using System.Collections;
 using Unity.Netcode;
 
-public class SpiderWebDebuffPlayer : MonoBehaviour
+public class SpiderWebDebuffPlayer : NetworkBehaviour
 {
+    [Header("UI - Mensagens")]
+    [Tooltip("Texto exibido quando o jogador está preso. Use {0} para mostrar a quantidade de cliques restantes.")]
+    public string textoPreso = "PRESO! Aperte ESPAÇO {0} vezes para se libertar!";
+
     private PlayerHealthSystem healthSystem;
     private PlayerMovement movement;
 
@@ -24,19 +28,15 @@ public class SpiderWebDebuffPlayer : MonoBehaviour
 
     public void OnHit(bool enableTrap)
     {
+        if (!IsServer) return;
         if (healthSystem == null || movement == null) return;
-
-        // Se já está preso, ignora novos acúmulos
         if (isTrapped) return;
 
         hitCount++;
         slowTimer = SLOW_DURATION;
 
         // Aplica lentidão (50% de velocidade) no servidor
-        if (NetworkManager.Singleton.IsServer)
-        {
-            healthSystem.speedMultiplier.Value = 0.5f;
-        }
+        healthSystem.speedMultiplier.Value = 0.5f;
 
         // Verifica se ultrapassou o limite de teias para prender
         if (hitCount >= 5 && enableTrap)
@@ -56,19 +56,18 @@ public class SpiderWebDebuffPlayer : MonoBehaviour
         isTrapped = true;
         spacePressesRemaining = 4;
 
-        if (NetworkManager.Singleton.IsServer)
-        {
-            movement.netIsWebTrapped.Value = true;
-            // Opcional: pode manter a velocidade reduzida para quando ele se libertar
-            healthSystem.speedMultiplier.Value = 0.5f;
-        }
+        movement.netIsWebTrapped.Value = true;
+        healthSystem.speedMultiplier.Value = 0.5f;
 
         if (debuffCoroutine != null) StopCoroutine(debuffCoroutine);
+
+        // Envia RPC para mostrar o alerta no cliente dono
+        ShowTrappedNotificationClientRpc(spacePressesRemaining);
     }
 
     public void RegisterSpacePress()
     {
-        if (!isTrapped) return;
+        if (!IsServer || !isTrapped) return;
 
         spacePressesRemaining--;
         Debug.Log($"[SpiderWebDebuffPlayer] Cliques restantes para se libertar: {spacePressesRemaining}");
@@ -77,6 +76,11 @@ public class SpiderWebDebuffPlayer : MonoBehaviour
         {
             ReleasePlayer();
         }
+        else
+        {
+            // Atualiza a notificação na tela do jogador
+            ShowTrappedNotificationClientRpc(spacePressesRemaining);
+        }
     }
 
     private void ReleasePlayer()
@@ -84,13 +88,11 @@ public class SpiderWebDebuffPlayer : MonoBehaviour
         isTrapped = false;
         hitCount = 0;
 
-        if (NetworkManager.Singleton.IsServer)
-        {
-            movement.netIsWebTrapped.Value = false;
-            healthSystem.speedMultiplier.Value = 1f; // restaura velocidade total
-        }
+        movement.netIsWebTrapped.Value = false;
+        healthSystem.speedMultiplier.Value = 1f; // restaura velocidade total
 
-        Destroy(this);
+        // Limpa a notificação na tela do jogador
+        ClearTrappedNotificationClientRpc();
     }
 
     private IEnumerator SlowCountdown()
@@ -101,21 +103,39 @@ public class SpiderWebDebuffPlayer : MonoBehaviour
             yield return null;
         }
 
-        // Se o tempo da lentidão expirou sem ele ficar preso
         if (!isTrapped)
         {
             hitCount = 0;
-            if (NetworkManager.Singleton.IsServer)
-            {
-                healthSystem.speedMultiplier.Value = 1f;
-            }
-            Destroy(this);
+            healthSystem.speedMultiplier.Value = 1f;
+        }
+    }
+
+    [ClientRpc]
+    private void ShowTrappedNotificationClientRpc(int presses)
+    {
+        if (!IsOwner) return;
+
+        if (PlayerHUD.Instance != null)
+        {
+            string formattedMsg = string.Format(textoPreso, presses);
+            PlayerHUD.Instance.SetAlertaPresoText(formattedMsg);
+        }
+    }
+
+    [ClientRpc]
+    private void ClearTrappedNotificationClientRpc()
+    {
+        if (!IsOwner) return;
+
+        if (PlayerHUD.Instance != null)
+        {
+            PlayerHUD.Instance.SetAlertaPresoText("");
         }
     }
 
     private void OnDestroy()
     {
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
+        if (IsServer)
         {
             if (movement != null) movement.netIsWebTrapped.Value = false;
             if (healthSystem != null) healthSystem.speedMultiplier.Value = 1f;

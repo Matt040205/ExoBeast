@@ -47,10 +47,14 @@ public class PlayerMovement : NetworkBehaviour
     public float landingRaycastDistance = 1.2f;
     private bool isAboutToLand;
 
-    [Header("FMOD")]
-    [EventRef] public string eventoPassos = "event:/SFX/Passos";
+    [Header("FMOD - Passos por Superfície")]
+    [EventRef] public string eventoPassosTerra = "event:/SFX/Passos";
+    [EventRef] public string eventoPassosConcreto;
+    [EventRef] public string eventoPassosAgua;
     private EventInstance passosSoundInstance;
     private bool isPlayingFootsteps = false;
+    private TerrainSurfaceDetector surfaceDetector;
+    private TerrainSurfaceDetector.SurfaceType lastSurface = TerrainSurfaceDetector.SurfaceType.Terra;
 
     [HideInInspector] public bool isDashing = false;
 
@@ -152,11 +156,8 @@ public class PlayerMovement : NetworkBehaviour
         networkAnimator = GetComponent<NetworkAnimator>();
         if (networkAnimator == null) networkAnimator = GetComponentInChildren<NetworkAnimator>();
 
-        if (!string.IsNullOrEmpty(eventoPassos))
-        {
-            passosSoundInstance = RuntimeManager.CreateInstance(eventoPassos);
-            RuntimeManager.AttachInstanceToGameObject(passosSoundInstance, transform);
-        }
+        surfaceDetector = GetComponent<TerrainSurfaceDetector>();
+        CreateFootstepInstance(GetEventForSurface(TerrainSurfaceDetector.SurfaceType.Terra));
     }
 
     public override void OnNetworkSpawn()
@@ -636,6 +637,25 @@ public class PlayerMovement : NetworkBehaviour
 
     private void PlayFootstepSound()
     {
+        // Detecta mudança de superfície e troca o evento se necessário
+        if (surfaceDetector != null)
+        {
+            TerrainSurfaceDetector.SurfaceType current = surfaceDetector.CurrentSurface;
+            if (current != lastSurface)
+            {
+                lastSurface = current;
+                string newEvent = GetEventForSurface(current);
+                if (!string.IsNullOrEmpty(newEvent))
+                {
+                    bool wasPlaying = isPlayingFootsteps;
+                    StopFootstepSound();
+                    ReleaseFootstepInstance();
+                    CreateFootstepInstance(newEvent);
+                    if (wasPlaying) { passosSoundInstance.start(); isPlayingFootsteps = true; }
+                }
+            }
+        }
+
         if (!isPlayingFootsteps && passosSoundInstance.isValid())
         {
             passosSoundInstance.start();
@@ -652,9 +672,34 @@ public class PlayerMovement : NetworkBehaviour
         }
     }
 
-    private void OnDestroy()
+    private string GetEventForSurface(TerrainSurfaceDetector.SurfaceType surface)
+    {
+        switch (surface)
+        {
+            case TerrainSurfaceDetector.SurfaceType.Concreto: return eventoPassosConcreto;
+            case TerrainSurfaceDetector.SurfaceType.Agua:     return eventoPassosAgua;
+            case TerrainSurfaceDetector.SurfaceType.Terra:
+            default:                                          return eventoPassosTerra;
+        }
+    }
+
+    private void CreateFootstepInstance(string eventPath)
+    {
+        if (!string.IsNullOrEmpty(eventPath))
+        {
+            passosSoundInstance = RuntimeManager.CreateInstance(eventPath);
+            RuntimeManager.AttachInstanceToGameObject(passosSoundInstance, transform);
+        }
+    }
+
+    private void ReleaseFootstepInstance()
     {
         if (passosSoundInstance.isValid()) passosSoundInstance.release();
+    }
+
+    private void OnDestroy()
+    {
+        ReleaseFootstepInstance();
     }
 
     [ServerRpc]

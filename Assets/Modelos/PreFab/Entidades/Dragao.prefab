@@ -29,6 +29,7 @@ GameObject:
   - component: {fileID: -6223414218303703111}
   - component: {fileID: 3066054497840770125}
   - component: {fileID: 4766425395099214609}
+  - component: {fileID: 7430468625175640989}
   m_Layer: 6
   m_Name: Dragao
   m_TagString: Player
@@ -171,7 +172,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 2725242546
+  GlobalObjectIdHash: 4263055735
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -218,6 +219,8 @@ MonoBehaviour:
   isFloating: 0
   floatDuration: 0
   jumpHeightModifier: 1
+  netIsWebTrapped:
+    m_InternalValue: 0
 --- !u!114 &-1770711784118414456
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -676,6 +679,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   radius: 0.7
+--- !u!114 &7430468625175640989
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 15912487291283997}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1243dbbee57227c419ceabc5c11840fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  textoPreso: "PRESO! Aperte ESPA\xC7O {0} vezes para se libertar!"
 --- !u!1 &2229213434603997921
 GameObject:
   m_ObjectHideFlags: 0

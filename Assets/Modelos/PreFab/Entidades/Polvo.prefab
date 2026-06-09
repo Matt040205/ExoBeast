@@ -352,6 +352,7 @@ GameObject:
   - component: {fileID: 7926698676025372789}
   - component: {fileID: 6587038865536683852}
   - component: {fileID: 5025570203272996356}
+  - component: {fileID: 6632895109608802784}
   m_Layer: 6
   m_Name: Polvo
   m_TagString: Player
@@ -493,7 +494,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d5a57f767e5e46a458fc5d3c628d0cbb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  GlobalObjectIdHash: 671670237
+  GlobalObjectIdHash: 1640674918
   InScenePlacedSourceGlobalObjectIdHash: 0
   AlwaysReplicateAsRoot: 0
   SynchronizeTransform: 1
@@ -540,6 +541,8 @@ MonoBehaviour:
   isFloating: 0
   floatDuration: 0
   jumpHeightModifier: 1
+  netIsWebTrapped:
+    m_InternalValue: 0
 --- !u!114 &4775827030820370958
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1001,6 +1004,19 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   radius: 0.7
+--- !u!114 &6632895109608802784
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7665187458952505880}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1243dbbee57227c419ceabc5c11840fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  textoPreso: "PRESO! Aperte ESPA\xC7O {0} vezes para se libertar!"
 --- !u!1001 &4197473869668565162
 PrefabInstance:
   m_ObjectHideFlags: 0

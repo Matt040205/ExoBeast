@@ -1,4 +1,5 @@
 using UnityEngine;
+using FMODUnity;
 
 public class SpiderRangedAttack : MonoBehaviour
 {
@@ -8,6 +9,9 @@ public class SpiderRangedAttack : MonoBehaviour
     
     [Tooltip("Habilita a mecânica do alvo ser preso por teias ao receber múltiplos hits.")]
     public bool enableTrapMechanic = true;
+
+    [Header("FMOD - Sons")]
+    [EventRef] public string eventoAtaque;
 
     public void FireProjectile(Transform target, float damage)
     {
@@ -19,6 +23,11 @@ public class SpiderRangedAttack : MonoBehaviour
 
         Vector3 spawnPosition = firePoint != null ? firePoint.position : transform.position;
         GameObject projObj = Instantiate(webProjectilePrefab, spawnPosition, Quaternion.identity);
+
+        if (!string.IsNullOrEmpty(eventoAtaque))
+        {
+            RuntimeManager.PlayOneShot(eventoAtaque, spawnPosition);
+        }
         
         SpiderWebProjectile projectile = projObj.GetComponent<SpiderWebProjectile>();
         if (projectile != null)

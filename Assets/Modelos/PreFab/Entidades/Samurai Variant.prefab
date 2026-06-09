@@ -2430,6 +2430,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 2682399473942067493, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7248286368123582263}
+    - targetCorrespondingSourceObject: {fileID: 2682399473942067493, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2460224368843455704}
   m_SourcePrefab: {fileID: 100100000, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
 --- !u!4 &5251540604817601221 stripped
 Transform:
@@ -2667,3 +2670,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   radius: 0.7
+--- !u!114 &2460224368843455704
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6275176270602792791}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1243dbbee57227c419ceabc5c11840fc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  textoPreso: "PRESO! Aperte ESPA\xC7O {0} vezes para se libertar!"

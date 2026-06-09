@@ -36,6 +36,10 @@ public class PlayerHUD : MonoBehaviour
     public Image ability2_CooldownFill;
     public Image ultimate_ChargeFill;
 
+    [Header("Referencias de Alerta/Status")]
+    [Tooltip("Arraste o TextMeshProUGUI para o alerta de estar preso por teia")]
+    public TMP_Text textAlertaPreso;
+
     [Header("Configuracoes Visuais")]
     public float healthLerpSpeed = 5f;
     public Color fullHealthColor = Color.green;
@@ -308,5 +312,14 @@ public class PlayerHUD : MonoBehaviour
             playerHealth.currentHealth.OnValueChanged -= OnPlayerHealthChanged;
 
         ObjectiveHealthBus.OnObjectiveHealthChanged -= OnObjectiveHealthChanged;
+    }
+
+    public void SetAlertaPresoText(string text)
+    {
+        if (textAlertaPreso != null)
+        {
+            textAlertaPreso.text = text;
+            textAlertaPreso.gameObject.SetActive(!string.IsNullOrEmpty(text));
+        }
     }
 }
