@@ -55,6 +55,7 @@ public class TowerController : MonoBehaviour
     private float currentCritChance;
     private float currentCritDamage;
     private float currentArmorPenetration;
+    [HideInInspector] public float attackSpeedMultiplier = 1f;
 
     private List<TowerBehavior> activeBehaviors = new List<TowerBehavior>();
 
@@ -139,6 +140,7 @@ public class TowerController : MonoBehaviour
         CurrentRange = towerData.attackRange;
         IsDestroyed = false;
         TargetsFlyingEnemies = false;
+        attackSpeedMultiplier = 1f;
     }
 
     // --- MUDANÃ‡A IMPORTANTE AQUI ---
@@ -274,7 +276,8 @@ public class TowerController : MonoBehaviour
         fireCountdown -= Time.deltaTime;
         if (fireCountdown <= 0f)
         {
-            fireCountdown = 1f / currentAttackSpeed;
+            float effectiveAttackSpeed = currentAttackSpeed * attackSpeedMultiplier;
+            fireCountdown = effectiveAttackSpeed > 0f ? 1f / effectiveAttackSpeed : 99999f;
             Shoot();
         }
     }

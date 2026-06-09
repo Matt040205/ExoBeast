@@ -70,6 +70,7 @@ public class BuildManager : NetworkBehaviour
     private PlayerInput scenePlayerInput;
     private LocalPlayerInputBridge localOwnerInputBridge;
     private int lastBuildToggleFrame = -1;
+    private bool originalFogState = true;
 
     private readonly Dictionary<int, HashSet<ulong>> authoritativeTrapInstances = new Dictionary<int, HashSet<ulong>>();
     private readonly Dictionary<int, int> pendingTrapPlacements = new Dictionary<int, int>();
@@ -86,6 +87,7 @@ public class BuildManager : NetworkBehaviour
         }
         Instance = this;
         isBuildingMode = false;
+        originalFogState = RenderSettings.fog;
         DisableCompetingScenePlayerInput();
     }
 
@@ -288,6 +290,9 @@ public class BuildManager : NetworkBehaviour
     void ToggleBuildMode(bool state)
     {
         if (TopDownCameraManager.Instance != null) TopDownCameraManager.Instance.ToggleTopDownView(state);
+
+        // Desativa a Fog do Lighting ao entrar no modo build, e restaura o estado original ao sair
+        RenderSettings.fog = state ? false : originalFogState;
 
         // Desativa ou reativa a Fog dependendo do estado do modo de construção
         if (fogObject != null)

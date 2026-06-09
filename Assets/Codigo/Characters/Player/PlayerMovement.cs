@@ -127,6 +127,10 @@ public class PlayerMovement : NetworkBehaviour
 
     private bool jaMoveuTutorial = false;
     private PlayerHealthSystem healthSystem;
+
+    [HideInInspector]
+    public NetworkVariable<bool> netIsWebTrapped = new NetworkVariable<bool>(
+        false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     private LocalPlayerInputBridge inputBridge;
     private bool loggedMovementFallbackWithoutCamera;
     private float currentAnimatorMovementSpeed;
@@ -252,6 +256,11 @@ public class PlayerMovement : NetworkBehaviour
 
     private void HandleJumpPressed()
     {
+        if (netIsWebTrapped.Value)
+        {
+            RequestBreakWebSpacePressServerRpc();
+            return;
+        }
         if (GetComponent<MergulhoTintaLogic>() != null) return;
         if (PauseControl.isPaused || BuildManager.isBuildingMode || isFloating || isDashing) return;
 
@@ -453,6 +462,18 @@ public class PlayerMovement : NetworkBehaviour
     private void HandleMovement()
     {
         TryResolveCriticalReferences(false);
+
+        if (netIsWebTrapped.Value)
+        {
+            controller.Move(Vector3.zero);
+            if (animator != null)
+            {
+                animator.SetFloat("MovementSpeed", 0f, 0.1f, Time.deltaTime);
+            }
+            currentAnimatorMovementSpeed = 0f;
+            StopFootstepSound();
+            return;
+        }
 
         direction = new Vector3(inputMove.x, 0f, inputMove.y);
         currentSpeed = inputRun ? runSpeed : walkSpeed;
@@ -869,5 +890,17 @@ public class PlayerMovement : NetworkBehaviour
             probeDistance,
             probeMask,
             QueryTriggerInteraction.Ignore);
+    }
+
+    [ServerRpc]
+    private void RequestBreakWebSpacePressServerRpc()
+    {
+        if (!netIsWebTrapped.Value) return;
+
+        SpiderWebDebuffPlayer debuff = GetComponent<SpiderWebDebuffPlayer>();
+        if (debuff != null)
+        {
+            debuff.RegisterSpacePress();
+        }
     }
 }

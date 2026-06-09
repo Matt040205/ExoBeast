@@ -67,6 +67,7 @@ public class EnemyController : MonoBehaviour
     private readonly List<Transform> playerTargetCandidates = new List<Transform>(4);
 
     private const string TAG_POCA = "Poca";
+    private bool targetPlayerNext = true;
 
     public EnemyDataSO enemyData { get; private set; }
 
@@ -166,42 +167,15 @@ public class EnemyController : MonoBehaviour
             {
                 yield return new WaitForSeconds(0.3f);
                 continue;
-            }
+            }            DecideTargetTick();
 
-            DecideTargetTick();
+            ResumeMovement();
+            PatrolTick();
 
             if (target != null)
             {
-                if (agent.isStopped)
-                {
-                    if (!IsTargetInDisengageRange())
-                    {
-                        ResumeMovement();
-                        MoveTowardsPositionTick(target.position);
-                    }
-                    else
-                    {
-                        FaceTarget();
-                    }
-                }
-                else
-                {
-                    if (IsTargetInAttackRange())
-                    {
-                        HoldAttackPosition();
-                    }
-                    else
-                    {
-                        ResumeMovement();
-                        MoveTowardsPositionTick(target.position);
-                    }
-                }
-            }
-            else
-            {
-                ResumeMovement();
-                PatrolTick();
-            }
+                FaceTarget();
+            }   
 
             if (agent != null && agent.enabled && agent.isOnNavMesh && !agent.isStopped)
             {
@@ -252,15 +226,15 @@ public class EnemyController : MonoBehaviour
         }
     }
 
-    private static readonly Collider[] _targetingBuffer = new Collider[64];
-
+    private static readonly Collider[] _targetingBuffer = new Collider[64];    
+    
     private void DecideTargetTick()
     {
         float allowedRadius = (mainPriority == AITargetPriority.Player) ? findDistance : selfDefenseRadius;
 
-        Transform nearestEntity = null;
-        float nearestDistance = float.MaxValue;
-
+        // 1. Encontra Player mais próximo
+        Transform nearestPlayer = null;
+        float nearestPlayerDist = float.MaxValue;
         PlayerRegistry.CollectValidPlayerTransforms(playerTargetCandidates);
         foreach (Transform player in playerTargetCandidates)
         {
@@ -268,77 +242,73 @@ public class EnemyController : MonoBehaviour
                 continue;
 
             float distance = GetDistanceToTarget(player);
-            if (distance < nearestDistance)
+            if (distance < nearestPlayerDist)
             {
-                nearestDistance = distance;
-                nearestEntity = player;
+                nearestPlayerDist = distance;
+                nearestPlayer = player;
             }
         }
 
-        bool usePhysicsBuildFallback = !TryEvaluateRegisteredBuildTargets(allowedRadius, ref nearestEntity, ref nearestDistance);
-
-        if (usePhysicsBuildFallback)
+        // 2. Encontra Torre mais próxima
+        Transform nearestTower = null;
+        float nearestTowerDist = float.MaxValue;
+        int hitCount = Physics.OverlapSphereNonAlloc(transform.position, allowedRadius, _targetingBuffer);
+        for (int i = 0; i < hitCount; i++)
         {
-            int hitCount = Physics.OverlapSphereNonAlloc(transform.position, allowedRadius, _targetingBuffer);
-            for (int i = 0; i < hitCount; i++)
+            Collider col = _targetingBuffer[i];
+            if (col == null) continue;
+
+            TowerController towerObj = col.GetComponent<TowerController>();
+            if (towerObj != null && !towerObj.IsDestroyed)
             {
-                Collider col = _targetingBuffer[i];
-                if (col == null) continue;
-
-                TowerController tower = col.GetComponent<TowerController>();
-                if (tower != null)
+                float distance = GetDistanceToTarget(col.transform);
+                if (distance < nearestTowerDist)
                 {
-                    if (tower.IsDestroyed) continue;
-
-                    float distance = GetDistanceToTarget(col.transform);
-                    if (distance < nearestDistance)
-                    {
-                        nearestDistance = distance;
-                        nearestEntity = col.transform;
-                    }
-                    continue;
+                    nearestTowerDist = distance;
+                    nearestTower = col.transform;
                 }
+                continue;
+            }
 
-                if (col.GetComponent<NetworkedBuilding>() != null)
+            if (col.GetComponent<NetworkedBuilding>() != null)
+            {
+                float distance = GetDistanceToTarget(col.transform);
+                if (distance < nearestTowerDist)
                 {
-                    float distance = GetDistanceToTarget(col.transform);
-                    if (distance < nearestDistance)
-                    {
-                        nearestDistance = distance;
-                        nearestEntity = col.transform;
-                    }
+                    nearestTowerDist = distance;
+                    nearestTower = col.transform;
                 }
             }
         }
 
-        if (nearestEntity != null && nearestDistance <= allowedRadius)
+        // 3. Aplica lógica alternada
+        if (nearestPlayer != null && nearestPlayerDist <= allowedRadius && nearestTower != null && nearestTowerDist <= allowedRadius)
         {
-            if (target != nearestEntity)
+            // Ambos estão no alcance, alterna!
+            if (targetPlayerNext)
             {
-                target = nearestEntity;
-                initialChasePosition = transform.position;
-                currentChaseTimer = 0f;
-                SetAggroVisual(true);
+                target = nearestPlayer;
             }
             else
             {
-                currentChaseTimer += 0.3f;
-                float distanceTraveled = Vector3.Distance(transform.position, initialChasePosition);
-
-                if (currentChaseTimer >= maxChaseTime ||
-                    distanceTraveled >= maxChaseDistance ||
-                    nearestDistance > loseSightDistance)
-                {
-                    target = null;
-                    currentChaseTimer = 0f;
-                    SetAggroVisual(false);
-                }
+                target = nearestTower;
             }
+            targetPlayerNext = !targetPlayerNext;
+            SetAggroVisual(true);
+        }
+        else if (nearestPlayer != null && nearestPlayerDist <= allowedRadius)
+        {
+            target = nearestPlayer;
+            SetAggroVisual(true);
+        }
+        else if (nearestTower != null && nearestTowerDist <= allowedRadius)
+        {
+            target = nearestTower;
+            SetAggroVisual(true);
         }
         else
         {
             target = null;
-            currentChaseTimer = 0f;
             SetAggroVisual(false);
         }
     }

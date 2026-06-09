@@ -81,11 +81,6 @@ public class EnemyCombatSystem : NetworkBehaviour
             return;
 
         currentDamage = enemyData.GetDamage(nivel);
-
-        if (towerAuraCoroutine != null)
-            StopCoroutine(towerAuraCoroutine);
-
-        towerAuraCoroutine = StartCoroutine(TowerAuraCycle());
         ResetAttackState();
     }
 
@@ -110,7 +105,6 @@ public class EnemyCombatSystem : NetworkBehaviour
 
         if (attackCoroutine != null)
         {
-            enemyController.HoldAttackPosition();
             return;
         }
 
@@ -122,7 +116,6 @@ public class EnemyCombatSystem : NetworkBehaviour
 
         if (Time.time < nextAttackTime)
         {
-            enemyController.HoldAttackPosition();
             return;
         }
 
@@ -145,14 +138,22 @@ public class EnemyCombatSystem : NetworkBehaviour
         nextAttackTime = Time.time + cooldown;
 
         // O dano ocorrerá via AnimationEvent_ApplyDamage().
-        // Aguardamos o tempo total de recarga (cooldown) para finalizar o ciclo.
-        yield return new WaitForSeconds(cooldown);
-
-        attackState = AttackState.Idle;
-        attackCoroutine = null;
+        // Em vez de pausar a caminhada por todo o cooldown, pausamos por no máximo 0.5 segundos (tempo do golpe)
+        // e liberamos o inimigo para continuar andando em direção à base enquanto recarrega.
+        float pauseTime = Mathf.Min(0.5f, cooldown);
+        yield return new WaitForSeconds(pauseTime);
 
         if (enemyController != null)
             enemyController.ResumeMovement();
+
+        float remainingCooldown = cooldown - pauseTime;
+        if (remainingCooldown > 0f)
+        {
+            yield return new WaitForSeconds(remainingCooldown);
+        }
+
+        attackState = AttackState.Idle;
+        attackCoroutine = null;
     }
 
     // =======================================================================
@@ -263,14 +264,22 @@ public class EnemyCombatSystem : NetworkBehaviour
         if (enemyController.IsBlinded && Random.value < 0.8f)
             return;
 
-        DealDamageToTarget(targetTransform);
+        SpiderRangedAttack rangedAttack = GetComponent<SpiderRangedAttack>();
+        if (rangedAttack != null)
+        {
+            rangedAttack.FireProjectile(targetTransform, currentDamage);
+        }
+        else
+        {
+            DealDamageToTarget(targetTransform);
 
-        EnemyBleedAttack bleed = GetComponent<EnemyBleedAttack>();
-        if (bleed != null)
-            bleed.ApplyBleed(targetTransform);
+            EnemyBleedAttack bleed = GetComponent<EnemyBleedAttack>();
+            if (bleed != null)
+                bleed.ApplyBleed(targetTransform);
 
-        if (enemyData.enemyType != EnemyType.Voador)
-            ApplyDamageInArea(targetTransform);
+            if (enemyData.enemyType != EnemyType.Voador)
+                ApplyDamageInArea(targetTransform);
+        }
     }
 
     private void DealDamageToTarget(Transform targetTransform)
@@ -332,30 +341,7 @@ public class EnemyCombatSystem : NetworkBehaviour
         }
     }
 
-    private IEnumerator TowerAuraCycle()
-    {
-        yield return null;
-
-        while (enemyController != null && !enemyController.IsDead)
-        {
-            ApplyAuraDamageToTowers();
-            yield return new WaitForSeconds(towerAuraInterval);
-        }
-    }
-
-    private void ApplyAuraDamageToTowers()
-    {
-        if (!IsServer)
-            return;
-
-        Collider[] hitTowers = Physics.OverlapSphere(transform.position, towerAuraRadius, towerLayer);
-        foreach (Collider towerCollider in hitTowers)
-        {
-            TowerController tower = towerCollider.GetComponent<TowerController>();
-            if (tower != null)
-                tower.TakeDamage(towerAuraDamage);
-        }
-    }
+    // Aura de dano removida conforme solicitação.
 
     private void ResetAttackState()
     {
