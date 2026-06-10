@@ -60,7 +60,7 @@ public class BuildManager : NetworkBehaviour
     public GameObject fogObject;
 
     [Header("FMOD - Sons")]
-    [EventRef] public string somConstrucao;
+    [EventRef] public string somConstrucao = "event:/Towers/Spawn_Magic";
 
     private GameObject currentBuildGhost;
     private GameObject selectedBuildablePrefab;

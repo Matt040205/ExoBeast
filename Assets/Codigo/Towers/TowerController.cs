@@ -29,7 +29,7 @@ public class TowerController : MonoBehaviour
     public Vector3 rotationOffset;
 
     [Header("FMOD - Sons")]
-    [EventRef] public string somTiro;
+    [EventRef] public string somTiro = "event:/Towers/Shot_Magic";
 
     [Header("ConfiguraÃ§Ãµes de IA")]
     [SerializeField] private string enemyTag = "Enemy";

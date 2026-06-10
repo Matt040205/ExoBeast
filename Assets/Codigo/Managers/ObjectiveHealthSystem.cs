@@ -19,7 +19,7 @@ public class ObjectiveHealthSystem : NetworkBehaviour
     public event Action OnHealthChanged;
 
     [Header("FMOD - Sons")]
-    [EventRef] public string somBaseAtacada;
+    [EventRef] public string somBaseAtacada = "event:/Base/Hit_Light";
 
     private bool isDead;
     private float localHealth;

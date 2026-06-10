@@ -21,7 +21,7 @@ public class PeaceOfMindLogic : NetworkBehaviour
 
     [Header("FMOD")]
     [EventRef]
-    public string eventoCura = "event:/SFX/Cura";
+    public string eventoCura = "event:/Player/Heal";
 
     public void StartEffect(float totalHeal, float duration, Ability sourceAbility)
     {

@@ -48,9 +48,9 @@ public class PlayerMovement : NetworkBehaviour
     private bool isAboutToLand;
 
     [Header("FMOD - Passos por Superfície")]
-    [EventRef] public string eventoPassosTerra = "event:/SFX/Passos";
-    [EventRef] public string eventoPassosConcreto;
-    [EventRef] public string eventoPassosAgua;
+    [EventRef] public string eventoPassosTerra = "event:/Player/Footsteps/Dirt";
+    [EventRef] public string eventoPassosConcreto = "event:/Player/Footsteps/Concrete";
+    [EventRef] public string eventoPassosAgua = "event:/Player/Footsteps/Water";
     private EventInstance passosSoundInstance;
     private bool isPlayingFootsteps = false;
     private TerrainSurfaceDetector surfaceDetector;

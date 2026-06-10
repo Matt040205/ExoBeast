@@ -42,8 +42,8 @@ public class PlayerShooting : NetworkBehaviour
     [EventRef] public string eventoTiroUnicoArma = "event:/SFX/Atirar";
     [EventRef] public string eventoTiroContinuoArma = "event:/SFX/Atirar_segurando";
     [EventRef] public string eventoRecargaArma = "event:/SFX/Recarga Arma";
-    [EventRef] public string eventoTiroUnicoArco = "event:/SFX/Arco";
-    [EventRef] public string eventoTiroContinuoArco = "event:/SFX/Arco";
+    [EventRef] public string eventoTiroUnicoArco = "event:/Player/Bow_Shot";
+    [EventRef] public string eventoTiroContinuoArco = "event:/Player/Bow_Shot";
 
     [Header("Raycast Settings")]
     public float maxDistance = 100f;
