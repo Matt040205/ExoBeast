@@ -420,14 +420,18 @@ public class PlayerHealthSystem : NetworkBehaviour
             combatScript = GetComponent<PlayerCombatManager>();
 
             controllerWasEnabled = controller != null && controller.enabled;
-            movementWasEnabled = movementScript != null && movementScript.enabled;
-            shootingWasEnabled = shootingScript != null && shootingScript.enabled;
-            combatWasEnabled = combatScript != null && combatScript.enabled;
+            // BUGFIX: O PlayerNetworkSetup habilita os componentes via coroutine (2+ frames
+            // após OnNetworkSpawn). Se este flow capturar o estado ANTES disso, ele restaurará
+            // tudo como desabilitado. Para o owner, sempre forçamos true no restore, garantindo
+            // que o jogador local nunca fique travado após a materialização do holograma.
+            movementWasEnabled = true;
+            shootingWasEnabled = true;
+            combatWasEnabled = true;
 
             if (controllerWasEnabled) controller.enabled = false;
-            if (movementWasEnabled) movementScript.enabled = false;
-            if (shootingWasEnabled) shootingScript.enabled = false;
-            if (combatWasEnabled) combatScript.enabled = false;
+            if (movementScript != null) movementScript.enabled = false;
+            if (shootingScript != null) shootingScript.enabled = false;
+            if (combatScript != null) combatScript.enabled = false;
         }
 
         try
