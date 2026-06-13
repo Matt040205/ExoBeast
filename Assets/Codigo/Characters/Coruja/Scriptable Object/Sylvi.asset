@@ -10,17 +10,17 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e2027bee059fbbd498af999a02b71322, type: 3}
-  m_Name: Ansgar
+  m_Name: Sylvi
   m_EditorClassIdentifier: 
-  name: Ansgar
+  name: Sylvi
   description: 'Uma torre focada em alcance e perita em acertar inimigos voadores
 
 '
-  maxHealth: 100
-  damage: 35
+  maxHealth: 10
+  damage: 1
   moveSpeed: 5
   reloadSpeed: 1
-  attackSpeed: 1
+  attackSpeed: 1.5
   attackRange: 15
   armor: 0
   critChance: 0.05
@@ -32,6 +32,7 @@ MonoBehaviour:
   fireMode: 0
   meleeAngle: 90
   isCommander: 0
+  desbloqueadoComandantePadrao: 0
   characterIcon: {fileID: 21300000, guid: 82119f4032ab72646a22b35d4fc801ca, type: 3}
   commanderPrefab: {fileID: 1325491475885760399, guid: a6b2566ee8f37924f89ec31a933bb4da, type: 3}
   towerPrefab: {fileID: 5586063003785400700, guid: fcb695c59e8d8aa44a030a957a857285, type: 3}
@@ -44,7 +45,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 65288e2aa44cff14988f5eaacde930b2, type: 2}
   - {fileID: 11400000, guid: e3b5fca90f9ede7468360d926aa3e19d, type: 2}
   - {fileID: 11400000, guid: 2fc44f5f36e25f944888dfed422ae759, type: 2}
-  cost: 600
+  cost: 10
   pontosRastrosDisponiveis: 10
   pontosRastrosGastos: 0
   pontosPorCaminho: []

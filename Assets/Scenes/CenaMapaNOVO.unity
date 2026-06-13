@@ -692,6 +692,43 @@ Transform:
   m_Children: []
   m_Father: {fileID: 737965624}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!84 &465172807
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 512
+  m_Height: 512
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 94
+  m_ColorFormat: 4
+  m_MipMap: 0
+  m_GenerateMips: 1
+  m_SRGB: 1
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 2
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &485546754
 GameObject:
   m_ObjectHideFlags: 0
@@ -820,6 +857,52 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 233.8885, y: 48.152126, z: 173.41208}
   m_Center: {x: -64.14452, y: 23.576063, z: 58.488297}
+--- !u!21 &588995613
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ShaderGrass(Clone)
+  m_Shader: {fileID: -6465566751694194690, guid: c1998fd2a7a6e654e84504d5d3d130c0, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses:
+  - MOTIONVECTORS
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Blend: 1
+    - _BlendMult: 1
+    - _BlendOff: 0
+    - _QueueControl: 0
+    - _QueueOffset: 0
+    m_Colors: []
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
 --- !u!1 &615305395
 GameObject:
   m_ObjectHideFlags: 0
@@ -1698,6 +1781,215 @@ MonoBehaviour:
   timeBetweenWaves: 10
   spawnInterval: 1
   enemiesPerInterval: 1
+  customWaves:
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 12
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 15
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: c2d5ff50d56067b4d964aca900bfe504, type: 2}
+      spawnCount: 2
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 10
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: c2d5ff50d56067b4d964aca900bfe504, type: 2}
+      spawnCount: 3
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 02021e95517318b4390ef87a80f7899c, type: 2}
+      spawnCount: 4
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 15
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 582db1d6265e1454595053331b34f138, type: 2}
+      spawnCount: 4
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 25
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: c2d5ff50d56067b4d964aca900bfe504, type: 2}
+      spawnCount: 5
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 10
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 02021e95517318b4390ef87a80f7899c, type: 2}
+      spawnCount: 10
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 582db1d6265e1454595053331b34f138, type: 2}
+      spawnCount: 12
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: c2d5ff50d56067b4d964aca900bfe504, type: 2}
+      spawnCount: 8
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 20
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 02021e95517318b4390ef87a80f7899c, type: 2}
+      spawnCount: 6
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 582db1d6265e1454595053331b34f138, type: 2}
+      spawnCount: 4
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 35
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 6c387383024c2f64eae487681be4e202, type: 2}
+      spawnCount: 1
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: c2d5ff50d56067b4d964aca900bfe504, type: 2}
+      spawnCount: 8
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 30
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 582db1d6265e1454595053331b34f138, type: 2}
+      spawnCount: 10
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 02021e95517318b4390ef87a80f7899c, type: 2}
+      spawnCount: 25
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: c2d5ff50d56067b4d964aca900bfe504, type: 2}
+      spawnCount: 5
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 6c387383024c2f64eae487681be4e202, type: 2}
+      spawnCount: 3
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 15
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 50
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 6c387383024c2f64eae487681be4e202, type: 2}
+      spawnCount: 4
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 582db1d6265e1454595053331b34f138, type: 2}
+      spawnCount: 15
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: c2d5ff50d56067b4d964aca900bfe504, type: 2}
+      spawnCount: 15
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 02021e95517318b4390ef87a80f7899c, type: 2}
+      spawnCount: 40
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 10
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 582db1d6265e1454595053331b34f138, type: 2}
+      spawnCount: 30
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 6c387383024c2f64eae487681be4e202, type: 2}
+      spawnCount: 2
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 6c387383024c2f64eae487681be4e202, type: 2}
+      spawnCount: 8
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 20
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 02021e95517318b4390ef87a80f7899c, type: 2}
+      spawnCount: 10
+      pathIndex: 0
+      spawnDelay: 0
+  - prepTime: 30
+    spawnSequence:
+    - enemyData: {fileID: 11400000, guid: 6c387383024c2f64eae487681be4e202, type: 2}
+      spawnCount: 20
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 02021e95517318b4390ef87a80f7899c, type: 2}
+      spawnCount: 20
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 582db1d6265e1454595053331b34f138, type: 2}
+      spawnCount: 25
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: c2d5ff50d56067b4d964aca900bfe504, type: 2}
+      spawnCount: 25
+      pathIndex: 0
+      spawnDelay: 0
+    - enemyData: {fileID: 11400000, guid: 47c15c3d3977ace49b133fb01c00434c, type: 2}
+      spawnCount: 50
+      pathIndex: 0
+      spawnDelay: 0
   enemyTypes:
   - {fileID: 11400000, guid: 02021e95517318b4390ef87a80f7899c, type: 2}
   - {fileID: 11400000, guid: c2d5ff50d56067b4d964aca900bfe504, type: 2}
@@ -2212,7 +2504,7 @@ MonoBehaviour:
   geoditesTextBuild: {fileID: 627635311}
   geoditesText: {fileID: 627635321}
   darkEtherText: {fileID: 0}
-  initialGeodites: 10000000
+  initialGeodites: 0
   initialDarkEther: 0
 --- !u!114 &1432832623
 MonoBehaviour:
@@ -2622,43 +2914,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1691828806}
   m_CullTransparentMesh: 1
---- !u!84 &1745151249
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 512
-  m_Height: 512
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 94
-  m_ColorFormat: 4
-  m_MipMap: 0
-  m_GenerateMips: 1
-  m_SRGB: 1
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 2
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &1782622518
 GameObject:
   m_ObjectHideFlags: 0
@@ -2690,52 +2945,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 294664648}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!21 &1822551693
-Material:
-  serializedVersion: 8
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: ShaderGrass(Clone)
-  m_Shader: {fileID: -6465566751694194690, guid: c1998fd2a7a6e654e84504d5d3d130c0, type: 3}
-  m_Parent: {fileID: 0}
-  m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
-  m_InvalidKeywords: []
-  m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
-  stringTagMap: {}
-  disabledShaderPasses:
-  - MOTIONVECTORS
-  m_LockedProperties: 
-  m_SavedProperties:
-    serializedVersion: 3
-    m_TexEnvs:
-    - unity_Lightmaps:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - unity_LightmapsInd:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - unity_ShadowMasks:
-        m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    m_Ints: []
-    m_Floats:
-    - _Blend: 1
-    - _BlendMult: 1
-    - _BlendOff: 0
-    - _QueueControl: 0
-    - _QueueOffset: 0
-    m_Colors: []
-  m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!1 &1842976864
 GameObject:
   m_ObjectHideFlags: 0
@@ -6939,7 +7148,7 @@ PrefabInstance:
     - target: {fileID: 6875118186633323498, guid: 9ed5bc663ea36fc49ba85af6649653e5, type: 3}
       propertyPath: m_TargetTexture
       value: 
-      objectReference: {fileID: 1745151249}
+      objectReference: {fileID: 465172807}
     - target: {fileID: 6912334758927008010, guid: 9ed5bc663ea36fc49ba85af6649653e5, type: 3}
       propertyPath: m_LocalPosition.y
       value: -19.37

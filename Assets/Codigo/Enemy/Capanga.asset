@@ -10,13 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b99c2fcabcc0ff9418ea43cf94220c11, type: 3}
-  m_Name: Monstro
+  m_Name: Capanga
   m_EditorClassIdentifier: 
-  enemyPrefab: {fileID: 366370626998246806, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+  enemyPrefab: {fileID: 366370626998246806, guid: 23ba50663077e324c8b5aacf88650425, type: 3}
   enemyType: 0
-  baseHP: 8
-  baseATQ: 5
-  damageToBase: 5
+  baseHP: 3
+  baseATQ: 2
+  damageToBase: 1
   moveSpeed: 5
   attackSpeed: 1
   baseArmor: 0
@@ -24,5 +24,5 @@ MonoBehaviour:
   atqPerLevel: 0
   speedPerLevel: 0.5
   armorPerLevel: 0.01
-  geoditasOnDeath: 4
+  geoditasOnDeath: 1
   etherDropChance: 0.1

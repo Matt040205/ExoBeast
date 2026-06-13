@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e2027bee059fbbd498af999a02b71322, type: 3}
-  m_Name: Dragao
+  m_Name: Brunnhild
   m_EditorClassIdentifier: 
-  name: Dragao
+  name: Brunnhild
   description: "Separou do Burro e veio pra esse mundo pra martelar inimigos \n"
-  maxHealth: 100
-  damage: 10
+  maxHealth: 15
+  damage: 2
   moveSpeed: 5
   reloadSpeed: 2
-  attackSpeed: 1
+  attackSpeed: 2
   attackRange: 2
   armor: 0
   critChance: 0.05
@@ -30,6 +30,7 @@ MonoBehaviour:
   fireMode: 0
   meleeAngle: 90
   isCommander: 1
+  desbloqueadoComandantePadrao: 0
   characterIcon: {fileID: 21300000, guid: ea3779e17851a61498cfc1cef6cbb5c6, type: 3}
   commanderPrefab: {fileID: 15912487291283997, guid: 6908eb6a70a6c3443ba1b63e2448a890, type: 3}
   towerPrefab: {fileID: 8490162969109981554, guid: 8c0d09cdae8d72a4db008b713bd0d77b, type: 3}
@@ -42,7 +43,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 68bbe01a394a6e14580fdbe2401f4bcb, type: 2}
   - {fileID: 11400000, guid: 2e3379077edcdb440b6e2b8acb6ed84d, type: 2}
   - {fileID: 11400000, guid: d98dc259d714ded46b82ecc5e4684085, type: 2}
-  cost: 50
+  cost: 20
   pontosRastrosDisponiveis: 10
   pontosRastrosGastos: 0
   pontosPorCaminho: []

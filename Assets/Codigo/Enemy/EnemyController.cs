@@ -597,7 +597,7 @@ public class EnemyController : MonoBehaviour
     {
         ObjectiveHealthSystem objective = ObjectiveHealthSystem.Instance;
         if (objective != null && enemyData != null)
-            objective.TakeDamage(enemyData.GetDamage(nivel));
+            objective.TakeDamage(enemyData.damageToBase);
 
         EnemyEvents.OnEnemyReachedBase?.Invoke();
         HandleDeath();

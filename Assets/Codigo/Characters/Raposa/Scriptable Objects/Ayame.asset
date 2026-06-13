@@ -10,15 +10,15 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e2027bee059fbbd498af999a02b71322, type: 3}
-  m_Name: Naoyoshi
+  m_Name: Ayame
   m_EditorClassIdentifier: 
-  name: NaoYoshi
+  name: Ayame
   description: Uma torre focada em cura e ataque
-  maxHealth: 120
-  damage: 25
-  moveSpeed: 5
+  maxHealth: 20
+  damage: 1
+  moveSpeed: 4
   reloadSpeed: 2
-  attackSpeed: 10
+  attackSpeed: 1
   attackRange: 10
   armor: 0
   critChance: 0.05
@@ -43,7 +43,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b130a5c8183ba4d4483f43c3aebc7bfa, type: 2}
   - {fileID: 11400000, guid: cd0e481f38befc0458343bf71b90b0f0, type: 2}
   - {fileID: 11400000, guid: 2d797209d612bf94bbf1a50ef6ef172f, type: 2}
-  cost: 600
+  cost: 15
   pontosRastrosDisponiveis: 10
   pontosRastrosGastos: 0
   pontosPorCaminho:

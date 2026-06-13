@@ -15,8 +15,8 @@ public class Teleportador : TrapLogicBase
     private readonly HashSet<ulong> playersOnCooldown = new HashSet<ulong>();
 
     private Teleportador portalLigado;
-    private float cooldownTeleporte = 1f;
-    private float entradaOffset = 1.5f;
+    [SerializeField] private float cooldownTeleporte = 1f;
+    [SerializeField] private float entradaOffset = 1.5f;
     [SerializeField] private bool debugTeleportLogs;
 
     private bool isServerMode;

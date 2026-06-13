@@ -14,14 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   enemyPrefab: {fileID: 8676188461304220958, guid: e246350e14706304a82d941bf54faf0c, type: 3}
   enemyType: 0
-  baseHP: 90
-  baseATQ: 6
+  baseHP: 3
+  baseATQ: 1
+  damageToBase: 1
   moveSpeed: 2
   attackSpeed: 1
   baseArmor: 0
   hpPerLevel: 10
-  atqPerLevel: 2
+  atqPerLevel: 0
   speedPerLevel: 0.5
   armorPerLevel: 0.01
-  geoditasOnDeath: 40
+  geoditasOnDeath: 2
   etherDropChance: 0.1

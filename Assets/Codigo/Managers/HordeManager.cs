@@ -17,6 +17,28 @@ using ExoBeasts.Multiplayer.GameServer;
 ///  ▸ Escala de dificuldade via nível da horda (EnemyDataSO.GetHealth/Damage/etc)
 /// ─────────────────────────────────────────────────────
 /// </summary>
+[System.Serializable]
+public struct EnemySpawnConfig
+{
+    [Tooltip("Tipo de inimigo a ser instanciado.")]
+    public EnemyDataSO enemyData;
+    [Tooltip("Quantidade de inimigos deste tipo a serem gerados nesta entrada.")]
+    public int spawnCount; //
+    [Tooltip("Índice do caminho no Spawn Paths. Se menor que 0 ou inválido, escolhe um caminho aleatório.")]
+    public int pathIndex;
+    [Tooltip("Intervalo de tempo (segundos) para esperar após o nascimento deste inimigo antes de instanciar o próximo.")]
+    public float spawnDelay;
+}
+
+[System.Serializable]
+public struct WaveConfig
+{
+    [Tooltip("Tempo de preparação antes do início desta rodada (em segundos).")]
+    public float prepTime;
+    [Tooltip("Sequência ordenada de spawn dos inimigos nesta rodada.")]
+    public List<EnemySpawnConfig> spawnSequence;
+}
+
 public class HordeManager : NetworkBehaviour
 {
     public static HordeManager Instance { get; private set; }
@@ -27,6 +49,10 @@ public class HordeManager : NetworkBehaviour
     public float timeBetweenWaves = 10f;
     public float spawnInterval = 1f;
     public int enemiesPerInterval = 1;
+
+    [Header("Configurações de Ondas Customizadas (Opcional)")]
+    [Tooltip("Lista de ondas personalizadas. Se vazia, o jogo gerará as ondas de forma randômica.")]
+    public List<WaveConfig> customWaves;
 
     [Header("Inimigos e Dificuldade")]
     public EnemyDataSO[] enemyTypes;
@@ -63,8 +89,8 @@ public class HordeManager : NetworkBehaviour
     public float prepTimeBetweenWaves = 30f;
     private bool isPreparing = false;
 
-    // Lista pre-sorteada de inimigos para a proxima onda (inimigo + indice do caminho)
-    private List<(EnemyDataSO enemy, int pathIndex)> preGeneratedWaveList = new List<(EnemyDataSO, int)>();
+    // Lista pre-sorteada de inimigos para a proxima onda (inimigo + indice do caminho + atraso)
+    private List<(EnemyDataSO enemy, int pathIndex, float spawnDelay)> preGeneratedWaveList = new List<(EnemyDataSO, int, float)>();
     private readonly List<Transform> playerTargetCandidates = new List<Transform>(4);
     private static readonly List<EnemyController> _activeEnemiesRegistry = new List<EnemyController>(64);
 
@@ -361,6 +387,12 @@ public class HordeManager : NetworkBehaviour
         string listaInimigos = BuildAnnouncementText(preGeneratedWaveList);
         float prepTime = isFirstWave ? prepTimeFirstWave : prepTimeBetweenWaves;
 
+        int waveArrayIndex = CurrentHorde;
+        if (customWaves != null && waveArrayIndex >= 0 && waveArrayIndex < customWaves.Count)
+        {
+            prepTime = customWaves[waveArrayIndex].prepTime;
+        }
+
         Debug.Log($"[HordeManager] {titulo}: {listaInimigos} | Preparacao: {prepTime}s");
 
         // 3) Manda o anuncio para todos os clientes (e local)
@@ -401,22 +433,51 @@ public class HordeManager : NetworkBehaviour
     {
         preGeneratedWaveList.Clear();
 
-        if (enemyTypes == null || enemyTypes.Length == 0) return;
-        if (spawnPaths == null || spawnPaths.Count == 0) return;
-
-        int total = Random.Range(enemiesPerHordeMin, enemiesPerHordeMax + 1);
-
-        for (int i = 0; i < total; i++)
+        int waveArrayIndex = CurrentHorde; // 0 before wave 1 starts
+        if (customWaves != null && waveArrayIndex >= 0 && waveArrayIndex < customWaves.Count)
         {
-            int typeIndex = Random.Range(0, enemyTypes.Length);
-            int pathIndex = Random.Range(0, spawnPaths.Count);
-            EnemyDataSO enemyData = enemyTypes[typeIndex];
-            if (enemyData != null)
-                preGeneratedWaveList.Add((enemyData, pathIndex));
+            WaveConfig waveConfig = customWaves[waveArrayIndex];
+            if (waveConfig.spawnSequence != null)
+            {
+                foreach (EnemySpawnConfig config in waveConfig.spawnSequence)
+                {
+                    if (config.enemyData != null)
+                    {
+                        int pathIndex = config.pathIndex;
+                        if (pathIndex < 0 || spawnPaths == null || pathIndex >= spawnPaths.Count)
+                        {
+                            pathIndex = GetRandomPathIndex();
+                        }
+
+                        // Loop baseado na quantidade definida no novo campo spawnCount
+                        int count = config.spawnCount > 0 ? config.spawnCount : 1;
+                        for (int i = 0; i < count; i++)
+                        {
+                            preGeneratedWaveList.Add((config.enemyData, pathIndex, config.spawnDelay));
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (enemyTypes == null || enemyTypes.Length == 0) return;
+                if (spawnPaths == null || spawnPaths.Count == 0) return;
+
+                int total = Random.Range(enemiesPerHordeMin, enemiesPerHordeMax + 1);
+
+                for (int i = 0; i < total; i++)
+                {
+                    int typeIndex = Random.Range(0, enemyTypes.Length);
+                    int pathIndex = Random.Range(0, spawnPaths.Count);
+                    EnemyDataSO enemyData = enemyTypes[typeIndex];
+                    if (enemyData != null)
+                        preGeneratedWaveList.Add((enemyData, pathIndex, spawnInterval));
+                }
+            }
         }
     }
 
-    private string BuildAnnouncementText(List<(EnemyDataSO enemy, int pathIndex)> lista)
+    private string BuildAnnouncementText(List<(EnemyDataSO enemy, int pathIndex, float spawnDelay)> lista)
     {
         if (lista == null || lista.Count == 0) return "Nenhum inimigo";
 
@@ -503,17 +564,39 @@ public class HordeManager : NetworkBehaviour
 
     private IEnumerator SpawnEnemiesOverTime()
     {
-        while (enemiesSpawnedCount < enemiesToSpawnTotal)
+        int waveArrayIndex = CurrentHorde - 1; // Since CurrentHorde was incremented in StartNextHorde()
+        bool isCustomWave = customWaves != null && waveArrayIndex >= 0 && waveArrayIndex < customWaves.Count;
+
+        if (isCustomWave)
         {
-            int batchSize = Mathf.Min(enemiesPerInterval, enemiesToSpawnTotal - enemiesSpawnedCount);
-
-            for (int i = 0; i < batchSize; i++)
+            while (enemiesSpawnedCount < enemiesToSpawnTotal)
             {
-                SpawnSingleEnemy();
-            }
+                float delay = spawnInterval;
+                if (preGeneratedWaveList.Count > 0)
+                {
+                    delay = preGeneratedWaveList[0].spawnDelay;
+                }
 
-            enemiesSpawnedCount += batchSize;
-            yield return new WaitForSeconds(spawnInterval);
+                SpawnSingleEnemy();
+                enemiesSpawnedCount++;
+
+                yield return new WaitForSeconds(delay);
+            }
+        }
+        else
+        {
+            while (enemiesSpawnedCount < enemiesToSpawnTotal)
+            {
+                int batchSize = Mathf.Min(enemiesPerInterval, enemiesToSpawnTotal - enemiesSpawnedCount);
+
+                for (int i = 0; i < batchSize; i++)
+                {
+                    SpawnSingleEnemy();
+                }
+
+                enemiesSpawnedCount += batchSize;
+                yield return new WaitForSeconds(spawnInterval);
+            }
         }
     }
 

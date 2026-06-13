@@ -7,8 +7,8 @@ using Unity.Netcode;
 /// </summary>
 public class Broca : TrapLogicBase
 {
-    public int geodidasPorCiclo = 5;
-    public float tempoPorCiclo = 10f;
+    public int geodidasPorCiclo = 2; 
+    public float tempoPorCiclo = 10f; 
 
     public override void OnNetworkSpawn()
     {
