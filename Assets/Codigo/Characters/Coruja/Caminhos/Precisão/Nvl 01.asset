@@ -12,12 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 691f535880d49194eb92d2bdd093e5cc, type: 3}
   m_Name: Nvl 01
   m_EditorClassIdentifier: 
-  upgradeName: Mais Alcance
-  description: +15% Alcanse
-  geoditeCost: 50
+  upgradeName: Mais Dano
+  description: +1 de Dano Base
+  geoditeCost: 10
   darkEtherCost: 0
   modifiers:
-  - statToModify: 2
-    modType: 1
-    value: 0.15
+  - statToModify: 0
+    modType: 0
+    value: 1
   behaviorToUnlock: {fileID: 0}

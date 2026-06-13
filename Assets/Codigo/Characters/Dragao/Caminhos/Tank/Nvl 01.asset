@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: Nvl 01
   m_EditorClassIdentifier: 
   upgradeName: Mais vida
-  description: +30% Vida da Torre.
-  geoditeCost: 0
+  description: "+5 HP M\xE1ximo"
+  geoditeCost: 15
   darkEtherCost: 0
-  modifiers: []
-  behaviorToUnlock: {fileID: 1275490137502075972, guid: 46459a4e9fb335741992944013cd4c00, type: 3}
+  modifiers:
+  - statToModify: 0
+    modType: 0
+    value: 5
+  behaviorToUnlock: {fileID: 0}

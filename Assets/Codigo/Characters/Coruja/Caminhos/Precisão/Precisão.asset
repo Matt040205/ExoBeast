@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36021cb4f5de86d41a9f9881389bfa81, type: 3}
+  m_Name: "Precis\xE3o"
+  m_EditorClassIdentifier: 
+  pathName: "Precis\xE3o "
+  upgradesInPath:
+  - {fileID: 11400000, guid: acfa99a5252555e40a8f0a80be5af4e2, type: 2}
+  - {fileID: 11400000, guid: cdaf42d789ae7b145bc2c9b3b603b140, type: 2}
+  - {fileID: 11400000, guid: 08bbc3c47d5688141b061ab253dda9a8, type: 2}
+  - {fileID: 11400000, guid: 13f27d6f7eb8e4e4898378b5678ed08b, type: 2}
+  - {fileID: 11400000, guid: ba3fd4caebc3a404887d6859e99e65b0, type: 2}

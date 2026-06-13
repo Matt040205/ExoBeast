@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: Nvl 01
   m_EditorClassIdentifier: 
   upgradeName: Mais dano
-  description: +15% de Dano de Ataque.
-  geoditeCost: 0
+  description: +1 de Dano de Ataque
+  geoditeCost: 15
   darkEtherCost: 0
   modifiers:
   - statToModify: 0
-    modType: 1
-    value: 0.15
+    modType: 0
+    value: 1
   behaviorToUnlock: {fileID: 0}
