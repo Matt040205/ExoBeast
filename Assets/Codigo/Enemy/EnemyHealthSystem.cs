@@ -235,6 +235,13 @@ public class EnemyHealthSystem : MonoBehaviour
         float effectiveArmor = Mathf.Max(0, baseArmor - currentArmorModifier - armorToIgnore);
         float finalDamage = damageWithMark * (1.0f - Mathf.Clamp01(effectiveArmor / 100f));
         if (finalDamage < 0) finalDamage = 0;
+
+        // Garante no mínimo 1 de dano se o dano original for maior que zero
+        if (damage > 0f && finalDamage < 1f)
+        {
+            finalDamage = 1f;
+        }
+
         finalDamageApplied = finalDamage;
 
         currentHealth -= finalDamage;
@@ -266,7 +273,12 @@ public class EnemyHealthSystem : MonoBehaviour
 
         if (showPopup)
         {
-            SpawnDamagePopupLocal((int)damageAmount, isCritical);
+            int displayDamage = Mathf.RoundToInt(damageAmount);
+            if (damageAmount > 0f && displayDamage <= 0)
+            {
+                displayDamage = 1;
+            }
+            SpawnDamagePopupLocal(displayDamage, isCritical);
         }
     }
 
