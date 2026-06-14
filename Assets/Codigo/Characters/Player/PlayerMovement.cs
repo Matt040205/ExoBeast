@@ -66,8 +66,7 @@ public class PlayerMovement : NetworkBehaviour
     private float currentSpeed;
     private float rotationVelocity;
 
-    private Animator animator;
-    private NetworkAnimator networkAnimator; // <--- CACHE SEGURO ADICIONADO AQUI
+    private UniversalCharacterAnimator universalAnimator;
     private Vector3 direction;
     private float targetAngle;
 
@@ -149,12 +148,8 @@ public class PlayerMovement : NetworkBehaviour
         inputBridge = GetComponent<LocalPlayerInputBridge>();
         TryResolveCriticalReferences(false);
 
-        if (modelPivot != null)
-            animator = modelPivot.GetComponentInChildren<Animator>();
-
-        // Tenta achar o NetworkAnimator na raiz, se não achar, procura nos filhos (onde o modelo 3D geralmente fica)
-        networkAnimator = GetComponent<NetworkAnimator>();
-        if (networkAnimator == null) networkAnimator = GetComponentInChildren<NetworkAnimator>();
+        universalAnimator = GetComponent<UniversalCharacterAnimator>();
+        if (universalAnimator == null) universalAnimator = GetComponentInChildren<UniversalCharacterAnimator>();
 
         surfaceDetector = GetComponent<TerrainSurfaceDetector>();
         CreateFootstepInstance(GetEventForSurface(TerrainSurfaceDetector.SurfaceType.Terra));
@@ -270,15 +265,11 @@ public class PlayerMovement : NetworkBehaviour
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity) * jumpHeightModifier;
             isGrounded = false;
 
-            if (animator != null)
+            if (universalAnimator != null)
             {
-                animator.ResetTrigger("Attack");
-                animator.ResetTrigger("Shoot");
-                animator.ResetTrigger("Reload");
+                universalAnimator.ResetActionTrigger();
+                universalAnimator.TriggerAction(CharacterActionID.Jump);
             }
-
-            // CORREÇÃO DA LINHA 172: Usando a referência segura para o NetworkAnimator
-            if (networkAnimator != null) networkAnimator.SetTrigger("Jump");
 
             StopFootstepSound();
         }
@@ -287,15 +278,11 @@ public class PlayerMovement : NetworkBehaviour
             velocity.y = Mathf.Sqrt(jumpForce * -2f * gravity) * jumpHeightModifier;
             hasDoubleJumped = true;
 
-            if (animator != null)
+            if (universalAnimator != null)
             {
-                animator.ResetTrigger("Attack");
-                animator.ResetTrigger("Shoot");
-                animator.ResetTrigger("Reload");
+                universalAnimator.ResetActionTrigger();
+                universalAnimator.TriggerAction(CharacterActionID.Jump);
             }
-
-            // CORREÇÃO DO PULO DUPLO TAMBÉM:
-            if (networkAnimator != null) networkAnimator.SetTrigger("Jump");
 
             // Instancia o VFX localmente (Zero Latency) e avisa a rede
             if (doubleJumpVfxPrefab != null)
@@ -320,9 +307,9 @@ public class PlayerMovement : NetworkBehaviour
         {
             isAiming = aimingInput;
 
-            if (animator != null)
+            if (universalAnimator != null)
             {
-                animator.SetBool("isAiming", isAiming);
+                universalAnimator.SetAiming(isAiming);
             }
 
             StopAllCoroutines();
@@ -335,23 +322,14 @@ public class PlayerMovement : NetworkBehaviour
         if (!IsOwner)
         {
             // Remotos: aplicar estado sincronizado ao Animator
-            if (animator != null)
+            if (universalAnimator != null)
             {
-                // OPTIMIZATION (Sprint 3 / Item G3.2 - 2026-05-08): netIsGrounded removido.
-                // Antes: owner escrevia grounded em NetworkVariable todo frame para animacao remota.
-                // Agora: cada cliente deriva grounded localmente com o mesmo SphereCast usado por gameplay.
-                // Sem isso: um bool continuo gerava deltas de rede redundantes por jogador.
                 bool localGrounded = ProbeGrounded(0.35f);
                 PlayerAnimState syncedAnimState = netAnimState.Value;
                 float syncedYVel = syncedAnimState.YVelocity;
 
-                animator.SetBool("isGrounded", localGrounded);
-                animator.SetFloat("yVelocity", syncedYVel);
-                animator.SetFloat("MovementSpeed", syncedAnimState.MovementSpeed);
-
-                bool aboutToLand = !localGrounded && syncedYVel < 0 &&
-                    Physics.Raycast(transform.position, Vector3.down, landingRaycastDistance, groundMask);
-                animator.SetBool("isAboutToLand", localGrounded || aboutToLand);
+                universalAnimator.UpdateAirborne(localGrounded, syncedYVel);
+                universalAnimator.UpdateMovement(syncedAnimState.MovementSpeed, dampTime: 0f);
             }
             return;
         }
@@ -363,7 +341,7 @@ public class PlayerMovement : NetworkBehaviour
 
         if (PauseControl.isPaused || isDashing)
         {
-            if (animator != null && !isDashing) animator.SetFloat("MovementSpeed", 0f);
+            if (universalAnimator != null && !isDashing) universalAnimator.UpdateMovement(0f, dampTime: 0f);
             currentAnimatorMovementSpeed = 0f;
             SetNetworkAnimState(0f, velocity.y);
             StopFootstepSound();
@@ -372,7 +350,7 @@ public class PlayerMovement : NetworkBehaviour
 
         if (BuildManager.isBuildingMode)
         {
-            if (animator != null) animator.SetFloat("MovementSpeed", 0f);
+            if (universalAnimator != null) universalAnimator.UpdateMovement(0f, dampTime: 0f);
             currentAnimatorMovementSpeed = 0f;
             SetNetworkAnimState(0f, velocity.y);
             StopFootstepSound();
@@ -402,26 +380,9 @@ public class PlayerMovement : NetworkBehaviour
                 aimTarget.position = ray.GetPoint(100f);
         }
 
-        if (animator != null)
+        if (universalAnimator != null)
         {
-            animator.SetBool("isGrounded", isGrounded);
-            animator.SetFloat("yVelocity", velocity.y);
-
-            if (!isGrounded && velocity.y < 0)
-            {
-                isAboutToLand = Physics.Raycast(transform.position, Vector3.down, landingRaycastDistance, groundMask);
-            }
-            else
-            {
-                isAboutToLand = false;
-            }
-
-            if (isGrounded)
-            {
-                isAboutToLand = true;
-            }
-
-            animator.SetBool("isAboutToLand", isAboutToLand);
+            universalAnimator.UpdateAirborne(isGrounded, velocity.y);
         }
 
         // Publicar estado para remotos
@@ -467,9 +428,9 @@ public class PlayerMovement : NetworkBehaviour
         if (netIsWebTrapped.Value)
         {
             controller.Move(Vector3.zero);
-            if (animator != null)
+            if (universalAnimator != null)
             {
-                animator.SetFloat("MovementSpeed", 0f, 0.1f, Time.deltaTime);
+                universalAnimator.UpdateMovement(0f, dampTime: 0.1f);
             }
             currentAnimatorMovementSpeed = 0f;
             StopFootstepSound();
@@ -494,21 +455,20 @@ public class PlayerMovement : NetworkBehaviour
             {
                 targetAngle = Mathf.Atan2(basisForward.x, basisForward.z) * Mathf.Rad2Deg;
 
-                if (animator != null)
+                if (universalAnimator != null)
                 {
-                    animator.SetFloat("AimMoveX", inputMove.x, 0.1f, Time.deltaTime);
-                    animator.SetFloat("AimMoveY", inputMove.y, 0.1f, Time.deltaTime);
+                    universalAnimator.UpdateMovement(0f, inputMove.x, inputMove.y, dampTime: 0.1f);
                 }
             }
             else
             {
                 targetAngle = Mathf.Atan2(moveDir.x, moveDir.z) * Mathf.Rad2Deg;
 
-                if (animator != null)
+                if (universalAnimator != null)
                 {
                     float animSpeed = (inputRun ? 1.0f : 0.5f) * direction.magnitude;
                     if (healthSystem != null && healthSystem.speedMultiplier.Value > 1.1f) animSpeed *= 1.2f;
-                    animator.SetFloat("MovementSpeed", animSpeed, 0.1f, Time.deltaTime);
+                    universalAnimator.UpdateMovement(animSpeed, dampTime: 0.1f);
                     currentAnimatorMovementSpeed = animSpeed;
                 }
             }
@@ -530,11 +490,9 @@ public class PlayerMovement : NetworkBehaviour
         else
         {
             controller.Move(Vector3.zero);
-            if (animator != null)
+            if (universalAnimator != null)
             {
-                animator.SetFloat("MovementSpeed", 0f, 0.1f, Time.deltaTime);
-                animator.SetFloat("AimMoveX", 0f, 0.1f, Time.deltaTime);
-                animator.SetFloat("AimMoveY", 0f, 0.1f, Time.deltaTime);
+                universalAnimator.UpdateMovement(0f, 0f, 0f, dampTime: 0.1f);
             }
             currentAnimatorMovementSpeed = 0f;
             StopFootstepSound();
@@ -610,9 +568,9 @@ public class PlayerMovement : NetworkBehaviour
         {
             velocity.y = -2f;
 
-            if (animator != null)
+            if (universalAnimator != null)
             {
-                animator.ResetTrigger("Jump");
+                universalAnimator.ResetActionTrigger();
             }
         }
 
@@ -739,16 +697,12 @@ public class PlayerMovement : NetworkBehaviour
             modelPivot.localPosition = Vector3.zero;
         }
 
-        if (animator != null)
+        if (universalAnimator != null)
         {
-            animator.Rebind(); // Força o Animator a recalcular posição (corrige o bug do Rig ficar no lugar)
-            animator.ResetTrigger("Jump");
-            animator.SetBool("isGrounded", true);
-            animator.SetBool("isAboutToLand", true);
-            animator.SetFloat("yVelocity", 0f);
-            animator.SetFloat("MovementSpeed", 0f);
-            animator.SetFloat("AimMoveX", 0f);
-            animator.SetFloat("AimMoveY", 0f);
+            universalAnimator.Rebind(); // Força o Animator a recalcular posição (corrige o bug do Rig ficar no lugar)
+            universalAnimator.ResetActionTrigger();
+            universalAnimator.UpdateAirborne(true, 0f);
+            universalAnimator.UpdateMovement(0f, 0f, 0f, dampTime: 0f);
         }
 
         if (IsSpawned && IsOwner)
@@ -814,8 +768,12 @@ public class PlayerMovement : NetworkBehaviour
             }
         }
 
-        if (animator == null && modelPivot != null)
-            animator = modelPivot.GetComponentInChildren<Animator>(true);
+        if (universalAnimator == null)
+        {
+            universalAnimator = GetComponent<UniversalCharacterAnimator>();
+            if (universalAnimator == null && modelPivot != null)
+                universalAnimator = modelPivot.GetComponentInChildren<UniversalCharacterAnimator>(true);
+        }
 
         if (logErrors && modelPivot == null)
         {

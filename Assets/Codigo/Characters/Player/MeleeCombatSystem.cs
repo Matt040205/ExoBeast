@@ -60,8 +60,7 @@ public class MeleeCombatSystem : NetworkBehaviour
     [Header("Juice Configs")]
     [SerializeField] private CameraShakeConfig ultimateHitShake = new CameraShakeConfig(0.8f, 15f, 0.1f);
 
-    private Animator anim;
-    private NetworkAnimator networkAnimator; // <--- CACHE SEGURO ADICIONADO AQUI
+    private UniversalCharacterAnimator universalAnimator;
     private WeaponConfig currentStats;
     private LocalPlayerInputBridge inputBridge;
 
@@ -69,12 +68,12 @@ public class MeleeCombatSystem : NetworkBehaviour
     {
         base.OnNetworkSpawn();
 
-        // Inicializar anim para TODOS (owner e remotos): AnimEvents de som precisam rodar em todos
-        anim = GetComponentInChildren<Animator>();
+        // Inicializar universalAnimator para TODOS (owner e remotos): AnimEvents de som precisam rodar em todos
+        universalAnimator = GetComponentInChildren<UniversalCharacterAnimator>();
 
         // Garantir velocidade de ataque correta desde o spawn (evita animacoes congeladas em 0)
-        if (anim != null)
-            anim.SetFloat("AttackSpeedMultiplier", 1f);
+        if (universalAnimator != null)
+            universalAnimator.SetAttackSpeedMultiplier(1f);
 
         if (!IsOwner)
         {
@@ -82,9 +81,6 @@ public class MeleeCombatSystem : NetworkBehaviour
             // Apenas input e logica de deteccao de hit sao bloqueados via guard no Update/OnFire
             return;
         }
-
-        networkAnimator = GetComponent<NetworkAnimator>();
-        if (networkAnimator == null) networkAnimator = GetComponentInChildren<NetworkAnimator>();
 
         inputBridge = GetComponent<LocalPlayerInputBridge>();
 
@@ -134,7 +130,7 @@ public class MeleeCombatSystem : NetworkBehaviour
             FaceCameraBeforeAttack();
 
             // CORREÇÃO DA LINHA 79: Usando a referência segura para o NetworkAnimator
-            if (networkAnimator != null) networkAnimator.SetTrigger("Attack");
+            if (universalAnimator != null) universalAnimator.TriggerAction(CharacterActionID.Attack);
 
             hitProcessedForCurrentAttack = false;
             isInAttackSequence = true;
@@ -160,10 +156,10 @@ public class MeleeCombatSystem : NetworkBehaviour
         // Velocidade de ataque deve ser aplicada em todos os clientes para animar corretamente
         UpdateCurrentStats();
 
-        if (anim != null)
+        if (universalAnimator != null)
         {
             float targetSpeed = overrideAttackSpeed.HasValue ? overrideAttackSpeed.Value : currentStats.animationSpeed;
-            anim.SetFloat("AttackSpeedMultiplier", targetSpeed);
+            universalAnimator.SetAttackSpeedMultiplier(targetSpeed);
         }
 
         if (IsOwner)
@@ -176,7 +172,7 @@ public class MeleeCombatSystem : NetworkBehaviour
                 {
                     FaceCameraBeforeAttack();
 
-                    if (networkAnimator != null) networkAnimator.SetTrigger("Attack");
+                    if (universalAnimator != null) universalAnimator.TriggerAction(CharacterActionID.Attack);
                     hitProcessedForCurrentAttack = false;
                     isInAttackSequence = true;
                     StartCoroutine(FallbackHitRoutine());
@@ -187,7 +183,7 @@ public class MeleeCombatSystem : NetworkBehaviour
 
     void OnDisable()
     {
-        if (anim != null) anim.SetFloat("AttackSpeedMultiplier", 1.0f);
+        if (universalAnimator != null) universalAnimator.SetAttackSpeedMultiplier(1.0f);
     }
 
     private void UpdateCurrentStats()

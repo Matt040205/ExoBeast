@@ -60,8 +60,7 @@ public class PlayerShooting : NetworkBehaviour
     private CameraController cameraController;
     private Transform modelPivot;
     private Camera mainCamera;
-    private Animator animator;
-    private NetworkAnimator networkAnimator;
+    private UniversalCharacterAnimator universalAnimator;
     private PlayerHealthSystem playerHealth;
     private PlayerCombatManager combatManager;
     private LocalPlayerInputBridge inputBridge;
@@ -104,13 +103,11 @@ public class PlayerShooting : NetworkBehaviour
         if (playerMovement != null)
         {
             modelPivot = playerMovement.GetModelPivot();
-            if (modelPivot != null)
-                animator = modelPivot.GetComponentInChildren<Animator>();
         }
 
-        networkAnimator = GetComponent<NetworkAnimator>();
-        if (networkAnimator == null)
-            networkAnimator = GetComponentInChildren<NetworkAnimator>();
+        universalAnimator = GetComponent<UniversalCharacterAnimator>();
+        if (universalAnimator == null)
+            universalAnimator = GetComponentInChildren<UniversalCharacterAnimator>();
 
         cameraController = GetComponentInChildren<CameraController>();
         if (cameraController == null && mainCamera != null)
@@ -312,8 +309,8 @@ public class PlayerShooting : NetworkBehaviour
 
     private void ExecuteShootVisual(Vector3 origin, Vector3 direction, bool isOwnerShot, bool empoweredShot)
     {
-        if (isOwnerShot && networkAnimator != null)
-            networkAnimator.SetTrigger("Shoot");
+        if (isOwnerShot && universalAnimator != null)
+            universalAnimator.TriggerAction(CharacterActionID.Shoot);
 
         PlayShootSound(origin);
 
@@ -517,10 +514,10 @@ public class PlayerShooting : NetworkBehaviour
         float reloadSpeed = characterData != null && characterData.reloadSpeed > 0f ? characterData.reloadSpeed : 2f;
         float multiplier = 3.0f / reloadSpeed;
 
-        if (animator != null && networkAnimator != null)
+        if (universalAnimator != null)
         {
-            animator.SetFloat("ReloadSpeedMultiplier", multiplier);
-            networkAnimator.SetTrigger("Reload");
+            universalAnimator.SetReloadSpeedMultiplier(multiplier);
+            universalAnimator.TriggerAction(CharacterActionID.Reload);
         }
 
         if (tipoDeSom == "Arma" && !string.IsNullOrEmpty(eventoRecargaArma))

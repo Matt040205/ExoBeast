@@ -25,7 +25,7 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
 
     private GameObject caster;
     private LayerMask visualRaycastMask;
-    private Animator anim;
+    private UniversalCharacterAnimator universalAnimator;
     private bool hasAppliedBeamDamage;
     private bool hasShownBeamVisual;
     private bool hasBeamVisualPayload;
@@ -139,17 +139,15 @@ public class CacadoraNoturnaLogic : NetworkBehaviour
         setupCasterNetworkObjectId = casterNO.NetworkObjectId;
 
         caster = casterNO.gameObject;
-        anim = caster.GetComponentInChildren<Animator>();
+        universalAnimator = caster.GetComponentInChildren<UniversalCharacterAnimator>();
 
         AnimationEventProxy proxy = caster.GetComponentInChildren<AnimationEventProxy>();
         if (proxy != null)
             proxy.magiaAtualDaCacadora = this;
 
-        if (IsServer && shouldTriggerAnimation && anim != null)
+        if (IsServer && shouldTriggerAnimation && universalAnimator != null)
         {
-            NetworkAnimator networkAnimator = caster.GetComponentInChildren<NetworkAnimator>();
-            if (networkAnimator != null) networkAnimator.SetTrigger("CacadoraUltimate");
-            else anim.SetTrigger("CacadoraUltimate");
+            universalAnimator.TriggerAction(CharacterActionID.CacadoraUltimate);
         }
     }
 
