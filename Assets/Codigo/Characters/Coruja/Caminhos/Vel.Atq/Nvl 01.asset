@@ -13,11 +13,11 @@ MonoBehaviour:
   m_Name: Nvl 01
   m_EditorClassIdentifier: 
   upgradeName: Mais Vel. Atq
-  description: +1% Vel. de Atq
+  description: +25% Vel. de Atq
   geoditeCost: 10
   darkEtherCost: 0
   modifiers:
   - statToModify: 1
     modType: 1
-    value: 0.01
+    value: 0.25
   behaviorToUnlock: {fileID: 0}

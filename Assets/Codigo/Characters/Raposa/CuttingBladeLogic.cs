@@ -204,13 +204,19 @@ public class CuttingBladeLogic : NetworkBehaviour
         List<EnemyHealthSystem> enemiesHit = new List<EnemyHealthSystem>();
         bool matouAlguem = false;
 
+        float finalDashDamage = dashDamage;
+        if (BuildManager.Instance != null)
+        {
+            finalDashDamage += BuildManager.Instance.GetSynergyBladeDmgBonus();
+        }
+
         foreach (var hit in hits)
         {
             EnemyHealthSystem vidaInimigo = hit.collider.GetComponent<EnemyHealthSystem>();
             if (vidaInimigo != null && !enemiesHit.Contains(vidaInimigo))
             {
                 enemiesHit.Add(vidaInimigo);
-                bool inimigoMorreu = vidaInimigo.TakeDamage(dashDamage);
+                bool inimigoMorreu = vidaInimigo.TakeDamage(finalDashDamage);
                 if (inimigoMorreu)
                 {
                     matouAlguem = true;

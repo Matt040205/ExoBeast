@@ -19,7 +19,7 @@ public class DragonPatrolBehavior : MonoBehaviour
     }
 
     [Header("Movimentacao")]
-    public float moveSpeed = 4f;
+    public float moveSpeed = 0.5f;
     public float patrolVisionRadius = 15f;
 
     [SerializeField] private float homeArrivalDistance = 0.5f;

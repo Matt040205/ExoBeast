@@ -50,6 +50,11 @@ public class PeaceOfMindLogic : NetworkBehaviour
         if (!IsOwner) return;
         var netAnim = GetComponent<NetworkAnimator>() ?? GetComponentInChildren<NetworkAnimator>();
         if (netAnim != null) netAnim.SetTrigger("Heal");
+
+        var movement = GetComponent<PlayerMovement>();
+        if (movement != null) movement.enabled = false;
+        var shooting = GetComponent<PlayerShooting>();
+        if (shooting != null) shooting.enabled = false;
     }
 
     [ClientRpc]
@@ -87,6 +92,14 @@ public class PeaceOfMindLogic : NetworkBehaviour
         {
             curaSoundInstance.stop(FMOD.Studio.STOP_MODE.ALLOWFADEOUT);
             curaSoundInstance.release();
+        }
+
+        if (IsOwner)
+        {
+            var movement = GetComponent<PlayerMovement>();
+            if (movement != null) movement.enabled = true;
+            var shooting = GetComponent<PlayerShooting>();
+            if (shooting != null) shooting.enabled = true;
         }
     }
 

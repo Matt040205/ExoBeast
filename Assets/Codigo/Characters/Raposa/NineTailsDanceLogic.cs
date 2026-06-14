@@ -32,6 +32,8 @@ public class NineTailsDanceLogic : NetworkBehaviour
         NetworkVariableWritePermission.Server
     );
 
+    public bool IsUltimateActive => netIsUltimateActive.Value;
+
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
@@ -65,7 +67,30 @@ public class NineTailsDanceLogic : NetworkBehaviour
 
     private IEnumerator UltimateTimerCoroutine(float duration)
     {
-        yield return new WaitForSeconds(duration);
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            yield return new WaitForSeconds(0.5f);
+            elapsed += 0.5f;
+
+            if (IsServer && netIsUltimateActive.Value)
+            {
+                var movement = GetComponent<PlayerMovement>();
+                if (movement != null && movement.enabled)
+                {
+                    Collider[] hits = Physics.OverlapSphere(transform.position, 5.0f);
+                    foreach (var hit in hits)
+                    {
+                        EnemyHealthSystem enemyHealth = hit.GetComponent<EnemyHealthSystem>();
+                        if (enemyHealth != null)
+                        {
+                            enemyHealth.TakeDamage(2f, 0f, false, OwnerClientId);
+                        }
+                    }
+                }
+            }
+        }
+
         if (IsServer)
         {
             netIsUltimateActive.Value = false;

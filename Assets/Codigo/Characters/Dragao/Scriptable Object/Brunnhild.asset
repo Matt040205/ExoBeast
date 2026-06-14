@@ -16,9 +16,9 @@ MonoBehaviour:
   description: "Separou do Burro e veio pra esse mundo pra martelar inimigos \n"
   maxHealth: 15
   damage: 2
-  moveSpeed: 5
+  moveSpeed: 0.5
   reloadSpeed: 2
-  attackSpeed: 2
+  attackSpeed: 0.5
   attackRange: 2
   armor: 0
   critChance: 0.05
@@ -29,7 +29,7 @@ MonoBehaviour:
   combatType: 0
   fireMode: 0
   meleeAngle: 90
-  isCommander: 1
+  isCommander: 0
   desbloqueadoComandantePadrao: 0
   characterIcon: {fileID: 21300000, guid: ea3779e17851a61498cfc1cef6cbb5c6, type: 3}
   commanderPrefab: {fileID: 15912487291283997, guid: 6908eb6a70a6c3443ba1b63e2448a890, type: 3}

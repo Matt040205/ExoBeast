@@ -9,8 +9,8 @@ public class ObjectiveHealthSystem : NetworkBehaviour
 {
     public static ObjectiveHealthSystem Instance { get; private set; }
 
-    [Header("Configuracoes de Vida (Sincronizada)")]
-    public float maxHealth = 100f;
+    [Header("Status da Base")]
+    public float maxHealth = 20f;
     public NetworkVariable<float> currentHealth = new NetworkVariable<float>(
         100f,
         NetworkVariableReadPermission.Everyone,

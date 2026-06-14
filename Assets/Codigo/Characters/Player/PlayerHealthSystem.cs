@@ -68,6 +68,7 @@ public class PlayerHealthSystem : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
+        tempoDeSpawn = 5f;
         TryResolveCharacterData();
 
         if (IsServer)

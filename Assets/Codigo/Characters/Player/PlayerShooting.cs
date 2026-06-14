@@ -364,7 +364,13 @@ public class PlayerShooting : NetworkBehaviour
 
     private float CalculateAuthoritativeDamage(out bool isCritical, out float areaRadius)
     {
-        float finalDamage = characterData != null ? characterData.damage : 10f;
+        float baseDamage = characterData != null ? characterData.damage : 10f;
+        if (BuildManager.Instance != null)
+        {
+            baseDamage += BuildManager.Instance.GetSynergyVectorDmgBonus();
+        }
+
+        float finalDamage = baseDamage;
         isCritical = false;
         areaRadius = 0f;
 

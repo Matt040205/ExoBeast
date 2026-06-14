@@ -62,7 +62,25 @@ public class BuildButtonUI : MonoBehaviour
             BuildTooltipTrigger tooltipTrigger = buttonGO.GetComponent<BuildTooltipTrigger>();
             if (tooltipTrigger != null) tooltipTrigger.SetBuildInfo(towerData.name, towerData.description);
 
-            SetTextOnButton(buttonGO, limitTextChildObjectName, "", false);
+            int characterIndex = BuildManager.Instance != null ? BuildManager.Instance.GetCharacterLibraryIndex(towerData) : -1;
+            bool isBuilt = false;
+            if (BuildManager.Instance != null && characterIndex >= 0)
+            {
+                isBuilt = BuildManager.Instance.IsCharacterAlreadyBuilt(characterIndex);
+            }
+
+            string limitStr = "";
+            bool limitActive = false;
+            bool canBuild = true;
+
+            if (isBuilt)
+            {
+                limitStr = "Em campo";
+                limitActive = true;
+                canBuild = false;
+            }
+
+            SetTextOnButton(buttonGO, limitTextChildObjectName, limitStr, limitActive);
             SetTextOnButton(buttonGO, priceTextChildObjectName, $"<color=#76D7C4>{towerData.cost}G</color>", true);
 
             Image iconImage = FindChildIcon(buttonGO);
@@ -72,7 +90,11 @@ public class BuildButtonUI : MonoBehaviour
                 iconImage.enabled = true;
             }
 
-            if (button != null) button.onClick.AddListener(() => { BuildManager.Instance.SelectTowerToBuild(towerData); });
+            if (button != null)
+            {
+                button.interactable = canBuild;
+                button.onClick.AddListener(() => { BuildManager.Instance.SelectTowerToBuild(towerData); });
+            }
         }
     }
 

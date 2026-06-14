@@ -17,8 +17,8 @@ MonoBehaviour:
     se ela der o \xFAltimo hit ao inimigo usando essa habilidade,a habilidade poder\xE1
     ser usada novamente.\r\n\n"
   icon: {fileID: 21300000, guid: 87815dc1a2aaab24c9f4b2fcd396e045, type: 3}
-  cooldown: 5
-  dashDistance: 30
-  damage: 50
+  cooldown: 8
+  dashDistance: 8
+  damage: 4
   resetCooldownOnKill: 1
   eventoDash: event:/SFX/Dash

@@ -17,10 +17,23 @@ public class NineTailsLegacyPassive : PassivaAbility
 
     public override void OnEquip(GameObject owner)
     {
+        if (owner == null) return;
+        var aura = owner.GetComponent<CommanderPassiveAura>();
+        if (aura == null)
+        {
+            aura = owner.AddComponent<CommanderPassiveAura>();
+            aura.attackSpeedBonus = attackSpeedBonus;
+        }
     }
 
     public override void OnUnequip(GameObject owner)
     {
+        if (owner == null) return;
+        var aura = owner.GetComponent<CommanderPassiveAura>();
+        if (aura != null)
+        {
+            Destroy(aura);
+        }
         Debug.Log("Passiva desequipada: " + abilityName);
     }
 }

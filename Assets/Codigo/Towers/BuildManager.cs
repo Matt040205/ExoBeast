@@ -183,7 +183,14 @@ public class BuildManager : NetworkBehaviour
 
         ClearSelection();
         selectedBuildablePrefab = trapData.prefab;
-        selectedBuildableCost = trapData.geoditeCost;
+
+        int calculatedCost = trapData.geoditeCost;
+        if (trapData != null && (trapData.trapName.Contains("Broca") || trapData.name.Contains("Broca")))
+        {
+            int count = GetTrapCount(trapData);
+            calculatedCost = Mathf.RoundToInt(trapData.geoditeCost * (1f + (count * 0.5f)));
+        }
+        selectedBuildableCost = calculatedCost;
         selectedBuildableData = trapData;
     }
 
@@ -752,6 +759,7 @@ public class BuildManager : NetworkBehaviour
             return;
 
         activeBuildingsRegistry.Add(building);
+        RefreshBuildUI();
     }
 
     public void UnregisterNetworkedBuilding(NetworkedBuilding building)
@@ -760,6 +768,63 @@ public class BuildManager : NetworkBehaviour
             return;
 
         activeBuildingsRegistry.Remove(building);
+        RefreshBuildUI();
+    }
+
+    public bool IsCharacterAlreadyBuilt(int characterIndex)
+    {
+        foreach (var building in activeBuildingsRegistry)
+        {
+            if (building != null && building.CharacterIndex.Value == characterIndex)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public int GetSynergyVectorDmgBonus()
+    {
+        int bonus = 0;
+        foreach (var building in activeBuildingsRegistry)
+        {
+            if (building == null || !building.IsActive.Value) continue;
+            if (building.DpsLevel.Value >= 3) bonus++;
+            if (building.ControlLevel.Value >= 3) bonus++;
+            if (building.SupportLevel.Value >= 3) bonus++;
+        }
+        return bonus;
+    }
+
+    public int GetSynergyBladeDmgBonus()
+    {
+        int bonus = 0;
+        foreach (var building in activeBuildingsRegistry)
+        {
+            if (building == null || !building.IsActive.Value) continue;
+            if (building.DpsLevel.Value >= 5) bonus += 5;
+            if (building.ControlLevel.Value >= 5) bonus += 5;
+            if (building.SupportLevel.Value >= 5) bonus += 5;
+        }
+        return bonus;
+    }
+
+    private void RefreshBuildUI()
+    {
+        if (UIManager.Instance != null)
+        {
+            List<CharacterBase> torres = new List<CharacterBase>();
+            var membros = GameDataManager.Instance?.equipeSelecionada;
+            if (membros != null)
+            {
+                foreach (var personagem in membros)
+                {
+                    if (personagem != null && personagem.towerPrefab != null)
+                        torres.Add(personagem);
+                }
+            }
+            UIManager.Instance.UpdateBuildUI(torres, availableTraps);
+        }
     }
 
     public void SetAvailableTowers(CharacterBase[] equipe)
@@ -984,7 +1049,7 @@ public class BuildManager : NetworkBehaviour
         return new List<int> { 1, 2, 3, 4, 5, 6, 7 };
     }
 
-    private int GetCharacterLibraryIndex(CharacterBase towerData)
+    public int GetCharacterLibraryIndex(CharacterBase towerData)
     {
         if (towerData == null || GameDataManager.Instance?.bibliotecaOriginalPersonagens == null)
             return -1;
@@ -1169,19 +1234,33 @@ public class BuildManager : NetworkBehaviour
         return IsInsidePlayableArea(pos);
     }
 
+    private int GetAuthoritativeTrapCost(TrapDataSO trapData)
+    {
+        if (trapData == null) return 0;
+        int cost = trapData.geoditeCost;
+        if (trapData.trapName.Contains("Broca") || trapData.name.Contains("Broca"))
+        {
+            int count = GetTrapCount(trapData);
+            cost = Mathf.RoundToInt(trapData.geoditeCost * (1f + (count * 0.5f)));
+        }
+        return cost;
+    }
+
     private bool TrySpendTrapCost(TrapDataSO trapData)
     {
         if (trapData == null || CurrencyManager.Instance == null)
             return false;
 
-        if (!CurrencyManager.Instance.HasEnoughCurrency(trapData.geoditeCost, CurrencyType.Geodites) ||
+        int calculatedCost = GetAuthoritativeTrapCost(trapData);
+
+        if (!CurrencyManager.Instance.HasEnoughCurrency(calculatedCost, CurrencyType.Geodites) ||
             !CurrencyManager.Instance.HasEnoughCurrency(trapData.darkEtherCost, CurrencyType.DarkEther))
         {
             return false;
         }
 
-        if (trapData.geoditeCost > 0)
-            CurrencyManager.Instance.SpendCurrency(trapData.geoditeCost, CurrencyType.Geodites);
+        if (calculatedCost > 0)
+            CurrencyManager.Instance.SpendCurrency(calculatedCost, CurrencyType.Geodites);
 
         if (trapData.darkEtherCost > 0)
             CurrencyManager.Instance.SpendCurrency(trapData.darkEtherCost, CurrencyType.DarkEther);
@@ -1194,8 +1273,10 @@ public class BuildManager : NetworkBehaviour
         if (trapData == null || CurrencyManager.Instance == null)
             return;
 
-        if (trapData.geoditeCost > 0)
-            CurrencyManager.Instance.AddCurrency(trapData.geoditeCost, CurrencyType.Geodites);
+        int calculatedCost = GetAuthoritativeTrapCost(trapData);
+
+        if (calculatedCost > 0)
+            CurrencyManager.Instance.AddCurrency(calculatedCost, CurrencyType.Geodites);
 
         if (trapData.darkEtherCost > 0)
             CurrencyManager.Instance.AddCurrency(trapData.darkEtherCost, CurrencyType.DarkEther);

@@ -30,6 +30,10 @@ public class SpiderWebDebuffPlayer : NetworkBehaviour
     {
         if (!IsServer) return;
         if (healthSystem == null || movement == null) return;
+
+        var ultimate = GetComponent<NineTailsDanceLogic>();
+        if (ultimate != null && ultimate.IsUltimateActive) return;
+
         if (isTrapped) return;
 
         hitCount++;
