@@ -1029,8 +1029,20 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1834158642223212952, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
+      propertyPath: loadingPanel
+      value: 
+      objectReference: {fileID: 94852666}
+    - target: {fileID: 1834158642223212952, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
+      propertyPath: progressFillImage
+      value: 
+      objectReference: {fileID: 94852665}
+    - target: {fileID: 1834158642223212952, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
       propertyPath: minimumDisplayTime
       value: 1.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5246531515793446101, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5389175012258306546, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
       propertyPath: m_IsActive
@@ -1053,6 +1065,22 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
+--- !u!114 &94852665 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6136460380076631294, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
+  m_PrefabInstance: {fileID: 94852664}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!1 &94852666 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 5246531515793446101, guid: 740019677bdc1264189ee1e15d39580b, type: 3}
+  m_PrefabInstance: {fileID: 94852664}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &114905190
 GameObject:
   m_ObjectHideFlags: 0
