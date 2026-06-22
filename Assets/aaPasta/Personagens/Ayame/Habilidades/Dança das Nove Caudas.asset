@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 124110800f9eaa341a8b2b4c82bf8c30, type: 3}
+  m_Name: "Dan\xE7a das Nove Caudas"
+  m_EditorClassIdentifier: 
+  abilityName: "Dan\xE7a das Nove Caudas"
+  description: "Ela abandona sua arma, puxa a katana e entra em estado de f\xFAria
+    por 8s. Cortes r\xE1pidos causam dano em \xE1rea, reduzem 40% do tempo de recarga
+    das outras habilidades e concedem imunidade a controles."
+  icon: {fileID: 21300000, guid: 1976ce00e9f67984aa59613693cd0ee8, type: 3}
+  cooldown: 60
+  duration: 8
+  cooldownReductionPercent: 0.4
