@@ -48,9 +48,9 @@ public class PlayerMovement : NetworkBehaviour
     private bool isAboutToLand;
 
     [Header("FMOD - Passos por Superfície")]
-    [EventRef] public string eventoPassosTerra = "event:/Player/Footsteps/Dirt";
-    [EventRef] public string eventoPassosConcreto = "event:/Player/Footsteps/Concrete";
-    [EventRef] public string eventoPassosAgua = "event:/Player/Footsteps/Water";
+    [EventRef] public string eventoPassosTerra = "event:/SFX/Player/Footsteps/Dirt";
+    [EventRef] public string eventoPassosConcreto = "event:/SFX/Player/Footsteps/Concrete";
+    [EventRef] public string eventoPassosAgua = "event:/SFX/Player/Footsteps/Water";
     private EventInstance passosSoundInstance;
     private bool isPlayingFootsteps = false;
     private TerrainSurfaceDetector surfaceDetector;
@@ -401,7 +401,7 @@ public class PlayerMovement : NetworkBehaviour
         {
             // Remotos: aplicar rotacao sincronizada ao modelPivot
             if (modelPivot != null)
-                modelPivot.rotation = Quaternion.Euler(0f, netModelYRot.Value, 0f);
+                modelPivot.rotation = Quaternion.Euler(modelPivot.rotation.eulerAngles.x, netModelYRot.Value, modelPivot.rotation.eulerAngles.z);
             return;
         }
 
@@ -414,7 +414,7 @@ public class PlayerMovement : NetworkBehaviour
                 targetAngle = cameraController.eulerAngles.y;
             }
             float angle = Mathf.SmoothDampAngle(modelPivot.eulerAngles.y, targetAngle, ref rotationVelocity, 0.1f);
-            modelPivot.rotation = Quaternion.Euler(0f, angle, 0f);
+            modelPivot.rotation = Quaternion.Euler(modelPivot.rotation.eulerAngles.x, angle, modelPivot.rotation.eulerAngles.z);
 
             // Publicar rotacao para remotos
             netModelYRot.Value = angle;
@@ -468,7 +468,7 @@ public class PlayerMovement : NetworkBehaviour
                 {
                     float animSpeed = (inputRun ? 1.0f : 0.5f) * direction.magnitude;
                     if (healthSystem != null && healthSystem.speedMultiplier.Value > 1.1f) animSpeed *= 1.2f;
-                    universalAnimator.UpdateMovement(animSpeed, dampTime: 0.1f);
+                    universalAnimator.UpdateMovement(animSpeed, aimMoveX: 0f, aimMoveY: animSpeed, dampTime: 0.1f);
                     currentAnimatorMovementSpeed = animSpeed;
                 }
             }
@@ -512,7 +512,7 @@ public class PlayerMovement : NetworkBehaviour
         if (modelPivot == null || cameraController == null) return;
 
         float cameraYaw = cameraController.eulerAngles.y;
-        modelPivot.rotation = Quaternion.Euler(0f, cameraYaw, 0f);
+        modelPivot.rotation = Quaternion.Euler(modelPivot.rotation.eulerAngles.x, cameraYaw, modelPivot.rotation.eulerAngles.z);
         targetAngle = cameraYaw;        // alinha o targetAngle do SmoothDamp para nao "puxar" de volta
         netModelYRot.Value = cameraYaw; // replica para remotos
     }
@@ -747,7 +747,8 @@ public class PlayerMovement : NetworkBehaviour
                 cameraController = Camera.main.transform;
         }
 
-        if (modelPivot == null)
+        // Corrigir referências cruzadas ou quebradas que apontam para fora do Prefab
+        if (modelPivot == null || !modelPivot.IsChildOf(transform))
         {
             Transform namedPivot = transform.Find("ModelPivot");
             if (namedPivot != null)
@@ -768,6 +769,33 @@ public class PlayerMovement : NetworkBehaviour
             }
         }
 
+        if (aimRig == null || !aimRig.transform.IsChildOf(transform))
+        {
+            aimRig = GetComponentInChildren<Rig>(true);
+        }
+
+        if (aimConstraint == null || !aimConstraint.transform.IsChildOf(transform))
+        {
+            aimConstraint = GetComponentInChildren<MultiAimConstraint>(true);
+        }
+
+        if (aimTarget == null || !aimTarget.IsChildOf(transform))
+        {
+            Transform foundTarget = transform.Find("AimTarget_Fixo");
+            if (foundTarget == null)
+            {
+                foundTarget = FindDeepChild(transform, "AimTarget_Fixo");
+                if (foundTarget == null)
+                {
+                    foundTarget = FindDeepChild(transform, "AimTarget");
+                }
+            }
+            if (foundTarget != null)
+            {
+                aimTarget = foundTarget;
+            }
+        }
+
         if (universalAnimator == null)
         {
             universalAnimator = GetComponent<UniversalCharacterAnimator>();
@@ -779,6 +807,19 @@ public class PlayerMovement : NetworkBehaviour
         {
             Debug.LogError($"[PlayerMovement] modelPivot nao configurado para '{name}'. Verifique o prefab e o PlayerNetworkSetup.");
         }
+    }
+
+    private Transform FindDeepChild(Transform parent, string nameContains)
+    {
+        foreach (Transform child in parent)
+        {
+            if (child.name.Contains(nameContains))
+                return child;
+            Transform result = FindDeepChild(child, nameContains);
+            if (result != null)
+                return result;
+        }
+        return null;
     }
 
     private IEnumerator SetupOwnerInputFallback()

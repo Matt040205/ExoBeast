@@ -32,6 +32,7 @@ namespace ExoBeasts.Multiplayer.Sync
             // Needed because "Samurai Variant" prefab has all fields at {fileID: 0}.
             if (movement == null) movement = GetComponent<PlayerMovement>();
             if (cameraController == null) cameraController = GetComponent<CameraController>();
+            if (cameraController == null) cameraController = GetComponentInChildren<CameraController>(true);
             if (characterController == null) characterController = GetComponent<CharacterController>();
             if (playerShooting == null) playerShooting = GetComponent<PlayerShooting>();
             if (meleeCombat == null) meleeCombat = GetComponent<MeleeCombatSystem>();

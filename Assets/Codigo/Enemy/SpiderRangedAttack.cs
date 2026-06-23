@@ -11,7 +11,7 @@ public class SpiderRangedAttack : MonoBehaviour
     public bool enableTrapMechanic = true;
 
     [Header("FMOD - Sons")]
-    [EventRef] public string eventoAtaque = "event:/Enemies/Spider_Attack";
+    [EventRef] public string eventoAtaque = "event:/SFX/Enemies/Spider_Attack";
 
     public void FireProjectile(Transform target, float damage)
     {

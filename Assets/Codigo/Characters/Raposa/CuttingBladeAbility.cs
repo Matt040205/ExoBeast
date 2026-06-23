@@ -20,7 +20,7 @@ public class CuttingBladeAbility : Ability
 
     [Header("FMOD")]
     [EventRef]
-    public string eventoDash = "event:/Player/Dash";
+    public string eventoDash = "event:/SFX/Player/Dash";
 
     public override void Initialize()
     {

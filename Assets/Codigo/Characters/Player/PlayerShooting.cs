@@ -42,8 +42,8 @@ public class PlayerShooting : NetworkBehaviour
     [EventRef] public string eventoTiroUnicoArma = "event:/SFX/Atirar";
     [EventRef] public string eventoTiroContinuoArma = "event:/SFX/Atirar_segurando";
     [EventRef] public string eventoRecargaArma = "event:/SFX/Recarga Arma";
-    [EventRef] public string eventoTiroUnicoArco = "event:/Player/Bow_Shot";
-    [EventRef] public string eventoTiroContinuoArco = "event:/Player/Bow_Shot";
+    [EventRef] public string eventoTiroUnicoArco = "event:/SFX/Player/Bow_Shot";
+    [EventRef] public string eventoTiroContinuoArco = "event:/SFX/Player/Bow_Shot";
 
     [Header("Raycast Settings")]
     public float maxDistance = 100f;
@@ -244,6 +244,12 @@ public class PlayerShooting : NetworkBehaviour
 
     private void Shoot()
     {
+        PlayerMovement playerMovement = GetComponent<PlayerMovement>();
+        if (playerMovement != null)
+        {
+            playerMovement.FaceCameraImmediately();
+        }
+
         Vector3 shotDirection = GetShotDirection();
         Vector3 shotOrigin = firePoint != null ? firePoint.position : transform.position;
         int characterIndex = ResolveCharacterLibraryIndex(characterData);
@@ -548,6 +554,13 @@ public class PlayerShooting : NetworkBehaviour
             PlayerMovement playerMovement = GetComponent<PlayerMovement>();
             if (playerMovement != null)
                 modelPivot = playerMovement.GetModelPivot();
+        }
+
+        if (aimTarget == null || !aimTarget.IsChildOf(transform))
+        {
+            PlayerMovement playerMovement = GetComponent<PlayerMovement>();
+            if (playerMovement != null)
+                aimTarget = playerMovement.aimTarget;
         }
 
         if (firePoint == null)
