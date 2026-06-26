@@ -10,10 +10,19 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 
 ## Docs ativos relacionados
 
-- `Assets/Codigo/Multiplayer/README.md` - indice curto
-- `Assets/Codigo/Docs/Guia_Setup_Multiplayer_Cenas.md` - setup de cena e prefab
-- `Assets/Codigo/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
-- `Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
+- `Assets/Multiplayer/README.md` - indice curto
+- `Assets/CoreScripts/Docs/Guia_Setup_Multiplayer_Cenas.md` - setup de cena e prefab
+- `Assets/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
+- `Assets/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
+
+## Ultima atualizacao: Unity 6.3 LTS + reorganizacao de Assets (2026-06-26)
+
+- Versao alvo do projeto: Unity `6000.3.10f1`.
+- A estrutura fisica atual de `Assets` e canonica: `CoreScripts`, `Cenas`, `Multiplayer`, `Configurações`, `Documentação`, `Endereçáveis`, `VFXgenerico` e equivalentes.
+- Cenas canonicas ficam em `Assets/Cenas/`; `Assets/Cenas/NetworkBootstrap.unity` e a cena tecnica de abertura e carrega `MenuScene`.
+- A lista NGO canonica fica em `Assets/Multiplayer/Setup/DefaultNetworkPrefabs.asset`.
+- O mapa jogavel atual e `CenaMapaNOVO`. O nome `CenaMapaTeste` aparece apenas em contexto historico ou em classes legadas de bootstrap direto.
+- Pastas legadas de codigo, cenas e organizacao antiga nao devem ser recriadas.
 
 ## Ultima atualizacao: Sprint 8 — integracao final + doc sync (2026-05-22)
 
@@ -42,7 +51,7 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - `EOSConfig.cs` (ScriptableObject) marcou todos os campos de credencial com `[NonSerialized]`. Resultado: o `.asset` nao persiste mais secrets.
 - `EOSManagerWrapper.cs` chama `LoadCredentials()` (renomeado de `LoadCredentialsFromFile`) e mascara `ClientId` nos logs; `ClientSecret` nunca aparece em log.
 - Pos-refactor, o Unity MCP `read_console` confirmou compilacao sem erros relacionados a EOS. Validacao funcional (Play Mode e build standalone) ainda pendente.
-- Documentacao atualizada: `Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md` cobre as tres formas de fornecer credenciais (env vars, JSON, template) com exemplos de CI/CD.
+- Documentacao atualizada: `Assets/Multiplayer/CREDENTIALS_SETUP.md` cobre as tres formas de fornecer credenciais (env vars, JSON, template) com exemplos de CI/CD.
 - Template versionado criado em `EOSCredentials.json.template` na raiz do projeto.
 
 ## Atualizacao anterior: blindagem do fluxo de startup, lobby e play direto (2026-04-30)
@@ -55,7 +64,7 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - `LobbySceneUI` agora usa o reset compartilhado ao voltar para o menu, evitando reconexao involuntaria.
 - `CenaMapaTeste` ganhou `CenaMapaTesteDirectPlayBootstrap`, que garante os singletons minimos, restaura a equipe do ultimo save e aplica fallback debug quando o save nao vier valido.
 - `GameDataManager` ganhou suporte de bootstrap para reutilizar a biblioteca original de personagens sem depender da passagem previa por `EscolherPersonagem`.
-- `MenuScene` e `EscolherPersonagem` tiveram listeners persistentes antigos limpos, e a cena duplicada `Assets/Codigo/Multiplayer/LobbyScene.unity` foi arquivada como `LobbyScene_Legacy.unity` para evitar entrada na cena errada.
+- `MenuScene` e `EscolherPersonagem` tiveram listeners persistentes antigos limpos, e a cena duplicada historica de lobby foi arquivada como `LobbyScene_Legacy.unity` para evitar entrada na cena errada.
 - Foram adicionados testes de validacao em `Assets/Tests/Editor/` para checar refs criticas da `MenuScene`, listeners proibidos e consistencia das cenas canonicas.
 - Validacao: os scripts modificados passaram no `validate_script` do Unity MCP; o runner de testes ainda foi inconsistente em uma execucao, entao a confirmacao final continua sendo mais confiavel direto no Editor Unity.
 
@@ -97,7 +106,7 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 ## Atualizacao anterior: correcoes de input local, build toggle e disputa de PlayerInput (2026-04-29)
 
 - O problema observado no log nao era mais de spawn, auth ou lobby: o host completava login EOS, criava lobby, entrava na partida e o `PlayerNetworkSetup` terminava o setup local, mas o comandante ainda nao respondia aos inputs de gameplay.
-- A investigacao mostrou um `PlayerInput` na cena, no objeto `ManagersDaPartida` de `Assets/Scenes/CenaMapaTeste.unity`, com o action `Player/Build` ligado diretamente a `BuildManager.OnBuild`. Esse componente competia com o `PlayerInput` do player local pelo mesmo teclado/mouse.
+- A investigacao historica mostrou um `PlayerInput` de cena no objeto `ManagersDaPartida`, com o action `Player/Build` ligado diretamente a `BuildManager.OnBuild`. Esse componente competia com o `PlayerInput` do player local pelo mesmo teclado/mouse.
 - O `PlayerInput` do player local tambem passava por um ciclo `disable -> enable` em `PlayerNetworkSetup`, o que podia deixar referencias de `InputAction` cacheadas em estado velho dentro do `LocalPlayerInputBridge`.
 - `PauseControl` ja estava mapeado no prefab, mas nao possuia um callback `OnPause(InputAction.CallbackContext)` compativel com o Input System novo.
 
@@ -105,10 +114,10 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 
 | Arquivo | O que foi ajustado |
 |---|---|
-| `Assets/Codigo/Towers/BuildManager.cs` | Desabilita o `PlayerInput` de cena em `Awake()` para evitar disputa de device com o comandante local. O toggle de build passou a ser lido via `LocalPlayerInputBridge` do owner, com fallback para `Keyboard.current.bKey.wasPressedThisFrame`. |
-| `Assets/Codigo/Characters/Player/LocalPlayerInputBridge.cs` | Passou a recachear bindings quando o `PlayerInput` muda de estado, incluindo a action `Build`. Tambem ganhou `ConsumeBuildPressed()`, flags de estado para `Build` e refresh explicito apos reset do `PlayerInput`. |
-| `Assets/Codigo/Multiplayer/Sync/PlayerNetworkSetup.cs` | Depois do `disable -> enable -> SwitchCurrentActionMap("Player")`, agora chama `RefreshBindingsAfterPlayerInputReset()` no bridge. O sanity-check do owner tambem passou a verificar `devices.Count` e `currentActionMap.enabled`. |
-| `Assets/Codigo/Managers/PauseControl.cs` | Ganhou `OnPause(InputAction.CallbackContext)` para receber o evento do action `Player/Pause` que ja estava ligado no prefab. |
+| `Assets/CoreScripts/Towers/BuildManager.cs` | Desabilita o `PlayerInput` de cena em `Awake()` para evitar disputa de device com o comandante local. O toggle de build passou a ser lido via `LocalPlayerInputBridge` do owner, com fallback para `Keyboard.current.bKey.wasPressedThisFrame`. |
+| `LocalPlayerInputBridge.cs` | Passou a recachear bindings quando o `PlayerInput` muda de estado, incluindo a action `Build`. Tambem ganhou `ConsumeBuildPressed()`, flags de estado para `Build` e refresh explicito apos reset do `PlayerInput`. |
+| `Assets/Multiplayer/Sync/PlayerNetworkSetup.cs` | Depois do `disable -> enable -> SwitchCurrentActionMap("Player")`, agora chama `RefreshBindingsAfterPlayerInputReset()` no bridge. O sanity-check do owner tambem passou a verificar `devices.Count` e `currentActionMap.enabled`. |
+| `Assets/CoreScripts/Managers/PauseControl.cs` | Ganhou `OnPause(InputAction.CallbackContext)` para receber o evento do action `Player/Pause` que ja estava ligado no prefab. |
 
 ### Comportamento novo
 
@@ -127,7 +136,7 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 
 - `ObjectiveHealthSystem` virou a fonte autoritativa da vida da Base e agora publica atualizacoes via `ObjectiveHealthBus`; `PlayerHUD` e `UIManager` apenas escutam eventos.
 - `Prefeitura.prefab` agora e um `NetworkObject` de cena para a Base sincronizar vida e derrota corretamente entre host e clientes.
-- Foi criada a pasta `Assets/Codigo/Combat/` com `DamageContext`, `DamageFeedbackMode`, `DamageRequest`, `DamageResponse` e `IDamageInterceptor` para padronizar validacao, bloqueio e feedback de dano.
+- Foi criada a pasta `Assets/CoreScripts/Combat/` com `DamageContext`, `DamageFeedbackMode`, `DamageRequest`, `DamageResponse` e `IDamageInterceptor` para padronizar validacao, bloqueio e feedback de dano.
 - `EnemyHealthSystem` e `NetworkedEnemy` passaram a usar contexto de dano autoritativo; popups e hit flash agora podem ser exibidos para todos os observadores.
 - `TrapLogicBase` ganhou `InitializeServer(...)` e `NetworkedTrapVisual` passou a concentrar a ativacao visual; `BuildManager` inicializa estado antes de `NetworkObject.Spawn()`.
 - `Espinhos.cs` agora usa o caminho autoritativo de dano com feedback sincronizado; `Teleportador.cs` delega o deslocamento para `PlayerTeleportService`.

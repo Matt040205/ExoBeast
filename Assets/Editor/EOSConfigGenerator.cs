@@ -128,7 +128,7 @@ namespace ExoBeasts.Multiplayer.Editor
             // BUG FIX (2026-05-21): em clones MPPM, Application.dataPath aponta para a copia
             // virtual em %LocalAppData%\Unity\Editor\MultiplayerPlayMode\... — nao para a raiz
             // do projeto original onde EOSCredentials.json reside. Replicamos o pattern
-            // ja validado em Assets/Codigo/Multiplayer/Core/EOSConfig.cs:72-76 (TryLoadFromFile
+            // ja validado em Assets/Multiplayer/Core/EOSConfig.cs:72-76 (TryLoadFromFile
             // do runtime). Sem isso, Play Mode no Player 2 do MPPM bloqueia com
             // "Nenhuma fonte de credenciais EOS encontrada".
             string projectRoot = MppmHelper.IsClone

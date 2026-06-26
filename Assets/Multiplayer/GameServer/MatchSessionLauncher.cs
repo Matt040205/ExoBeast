@@ -496,7 +496,7 @@ namespace ExoBeasts.Multiplayer.GameServer
             // Pareado com BuildSceneListGuard (Editor-time) e SceneManager.VerifySceneBeforeLoading (runtime).
             string scenePathForValidation = sceneName.StartsWith("Assets/") && sceneName.EndsWith(".unity")
                 ? sceneName
-                : "Assets/Scenes/" + sceneName + ".unity";
+                : "Assets/Cenas/" + sceneName + ".unity";
             int validationIndex = SceneUtility.GetBuildIndexByScenePath(scenePathForValidation);
             if (validationIndex < 0)
             {

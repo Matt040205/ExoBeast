@@ -9,18 +9,19 @@ using UnityEngine.UI;
 
 public class MenuSceneValidationTests
 {
-    private const string MenuScenePath = "Assets/Scenes/MenuScene.unity";
-    private const string SupportedLobbyScenePath = "Assets/Scenes/LobbyScene.unity";
+    private const string NetworkBootstrapScenePath = "Assets/Cenas/NetworkBootstrap.unity";
+    private const string MenuScenePath = "Assets/Cenas/MenuScene.unity";
+    private const string SupportedLobbyScenePath = "Assets/Cenas/LobbyScene.unity";
     private static readonly string[] CanonicalScenePaths =
     {
-        "Assets/Scenes/MenuScene.unity",
-        "Assets/Scenes/EscolherPersonagem.unity",
+        "Assets/Cenas/NetworkBootstrap.unity",
+        "Assets/Cenas/MenuScene.unity",
+        "Assets/Cenas/EscolherPersonagem.unity",
         SupportedLobbyScenePath,
-        "Assets/Scenes/Rastros.unity",
-        "Assets/Scenes/CenaMapaTeste.unity",
-        "Assets/Scenes/Lose.unity",
-        "Assets/Scenes/Win.unity",
-        "Assets/Scenes/CenaMapaNOVO.unity"
+        "Assets/Cenas/Rastros.unity",
+        "Assets/Cenas/Lose.unity",
+        "Assets/Cenas/Win.unity",
+        "Assets/Cenas/CenaMapaNOVO.unity"
     };
 
     [Test]
@@ -80,6 +81,24 @@ public class MenuSceneValidationTests
     {
         AssertCanonicalSceneList(EditorBuildSettings.globalScenes, "EditorBuildSettings.globalScenes");
         AssertCanonicalSceneList(EditorBuildSettings.scenes, "EditorBuildSettings.scenes");
+    }
+
+    [Test]
+    public void NetworkBootstrapSceneLoadsMenuScene()
+    {
+        WithScene(NetworkBootstrapScenePath, scene =>
+        {
+            MonoBehaviour bootstrapper = scene.GetRootGameObjects()
+                .SelectMany(root => root.GetComponentsInChildren<MonoBehaviour>(true))
+                .FirstOrDefault(component => component != null && component.GetType().Name == "SceneBootstrapper");
+
+            Assert.That(bootstrapper, Is.Not.Null, "SceneBootstrapper nao encontrado na NetworkBootstrap.");
+
+            SerializedObject serializedObject = new SerializedObject(bootstrapper);
+            SerializedProperty initialSceneName = serializedObject.FindProperty("initialSceneName");
+            Assert.That(initialSceneName, Is.Not.Null, "Campo initialSceneName nao encontrado no SceneBootstrapper.");
+            Assert.That(initialSceneName.stringValue, Is.EqualTo("MenuScene"));
+        });
     }
 
     [Test]

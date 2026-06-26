@@ -12,7 +12,7 @@ Criar branch `Multiplayer` com todo o sistema multiplayer, mantendo a `main` int
 
 **Localização:** `PI3D/EOSCredentials.json` (raiz do projeto, NÃO em Assets/)
 
-**Template:** Use `Assets/Codigo/Multiplayer/EOSCredentials.json.example`
+**Template:** Use `EOSCredentials.json.template` na raiz do projeto
 
 ```json
 {
