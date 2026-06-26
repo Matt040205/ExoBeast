@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
+    path: Assets/Cenas/NetworkBootstrap.unity
+    guid: 66fef73a87957b5449bae1627a4768a6
+  - enabled: 1
     path: Assets/Cenas/MenuScene.unity
     guid: 7f932158e8823b44cafc002298a17b6f
   - enabled: 1
@@ -17,9 +20,6 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Cenas/Rastros.unity
     guid: 09ffe242ca7a451429730bc7f11ebc06
-  - enabled: 0
-    path: Assets/Scenes/CenaMapaTeste.unity
-    guid: ff39d9ede6876484fa7884c7572a9ff2
   - enabled: 1
     path: Assets/Cenas/Lose.unity
     guid: 24ada1431a20db544810192e5310b291
