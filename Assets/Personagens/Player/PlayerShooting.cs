@@ -108,6 +108,10 @@ public class PlayerShooting : NetworkBehaviour
         universalAnimator = GetComponent<UniversalCharacterAnimator>();
         if (universalAnimator == null)
             universalAnimator = GetComponentInChildren<UniversalCharacterAnimator>();
+        if (universalAnimator == null)
+        {
+            universalAnimator = gameObject.AddComponent<UniversalCharacterAnimator>();
+        }
 
         cameraController = GetComponentInChildren<CameraController>();
         if (cameraController == null && mainCamera != null)

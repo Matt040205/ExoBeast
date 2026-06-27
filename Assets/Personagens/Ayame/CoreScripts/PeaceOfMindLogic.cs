@@ -49,12 +49,36 @@ public class PeaceOfMindLogic : NetworkBehaviour
     {
         if (!IsOwner) return;
         var netAnim = GetComponent<NetworkAnimator>() ?? GetComponentInChildren<NetworkAnimator>();
-        if (netAnim != null) netAnim.SetTrigger("Heal");
+        if (netAnim != null)
+        {
+            var anim = netAnim.Animator;
+            if (anim != null)
+            {
+                if (HasParameter(anim, "Heal"))
+                    netAnim.SetTrigger("Heal");
+                else if (HasParameter(anim, "Meditar"))
+                    netAnim.SetTrigger("Meditar");
+            }
+            else
+            {
+                netAnim.SetTrigger("Heal");
+            }
+        }
 
         var movement = GetComponent<PlayerMovement>();
         if (movement != null) movement.enabled = false;
         var shooting = GetComponent<PlayerShooting>();
         if (shooting != null) shooting.enabled = false;
+    }
+
+    private bool HasParameter(Animator anim, string paramName)
+    {
+        if (anim == null) return false;
+        foreach (AnimatorControllerParameter param in anim.parameters)
+        {
+            if (param.name == paramName) return true;
+        }
+        return false;
     }
 
     [ClientRpc]

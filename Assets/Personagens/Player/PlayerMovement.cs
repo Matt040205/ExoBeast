@@ -150,6 +150,10 @@ public class PlayerMovement : NetworkBehaviour
 
         universalAnimator = GetComponent<UniversalCharacterAnimator>();
         if (universalAnimator == null) universalAnimator = GetComponentInChildren<UniversalCharacterAnimator>();
+        if (universalAnimator == null)
+        {
+            universalAnimator = gameObject.AddComponent<UniversalCharacterAnimator>();
+        }
 
         surfaceDetector = GetComponent<TerrainSurfaceDetector>();
         CreateFootstepInstance(GetEventForSurface(TerrainSurfaceDetector.SurfaceType.Terra));

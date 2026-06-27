@@ -15,7 +15,7 @@ public static class CharacterActionID
 }
 
 [DisallowMultipleComponent]
-public class UniversalCharacterAnimator : NetworkBehaviour
+public class UniversalCharacterAnimator : MonoBehaviour
 {
     [Header("Components")]
     [SerializeField] private Animator animator;
@@ -44,9 +44,8 @@ public class UniversalCharacterAnimator : NetworkBehaviour
         EnsureComponentsResolved();
     }
 
-    public override void OnNetworkSpawn()
+    private void Start()
     {
-        base.OnNetworkSpawn();
         EnsureComponentsResolved();
     }
 
@@ -54,14 +53,34 @@ public class UniversalCharacterAnimator : NetworkBehaviour
     {
         if (animator == null)
         {
-            animator = GetComponentInChildren<Animator>(true);
+            // Prefer an active animator in children, fallback to inactive if none found
+            animator = GetComponentInChildren<Animator>();
+            if (animator == null)
+            {
+                animator = GetComponentInChildren<Animator>(true);
+            }
         }
         if (networkAnimator == null)
         {
             networkAnimator = GetComponent<NetworkAnimator>();
             if (networkAnimator == null)
             {
-                networkAnimator = GetComponentInChildren<NetworkAnimator>(true);
+                networkAnimator = GetComponentInChildren<NetworkAnimator>();
+                if (networkAnimator == null)
+                {
+                    networkAnimator = GetComponentInChildren<NetworkAnimator>(true);
+                }
+            }
+        }
+
+        // Dynamically resolve groundMask from PlayerMovement if not set
+        if (groundMask.value == 0)
+        {
+            var movement = GetComponent<PlayerMovement>();
+            if (movement == null) movement = GetComponentInParent<PlayerMovement>();
+            if (movement != null)
+            {
+                groundMask = movement.groundMask;
             }
         }
     }
@@ -144,17 +163,38 @@ public class UniversalCharacterAnimator : NetworkBehaviour
     {
         if (animator == null) return;
 
-        // Set the ID locally first
-        animator.SetInteger(ActionIDHash, actionID);
+        // Set the ID locally first (if ActionID parameter exists)
+        if (HasParameter(animator, "ActionID"))
+        {
+            animator.SetInteger(ActionIDHash, actionID);
+        }
+
+        string specificTrigger = GetSpecificTriggerName(actionID);
 
         // Sync trigger over network if active, otherwise trigger locally
         if (networkAnimator != null && networkAnimator.enabled && networkAnimator.IsSpawned)
         {
-            networkAnimator.SetTrigger("ActionTrigger");
+            if (HasParameter(animator, "ActionTrigger"))
+            {
+                networkAnimator.SetTrigger("ActionTrigger");
+            }
+
+            if (!string.IsNullOrEmpty(specificTrigger) && HasParameter(animator, specificTrigger))
+            {
+                networkAnimator.SetTrigger(specificTrigger);
+            }
         }
         else
         {
-            animator.SetTrigger(ActionTriggerHash);
+            if (HasParameter(animator, "ActionTrigger"))
+            {
+                animator.SetTrigger(ActionTriggerHash);
+            }
+
+            if (!string.IsNullOrEmpty(specificTrigger) && HasParameter(animator, specificTrigger))
+            {
+                animator.SetTrigger(specificTrigger);
+            }
         }
     }
 
@@ -182,6 +222,45 @@ public class UniversalCharacterAnimator : NetworkBehaviour
     public void ResetActionTrigger()
     {
         if (animator == null) return;
-        animator.ResetTrigger(ActionTriggerHash);
+
+        if (HasParameter(animator, "ActionTrigger"))
+        {
+            animator.ResetTrigger(ActionTriggerHash);
+        }
+
+        string[] specificTriggers = { "Jump", "Attack", "Shoot", "Reload", "CacadoraUltimate", "Meditar", "Heal", "Slip", "Dead" };
+        foreach (var trigger in specificTriggers)
+        {
+            if (HasParameter(animator, trigger))
+            {
+                animator.ResetTrigger(trigger);
+            }
+        }
+    }
+
+    private bool HasParameter(Animator anim, string paramName)
+    {
+        if (anim == null) return false;
+        foreach (AnimatorControllerParameter param in anim.parameters)
+        {
+            if (param.name == paramName) return true;
+        }
+        return false;
+    }
+
+    private string GetSpecificTriggerName(int actionID)
+    {
+        switch (actionID)
+        {
+            case CharacterActionID.Jump: return "Jump";
+            case CharacterActionID.Attack: return "Attack";
+            case CharacterActionID.Shoot: return "Shoot";
+            case CharacterActionID.Reload: return "Reload";
+            case CharacterActionID.CacadoraUltimate: return "CacadoraUltimate";
+            case CharacterActionID.Heal: return "Meditar";
+            case CharacterActionID.Slip: return "Slip";
+            case CharacterActionID.Dead: return "Dead";
+            default: return null;
+        }
     }
 }

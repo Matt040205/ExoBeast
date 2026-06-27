@@ -4,32 +4,43 @@ public class AnimationEventProxy : MonoBehaviour
 {
     private MeleeCombatSystem meleeSystem;
 
-    // !! A SOLU«√O: Vari·vel para guardar qual È a magia que est· acontecendo agora !!
-    [HideInInspector] public CacadoraNoturnaLogic magiaAtualDaCacadora;
-
-    void Start()
+    private MeleeCombatSystem MeleeSystem
     {
-        meleeSystem = GetComponentInParent<MeleeCombatSystem>();
+        get
+        {
+            if (meleeSystem == null)
+            {
+                meleeSystem = GetComponentInParent<MeleeCombatSystem>();
+            }
+            return meleeSystem;
+        }
     }
+
+    // !! A SOLU√á√ÉO: Vari√°vel para guardar qual √© a magia que est√° acontecendo agora !!
+    [HideInInspector] public CacadoraNoturnaLogic magiaAtualDaCacadora;
 
     public void AnimEvent_Hit1()
     {
-        if (meleeSystem != null && meleeSystem.enabled) meleeSystem.AnimEvent_Hit1();
+        var system = MeleeSystem;
+        if (system != null && system.enabled) system.AnimEvent_Hit1();
     }
 
     public void AnimEvent_Hit2()
     {
-        if (meleeSystem != null && meleeSystem.enabled) meleeSystem.AnimEvent_Hit2();
+        var system = MeleeSystem;
+        if (system != null && system.enabled) system.AnimEvent_Hit2();
     }
 
     public void AnimEvent_Hit3()
     {
-        if (meleeSystem != null && meleeSystem.enabled) meleeSystem.AnimEvent_Hit3();
+        var system = MeleeSystem;
+        if (system != null && system.enabled) system.AnimEvent_Hit3();
     }
 
     public void AnimEvent_Hit4()
     {
-        if (meleeSystem != null && meleeSystem.enabled) meleeSystem.AnimEvent_Hit4();
+        var system = MeleeSystem;
+        if (system != null && system.enabled) system.AnimEvent_Hit4();
     }
 
     public void AnimEvent_FireBeam()

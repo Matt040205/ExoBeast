@@ -69,7 +69,13 @@ public class MeleeCombatSystem : NetworkBehaviour
         base.OnNetworkSpawn();
 
         // Inicializar universalAnimator para TODOS (owner e remotos): AnimEvents de som precisam rodar em todos
-        universalAnimator = GetComponentInChildren<UniversalCharacterAnimator>();
+        universalAnimator = GetComponent<UniversalCharacterAnimator>();
+        if (universalAnimator == null)
+            universalAnimator = GetComponentInChildren<UniversalCharacterAnimator>();
+        if (universalAnimator == null)
+        {
+            universalAnimator = gameObject.AddComponent<UniversalCharacterAnimator>();
+        }
 
         // Garantir velocidade de ataque correta desde o spawn (evita animacoes congeladas em 0)
         if (universalAnimator != null)
