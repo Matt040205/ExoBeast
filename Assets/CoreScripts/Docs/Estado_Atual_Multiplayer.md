@@ -14,6 +14,9 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - `Assets/CoreScripts/Docs/PADROES_NGO.md` - padroes NGO especificos do projeto (bugs reais documentados)
 - `Assets/CoreScripts/Docs/Guia_Game_Designer.md` - explicacao sistema a sistema
 - `Assets/CoreScripts/Docs/Guia_Setup_Multiplayer_Cenas.md` - setup de cena e prefab
+- `Assets/CoreScripts/Docs/GUIA_PERSONAGENS.md` - CharacterBase, componentes do prefab, habilidades Q/E/X, Rastros
+- `Assets/CoreScripts/Docs/GUIA_TORRES_ARMADILHAS.md` - towerData, sistema de upgrade, TowerBehavior, TrapDataSO
+- `Assets/CoreScripts/Docs/GUIA_INIMIGOS_E_ONDAS.md` - EnemyDataSO, WaveConfig, HordeManager inspector
 - `Assets/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
 - `Assets/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
 - `Assets/Multiplayer/README.md` - indice curto

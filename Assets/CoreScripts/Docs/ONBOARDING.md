@@ -103,28 +103,40 @@ Cenas de teste isolado (fora do fluxo normal):
 ```
 Assets/
 ├── Cenas/             ← todas as cenas canônicas do projeto
-├── CoreScripts/       ← sistemas de gameplay (Player, Enemy, Towers, UI, Managers)
+├── CoreScripts/       ← sistemas de gameplay (Enemy, Managers, Towers, UI, Combat, Audio)
+│   ├── Base/          ← CharacterBase.cs (ScriptableObject compartilhado por commanders e torres)
 │   └── Docs/          ← documentação técnica do projeto ← VOCÊ ESTÁ AQUI
+├── Personagens/       ← assets de personagem (scripts, prefabs, SOs, animações de todos os commanders)
+│   └── AbilitySystem/ ← Ability.cs, CommanderAbilityController.cs, PassivaAbility.cs
 ├── Multiplayer/       ← código NGO + EOS (Auth, Lobby, Sync, GameServer)
 │   ├── Setup/         ← DefaultNetworkPrefabs.asset (lista NGO de prefabs)
 │   └── Docs/          ← guides de auth e credentials
-├── Configurações/     ← ScriptableObjects de configuração (TrapDataSO, etc.)
-├── Modelos/           ← prefabs de personagens, torres, armadilhas
+├── Armadilhas/        ← scripts de armadilhas (Broca, Espinhos, Fogueira, Piche, Teleportador)
+├── Entidades/
+│   └── Inimigos/      ← prefabs dos inimigos (Aguia, Aranha, Capanga, Escorpião, MONSTRO)
 ├── VFXgenerico/       ← efeitos visuais compartilhados
 └── Editor/            ← scripts de Editor (EOSConfigGenerator, etc.)
 ```
 
 ---
 
-## 7. Os 5 arquivos mais importantes para ler
+## 7. Arquivos importantes para ler
 
+### Multiplayer e rede
 | Arquivo | Por que ler |
 |---------|-------------|
-| `PADROES_NGO.md` (este pasta) | Padrões que causaram bugs reais — ler antes de mexer em qualquer NetworkBehaviour |
-| `Estado_Atual_Multiplayer.md` (este pasta) | Estado canônico: o que existe hoje, o que foi deletado, o que mudou |
-| `Guia_Game_Designer.md` (este pasta) | Explicação sistema a sistema do multiplayer, com status de migração |
-| `Guia_Setup_Multiplayer_Cenas.md` (este pasta) | Como montar cenas, prefabs e NetworkManager corretamente |
+| `PADROES_NGO.md` (esta pasta) | Padrões que causaram bugs reais — ler antes de mexer em qualquer NetworkBehaviour |
+| `Estado_Atual_Multiplayer.md` (esta pasta) | Estado canônico: o que existe hoje, o que foi deletado, o que mudou |
+| `Guia_Game_Designer.md` (esta pasta) | Explicação sistema a sistema do multiplayer, com status de migração |
+| `Guia_Setup_Multiplayer_Cenas.md` (esta pasta) | Como montar cenas, prefabs e NetworkManager corretamente |
 | `Assets/Multiplayer/CREDENTIALS_SETUP.md` | Como configurar EOS para desenvolvimento e CI/CD |
+
+### Sistemas de gameplay
+| Arquivo | Por que ler |
+|---------|-------------|
+| `GUIA_PERSONAGENS.md` (esta pasta) | CharacterBase SO, prefab de commander, habilidades Q/E/X, sistema Rastros |
+| `GUIA_TORRES_ARMADILHAS.md` (esta pasta) | towerData, caminhos de upgrade, TowerBehavior, TrapDataSO dual prefab |
+| `GUIA_INIMIGOS_E_ONDAS.md` (esta pasta) | EnemyDataSO, fórmulas de scaling, WaveConfig, HordeManager Inspector |
 
 ---
 
