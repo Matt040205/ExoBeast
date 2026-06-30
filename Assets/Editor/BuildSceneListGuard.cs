@@ -10,14 +10,14 @@ namespace ExoBeasts.Editor
     {
         public static readonly string[] CanonicalScenePaths =
         {
-            "Assets/Scenes/MenuScene.unity",
-            "Assets/Scenes/EscolherPersonagem.unity",
-            "Assets/Scenes/LobbyScene.unity",
-            "Assets/Scenes/Rastros.unity",
-            "Assets/Scenes/CenaMapaTeste.unity",
-            "Assets/Scenes/Lose.unity",
-            "Assets/Scenes/Win.unity",
-            "Assets/Scenes/CenaMapaNOVO.unity"
+            "Assets/Cenas/NetworkBootstrap.unity",
+            "Assets/Cenas/MenuScene.unity",
+            "Assets/Cenas/EscolherPersonagem.unity",
+            "Assets/Cenas/LobbyScene.unity",
+            "Assets/Cenas/Rastros.unity",
+            "Assets/Cenas/Lose.unity",
+            "Assets/Cenas/Win.unity",
+            "Assets/Cenas/CenaMapaNOVO.unity"
         };
 
         static BuildSceneListGuard()

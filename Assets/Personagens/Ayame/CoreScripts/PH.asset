@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e2027bee059fbbd498af999a02b71322, type: 3}
+  m_Name: PH
+  m_EditorClassIdentifier: 
+  name: PH
+  description: 'Nada
+
+'
+  maxHealth: 100
+  damage: 10
+  moveSpeed: 5
+  reloadSpeed: 2
+  attackSpeed: 1
+  meleeRange: 1000
+  armor: 0
+  critChance: 0.05
+  critDamage: 1.5
+  armorPenetration: 0
+  ultimateChargePerDamage: 0.001
+  combatType: 0
+  fireMode: 0
+  meleeAngle: 90
+  isCommander: 1
+  characterIcon: {fileID: 21300000, guid: 7e0b9d605fae73a499232103c1892355, type: 3}
+  commanderPrefab: {fileID: 2682399473942067493, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
+  towerPrefab: {fileID: 7734725407009037971, guid: 4d14d003461c1c840ac62da38e8680f5, type: 3}
+  magazineSize: 10
+  passive: {fileID: 0}
+  ability1: {fileID: 0}
+  ability2: {fileID: 0}
+  ultimate: {fileID: 0}
+  upgradePaths: []
+  cost: 50
+  pontosRastrosDisponiveis: 10
+  pontosRastrosGastos: 0
+  pontosPorCaminho: []
+  habilidadesDesbloqueadas: []

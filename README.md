@@ -1,37 +1,79 @@
-# ExoBeasts V3
+# ExoBeast
 
-Projeto Unity 6 (`6000.0.52f1`) de tower defense cooperativo para 1 a 4 jogadores. Jogadores escolhem comandantes, constroem torres e armadilhas, protegem a base e enfrentam ondas de inimigos em fluxo singleplayer ou multiplayer host/client.
+Cooperative tower-defense prototype where commander creatures defend an objective against waves of enemies. Unity 6 project with online multiplayer for up to 4 players.
 
-## Estado Atual
+## Status
 
-- Estrutura ativa principal: `Assets/aaPasta`.
-- Cenas ativas: `MenuScene`, `LobbyScene`, `EscolherPersonagem`, `CenaMapaNOVO`, `Win`, `Lose`, `Rastros`.
-- Multiplayer: Netcode for GameObjects, Unity Transport, Epic Online Services e MPPM para teste multi-instancia.
-- Audio: FMOD instalado em `Assets/Plugins/FMOD`; BetterFMOD embutido em `Packages/com.bisc8.betterfmod` e sempre usado por meio da camada `ExoAudioService`.
-- Documentacao ativa: comece por [docs/INDEX.md](docs/INDEX.md).
+Student team project, active development. Current state: vertical-slice prototype with a working multiplayer flow and core gameplay loop.
 
-## Regras De Organizacao
+## Overview
 
-- Nao use documentos antigos como fonte operacional. Tudo que foi substituido esta em `docs/archive/`.
-- Nao crie novas pastas paralelas fora de `Assets/aaPasta` para gameplay, personagens, mapas ou sistemas.
-- Nao chame `FMODUnity.RuntimeManager` direto em gameplay; use `ExoAudioService`.
-- Nao instale outro FMOD pelo instalador do BetterFMOD. A instalacao canonica e `Assets/Plugins/FMOD`.
-- Qualquer personagem, mapa, som ou plugin novo precisa atualizar a documentacao e passar pelo checklist correspondente em `docs/checklists/`.
+ExoBeast is a 1-4 player cooperative tower-defense game built in Unity 6 LTS (`6000.3.10f1`). Players pick from a roster of commander characters, place towers and traps around a defended objective, and survive waves of enemies. The multiplayer layer uses Unity Netcode for GameObjects in a peer-to-peer host model, with lobby and authentication handled through Epic Online Services.
 
-## Setup Rapido
+## Tech Stack
 
-1. Abra este diretorio no Unity Hub com Unity `6000.0.52f1`.
-2. Configure as credenciais EOS seguindo [Assets/aaPasta/Multiplayer/CREDENTIALS_SETUP.md](Assets/aaPasta/Multiplayer/CREDENTIALS_SETUP.md).
-3. Abra `Assets/aaPasta/Cenas/MenuScene.unity`.
-4. Para multiplayer local, use Unity Multiplayer Play Mode com 2 instancias.
+| Area | Technology |
+|---|---|
+| Engine | Unity 6 LTS (`6000.3.10f1`) |
+| Language | C# |
+| Networking | Netcode for GameObjects 1.12 + Unity Transport 2.4 |
+| Online Services | Epic Online Services (PlayEveryWare plugin) |
+| Multi-instance testing | Unity Multiplayer Play Mode 1.6.3 |
+| Audio | FMOD |
+| Version Control | Git / GitHub |
 
-## Leitura Obrigatoria
+## Multiplayer System
 
-| Tema | Documento |
-| --- | --- |
-| Indice operacional | [docs/INDEX.md](docs/INDEX.md) |
-| Multiplayer | [docs/multiplayer.md](docs/multiplayer.md) |
-| Audio e BetterFMOD | [docs/audio/README.md](docs/audio/README.md) |
-| Personagens | [docs/personagens/README.md](docs/personagens/README.md) |
-| Mapas | [docs/mapas/README.md](docs/mapas/README.md) |
-| Plugins UPM | [docs/plugins/adicionar-plugin-upm.md](docs/plugins/adicionar-plugin-upm.md) |
+The multiplayer layer handles EOS authentication, lobby and session lifecycle, scene transitions, and networked state synchronization for players, enemies, traps, and built objects. EOS credentials are loaded from environment variables, local `EOSCredentials.json`, or runtime configs in `StreamingAssets/EOS/`; the real credential file is never committed.
+
+See [docs/multiplayer.md](docs/multiplayer.md) for an architecture overview and links to active technical docs in `Assets/CoreScripts/Docs/` and `Assets/Multiplayer/`.
+
+## Project Layout
+
+| Area | Path |
+|---|---|
+| Canonical scenes | `Assets/Cenas/` |
+| Technical bootstrap scene | `Assets/Cenas/NetworkBootstrap.unity` |
+| Core gameplay scripts | `Assets/CoreScripts/` |
+| Multiplayer scripts and docs | `Assets/Multiplayer/` |
+| Active multiplayer state doc | `Assets/CoreScripts/Docs/Estado_Atual_Multiplayer.md` |
+| Canonical NGO prefab list | `Assets/Multiplayer/Setup/DefaultNetworkPrefabs.asset` |
+
+## Setup
+
+### Requirements
+
+- Unity 6 LTS (`6000.3.10f1`) - see `ProjectSettings/ProjectVersion.txt`
+- Epic Games developer account with an EOS product configured
+- Optional: Unity Multiplayer Play Mode for in-editor multi-instance testing
+
+### Opening the project
+
+1. Clone the repository.
+2. Open the project root in Unity Hub with Unity `6000.3.10f1`.
+3. Set up EOS credentials before entering Play Mode - see [Configuration](#configuration).
+4. Open `Assets/Cenas/NetworkBootstrap.unity` or `Assets/Cenas/MenuScene.unity` and press Play.
+
+## Configuration
+
+The project never commits real EOS credentials. Credentials are loaded from one of three sources, in order:
+
+1. Environment variables for CI/CD: `EOS_PRODUCT_ID`, `EOS_SANDBOX_ID`, `EOS_DEPLOYMENT_ID`, `EOS_CLIENT_ID`, `EOS_CLIENT_SECRET`, `EOS_ENCRYPTION_KEY`.
+2. Local JSON at the repo root: copy `EOSCredentials.json.template` to `EOSCredentials.json` and fill in your own values. This file is gitignored.
+3. Runtime configs in `StreamingAssets/EOS/`, generated by `Assets/Editor/EOSConfigGenerator.cs`.
+
+For details, read [Assets/Multiplayer/CREDENTIALS_SETUP.md](Assets/Multiplayer/CREDENTIALS_SETUP.md).
+
+## Build Notes
+
+- Builds run `EOSConfigGenerator.OnPreprocessBuild` automatically (`callbackOrder = -100`).
+- Missing credentials abort the build with a clear error.
+- `ClientSecret` and `EncryptionKey` are never written to logs; `ClientId` is masked.
+
+## Contributors
+
+| Handle | Focus area |
+|---|---|
+| [@Matt040205](https://github.com/Matt040205) | Repository owner. Art assets, level/scene work, UI flow, gameplay systems. |
+| [@Sitr3n01](https://github.com/Sitr3n01) | Multiplayer, networking, EOS integration, sync optimization, bug fixes. |
+| [@amigolindu](https://github.com/amigolindu) | Enemy animation, VFX particles. |
