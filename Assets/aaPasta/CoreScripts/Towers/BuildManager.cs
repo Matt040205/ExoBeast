@@ -60,7 +60,7 @@ public class BuildManager : NetworkBehaviour
     public GameObject fogObject;
 
     [Header("FMOD - Sons")]
-    [EventRef] public string somConstrucao = "event:/Towers/Spawn_Magic";
+    public string somConstrucao = AudioEventIds.TowerSpawnMagic;
 
     private GameObject currentBuildGhost;
     private GameObject selectedBuildablePrefab;
@@ -713,7 +713,7 @@ public class BuildManager : NetworkBehaviour
 
         if (!string.IsNullOrEmpty(somConstrucao))
         {
-            RuntimeManager.PlayOneShot(somConstrucao, pos);
+            ExoAudioService.PlayOneShot3D(somConstrucao, pos);
         }
 
         StartCoroutine(UpdateUIAfterSpawn());

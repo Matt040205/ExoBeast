@@ -1,7 +1,5 @@
 using UnityEngine;
 using System.Collections;
-using FMODUnity;
-using FMOD.Studio;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 
@@ -17,11 +15,10 @@ using Unity.Netcode.Components;
 public class PeaceOfMindLogic : NetworkBehaviour
 {
     private PlayerHealthSystem healthSystem;
-    private EventInstance curaSoundInstance;
+    private AudioLoopHandle curaSoundLoop;
 
     [Header("FMOD")]
-    [EventRef]
-    public string eventoCura = "event:/Player/Heal";
+    public string eventoCura = AudioEventIds.PlayerHeal;
 
     public void StartEffect(float totalHeal, float duration, Ability sourceAbility)
     {
@@ -62,9 +59,7 @@ public class PeaceOfMindLogic : NetworkBehaviour
     {
         if (!string.IsNullOrEmpty(eventoCura))
         {
-            curaSoundInstance = RuntimeManager.CreateInstance(eventoCura);
-            RuntimeManager.AttachInstanceToGameObject(curaSoundInstance, transform);
-            curaSoundInstance.start();
+            curaSoundLoop = ExoAudioService.StartLoop(eventoCura, transform);
         }
     }
 
@@ -88,11 +83,7 @@ public class PeaceOfMindLogic : NetworkBehaviour
     [ClientRpc]
     private void StopHealSFXClientRpc()
     {
-        if (curaSoundInstance.isValid())
-        {
-            curaSoundInstance.stop(FMOD.Studio.STOP_MODE.ALLOWFADEOUT);
-            curaSoundInstance.release();
-        }
+        ExoAudioService.StopLoop(ref curaSoundLoop);
 
         if (IsOwner)
         {
@@ -105,11 +96,7 @@ public class PeaceOfMindLogic : NetworkBehaviour
 
     public override void OnNetworkDespawn()
     {
-        if (curaSoundInstance.isValid())
-        {
-            curaSoundInstance.stop(FMOD.Studio.STOP_MODE.IMMEDIATE);
-            curaSoundInstance.release();
-        }
+        ExoAudioService.StopLoop(ref curaSoundLoop, allowFadeout: false);
         base.OnNetworkDespawn();
     }
 }

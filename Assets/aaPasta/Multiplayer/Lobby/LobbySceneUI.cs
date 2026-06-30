@@ -10,7 +10,7 @@ using ExoBeasts.Multiplayer.Core;
 using ExoBeasts.Managers;
 
 /// <summary>
-/// Controlador Canvas-based para Assets/Scenes/LobbyScene.unity.
+/// Controlador Canvas-based para Assets/aaPasta/Cenas/LobbyScene.unity.
 /// Auto-detecta elementos por nome no Awake; [SerializeField] permite override no Inspector.
 ///
 /// Estados:

@@ -223,7 +223,7 @@ public class MenuManager : MonoBehaviour
         if (button != null)
             return;
 
-        foreach (Button candidate in FindObjectsOfType<Button>(true))
+        foreach (Button candidate in FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
             if (candidate != null &&
                 candidate.gameObject.scene == gameObject.scene &&

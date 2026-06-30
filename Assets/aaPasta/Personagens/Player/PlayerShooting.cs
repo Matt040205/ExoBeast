@@ -1,4 +1,3 @@
-using FMODUnity;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine;
@@ -39,11 +38,11 @@ public class PlayerShooting : NetworkBehaviour
     public string tipoDeSom = "Arma";
 
     [Header("FMOD - Sons")]
-    [EventRef] public string eventoTiroUnicoArma = "event:/SFX/Atirar";
-    [EventRef] public string eventoTiroContinuoArma = "event:/SFX/Atirar_segurando";
-    [EventRef] public string eventoRecargaArma = "event:/SFX/Recarga Arma";
-    [EventRef] public string eventoTiroUnicoArco = "event:/Player/Bow_Shot";
-    [EventRef] public string eventoTiroContinuoArco = "event:/Player/Bow_Shot";
+    public string eventoTiroUnicoArma = AudioEventIds.SfxShoot;
+    public string eventoTiroContinuoArma = AudioEventIds.SfxShootHeld;
+    public string eventoRecargaArma = AudioEventIds.SfxReloadGun;
+    public string eventoTiroUnicoArco = AudioEventIds.PlayerBowShot;
+    public string eventoTiroContinuoArco = AudioEventIds.PlayerBowShot;
 
     [Header("Raycast Settings")]
     public float maxDistance = 100f;
@@ -356,7 +355,7 @@ public class PlayerShooting : NetworkBehaviour
             eventToPlay = isFullAuto ? eventoTiroContinuoArma : eventoTiroUnicoArma;
 
         if (!string.IsNullOrEmpty(eventToPlay))
-            RuntimeManager.PlayOneShot(eventToPlay, emissionPosition);
+            ExoAudioService.PlayOneShot3D(eventToPlay, emissionPosition);
     }
 
     private float CalculateAuthoritativeDamage(out bool isCritical, out float areaRadius)
@@ -521,7 +520,7 @@ public class PlayerShooting : NetworkBehaviour
         }
 
         if (tipoDeSom == "Arma" && !string.IsNullOrEmpty(eventoRecargaArma))
-            RuntimeManager.PlayOneShot(eventoRecargaArma, transform.position);
+            ExoAudioService.PlayOneShot3D(eventoRecargaArma, transform.position);
 
         isReloading = true;
         reloadStartTime = Time.time;

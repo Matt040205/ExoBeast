@@ -20,7 +20,7 @@ public class PassiveEscamasAdamantium : PassivaAbility
             playerHealth.damageResistance.Value += playerDamageReduction;
         }
 
-        TowerController[] towers = FindObjectsOfType<TowerController>();
+        TowerController[] towers = FindObjectsByType<TowerController>(FindObjectsSortMode.None);
         foreach (var tower in towers)
         {
             var health = tower.GetComponent<ObjectiveHealthSystem>();
@@ -44,7 +44,7 @@ public class PassiveEscamasAdamantium : PassivaAbility
             playerHealth.damageResistance.Value -= playerDamageReduction;
         }
 
-        TowerController[] towers = FindObjectsOfType<TowerController>();
+        TowerController[] towers = FindObjectsByType<TowerController>(FindObjectsSortMode.None);
         foreach (var tower in towers)
         {
             var health = tower.GetComponent<ObjectiveHealthSystem>();

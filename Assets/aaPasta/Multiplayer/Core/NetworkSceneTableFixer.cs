@@ -399,7 +399,7 @@ namespace ExoBeasts.Multiplayer.Core
                 return normalized;
             }
 
-            return "Assets/Scenes/" + normalized + ".unity";
+            return "Assets/aaPasta/Cenas/" + normalized + ".unity";
         }
 
         private static bool TryGetNetcodeFallbackHashToPath(out Dictionary<uint, string> fallback)
@@ -437,9 +437,8 @@ namespace ExoBeasts.Multiplayer.Core
         /// <summary>
         /// XXHash32 portado de <c>Unity.Netcode.XXHash.Hash32(byte*, int, uint)</c> com seed=0.
         /// Necessário porque a classe XXHash do NGO é internal, então não dá pra chamar direto
-        /// de outro assembly. Implementação validada contra targets observados nos logs:
-        /// "Assets/Scenes/EscolherPersonagem.unity" -> 887303660;
-        /// "Assets/Scenes/LobbyScene.unity" -> 2736343817.
+        /// de outro assembly. Recalcule os valores de validacao quando a lista canonica
+        /// de cenas ou seus paths mudarem.
         /// </summary>
         public static uint Hash32(string text)
         {

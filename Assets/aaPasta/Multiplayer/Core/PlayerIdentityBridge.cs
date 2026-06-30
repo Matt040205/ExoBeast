@@ -87,9 +87,10 @@ namespace ExoBeasts.Multiplayer.Core
             base.OnNetworkDespawn();
         }
 
-        private void OnDestroy()
+        public override void OnDestroy()
         {
             if (Instance == this) Instance = null;
+            base.OnDestroy();
         }
     }
 }

@@ -3,7 +3,6 @@ using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using FMODUnity;
 
 public class ObjectiveHealthSystem : NetworkBehaviour
 {
@@ -19,7 +18,7 @@ public class ObjectiveHealthSystem : NetworkBehaviour
     public event Action OnHealthChanged;
 
     [Header("FMOD - Sons")]
-    [EventRef] public string somBaseAtacada = "event:/Base/Hit_Light";
+    public string somBaseAtacada = AudioEventIds.BaseHitLight;
 
     private bool isDead;
     private float localHealth;
@@ -149,7 +148,7 @@ public class ObjectiveHealthSystem : NetworkBehaviour
     {
         if (!string.IsNullOrEmpty(somBaseAtacada))
         {
-            RuntimeManager.PlayOneShot(somBaseAtacada, transform.position);
+            ExoAudioService.PlayOneShot3D(somBaseAtacada, transform.position);
         }
     }
 

@@ -14,7 +14,7 @@ public struct MapeamentoUpgradePersonagem
 [RequireComponent(typeof(Button))]
 public class BotaoHabilidade : MonoBehaviour
 {
-    [Header("Identificação da Habilidade")]
+    [Header("IdentificaÃ§Ã£o da Habilidade")]
     public string idHabilidade;
     public string idCaminho;
 
@@ -27,7 +27,7 @@ public class BotaoHabilidade : MonoBehaviour
     [Header("Mapeamento de Upgrades")]
     public List<MapeamentoUpgradePersonagem> upgradesPorPersonagem;
 
-    [Header("Referências")]
+    [Header("ReferÃªncias")]
     public Rastros managerRastros;
     private Button meuBotao;
     public Image iconeHabilidade;
@@ -48,7 +48,7 @@ public class BotaoHabilidade : MonoBehaviour
 
         if (managerRastros == null)
         {
-            managerRastros = FindObjectOfType<Rastros>();
+            managerRastros = FindFirstObjectByType<Rastros>();
         }
 
         if (managerRastros != null)
@@ -100,7 +100,7 @@ public class BotaoHabilidade : MonoBehaviour
         if (manager == null || manager.habilidadesDesbloqueadas == null || manager.pontosPorCaminho == null)
         {
             if (managerRastros == null)
-                managerRastros = FindObjectOfType<Rastros>();
+                managerRastros = FindFirstObjectByType<Rastros>();
 
             if (managerRastros == null || managerRastros.habilidadesDesbloqueadas == null)
             {

@@ -1,17 +1,9 @@
 using System.Collections;
 using Unity.Netcode;
 using UnityEngine;
-using FMODUnity;
 
 public class EnemyCombatSystem : NetworkBehaviour
 {
-    private enum AttackState
-    {
-        Idle,
-        Windup,
-        Recover
-    }
-
     [Header("Configuracoes de Combate")]
     public float attackRange = 2f;
     [Header("Nota: O tempo do dano agora é controlado pelo Animation Event")]
@@ -26,7 +18,7 @@ public class EnemyCombatSystem : NetworkBehaviour
     public GameObject attackVfxPrefab;
 
     [Header("FMOD - Sons")]
-    [EventRef] public string eventoAtaque;
+    public string eventoAtaque;
 
     [Header("Referencias")]
     public Transform attackPoint;
@@ -38,7 +30,6 @@ public class EnemyCombatSystem : NetworkBehaviour
     private float currentDamage;
     private Coroutine attackCoroutine;
     private Coroutine towerAuraCoroutine;
-    private AttackState attackState = AttackState.Idle;
 
     // Salva o alvo atual para o Animation Event saber quem golpear
     private Transform targetForAnimationEvent;
@@ -125,8 +116,6 @@ public class EnemyCombatSystem : NetworkBehaviour
 
     private IEnumerator AttackCycle(Transform initialTarget)
     {
-        attackState = AttackState.Windup;
-
         // Salva o alvo para que o AnimationEvent saiba em quem bater quando o frame correto chegar
         targetForAnimationEvent = initialTarget;
         hasDealtDamageThisCycle = false;
@@ -152,7 +141,6 @@ public class EnemyCombatSystem : NetworkBehaviour
             yield return new WaitForSeconds(remainingCooldown);
         }
 
-        attackState = AttackState.Idle;
         attackCoroutine = null;
     }
 
@@ -176,7 +164,6 @@ public class EnemyCombatSystem : NetworkBehaviour
         TriggerAttackVfx(targetForAnimationEvent.position);
         ProcessAttack(targetForAnimationEvent);
 
-        attackState = AttackState.Recover;
     }
     // =======================================================================
 
@@ -195,7 +182,7 @@ public class EnemyCombatSystem : NetworkBehaviour
 
         if (!string.IsNullOrEmpty(eventoAtaque))
         {
-            RuntimeManager.PlayOneShot(eventoAtaque, transform.position);
+            ExoAudioService.PlayOneShot3D(eventoAtaque, transform.position);
         }
     }
 
@@ -349,8 +336,6 @@ public class EnemyCombatSystem : NetworkBehaviour
             StopCoroutine(attackCoroutine);
 
         attackCoroutine = null;
-        attackState = AttackState.Idle;
-
         if (enemyController != null)
             enemyController.ResumeMovement();
     }

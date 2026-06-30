@@ -1,5 +1,4 @@
 using UnityEngine;
-using FMODUnity;
 
 public class SpiderRangedAttack : MonoBehaviour
 {
@@ -11,7 +10,7 @@ public class SpiderRangedAttack : MonoBehaviour
     public bool enableTrapMechanic = true;
 
     [Header("FMOD - Sons")]
-    [EventRef] public string eventoAtaque = "event:/Enemies/Spider_Attack";
+    public string eventoAtaque = AudioEventIds.EnemySpiderAttack;
 
     public void FireProjectile(Transform target, float damage)
     {
@@ -26,7 +25,7 @@ public class SpiderRangedAttack : MonoBehaviour
 
         if (!string.IsNullOrEmpty(eventoAtaque))
         {
-            RuntimeManager.PlayOneShot(eventoAtaque, spawnPosition);
+            ExoAudioService.PlayOneShot3D(eventoAtaque, spawnPosition);
         }
         
         SpiderWebProjectile projectile = projObj.GetComponent<SpiderWebProjectile>();

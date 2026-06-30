@@ -4,7 +4,6 @@ using System.Linq;
 using System.Collections.Generic;
 using Unity.Netcode;
 using ExoBeasts.Multiplayer.Sync;
-using FMODUnity;
 
 public class TowerController : MonoBehaviour
 {
@@ -29,7 +28,7 @@ public class TowerController : MonoBehaviour
     public Vector3 rotationOffset;
 
     [Header("FMOD - Sons")]
-    [EventRef] public string somTiro = "event:/Towers/Shot_Magic";
+    public string somTiro = AudioEventIds.TowerShotMagic;
 
     [Header("ConfiguraÃ§Ãµes de IA")]
     [SerializeField] private string enemyTag = "Enemy";
@@ -362,7 +361,7 @@ public class TowerController : MonoBehaviour
 
         if (!string.IsNullOrEmpty(somTiro))
         {
-            RuntimeManager.PlayOneShot(somTiro, originPoint);
+            ExoAudioService.PlayOneShot3D(somTiro, originPoint);
         }
     }
 

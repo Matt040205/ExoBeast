@@ -1,5 +1,4 @@
 using UnityEngine;
-using FMODUnity;
 
 [CreateAssetMenu(fileName = "Aqui Nao", menuName = "ExoBeasts/Personagens/Dragao/Habilidade/Aqui Nao")]
 public class HabilidadeAquiNao : Ability
@@ -18,8 +17,7 @@ public class HabilidadeAquiNao : Ability
     public GameObject slashVfxPrefab;
 
     [Header("FMOD")]
-    [EventRef]
-    public string sfxSwing = "event:/SFX/HammerSwing";
+    public string sfxSwing = AudioEventIds.SfxHammerSwing;
 
     public override bool Activate(GameObject quemUsou)
     {
@@ -29,7 +27,7 @@ public class HabilidadeAquiNao : Ability
 
         // Som e lógica rodam no servidor
         if (!string.IsNullOrEmpty(sfxSwing))
-            RuntimeManager.PlayOneShot(sfxSwing, quemUsou.transform.position);
+            ExoAudioService.PlayOneShot3D(sfxSwing, quemUsou.transform.position);
 
         AquiNaoLogic logic = Instantiate(
             logicPrefab,

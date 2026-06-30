@@ -1,24 +1,16 @@
-# Sistema Multiplayer - ExoBeasts V3
+# Multiplayer - Indice Interno
 
-Status: ativo
-Publico: quem vai configurar ou depurar o multiplayer
-Ler primeiro: [Estado_Atual_Multiplayer.md](../Docs/Estado_Atual_Multiplayer.md)
-Nao usar como fonte de verdade: docs antigas e guias substituidos
+Status: ativo.
 
-Este arquivo e um indice curto. A verdade operacional fica em
-[Estado_Atual_Multiplayer.md](../Docs/Estado_Atual_Multiplayer.md).
+Esta pasta contem o codigo multiplayer atual. A documentacao operacional fica fora de `Assets`, em:
 
-## Leia por tarefa
+- `docs/multiplayer.md`
+- `docs/INDEX.md`
+- `Assets/aaPasta/Multiplayer/CREDENTIALS_SETUP.md`
+- `Assets/aaPasta/Multiplayer/Docs/AUTHENTICATION_GUIDE.md`
 
-| Tarefa | Leia |
-| --- | --- |
-| Entender o estado atual | [Estado_Atual_Multiplayer.md](../Docs/Estado_Atual_Multiplayer.md) |
-| Montar scene/prefab | [Guia_Setup_Multiplayer_Cenas.md](../Docs/Guia_Setup_Multiplayer_Cenas.md) |
-| Ponte legada | [SETUP_INSTRUCTIONS.md](SETUP_INSTRUCTIONS.md) |
-| Autenticacao EOS | [AUTHENTICATION_GUIDE.md](Docs/AUTHENTICATION_GUIDE.md) |
-| Credenciais | [CREDENTIALS_SETUP.md](CREDENTIALS_SETUP.md) |
+## Regras
 
-## Regra de manutencao
-
-- Atualize primeiro o estado atual, depois os guias especializados.
-- Se um nome de arquivo ou classe mudar, corrija os links antes de duplicar o texto.
+- Nao recriar managers legados de host/server.
+- Nao usar docs arquivadas como fonte de verdade.
+- Atualizar `docs/multiplayer.md` quando mudar fluxo, cena, prefab de rede ou contrato EOS/NGO.

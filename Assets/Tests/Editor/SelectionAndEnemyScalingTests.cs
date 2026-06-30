@@ -9,9 +9,9 @@ using UnityEngine.UI;
 
 public class SelectionAndEnemyScalingTests
 {
-    private const string SelectionScenePath = "Assets/Scenes/EscolherPersonagem.unity";
-    private const string TeamSlotPrefabPath = "Assets/Codigo/Managers/Saves/slotPersonagemPrefab.prefab";
-    private const string CommanderSlotPrefabPath = "Assets/Codigo/Managers/Saves/slotPersonagemPrefabComando.prefab";
+    private const string SelectionScenePath = "Assets/aaPasta/Cenas/EscolherPersonagem.unity";
+    private const string TeamSlotPrefabPath = "Assets/aaPasta/CoreScripts/Managers/Saves/slotPersonagemPrefab.prefab";
+    private const string CommanderSlotPrefabPath = "Assets/aaPasta/CoreScripts/Managers/Saves/slotPersonagemPrefabComando.prefab";
 
     private static readonly Color[] ExpectedPlayerColors =
     {

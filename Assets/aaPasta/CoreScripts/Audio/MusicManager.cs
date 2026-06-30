@@ -1,16 +1,13 @@
 using UnityEngine;
-using FMODUnity;
-using FMOD.Studio;
 
 public class MusicManager : MonoBehaviour
 {
     public static MusicManager Instance;
 
-    [Header("Configuração FMOD")]
-    [EventRef]
-    public string eventoMusica = "event:/Music";
+    [Header("ConfiguraÃ§Ã£o FMOD")]
+    public string eventoMusica = AudioEventIds.MusicDefault;
 
-    private EventInstance musicInstance;
+    private AudioLoopHandle musicLoop;
 
     void Awake()
     {
@@ -23,7 +20,7 @@ public class MusicManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        // Verifica se a música já está tocando para não sobrepor
+        // Verifica se a mÃºsica jÃ¡ estÃ¡ tocando para nÃ£o sobrepor
         if (!IsPlaying())
         {
             StartMusic();
@@ -32,47 +29,31 @@ public class MusicManager : MonoBehaviour
 
     public bool IsPlaying()
     {
-        if (musicInstance.isValid())
-        {
-            PLAYBACK_STATE state;
-            musicInstance.getPlaybackState(out state);
-            return state != PLAYBACK_STATE.STOPPED;
-        }
-        return false;
+        return musicLoop.IsValid;
     }
 
     void StartMusic()
     {
         if (!string.IsNullOrEmpty(eventoMusica))
         {
-            // Se já existir uma instância válida, vamos apenas garantir que ela toque
-            if (!musicInstance.isValid())
-            {
-                musicInstance = RuntimeManager.CreateInstance(eventoMusica);
-            }
-
             if (!IsPlaying())
             {
-                musicInstance.start();
+                musicLoop = ExoAudioService.StartLoop(eventoMusica, transform);
             }
         }
         else
         {
-            Debug.LogWarning("MusicManager: Nenhum evento de música selecionado!");
+            Debug.LogWarning("MusicManager: Nenhum evento de mÃºsica selecionado!");
         }
     }
 
-    // Método opcional caso você queira parar a música via código (ex: créditos finais)
+    // MÃ©todo opcional caso vocÃª queira parar a mÃºsica via cÃ³digo (ex: crÃ©ditos finais)
     public void StopMusic()
     {
-        if (musicInstance.isValid())
-        {
-            musicInstance.stop(FMOD.Studio.STOP_MODE.ALLOWFADEOUT);
-            musicInstance.release(); // Agora liberamos apenas quando paramos de verdade
-        }
+        ExoAudioService.StopLoop(ref musicLoop);
     }
 
-    // Método opcional para trocar a música dinamicamente
+    // MÃ©todo opcional para trocar a mÃºsica dinamicamente
     public void ChangeMusic(string novoEvento)
     {
         StopMusic();
@@ -80,10 +61,10 @@ public class MusicManager : MonoBehaviour
         StartMusic();
     }
 
-    // Garante que o som morra se você fechar o jogo completamente
+    // Garante que o som morra se vocÃª fechar o jogo completamente
     private void OnDestroy()
     {
-        // Só para o som se ESTA for a instância original que está sendo destruída
+        // SÃ³ para o som se ESTA for a instÃ¢ncia original que estÃ¡ sendo destruÃ­da
         if (Instance == this)
         {
             StopMusic();

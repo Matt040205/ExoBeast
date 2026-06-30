@@ -1,0 +1,257 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1073a74d2e31ee7468e98db73d5e0cf0, type: 3}
+  m_Name: ExoFmodEvents
+  m_EditorClassIdentifier:
+  type: 3
+  typeName: ExoBeasts
+  events:
+  - id: "event:/MUSIC/Defeat_1"
+    reference:
+      Guid:
+        Data1: 134591673
+        Data2: 1190155385
+        Data3: 252938928
+        Data4: -1892561092
+      Path: "event:/MUSIC/Defeat_1"
+  - id: "event:/MUSIC/Defeat_2"
+    reference:
+      Guid:
+        Data1: 1121425080
+        Data2: 1285034484
+        Data3: -962989944
+        Data4: -13609115
+      Path: "event:/MUSIC/Defeat_2"
+  - id: "event:/MUSIC/Defeat_3"
+    reference:
+      Guid:
+        Data1: 2061100300
+        Data2: 1301383416
+        Data3: 919995324
+        Data4: -233328926
+      Path: "event:/MUSIC/Defeat_3"
+  - id: "event:/MUSIC/Musica_principal"
+    reference:
+      Guid:
+        Data1: -120260305
+        Data2: 1124209259
+        Data3: -918451034
+        Data4: -2104134037
+      Path: "event:/MUSIC/Musica_principal"
+  - id: "event:/MUSIC/Victory_1"
+    reference:
+      Guid:
+        Data1: 1347350424
+        Data2: 1132714945
+        Data3: 1451864450
+        Data4: 1282912826
+      Path: "event:/MUSIC/Victory_1"
+  - id: "event:/MUSIC/Victory_2"
+    reference:
+      Guid:
+        Data1: 1993382463
+        Data2: 1152458141
+        Data3: -208805199
+        Data4: 488291523
+      Path: "event:/MUSIC/Victory_2"
+  - id: "event:/SFX/Atirar"
+    reference:
+      Guid:
+        Data1: 1164908326
+        Data2: 1327198545
+        Data3: 330965408
+        Data4: -1388047387
+      Path: "event:/SFX/Atirar"
+  - id: "event:/SFX/Atirar_segurando"
+    reference:
+      Guid:
+        Data1: -634893666
+        Data2: 1306946714
+        Data3: 1149299361
+        Data4: 2068296765
+      Path: "event:/SFX/Atirar_segurando"
+  - id: "event:/SFX/Base/Hit_Heavy"
+    reference:
+      Guid:
+        Data1: 1825546681
+        Data2: 1148825170
+        Data3: -1080234619
+        Data4: 1623910688
+      Path: "event:/SFX/Base/Hit_Heavy"
+  - id: "event:/SFX/Base/Hit_Light"
+    reference:
+      Guid:
+        Data1: 2144584823
+        Data2: 1276622057
+        Data3: 230779321
+        Data4: -1712071671
+      Path: "event:/SFX/Base/Hit_Light"
+  - id: "event:/SFX/Enemies/Eagle_Screech"
+    reference:
+      Guid:
+        Data1: -653657015
+        Data2: 1082109095
+        Data3: -1228256855
+        Data4: 187631107
+      Path: "event:/SFX/Enemies/Eagle_Screech"
+  - id: "event:/SFX/Enemies/Monster_Growl"
+    reference:
+      Guid:
+        Data1: 130404865
+        Data2: 1081681087
+        Data3: -263949633
+        Data4: 52835110
+      Path: "event:/SFX/Enemies/Monster_Growl"
+  - id: "event:/SFX/Enemies/Scorpion_Attack"
+    reference:
+      Guid:
+        Data1: 1788928935
+        Data2: 1173176165
+        Data3: 485842358
+        Data4: 467796637
+      Path: "event:/SFX/Enemies/Scorpion_Attack"
+  - id: "event:/SFX/Enemies/Spider_Attack"
+    reference:
+      Guid:
+        Data1: -1431082180
+        Data2: 1322646510
+        Data3: -1896992376
+        Data4: -1419774470
+      Path: "event:/SFX/Enemies/Spider_Attack"
+  - id: "event:/SFX/Espada"
+    reference:
+      Guid:
+        Data1: 684018038
+        Data2: 1104185050
+        Data3: -842573141
+        Data4: 1457953396
+      Path: "event:/SFX/Espada"
+  - id: "event:/SFX/Espada_1"
+    reference:
+      Guid:
+        Data1: 1246404791
+        Data2: 1225319253
+        Data3: 1987947676
+        Data4: -1127638413
+      Path: "event:/SFX/Espada_1"
+  - id: "event:/SFX/Espada_2"
+    reference:
+      Guid:
+        Data1: -486789327
+        Data2: 1214309688
+        Data3: 539770288
+        Data4: 268897714
+      Path: "event:/SFX/Espada_2"
+  - id: "event:/SFX/Katana Vento"
+    reference:
+      Guid:
+        Data1: -961029666
+        Data2: 1194885073
+        Data3: 1356332954
+        Data4: 43148935
+      Path: "event:/SFX/Katana Vento"
+  - id: "event:/SFX/Monstro"
+    reference:
+      Guid:
+        Data1: 1165279417
+        Data2: 1292865720
+        Data3: 1113735837
+        Data4: 787620680
+      Path: "event:/SFX/Monstro"
+  - id: "event:/SFX/Player/Bow_Draw"
+    reference:
+      Guid:
+        Data1: -234794547
+        Data2: 1165716568
+        Data3: 1057351080
+        Data4: -478330255
+      Path: "event:/SFX/Player/Bow_Draw"
+  - id: "event:/SFX/Player/Bow_Shot"
+    reference:
+      Guid:
+        Data1: -682544482
+        Data2: 1327254775
+        Data3: -2011096681
+        Data4: 9134510
+      Path: "event:/SFX/Player/Bow_Shot"
+  - id: "event:/SFX/Player/Dash"
+    reference:
+      Guid:
+        Data1: 1047359346
+        Data2: 1298268230
+        Data3: -116106323
+        Data4: -1650936735
+      Path: "event:/SFX/Player/Dash"
+  - id: "event:/SFX/Player/Footsteps/Concrete"
+    reference:
+      Guid:
+        Data1: 377862496
+        Data2: 1188348400
+        Data3: -1057776966
+        Data4: 200793349
+      Path: "event:/SFX/Player/Footsteps/Concrete"
+  - id: "event:/SFX/Player/Footsteps/Dirt"
+    reference:
+      Guid:
+        Data1: -520804514
+        Data2: 1190445762
+        Data3: 1478731438
+        Data4: 1429012977
+      Path: "event:/SFX/Player/Footsteps/Dirt"
+  - id: "event:/SFX/Player/Footsteps/Water"
+    reference:
+      Guid:
+        Data1: 1894887124
+        Data2: 1269082553
+        Data3: -580035918
+        Data4: -745013894
+      Path: "event:/SFX/Player/Footsteps/Water"
+  - id: "event:/SFX/Player/Heal"
+    reference:
+      Guid:
+        Data1: 445839572
+        Data2: 1218016813
+        Data3: 1161783990
+        Data4: 783406802
+      Path: "event:/SFX/Player/Heal"
+  - id: "event:/SFX/Recarga Arma"
+    reference:
+      Guid:
+        Data1: -1111695801
+        Data2: 1258776021
+        Data3: -1521670000
+        Data4: -400398419
+      Path: "event:/SFX/Recarga Arma"
+  - id: "event:/SFX/Towers/Shot_Magic"
+    reference:
+      Guid:
+        Data1: -404776501
+        Data2: 1185261430
+        Data3: -488411487
+        Data4: -1031825232
+      Path: "event:/SFX/Towers/Shot_Magic"
+  - id: "event:/SFX/Towers/Spawn_Magic"
+    reference:
+      Guid:
+        Data1: -1356679190
+        Data2: 1118663945
+        Data3: -995198325
+        Data4: -742535245
+      Path: "event:/SFX/Towers/Spawn_Magic"
+  - id: "event:/SFX/Vento"
+    reference:
+      Guid:
+        Data1: 905728325
+        Data2: 1203480838
+        Data3: -1811040578
+        Data4: 1283491977
+      Path: "event:/SFX/Vento"

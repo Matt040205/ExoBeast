@@ -50,7 +50,6 @@ public class EnemyController : MonoBehaviour
     private Transform playerTransform;
     private List<Transform> patrolPoints;
     private int currentPointIndex;
-    private float currentChaseTimer;
     private Vector3 initialChasePosition;
     private int nivel;
     private int pathIndex;
@@ -97,7 +96,6 @@ public class EnemyController : MonoBehaviour
         currentPointIndex = 0;
         IsDead = false;
         HordeManager.RegisterEnemy(this);
-        currentChaseTimer = 0f;
         paintStacks = 0;
         paintStackResetTime = 0f;
         lastDestinationSet = Vector3.positiveInfinity;
@@ -545,7 +543,6 @@ public class EnemyController : MonoBehaviour
     public void LoseTarget()
     {
         target = null;
-        currentChaseTimer = 0f;
         lastDestinationSet = Vector3.positiveInfinity;
         SetAggroVisual(false);
 
@@ -575,7 +572,6 @@ public class EnemyController : MonoBehaviour
             return;
 
         target = null;
-        currentChaseTimer = 0f;
         lastDestinationSet = Vector3.positiveInfinity;
         DecideTargetTick();
     }

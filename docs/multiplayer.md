@@ -1,94 +1,46 @@
-# Multiplayer System
+# Multiplayer
 
-This document is the public overview of ExoBeast's multiplayer layer. For day-to-day technical detail kept in sync with the code, follow the links into `Assets/Codigo/` — those documents are the operational source of truth and are maintained in Portuguese alongside the team.
+Status: ativo. Este arquivo substitui a visao antiga baseada na estrutura anterior do projeto.
 
-## Purpose
+## Fonte Ativa
 
-The multiplayer system handles online authentication, lobby creation and discovery, the join/leave lifecycle, scene transitions, and networked state sync for players, enemies, and built objects. It is built on Netcode for GameObjects with a peer-to-peer host model and uses Epic Online Services for matchmaking and identity.
+- Codigo: `Assets/aaPasta/Multiplayer`.
+- Cenas: `Assets/aaPasta/Cenas/MenuScene.unity`, `LobbyScene.unity`, `EscolherPersonagem.unity`, `CenaMapaNOVO.unity`.
+- Credenciais: `Assets/aaPasta/Multiplayer/CREDENTIALS_SETUP.md`.
+- Autenticacao EOS: `Assets/aaPasta/Multiplayer/Docs/AUTHENTICATION_GUIDE.md`.
 
-## Scope
+## Fluxo De Jogo
 
-### Implemented
-- EOS Device ID authentication (anonymous, per-machine)
-- Online lobby (create, search, join, leave) via EOS
-- Player identity bridge linking NGO `ClientId` and EOS `ProductUserId`
-- Two-stage scene transition: `LobbyScene` → `EscolherPersonagem` → `CenaMapaTeste`
-- Owner-authoritative player movement (`ClientNetworkTransform`)
-- Server-authoritative enemy state (`NetworkedEnemy`)
-- Networked tower and trap placement
-- MPPM (Unity Multiplayer Play Mode) compatibility for editor multi-instance testing
-- Secure credential loading chain (env vars → local JSON → runtime configs); no committed secrets
+1. `MenuScene`: entrada e escolha de fluxo.
+2. `LobbyScene`: autenticacao EOS, criar/buscar/entrar em sala.
+3. `EscolherPersonagem`: selecao de comandante e composicao de equipe.
+4. `CenaMapaNOVO`: mapa ativo de gameplay.
+5. `Win` ou `Lose`: cenas finais com audio sincronizado via RPC.
 
-### Experimental / pending
-- NAT traversal for public-internet matches (LAN tested, internet host/join still pending validation)
-- Reconnect after disconnect
-- Host migration
-- Automated matchmaking
-- Cross-machine validation (currently single-PC / MPPM)
-- Dedicated-server build path
+## Subsystems
 
-## Architecture
+| Area | Scripts principais |
+| --- | --- |
+| Auth | `EOSAuthenticator`, `SessionManager` |
+| Core | `NetworkBootstrap`, `EOSManagerWrapper`, `PlayerIdentityBridge`, `MultiplayerRuntimeReset`, `MppmHelper` |
+| Lobby | `LobbyManager`, `LobbySceneUI`, `LobbyButtonBinder`, `LobbyMembershipService`, `LobbyNotificationDispatcher` |
+| GameServer | `MatchManager`, `MatchSessionLauncher`, `PlayerRegistry` |
+| Sync | `NetworkedPlayerController`, `NetworkedEnemy`, `NetworkedBuilding`, `NetworkedTrapVisual`, `ServerAuthoritativeProjectile` |
+| Testing | `EOSAuthTest`, `NetworkConnectionTest`, `NetworkedCubeMovement` |
 
-Source lives in `Assets/Codigo/Multiplayer/`, organized into namespaces:
+## Regras Que Nao Podem Regredir
 
-| Namespace | Key scripts |
-|---|---|
-| `Auth` | [EOSAuthenticator.cs](../Assets/Codigo/Multiplayer/Auth/EOSAuthenticator.cs), [SessionManager.cs](../Assets/Codigo/Multiplayer/Auth/SessionManager.cs) |
-| `Lobby` | [LobbyManager.cs](../Assets/Codigo/Multiplayer/Lobby/LobbyManager.cs), [LobbySceneUI.cs](../Assets/Codigo/Multiplayer/Lobby/LobbySceneUI.cs), [LobbyData.cs](../Assets/Codigo/Multiplayer/Lobby/LobbyData.cs) |
-| `Sync` | [ClientNetworkTransform.cs](../Assets/Codigo/Multiplayer/Sync/ClientNetworkTransform.cs), [NetworkedPlayerController.cs](../Assets/Codigo/Multiplayer/Sync/NetworkedPlayerController.cs), [PlayerNetworkSetup.cs](../Assets/Codigo/Multiplayer/Sync/PlayerNetworkSetup.cs), [NetworkedEnemy.cs](../Assets/Codigo/Multiplayer/Sync/NetworkedEnemy.cs), [NetworkedBuilding.cs](../Assets/Codigo/Multiplayer/Sync/NetworkedBuilding.cs), [NetworkedTrapVisual.cs](../Assets/Codigo/Multiplayer/Sync/NetworkedTrapVisual.cs) |
-| `Core` | [EOSConfig.cs](../Assets/Codigo/Multiplayer/Core/EOSConfig.cs), [EOSManagerWrapper.cs](../Assets/Codigo/Multiplayer/Core/EOSManagerWrapper.cs), [NetworkBootstrap.cs](../Assets/Codigo/Multiplayer/Core/NetworkBootstrap.cs), [HostManager.cs](../Assets/Codigo/Multiplayer/Core/HostManager.cs), [MppmHelper.cs](../Assets/Codigo/Multiplayer/Core/MppmHelper.cs), [PlayerIdentityBridge.cs](../Assets/Codigo/Multiplayer/Core/PlayerIdentityBridge.cs), [MultiplayerRuntimeReset.cs](../Assets/Codigo/Multiplayer/Core/MultiplayerRuntimeReset.cs) |
-| `GameServer` | [GameServerManager.cs](../Assets/Codigo/Multiplayer/GameServer/GameServerManager.cs), [MatchManager.cs](../Assets/Codigo/Multiplayer/GameServer/MatchManager.cs), [PlayerRegistry.cs](../Assets/Codigo/Multiplayer/GameServer/PlayerRegistry.cs) |
-| `Testing` | EOS auth test scenes, connection test, lobby placeholder UI |
+- Managers legados de host/server nao sao fontes ativas. Referencias a eles pertencem apenas ao arquivo historico em `docs/archive/`.
+- Toda transicao de cena multiplayer deve ser iniciada pelo servidor.
+- Prefabs spawnaveis precisam estar em `DefaultNetworkPrefabs`.
+- MPPM precisa continuar funcionando com host e cliente no mesmo PC.
+- Credenciais reais EOS nunca entram no Git.
 
-The canonical, frequently-updated state document is [Assets/Codigo/Docs/Estado_Atual_Multiplayer.md](../Assets/Codigo/Docs/Estado_Atual_Multiplayer.md) (Portuguese). Read it for the latest known issues, refactor history, and per-session changes.
+## Smoke Test Obrigatorio
 
-## Scene flow
-
-1. `MenuScene` — entry point. Singleplayer or multiplayer choice.
-2. `LobbyScene` — EOS auth + lobby create/search/join (handled by `LobbySceneUI`).
-3. `EscolherPersonagem` — networked character selection. The host triggers the transition with `LobbySceneUI.StartMatch(mapName="EscolherPersonagem")`.
-4. `CenaMapaTeste` — gameplay map. Players spawn through `GameSetupManager.OnNetworkSpawn`.
-
-The transition from selection to gameplay is server-driven through `NetworkManager.SceneManager.LoadScene`, guarded by `IsServer`. Late-joining clients are covered by the spawn loop that runs over `ConnectedClientsIds`.
-
-## Credential and Build Configuration
-
-EOS credentials are loaded from environment variables, a gitignored local `EOSCredentials.json`, or runtime configs in `StreamingAssets/EOS/` — never from a committed secret. The runtime configs are generated by the pre-build hook from whichever source above is available. See [Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md](../Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md) for the full chain, GitHub Actions snippet, and validation behavior.
-
-The pre-build hook (`Assets/Editor/EOSConfigGenerator.cs`, `callbackOrder = -100`) validates credentials before producing a binary and aborts with a clear error if any required field is missing. No developer-local JSON cloning is required for CI builds — provide the env vars and the generator handles the rest.
-
-## Debugging Guide
-
-Common multiplayer issues, in order of likelihood:
-
-- **EOS initialization failure** — usually missing or invalid credentials. Check the console for `[EOSConfig]` log lines indicating which source was tried.
-- **`StartHost` returns false** — check that no residual lobby attribute callbacks are firing for a previous session. The host startup path includes a guard that compares the lobby's host `ProductUserId` against the local user; see `Estado_Atual_Multiplayer.md` for the documented host-bug fix history.
-- **Client connects but spawns no player** — check that `PlayerIdentityBridge` exists in the scene with a `NetworkObject` component so its RPCs can fire.
-- **Traps invisible to non-host** — confirm the trap prefab is registered in `NetworkManager > NetworkPrefabsList`. Unregistered prefabs cause silent spawn failure on clients.
-- **MPPM clone uses wrong credentials** — `MppmHelper.IsClone` adjusts the JSON load path; verify that `EOSCredentials.json` exists at the project root one level above the clone.
-
-For deeper troubleshooting on the auth layer specifically, the dedicated guide is [AUTHENTICATION_GUIDE.md](../Assets/Codigo/Multiplayer/Docs/AUTHENTICATION_GUIDE.md).
-
-## Further reading
-
-| Topic | Document |
-|---|---|
-| Current state, recent fixes, refactor log | [Estado_Atual_Multiplayer.md](../Assets/Codigo/Docs/Estado_Atual_Multiplayer.md) |
-| Scene and prefab setup | [Guia_Setup_Multiplayer_Cenas.md](../Assets/Codigo/Docs/Guia_Setup_Multiplayer_Cenas.md) |
-| EOS authentication flow | [AUTHENTICATION_GUIDE.md](../Assets/Codigo/Multiplayer/Docs/AUTHENTICATION_GUIDE.md) |
-| Credentials and CI configuration | [CREDENTIALS_SETUP.md](../Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md) |
-| Sprint 3 (network optimization) docs | [Assets/Codigo/Docs/sprint3/](../Assets/Codigo/Docs/sprint3/) |
-| Sprint 4 (gameplay sync) docs | [Assets/Codigo/Docs/sprint4/](../Assets/Codigo/Docs/sprint4/) |
-| Internal multiplayer index | [Assets/Codigo/Multiplayer/README.md](../Assets/Codigo/Multiplayer/README.md) |
-
-## Future Improvements
-
-- CI smoke test for the multiplayer connection lifecycle.
-- Better error messages when credential source resolution fails.
-- NAT traversal / Relay path for over-the-internet matches.
-- Reconnect-after-disconnect flow for transient drops.
-- Stricter dev/prod credential separation (multiple EOS environments).
-
-## Security note
-
-The setup guide in [CREDENTIALS_SETUP.md](../Assets/Codigo/Multiplayer/CREDENTIALS_SETUP.md) covers what to do if real credentials ever land in a commit by mistake: rotate them at the [Epic Developer Portal](https://dev.epicgames.com/portal/) — removing the file from the index does not invalidate exposed secrets.
+- Abrir `MenuScene`.
+- Instancia host cria lobby.
+- Instancia cliente entra.
+- Host inicia partida.
+- Ambos passam por `EscolherPersonagem` e chegam em `CenaMapaNOVO`.
+- Validar movimento, tiro, construcao, inimigos, dano na base, vitoria/derrota e audio sem duplicacao.

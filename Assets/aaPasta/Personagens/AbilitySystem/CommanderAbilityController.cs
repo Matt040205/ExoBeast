@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using FMODUnity;
 using Unity.Netcode;
 using UnityEngine;
 using ExoBeasts.Multiplayer.Sync;
@@ -112,7 +111,7 @@ public class CommanderAbilityController : NetworkBehaviour
         };
     }
 
-    void OnDestroy()
+    public override void OnDestroy()
     {
         if (IsOwner && playerHealth != null)
             playerHealth.OnDamageDealt -= HandleDamageDealt;
@@ -122,6 +121,8 @@ public class CommanderAbilityController : NetworkBehaviour
             characterData.passive.OnUnequip(gameObject);
             passiveEquipped = false;
         }
+
+        base.OnDestroy();
     }
 
     void Update()
@@ -413,7 +414,7 @@ public class CommanderAbilityController : NetworkBehaviour
             return;
 
         if (!string.IsNullOrEmpty(sfxSwing))
-            RuntimeManager.PlayOneShot(sfxSwing, pos);
+            ExoAudioService.PlayOneShot3D(sfxSwing, pos);
 
         if (ability.logicPrefab != null)
         {

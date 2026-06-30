@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-using FMODUnity;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 
@@ -21,10 +20,10 @@ public class WeaponConfig
     public float damageHit4 = 30f;
 
     [Header("Sons FMOD")]
-    [EventRef] public string sfxHit1;
-    [EventRef] public string sfxHit2;
-    [EventRef] public string sfxHit3;
-    [EventRef] public string sfxHit4;
+    public string sfxHit1;
+    public string sfxHit2;
+    public string sfxHit3;
+    public string sfxHit4;
 }
 
 /// <summary>
@@ -194,7 +193,7 @@ public class MeleeCombatSystem : NetworkBehaviour
     private void DetectHits(float damageToApply, string fmodEvent)
     {
         if (!string.IsNullOrEmpty(fmodEvent))
-            RuntimeManager.PlayOneShot(fmodEvent, transform.position);
+            ExoAudioService.PlayOneShot3D(fmodEvent, transform.position);
 
         // VFX de slash: aparece APENAS com a espada (Sword) e durante um ataque real (não ao sacar)
         if (slashVfxPrefab != null && attackPoint != null && currentWeaponType == WeaponType.Sword && isInAttackSequence)

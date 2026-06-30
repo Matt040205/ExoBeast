@@ -1,13 +1,12 @@
 ﻿using UnityEngine;
 using Unity.Netcode;
-using FMODUnity;
 
 /// <summary>
 /// ── WinSound ────────────────────────────────────────────
 /// Toca musica de vitoria de forma sincronizada via ClientRpc.
 ///
 ///  ▸ Server escolhe indice aleatorio em OnNetworkSpawn
-///  ▸ PlayVictorySoundClientRpc: executa RuntimeManager.PlayOneShot em todos
+///  ▸ PlayVictorySoundClientRpc: executa ExoAudioService.PlayOneShot em todos
 ///  ▸ Ativado pela cena de vitoria — sem logica adicional apos o spawn
 /// ─────────────────────────────────────────────────────
 /// </summary>
@@ -15,8 +14,8 @@ public class WinSound : NetworkBehaviour
 {
     private string[] victoryEvents = new string[]
     {
-        "event:/MUSiC/Victory_1",
-        "event:/MUSiC/Victory_2"
+        AudioEventIds.MusicVictory1,
+        AudioEventIds.MusicVictory2
     };
 
     public override void OnNetworkSpawn()
@@ -36,7 +35,7 @@ public class WinSound : NetworkBehaviour
     {
         if (index >= 0 && index < victoryEvents.Length)
         {
-            RuntimeManager.PlayOneShot(victoryEvents[index]);
+            ExoAudioService.PlayOneShot(victoryEvents[index]);
         }
     }
 }

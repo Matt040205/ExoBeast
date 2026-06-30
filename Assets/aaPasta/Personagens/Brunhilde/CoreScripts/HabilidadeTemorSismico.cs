@@ -1,4 +1,3 @@
-using FMODUnity;
 using Unity.Netcode;
 using UnityEngine;
 
@@ -32,8 +31,7 @@ public class HabilidadeTemorSismico : Ability
     public float fadeOutGracePeriod = 2.0f;
 
     [Header("FMOD")]
-    [EventRef]
-    public string sfxSlam = "event:/SFX/SeismicSlam";
+    public string sfxSlam = AudioEventIds.SfxSeismicSlam;
 
     public override bool Activate(GameObject quemUsou)
     {
@@ -48,7 +46,7 @@ public class HabilidadeTemorSismico : Ability
             controller.SetAbilityUsage(this, true);
 
         if (!string.IsNullOrEmpty(sfxSlam))
-            RuntimeManager.PlayOneShot(sfxSlam, quemUsou.transform.position);
+            ExoAudioService.PlayOneShot3D(sfxSlam, quemUsou.transform.position);
 
         TemorSismicoLogic logic = Object.Instantiate(
             logicPrefab,

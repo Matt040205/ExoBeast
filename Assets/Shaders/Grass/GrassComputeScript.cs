@@ -399,7 +399,7 @@ public class GrassComputeScript : MonoBehaviour
         {
             m_InstantiatedComputeShader.SetFloat("_MinFadeDist", currentPresets.minFadeDistance);
             m_InstantiatedComputeShader.SetFloat("_MaxFadeDist", currentPresets.maxDrawDistance);
-            interactors = (ShaderInteractor[])FindObjectsOfType(typeof(ShaderInteractor));
+            interactors = FindObjectsByType<ShaderInteractor>(FindObjectsSortMode.None);
         }
         else
         {

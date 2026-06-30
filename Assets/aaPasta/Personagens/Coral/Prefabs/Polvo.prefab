@@ -533,7 +533,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   landingRaycastDistance: 1.2
-  eventoPassos: event:/SFX/Passos
+  eventoPassos: event:/SFX/Player/Footsteps/Dirt
   isDashing: 0
   isAiming: 0
   isGrounded: 0
@@ -599,8 +599,8 @@ MonoBehaviour:
   eventoTiroUnicoArma: event:/SFX/Atirar
   eventoTiroContinuoArma: event:/SFX/Atirar_segurando
   eventoRecargaArma: event:/SFX/Recarga Arma
-  eventoTiroUnicoArco: event:/SFX/Arco
-  eventoTiroContinuoArco: event:/SFX/Arco
+  eventoTiroUnicoArco: event:/SFX/Player/Bow_Shot
+  eventoTiroContinuoArco: event:/SFX/Player/Bow_Shot
   maxDistance: 100
   hitLayers:
     serializedVersion: 2

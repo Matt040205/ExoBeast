@@ -2,8 +2,6 @@ using UnityEngine;
 using UnityEngine.Animations.Rigging;
 using UnityEngine.InputSystem;
 using System.Collections;
-using FMODUnity;
-using FMOD.Studio;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 
@@ -45,13 +43,11 @@ public class PlayerMovement : NetworkBehaviour
     [Header("Ground Check & Landing")]
     public LayerMask groundMask;
     public float landingRaycastDistance = 1.2f;
-    private bool isAboutToLand;
-
     [Header("FMOD - Passos por Superfície")]
-    [EventRef] public string eventoPassosTerra = "event:/Player/Footsteps/Dirt";
-    [EventRef] public string eventoPassosConcreto = "event:/Player/Footsteps/Concrete";
-    [EventRef] public string eventoPassosAgua = "event:/Player/Footsteps/Water";
-    private EventInstance passosSoundInstance;
+    public string eventoPassosTerra = AudioEventIds.PlayerFootstepsDirt;
+    public string eventoPassosConcreto = AudioEventIds.PlayerFootstepsConcrete;
+    public string eventoPassosAgua = AudioEventIds.PlayerFootstepsWater;
+    private AudioLoopHandle passosLoop;
     private bool isPlayingFootsteps = false;
     private TerrainSurfaceDetector surfaceDetector;
     private TerrainSurfaceDetector.SurfaceType lastSurface = TerrainSurfaceDetector.SurfaceType.Terra;
@@ -128,7 +124,6 @@ public class PlayerMovement : NetworkBehaviour
     private NetworkVariable<PlayerAnimState> netAnimState = new NetworkVariable<PlayerAnimState>(
         PlayerAnimState.FromValues(0f, 0f), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Owner);
 
-    private bool jaMoveuTutorial = false;
     private PlayerHealthSystem healthSystem;
 
     [HideInInspector]
@@ -609,23 +604,23 @@ public class PlayerMovement : NetworkBehaviour
                     StopFootstepSound();
                     ReleaseFootstepInstance();
                     CreateFootstepInstance(newEvent);
-                    if (wasPlaying) { passosSoundInstance.start(); isPlayingFootsteps = true; }
+                    if (wasPlaying) { ExoAudioService.StartLoop(ref passosLoop); isPlayingFootsteps = passosLoop.IsValid; }
                 }
             }
         }
 
-        if (!isPlayingFootsteps && passosSoundInstance.isValid())
+        if (!isPlayingFootsteps && passosLoop.IsValid)
         {
-            passosSoundInstance.start();
+            ExoAudioService.StartLoop(ref passosLoop);
             isPlayingFootsteps = true;
         }
     }
 
     private void StopFootstepSound()
     {
-        if (isPlayingFootsteps && passosSoundInstance.isValid())
+        if (isPlayingFootsteps && passosLoop.IsValid)
         {
-            passosSoundInstance.stop(FMOD.Studio.STOP_MODE.ALLOWFADEOUT);
+            ExoAudioService.StopLoop(ref passosLoop, allowFadeout: true, release: false);
             isPlayingFootsteps = false;
         }
     }
@@ -645,19 +640,20 @@ public class PlayerMovement : NetworkBehaviour
     {
         if (!string.IsNullOrEmpty(eventPath))
         {
-            passosSoundInstance = RuntimeManager.CreateInstance(eventPath);
-            RuntimeManager.AttachInstanceToGameObject(passosSoundInstance, transform);
+            passosLoop = ExoAudioService.CreateLoop(eventPath, transform);
+
         }
     }
 
     private void ReleaseFootstepInstance()
     {
-        if (passosSoundInstance.isValid()) passosSoundInstance.release();
+        ExoAudioService.ReleaseLoop(ref passosLoop);
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         ReleaseFootstepInstance();
+        base.OnDestroy();
     }
 
     [ServerRpc]
@@ -687,7 +683,6 @@ public class PlayerMovement : NetworkBehaviour
         isFloating = false;
         floatDuration = 0f;
         hasDoubleJumped = false;
-        isAboutToLand = false;
         isGrounded = true;
 
         StopFootstepSound();

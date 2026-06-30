@@ -189,17 +189,6 @@ public class UpgradePanelUI : MonoBehaviour
         int pathsChosenCount = 0;
         for (int i = 0; i < 3; i++) if (GetCurrentLevel(i) > 0) pathsChosenCount++;
 
-        bool anotherPathIsTier3Plus = false;
-        // Verifica se algum OUTRO caminho é tier 3 ou mais
-        for (int i = 0; i < 3; i++)
-        {
-            if (i != pathIndex && GetCurrentLevel(i) > 2)
-            {
-                anotherPathIsTier3Plus = true;
-                break;
-            }
-        }
-
         bool isLockedByChoice = false;
         string lockReason = "";
 

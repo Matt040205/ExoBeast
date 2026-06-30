@@ -137,12 +137,14 @@ public class SpiderWebDebuffPlayer : NetworkBehaviour
         }
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (IsServer)
         {
             if (movement != null) movement.netIsWebTrapped.Value = false;
             if (healthSystem != null) healthSystem.speedMultiplier.Value = 1f;
         }
+
+        base.OnDestroy();
     }
 }

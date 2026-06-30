@@ -10,8 +10,6 @@ public class TowerRangeIndicator : MonoBehaviour
     [Tooltip("Referência ao TowerController da torre. Se vazio, o script tentará encontrar sozinho.")]
     public TowerController towerController;
 
-    private bool isMouseOver = false;
-
     private void Awake()
     {
         if (towerController == null)

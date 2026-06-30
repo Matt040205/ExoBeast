@@ -113,7 +113,7 @@ public class SelecaoManager : NetworkBehaviour
         StartCoroutine(SetupScene());
     }
 
-    private void OnDestroy()
+    public override void OnDestroy()
     {
         if (LobbyManager.Instance != null)
         {
@@ -123,6 +123,8 @@ public class SelecaoManager : NetworkBehaviour
 
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
             NetworkManager.Singleton.CustomMessagingManager.UnregisterNamedMessageHandler(k_CharChoiceMsg);
+
+        base.OnDestroy();
     }
 
     public override void OnNetworkSpawn() => CalcularLimitesDeSlots();

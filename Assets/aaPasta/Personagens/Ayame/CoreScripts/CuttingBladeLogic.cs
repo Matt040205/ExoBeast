@@ -1,7 +1,6 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
-using FMODUnity;
 using Unity.Netcode;
 
 /// <summary>
@@ -110,7 +109,7 @@ public class CuttingBladeLogic : NetworkBehaviour
 
         if (!string.IsNullOrEmpty(eventoDash))
         {
-            RuntimeManager.PlayOneShot(eventoDash, transform.position);
+            ExoAudioService.PlayOneShot3D(eventoDash, transform.position);
         }
 
         Vector3 startPosition = transform.position;

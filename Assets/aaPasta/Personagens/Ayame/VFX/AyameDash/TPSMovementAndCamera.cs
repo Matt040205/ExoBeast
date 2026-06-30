@@ -5,7 +5,7 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(CharacterController))]
 public class TPSMovementAndCamera : MonoBehaviour
 {
-    [Header("ConfiguraÁıes da C‚mara")]
+    [Header("Configura√ß√µes da C√¢mara")]
     public Transform cameraTransform;
     public float distance = 5f;
     public float height = 1.5f;
@@ -29,7 +29,7 @@ public class TPSMovementAndCamera : MonoBehaviour
 
         if (trailScript == null)
         {
-            Debug.LogError("ERRO: O script MeshTrail n„o est· no mesmo objeto que este controlador de movimento!");
+            Debug.LogError("ERRO: O script MeshTrail n√£o est√° no mesmo objeto que este controlador de movimento!");
         }
 
         Cursor.lockState = CursorLockMode.Locked;
@@ -93,7 +93,7 @@ public class TPSMovementAndCamera : MonoBehaviour
 
         if (trailScript != null)
         {
-            trailScript.TriggerTrail(); // AQUI: … o input que ativa o rasto.
+            trailScript.SpawnGhostAt(transform.position, transform.rotation, transform);
         }
 
         float startTime = Time.time;

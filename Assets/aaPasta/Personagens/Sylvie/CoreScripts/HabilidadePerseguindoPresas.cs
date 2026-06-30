@@ -1,5 +1,4 @@
 using UnityEngine;
-using FMODUnity;
 using Unity.Netcode;
 using System.Collections;
 using System.Collections.Generic;
@@ -18,8 +17,7 @@ public class HabilidadePerseguindoPresas : Ability
     public float bonusDamageMultiplier = 1.25f;
 
     [Header("FMOD")]
-    [EventRef]
-    public string eventoTEC = "event:/SFX/TEC";
+    public string eventoTEC = AudioEventIds.SfxTec;
 
     public override bool Activate(GameObject quemUsou)
     {

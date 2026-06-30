@@ -94,6 +94,8 @@ public class SobelOutlineRenderFeature : ScriptableRendererFeature
 
         // ── Compatibility Mode fallback ────────────────────────
 
+#pragma warning disable CS0618, CS0672
+        // URP 17 keeps these APIs only for Compatibility Mode. RenderGraph path above is the primary path.
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
             source = renderingData.cameraData.renderer.cameraColorTargetHandle;
@@ -116,6 +118,7 @@ public class SobelOutlineRenderFeature : ScriptableRendererFeature
             context.ExecuteCommandBuffer(cmd);
             CommandBufferPool.Release(cmd);
         }
+#pragma warning restore CS0618, CS0672
 
         public void Dispose()
         {

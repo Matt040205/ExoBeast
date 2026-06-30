@@ -178,7 +178,7 @@ namespace ExoBeasts.Managers
                 return sceneName;
             }
 
-            return "Assets/Scenes/" + sceneName + ".unity";
+            return "Assets/aaPasta/Cenas/" + sceneName + ".unity";
         }
 
         private static string GetBuildSceneListForLog()

@@ -211,7 +211,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   landingRaycastDistance: 1.2
-  eventoPassos: event:/SFX/Passos
+  eventoPassos: event:/SFX/Player/Footsteps/Dirt
   isDashing: 0
   isAiming: 0
   isGrounded: 0
@@ -286,10 +286,10 @@ MonoBehaviour:
     damageHit2: 15
     damageHit3: 20
     damageHit4: 30
-    sfxHit1: event:/SFX/
-    sfxHit2: event:/SFX/
-    sfxHit3: event:/SFX/
-    sfxHit4: event:/SFX/
+    sfxHit1: event:/SFX/Espada
+    sfxHit2: event:/SFX/Espada_1
+    sfxHit3: event:/SFX/Espada_2
+    sfxHit4: event:/SFX/Espada
   slashVfxPrefab: {fileID: 0}
   ultimateHitShake:
     amplitude: 0.8

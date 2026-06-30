@@ -9,18 +9,17 @@ using UnityEngine.UI;
 
 public class MenuSceneValidationTests
 {
-    private const string MenuScenePath = "Assets/Scenes/MenuScene.unity";
-    private const string SupportedLobbyScenePath = "Assets/Scenes/LobbyScene.unity";
+    private const string MenuScenePath = "Assets/aaPasta/Cenas/MenuScene.unity";
+    private const string SupportedLobbyScenePath = "Assets/aaPasta/Cenas/LobbyScene.unity";
     private static readonly string[] CanonicalScenePaths =
     {
-        "Assets/Scenes/MenuScene.unity",
-        "Assets/Scenes/EscolherPersonagem.unity",
+        "Assets/aaPasta/Cenas/MenuScene.unity",
+        "Assets/aaPasta/Cenas/EscolherPersonagem.unity",
         SupportedLobbyScenePath,
-        "Assets/Scenes/Rastros.unity",
-        "Assets/Scenes/CenaMapaTeste.unity",
-        "Assets/Scenes/Lose.unity",
-        "Assets/Scenes/Win.unity",
-        "Assets/Scenes/CenaMapaNOVO.unity"
+        "Assets/aaPasta/Cenas/Rastros.unity",
+        "Assets/aaPasta/Cenas/Lose.unity",
+        "Assets/aaPasta/Cenas/Win.unity",
+        "Assets/aaPasta/Cenas/CenaMapaNOVO.unity"
     };
 
     [Test]

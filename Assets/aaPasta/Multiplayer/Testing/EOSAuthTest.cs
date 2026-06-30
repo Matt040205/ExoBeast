@@ -42,7 +42,7 @@ namespace ExoBeasts.Multiplayer.Testing
         private void Awake()
         {
 #if !EOS_DISABLE
-            var existingManager = FindObjectOfType<PlayEveryWare.EpicOnlineServices.EOSManager>();
+            var existingManager = FindFirstObjectByType<PlayEveryWare.EpicOnlineServices.EOSManager>();
             if (existingManager == null)
             {
                 Debug.LogError("[EOSAuthTest] ERRO CRITICO: EOSManager nao encontrado na cena!");
@@ -79,7 +79,7 @@ namespace ExoBeasts.Multiplayer.Testing
         private void EnsurePlayEveryWareEOSManager()
         {
 #if !EOS_DISABLE
-            var existingManager = FindObjectOfType<PlayEveryWare.EpicOnlineServices.EOSManager>();
+            var existingManager = FindFirstObjectByType<PlayEveryWare.EpicOnlineServices.EOSManager>();
             if (existingManager == null)
             {
                 Debug.Log("[EOSAuthTest] Criando PlayEveryWare EOSManager...");

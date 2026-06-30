@@ -1,8 +1,5 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using FMODUnity;
-using FMOD.Studio;
-using FMOD;
 
 public class GerenciadorDeSomGlobal : MonoBehaviour
 {
@@ -33,8 +30,6 @@ public class GerenciadorDeSomGlobal : MonoBehaviour
     {
         UnityEngine.Debug.Log($"FMOD: Limpando todos os sons ao sair da cena: {cena.name}");
 
-        ChannelGroup mcg;
-        RuntimeManager.CoreSystem.getMasterChannelGroup(out mcg);
-        mcg.stop();
+        ExoAudioService.StopAll();
     }
 }

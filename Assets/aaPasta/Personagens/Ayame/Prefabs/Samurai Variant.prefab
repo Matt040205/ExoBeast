@@ -2271,7 +2271,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6853114845528409664, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: swordStats.sfxHit4
-      value: event:/SFX/Espada_3
+      value: event:/SFX/Espada_2
       objectReference: {fileID: 0}
     - target: {fileID: 6853114845528409664, guid: a0dbf9148972383479f04912c1ec19f8, type: 3}
       propertyPath: swordStats.damageHit1
@@ -2544,7 +2544,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 809cc331b78914848bf7c4e181acf170, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  eventoCura: event:/SFX/Cura
+  eventoCura: event:/SFX/Player/Heal
 --- !u!114 &4722782799964016861
 MonoBehaviour:
   m_ObjectHideFlags: 0

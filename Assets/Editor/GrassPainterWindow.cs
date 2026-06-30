@@ -108,7 +108,7 @@ public class GrassPainterWindow : EditorWindow
 
         if (grassObject == null)
         {
-            grassObject = FindObjectOfType<GrassComputeScript>()?.gameObject;
+            grassObject = FindFirstObjectByType<GrassComputeScript>()?.gameObject;
 
         }
 

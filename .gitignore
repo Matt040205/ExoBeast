@@ -91,6 +91,8 @@ fmod_editor.log
 # CRITICO: Nunca commitar credenciais reais!
 EOSCredentials.json
 **/EOSCredentials.json
+EOSCredentials.json.meta
+**/EOSCredentials.json.meta
 .env
 **/.env
 
@@ -98,9 +100,13 @@ EOSCredentials.json
 Assets/StreamingAssets/EOS/eos_product_config.json
 Assets/StreamingAssets/EOS/eos_windows_config.json
 Assets/StreamingAssets/EOS/EpicOnlineServicesConfig.json
+Assets/StreamingAssets/EOS/eos_product_config.json.meta
+Assets/StreamingAssets/EOS/eos_windows_config.json.meta
+Assets/StreamingAssets/EOS/EpicOnlineServicesConfig.json.meta
 
 # ScriptableObject com credenciais baked (gerado em runtime)
 Assets/Resources/EOSConfig_Main.asset
+Assets/Resources/EOSConfig_Main.asset.meta
 
 # Arquivos temporarios do Claude
 tmpclaude-*

@@ -1,20 +1,18 @@
 using UnityEngine;
 using System.Collections;
-using FMODUnity;
 
 public class WindSound : MonoBehaviour
 {
-    [Header("ConfiguraÁ„o do Som")]
-    [EventRef]
+    [Header("Configura√ß√£o do Som")]
     public string eventoVento = "event:/SFX/Vento";
 
-    [Header("ConfiguraÁ„o de Tempo (em segundos)")]
-    [Tooltip("O tempo MÕNIMO que o script vai esperar antes de TENTAR tocar o som.")]
+    [Header("Configura√ß√£o de Tempo (em segundos)")]
+    [Tooltip("O tempo M√çNIMO que o script vai esperar antes de TENTAR tocar o som.")]
     public float minIntervalo = 10f;
-    [Tooltip("O tempo M¡XIMO que o script vai esperar antes de TENTAR tocar o som.")]
+    [Tooltip("O tempo M√ÅXIMO que o script vai esperar antes de TENTAR tocar o som.")]
     public float maxIntervalo = 25f;
 
-    [Header("ConfiguraÁ„o da Chance")]
+    [Header("Configura√ß√£o da Chance")]
     [Tooltip("A chance (em porcentagem) que o som tem de tocar a cada intervalo.")]
     [Range(0, 100)]
     public float chancePercentual = 30f;
@@ -23,7 +21,7 @@ public class WindSound : MonoBehaviour
     {
         if (string.IsNullOrEmpty(eventoVento))
         {
-            Debug.LogError("Evento 'Vento' do FMOD n„o foi definido no WindSound.cs", this);
+            Debug.LogError("Evento 'Vento' do FMOD n√£o foi definido no WindSound.cs", this);
             return;
         }
 
@@ -41,7 +39,7 @@ public class WindSound : MonoBehaviour
 
             if (chanceRoll <= chancePercentual)
             {
-                RuntimeManager.PlayOneShot(eventoVento);
+                ExoAudioService.PlayOneShot(eventoVento);
             }
         }
     }

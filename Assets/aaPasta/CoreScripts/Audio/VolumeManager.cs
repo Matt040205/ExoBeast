@@ -1,11 +1,9 @@
 using UnityEngine;
 using UnityEngine.UI;
-using FMODUnity;
-using FMOD.Studio;
 
 /// <summary>
 /// -- VolumeManager ---------------------------------------
-/// Gerencia os volumes de ¡udio (Master, M˙sica, SFX) via Sliders e Botıes.
+/// Gerencia os volumes de √Åudio (Master, M√∫sica, SFX) via Sliders e Bot√µes.
 /// Sincroniza com as Busses do FMOD e salva em PlayerPrefs.
 /// --------------------------------------------------------
 /// </summary>
@@ -16,7 +14,7 @@ public class VolumeManager : MonoBehaviour
     public Slider musicSlider;
     public Slider sfxSlider;
 
-    [Header("Botıes de Mute/Ativar")]
+    [Header("Bot√µes de Mute/Ativar")]
     public Button masterButton;
     public Button musicButton;
     public Button sfxButton;
@@ -26,27 +24,18 @@ public class VolumeManager : MonoBehaviour
     public string musicBusPath = "bus:/Music";
     public string sfxBusPath = "bus:/SFX";
 
-    private Bus masterBus;
-    private Bus musicBus;
-    private Bus sfxBus;
 
     private bool masterMuted;
     private bool musicMuted;
     private bool sfxMuted;
 
-    void Awake()
-    {
-        masterBus = RuntimeManager.GetBus(masterBusPath);
-        musicBus = RuntimeManager.GetBus(musicBusPath);
-        sfxBus = RuntimeManager.GetBus(sfxBusPath);
-    }
 
     void Start()
     {
         InitializeVolumes();
     }
 
-    #region InicializaÁ„o
+    #region Inicializa√ß√£o
 
     private void InitializeVolumes()
     {
@@ -85,32 +74,32 @@ public class VolumeManager : MonoBehaviour
 
     #endregion
 
-    #region ConfiguraÁıes de Volume
+    #region Configura√ß√µes de Volume
 
     public void SetMasterVolume(float value)
     {
         PlayerPrefs.SetFloat("MasterVolume", value);
-        if (!masterMuted) masterBus.setVolume(value);
+        if (!masterMuted) ExoAudioService.SetBusVolume(masterBusPath, value);
     }
 
     public void SetMusicVolume(float value)
     {
         PlayerPrefs.SetFloat("MusicVolume", value);
-        if (!musicMuted) musicBus.setVolume(value);
+        if (!musicMuted) ExoAudioService.SetBusVolume(musicBusPath, value);
     }
 
     public void SetSFXVolume(float value)
     {
         PlayerPrefs.SetFloat("SFXVolume", value);
-        if (!sfxMuted) sfxBus.setVolume(value);
+        if (!sfxMuted) ExoAudioService.SetBusVolume(sfxBusPath, value);
         
         // Garante que o SFX seja atualizado no barramento
-        sfxBus.setVolume(sfxMuted ? 0 : value);
+        ExoAudioService.SetBusVolume(sfxBusPath, sfxMuted ? 0 : value);
     }
 
     #endregion
 
-    #region ConfiguraÁıes de Mute (Botıes)
+    #region Configura√ß√µes de Mute (Bot√µes)
 
     public void ToggleMasterMute()
     {
@@ -139,11 +128,11 @@ public class VolumeManager : MonoBehaviour
         float musicVol = PlayerPrefs.GetFloat("MusicVolume", 1f);
         float sfxVol = PlayerPrefs.GetFloat("SFXVolume", 1f);
 
-        masterBus.setVolume(masterMuted ? 0 : masterVol);
-        musicBus.setVolume(musicMuted ? 0 : musicVol);
-        sfxBus.setVolume(sfxMuted ? 0 : sfxVol);
+        ExoAudioService.SetBusVolume(masterBusPath, masterMuted ? 0 : masterVol);
+        ExoAudioService.SetBusVolume(musicBusPath, musicMuted ? 0 : musicVol);
+        ExoAudioService.SetBusVolume(sfxBusPath, sfxMuted ? 0 : sfxVol);
 
-        // Feedback visual simples pode ser adicionado aqui se houver imagens nos botıes
+        // Feedback visual simples pode ser adicionado aqui se houver imagens nos bot√µes
     }
 
     #endregion

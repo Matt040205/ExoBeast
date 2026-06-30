@@ -1,5 +1,4 @@
 using UnityEngine;
-using FMODUnity;
 
 /// <summary>
 /// ── CuttingBladeAbility ──────────────────────────────────
@@ -19,8 +18,7 @@ public class CuttingBladeAbility : Ability
     public bool resetCooldownOnKill = true;
 
     [Header("FMOD")]
-    [EventRef]
-    public string eventoDash = "event:/Player/Dash";
+    public string eventoDash = AudioEventIds.PlayerDash;
 
     public override void Initialize()
     {
