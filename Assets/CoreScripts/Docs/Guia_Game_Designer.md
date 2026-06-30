@@ -1,7 +1,8 @@
 # Guia do Game Designer — ExoBeasts V3 Multiplayer
 # Como os scripts funcionam apos a migracao NGO
 
-Ultima atualizacao: 2026-03-25
+Ultima atualizacao: 2026-06-30
+(Historico de mudancas: mar/2026 criacao inicial; jun/2026 atualizacao pos-Sprint 8)
 
 ---
 
@@ -293,37 +294,39 @@ Padrao geral: **Ability ScriptableObject** define os dados → **Logic component
 
 ---
 
-### 3f. Dragao + Polvo — NAO MIGRADOS (Alerta #19)
+### 3f. Dragao + Polvo — Status de migracao (atualizado jun/2026)
 
-**IMPORTANTE:** Todos os scripts de Dragao e Polvo ainda sao `MonoBehaviour`. Eles **NAO funcionam em multiplayer**.
+#### Dragao — MIGRADO (Sprint 4–Maio 2026)
 
-#### Dragao (7 scripts nao migrados):
-| Script | O que faz | Problema |
-|--------|-----------|----------|
-| AquiNaoLogic.cs | Area de knockback | Usa `Destroy()`, sem IsServer |
-| PosturaBaluarteLogic.cs | Escudo protetor | Adiciona Rigidbody em runtime, sem rede |
-| TemorSismicoLogic.cs | Dano em area sismico | Usa `Destroy()`, sem IsServer |
-| HabilidadeAquiNao.cs | SO de ativacao | Precisa de ServerRpc |
-| HabilidadePosturaBaluarte.cs | SO de ativacao | Precisa de ServerRpc |
-| HabilidadeTemorSismico.cs | SO de ativacao | Precisa de ServerRpc |
-| PassiveEscamasAdamantium.cs | Bonus armadura torres | Usa FindObjectsOfType sem guard |
+As habilidades do Dragao foram migradas para NGO. O alerta #19 original foi resolvido.
 
-#### Polvo (11+ scripts nao migrados):
-| Script | O que faz | Problema |
-|--------|-----------|----------|
-| MergulhoTintaLogic.cs | Dash com tinta | Usa `Destroy()`, `SendMessage()` |
-| ObraPrimaLogic.cs | Ultimate criativo | Usa `Destroy()` |
-| NuvemDeTintaLogic.cs | Nuvem cegante | Usa `Destroy()`, `SendMessage("SetBlinded")`, Debug.Log spam |
-| BombaSprayProjectile.cs | Projetil de tinta | Usa `Destroy()`, `Instantiate()` |
-| TracoUrbanoLogic.cs | Rastro de tinta | MonoBehaviour |
-| ProjetilColorido.cs | Projetil colorido | MonoBehaviour |
-| PaintAbilitySystem.cs | Sistema de pintura | MonoBehaviour |
+| Script | Status | Observacao |
+|--------|--------|------------|
+| AquiNaoLogic.cs | Migrado | Owner-proxy pattern para VFX; dano server-authoritative |
+| PosturaBaluarteLogic.cs | Migrado | Owner-proxy pattern; escudo server-authoritative |
+| TemorSismicoLogic.cs | Migrado | `NetworkObject` real; knock-up 2s via `EnemyStatusController` |
+| PassiveEscamasAdamantium.cs | Migrado | Guard `IsServer` + loop limitado (sem FindObjectsOfType) |
+| DragonPatrolBehavior.cs | Migrado | IA server-authoritative com estados Idle/Chasing/Attacking/Returning e leash no ponto de spawn |
+| TorretaDragao.prefab | Migrado | NetworkTransform server-authoritative; NavMeshObstacle movel desabilitado em runtime; IA/NavMesh desligados no modo preview |
 
-**O que precisara mudar quando migrar:**
+**Observacao Torre Dragao**: o ataque animado esta desligado ate existir animacao propria. O modelo fica em pose base em vez de tombar durante o ataque.
+
+#### Polvo — PARCIALMENTE MIGRADO
+
+| Script | Status | Observacao |
+|--------|--------|------------|
+| MergulhoTintaLogic.cs | Migrado | Entrada/saida decidida no servidor; `LoseTarget()` no servidor; posicao de superficie enviada ao owner via ClientRpc |
+| BombaSprayProjectile.cs | Migrado | Spawn da nuvem via servidor; prefab registrado em `DefaultNetworkPrefabs.asset` |
+| NuvemDeTintaLogic.cs | Migrado | Spawn server-side; sem SendMessage |
+| TracoUrbanoLogic.cs | Pendente | Ainda MonoBehaviour |
+| ProjetilColorido.cs | Pendente | Ainda MonoBehaviour |
+| PaintAbilitySystem.cs | Pendente | Ainda MonoBehaviour |
+| ObraPrimaLogic.cs | Pendente | Ultimate — ainda MonoBehaviour |
+
+Para os scripts ainda pendentes, quando migrar:
 - `MonoBehaviour` → `NetworkBehaviour`
 - `Destroy()` → `Despawn()`
-- `SendMessage()` → chamada direta ou ClientRpc
-- `TakeDamage(damage)` → incluir armorPenetration e isCritical
+- `TakeDamage(damage)` → incluir `armorPenetration` e `isCritical`
 - Adicionar guards `IsServer` / `IsOwner`
 
 ---
@@ -375,10 +378,10 @@ Padrao geral: **Ability ScriptableObject** define os dados → **Logic component
 
 ## 4. Sistema de Lobby (`Multiplayer/Lobby/`)
 
-### Fluxo Completo
+### Fluxo Completo (Sprint 8 — estado atual)
 
 ```
-1. Login EOS (automatico, Device ID)
+1. Login EOS (automatico, Device ID via EOSAuthenticator)
        │
        ▼
 2. Criar Lobby  ──OU──  Buscar Lobbies
@@ -388,27 +391,40 @@ Padrao geral: **Ability ScriptableObject** define os dados → **Logic component
        │                      │
        │◄─────── Entrar ──────┘
        ▼
-4. Todos marcam "Ready"
+4. Todos clicam "Pronto" (LobbySceneUI)
        │
-       ▼
-5. Host clica "Iniciar Partida"
+       ▼ AllMembersReady() == true
+5. Host clica "Iniciar Partida" (habilitado somente quando todos prontos)
        │
-       ├──► Host publica SERVER_ADDRESS no lobby
-       ├──► Clientes detectam e conectam automaticamente
-       └──► Todos carregam a cena de jogo
+       ├──► MatchSessionLauncher.LaunchHostCoroutine()
+       │         publica SERVER_ADDRESS / RELAY_CODE / LOBBY_STATE=InGame
+       │
+       ├──► Clientes detectam via OnLobbyAttributeUpdated
+       │         chamam ConnectAsClient*
+       │
+       └──► WaitForAllClientsAndLoadScene("EscolherPersonagem")
+               NGO carrega cena para todos → selecao de personagem
+               → LobbyManager.StartMatch(mapName="CenaMapaNOVO")
+               → CenaMapaNOVO carregada
 ```
 
-### Arquivos principais:
+### Arquivos principais (estado atual):
 - **LobbyManager.cs** — chamadas EOS (criar, buscar, entrar, sair, iniciar)
-- **LobbyData.cs** — estruturas de dados (LobbyMember, LobbyInfo, LobbySettings)
-- **LobbyUI.cs** — interface Canvas (aguarda artes finais)
-- **LobbyPlaceholderUI.cs** — interface de teste temporaria (OnGUI)
+- **LobbyData.cs** — estruturas de dados (`LobbyMember`, `LobbyInfo`, `LobbySettings`, `LobbyState`)
+- **LobbySceneUI.cs** — interface canonica Canvas (Sprint 6+); botos por nome via `LobbyButtonBinder`
+- **MatchSessionLauncher.cs** — orquestra StartHost/StartClient e publicacao de atributos de conexao
+- **LobbyMembershipService.cs** — gestao de membros extraida do LobbyManager (Sprint 5)
+- **LobbyNotificationDispatcher.cs** — notificacoes EOS extraidas do LobbyManager (Sprint 4)
+- **EosLobbyModHelper.cs** — helpers `AddStringAttr`, `AddInt64Attr`, `AddStringMemberAttr` (Sprint 7)
+
+**Nao usar** (deletados no Sprint 6): `LobbyPlaceholderUI.cs`, `MenuLobbyPanel.cs`.
+**Nao confundir** com `LobbyUIManager.cs` — e tombstone `#if UNITY_EDITOR [Obsolete]`, nao e UI real.
 
 ---
 
 ## 5. Alertas Ativos
 
-Problemas identificados durante auditoria que ainda nao foram corrigidos:
+Problemas identificados que ainda nao foram corrigidos (atualizado jun/2026):
 
 | # | Script | Problema | Severidade |
 |---|--------|----------|------------|
@@ -422,23 +438,30 @@ Problemas identificados durante auditoria que ainda nao foram corrigidos:
 | 8 | PlayerMovement | GetComponent<MergulhoTintaLogic> no input de pulo | Baixa |
 | 9 | CommanderAbilityController | Cooldowns nao sincronizados (local por cliente) | Baixa |
 | 10 | TrapLogicBase | Venda sem feedback visual | Baixa |
-| 11 | ObjectiveHealthSystem | Lambda anonima em OnNetworkSpawn | Baixa |
 | 14 | BleedingBehavior | ApplyBleed nao implementado no EnemyHealthSystem | Media |
 | 15 | OwlEyeBehavior | ApplyReveal nao implementado | Baixa |
 | 16 | ArmorAuraBehavior | OverlapSphere todo frame (deveria ter timer) | Baixa |
 | 17 | VooGraciosoLogic | DestroyLogic chamado duas vezes no Host | Baixa |
-| 18 | NineTailsDanceLogic | originalAttackRange pode nao inicializar (race condition) | Baixa |
-| 19 | Dragao/Polvo | 18+ scripts nao migrados para NGO | Alta |
+| 18 | NineTailsDanceLogic | originalAttackRange pode nao inicializar (race condition rara) | Baixa |
 | 20 | MultiShotBehavior | FireProjectileAt nao existe no TowerController | Media |
 | 21 | BotaoHabilidade | FindObjectOfType<Rastros> no menu | Baixa |
-| 22 | PassiveEscamasAdamantium | FindObjectsOfType sem IsServer guard | Media |
 | 24 | MatchManager | EndMatchVictory/Defeat nunca chamados pelo fluxo | Baixa |
 | 25 | MatchManager | Invoke sem cancelamento para delays | Baixa |
-| 26 | 13 TowerBehavior subclasses | OnDestroy em vez de OnNetworkDespawn | Media |
-| 28 | Dragao/Polvo | TakeDamage com 1 param (sem armorPen/crit) | Alta |
-| 29 | NuvemDeTinta/BombaSpray | Destroy()/SendMessage() (bloqueia multiplayer Polvo) | Alta |
+| 26 | 13 TowerBehavior subclasses | OnDestroy em vez de OnNetworkDespawn (problema se pooling implementado) | Media |
+| 30 | Polvo (TracoUrbano, ProjetilColorido, PaintAbilitySystem, ObraPrima) | Scripts ainda MonoBehaviour — nao funcionam em multiplayer | Alta |
+| 31 | TorretaDragao | Ataque animado desligado (sem animacao propria) — modelo em pose base durante ataque | Baixa |
+| 32 | Loading 2o match | Estado residual de SceneTransitionHandler prende cliente na transicao | Media |
+| 33 | Limite de armadilhas | BuildLimit == 0 nos TrapDataSO (Espinhos, TP, Broca, Fogueira, Piche) — configurar no Inspector | Alta |
 
-Alertas corrigidos: #12 (encoding TutorialPopupUI), #13 (Debug.Log UIManager), #23 (ObjectiveHealthSystem lambda), #27 (NineTailsDanceAbility enabled=true).
+Alertas corrigidos (removidos desta lista):
+- #12: encoding TutorialPopupUI
+- #13: Debug.Log UIManager
+- #19: Dragon/Polvo nao migrados — Dragon concluido, Polvo parcial (ver secao 3f)
+- #22: PassiveEscamasAdamantium sem IsServer guard — corrigido
+- #23: ObjectiveHealthSystem lambda — corrigido
+- #27: NineTailsDanceAbility enabled=true — corrigido
+- #28: Dragon/Polvo TakeDamage 1 param — corrigido nos migrados
+- #29: NuvemDeTinta/BombaSpray Destroy()/SendMessage() — corrigido
 
 ---
 
@@ -446,25 +469,39 @@ Alertas corrigidos: #12 (encoding TutorialPopupUI), #13 (Debug.Log UIManager), #
 
 ### Como testar multiplayer localmente (MPPM)
 
-1. **Abrir Unity** com MPPM (Multiplayer Play Mode) — menu Window > Multiplayer Play Mode
-2. **Configurar 2 Virtual Players** (Players 1 e 2)
-3. **Player 1:** StartHost (sera o servidor)
-4. **Player 2:** StartClient (conecta ao Player 1)
-5. **Verificar:**
-   - Ambos veem o personagem do outro?
-   - Animacoes sincronizam?
-   - Tiros/golpes causam dano correto?
-   - Inimigos perseguem o jogador mais proximo?
-   - Torres construidas aparecem para todos?
-   - Dinheiro atualiza para todos?
+**Pre-requisito**: ter `EOSCredentials.json` na raiz do projeto (ver `Assets/Multiplayer/CREDENTIALS_SETUP.md`).
 
-### O que observar no Inspector
+1. **Abrir Unity** com MPPM — menu `Window > Multiplayer Play Mode`
+2. **Configurar 1 Virtual Player** adicional (total: Editor principal + 1 clone)
+3. **Abrir** `LobbyScene.unity` (nao SceneMapTest diretamente)
+4. **Clicar Play** no Editor (Player 1 = futuro host)
+5. **No Editor**: criar lobby, escolher personagem, clicar "Pronto"
+6. **No clone MPPM**: entrar no mesmo lobby, escolher personagem, clicar "Pronto"
+7. **No Editor** (host): clicar "Iniciar Partida" (botao habilita quando todos prontos)
+8. Ambos devem carregar `EscolherPersonagem` → confirmar personagem → carregar `CenaMapaNOVO`
+
+**O que verificar apos entrar na partida:**
+- Ambos veem o personagem do outro?
+- Animacoes sincronizam (ataque, pulo)?
+- Tiros/golpes causam dano correto?
+- Inimigos perseguem o jogador mais proximo?
+- Torres construidas aparecem para todos?
+- Armadilhas respeitam o limite configurado?
+- Dinheiro atualiza para todos ao coletar?
+- Player remoto nao rouboa camera nem input?
+
+### O que observar no Inspector (checklist de prefab)
 
 Para cada prefab de jogador, verificar que tem:
 - `NetworkObject` (na raiz)
-- `ClientNetworkTransform` (Interpolate = true)
+- `ClientNetworkTransform` (Interpolate = true, SmoothedTime = 0.05)
 - `NetworkAnimator` ou `ClientNetworkAnimator`
 - Todos os scripts de `Player/` atribuidos
+
+Para torres e armadilhas:
+- `NetworkObject` na raiz
+- Prefab registrado em `Assets/Multiplayer/Setup/DefaultNetworkPrefabs.asset`
+- `TrapDataSO`: `buildLimit` > 0 (hoje todos em 0 = ilimitado — Alerta #33)
 
 ### Como diferenciar bug de rede vs bug de gameplay
 
@@ -476,6 +513,11 @@ Para cada prefab de jogador, verificar que tem:
 | Acao funciona para Host mas nao para Client | Falta ServerRpc ou guard errado |
 | Objeto desaparece para um jogador | Destroy() em vez de Despawn() |
 | Console mostra "non-server writes" | Codigo tentando mudar NetworkVariable sem ser servidor |
+| Player nao se move (host) | FinishLocalSetupNextFrame interrompido — ver PADROES_NGO.md P4 |
+| Player nao se move (cliente) | Dois PlayerInput ativos — ver bug_host_client_movement.md |
+| Armadilha/heal nao detecta player remoto | Rigidbody Kinematic ausente — ver PADROES_NGO.md P2 |
+| Limite de armadilha ignorado | IsServer pré-Spawn — ver PADROES_NGO.md P1 |
+| Inimigo sumiu em build (ok no Editor) | FileID de Prefab Variant — ver PADROES_NGO.md P6 |
 
 ---
 
@@ -499,3 +541,17 @@ Para cada prefab de jogador, verificar que tem:
 | Late-join | Jogador que entra no meio da partida |
 | Owner-authoritative | O dono do objeto controla o movimento (usado para jogadores) |
 | Server-authoritative | O servidor controla (usado para inimigos, economia, dano) |
+| LobbySceneUI | Interface canonica de lobby em Canvas (substitui LobbyPlaceholderUI deletado no Sprint 6) |
+| MatchSessionLauncher | Orquestra StartHost/StartClient e publicacao de dados de conexao no lobby EOS |
+| CharacterChoiceCache | Cache server-side da escolha de personagem de cada jogador ate o spawn |
+| EosLobbyModHelper | Helpers internos para modificar atributos de lobby e membro via EOS (Sprint 7) |
+| CenaMapaNOVO | Nome canônico atual da cena de jogo (o nome CenaMapaTeste e legado) |
+| EscolherPersonagem | Cena de selecao de personagem carregada pelo NGO antes da partida |
+
+## Docs relacionados
+
+- `PADROES_NGO.md` — padroes e armadilhas especificos deste projeto que causaram bugs reais
+- `Guia_Setup_Multiplayer_Cenas.md` — setup de cenas, prefabs e NetworkManager
+- `ONBOARDING.md` — guia de primeiro acesso para devs novos
+- `Estado_Atual_Multiplayer.md` — estado canonico do multiplayer (changelog detalhado)
+- `CREDENTIALS_SETUP.md` — como configurar credenciais EOS

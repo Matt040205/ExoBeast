@@ -10,13 +10,17 @@ Guia operacional atual para configurar cenas, prefabs e testes do multiplayer.
 ## Fluxo atual
 
 ```text
-EOSAuthTest.unity -> LobbyScene.unity -> SceneMapTest.unity
+NetworkBootstrap.unity -> MenuScene.unity -> LobbyScene.unity -> EscolherPersonagem.unity -> CenaMapaNOVO.unity
 ```
 
+Cenas de teste isolado:
+- `EOSAuthTest.unity` — testa apenas autenticacao EOS
+- `Network Test.unity` — testa Host/Client NGO sem EOS Lobby
+
 - `LobbyScene.unity` e a cena de entrada do fluxo multiplayer.
-- `SceneMapTest.unity` e a cena de gameplay carregada pela rede.
-- `Network Test.unity` continua como teste direto de Host/Client sem EOS Lobby.
-- `NetworkBootstrap.unity` nao existe neste repositorio; o bootstrap e feito por componentes.
+- `CenaMapaNOVO.unity` e a cena de gameplay carregada pela rede (o nome `CenaMapaTeste` e legado).
+- `EscolherPersonagem.unity` e carregada pelo NGO entre o lobby e a partida.
+- `NetworkBootstrap.unity` nao existe neste repositorio; o bootstrap e feito via componente `NetworkBootstrap.cs` na cena `NetworkBootstrap.unity` em `Assets/Cenas/`.
 
 ## LobbyScene.unity
 
@@ -32,16 +36,12 @@ Coloque aqui o runtime que precisa sobreviver ate a troca de cena:
 - `LobbyManager`
 - `LobbySceneUI` como interface canonica
 
-Componentes de apoio que ainda existem para teste/debug:
-
-- `LobbyUIManager`
-- `LobbyPlaceholderUI`
-- `MenuLobbyPanel`
-
 Observacoes:
 
-- O `NetworkManager` precisa continuar vivo ate `SceneMapTest`.
+- O `NetworkManager` precisa continuar vivo ate `CenaMapaNOVO`.
 - O fluxo atual de lobby publica o endereco de conexao e aguarda os clientes antes de carregar a cena de jogo.
+- `LobbyPlaceholderUI.cs` e `MenuLobbyPanel.cs` foram deletados no Sprint 6 — nao adicionar de volta.
+- `LobbyUIManager.cs` e tombstone `#if UNITY_EDITOR [Obsolete]` — nao e UI real, nao usa em producao.
 
 ## Player prefab
 
@@ -80,7 +80,7 @@ Regras:
 - O setup atual acontece em `PlayerNetworkSetup.OnNetworkSpawn()`.
 - O jogador remoto deve ter input, camera e objetos locais desligados.
 
-## 4. SceneMapTest.unity
+## 4. CenaMapaNOVO.unity (antes chamada SceneMapTest)
 
 Hierarquia sugerida para a cena de gameplay:
 
@@ -141,16 +141,17 @@ Se um prefab nao estiver na lista, o cliente nao vai conseguir instanciar o obje
 
 ## 6. Build Settings
 
-Garanta que estas cenas existam no build:
+Garanta que estas cenas existam no build (use os nomes exatos que aparecem nas strings do codigo):
 
+- `NetworkBootstrap`
+- `MenuScene`
 - `LobbyScene`
-- `SceneMapTest`
+- `EscolherPersonagem`
+- `CenaMapaNOVO`
 - `EOSAuthTest`
 - `Network Test`
 - `Win`
 - `Lose`
-
-Use exatamente os mesmos nomes que aparecem nas strings do codigo.
 
 ## 7. Teste com MPPM
 
@@ -160,7 +161,7 @@ Use exatamente os mesmos nomes que aparecem nas strings do codigo.
 4. No clone MPPM, entre no mesmo lobby.
 5. Verifique se o host publica os dados de conexao.
 6. Inicie a partida.
-7. Confirme que ambos carregam `SceneMapTest.unity`.
+7. Confirme que ambos carregam `EscolherPersonagem.unity` → `CenaMapaNOVO.unity`.
 
 O que checar:
 
@@ -200,7 +201,7 @@ O que checar:
 - `NetworkAnimator`
 - `PlayerNetworkSetup`
 
-### SceneMapTest
+### CenaMapaNOVO
 
 - `GameSetupManager`
 - `MatchManager`

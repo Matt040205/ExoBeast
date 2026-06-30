@@ -10,10 +10,13 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 
 ## Docs ativos relacionados
 
-- `Assets/Multiplayer/README.md` - indice curto
+- `Assets/CoreScripts/Docs/ONBOARDING.md` - guia de primeiro acesso para devs novos
+- `Assets/CoreScripts/Docs/PADROES_NGO.md` - padroes NGO especificos do projeto (bugs reais documentados)
+- `Assets/CoreScripts/Docs/Guia_Game_Designer.md` - explicacao sistema a sistema
 - `Assets/CoreScripts/Docs/Guia_Setup_Multiplayer_Cenas.md` - setup de cena e prefab
 - `Assets/Multiplayer/Docs/AUTHENTICATION_GUIDE.md` - login EOS
 - `Assets/Multiplayer/CREDENTIALS_SETUP.md` - segredos EOS
+- `Assets/Multiplayer/README.md` - indice curto
 
 ## Ultima atualizacao: Unity 6.3 LTS + reorganizacao de Assets (2026-06-26)
 
