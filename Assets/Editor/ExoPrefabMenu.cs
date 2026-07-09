@@ -1,4 +1,4 @@
-using UnityEngine;
+ï»¿using UnityEngine;
 using UnityEditor;
 using System.IO;
 using System.Text;
@@ -14,7 +14,7 @@ public class ExoPrefabMenu
 
         string sourcePath = AssetDatabase.GetAssetPath(selected);
         string fileName = Path.GetFileNameWithoutExtension(sourcePath);
-        string folderPath = Path.GetDirectoryName(sourcePath);
+        string folderPath = Path.GetDirectoryName(sourcePath).Replace("\\", "/");
 
         string prefix = categoria + "_" + nome + "_";
         string tModels = EditorPrefs.GetString(prefix + "Mod");
@@ -24,7 +24,7 @@ public class ExoPrefabMenu
 
         if (string.IsNullOrEmpty(tModels) || string.IsNullOrEmpty(tPrefabs))
         {
-            Debug.LogError($"Diretórios não configurados para {nome}. Verifique o Exo Config.");
+            Debug.LogError($"Diretorios nao configurados para {nome}. Verifique o Exo Config.");
             return;
         }
 
@@ -40,7 +40,16 @@ public class ExoPrefabMenu
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
 
-        ExoPrefabBuilder.BuildCharacterPrefab(destModel, tPrefabs, tMaterials);
+        ExoPrefabProfile profile = LoadProfile(categoria, nome);
+        ExoPrefabBuilder.BuildCharacterPrefab(destModel, tPrefabs, tMaterials, profile, categoria);
+    }
+
+    public static ExoPrefabProfile LoadProfile(string categoria, string nome)
+    {
+        string key = categoria + "_" + nome + "_Profile";
+        string profilePath = EditorPrefs.GetString(key, "");
+        if (string.IsNullOrEmpty(profilePath)) return null;
+        return AssetDatabase.LoadAssetAtPath<ExoPrefabProfile>(profilePath);
     }
 
     public static void GenerateMenus()
@@ -48,7 +57,7 @@ public class ExoPrefabMenu
         string path = "Assets/Editor/ExoGeneratedMenus.cs";
         StringBuilder sb = new StringBuilder();
 
-        sb.AppendLine("// ARQUIVO GERADO AUTOMATICAMENTE. NÃO EDITE.");
+        sb.AppendLine("// ARQUIVO GERADO AUTOMATICAMENTE. NAO EDITE.");
         sb.AppendLine("using UnityEditor;");
         sb.AppendLine("using UnityEngine;");
         sb.AppendLine("using System.IO;");
@@ -75,7 +84,6 @@ public class ExoPrefabMenu
         string[] entities = rawList.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
         foreach (string entity in entities)
         {
-            // Remove qualquer caractere que não seja letra ou número para evitar quebrar o código C#
             string safeName = Regex.Replace(entity, "[^a-zA-Z0-9_]", "");
 
             sb.AppendLine($"    [MenuItem(\"Assets/Exo Prefabs/{menuPath}{entity}\", true)]");

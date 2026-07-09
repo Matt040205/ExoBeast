@@ -115,15 +115,4 @@ public static class ExoGeneratedMenus
     {
         ExoPrefabMenu.ExecutarOrganizar("Environment", "Ponte");
     }
-    [MenuItem("Assets/Exo Prefabs/Environment/Mina", true)]
-    static bool Val_Environment_Mina()
-    {
-        string path = AssetDatabase.GetAssetPath(Selection.activeObject);
-        return !string.IsNullOrEmpty(path) && Path.GetExtension(path).ToLower() == ".fbx";
-    }
-    [MenuItem("Assets/Exo Prefabs/Environment/Mina", false, 20)]
-    public static void Org_Environment_Mina()
-    {
-        ExoPrefabMenu.ExecutarOrganizar("Environment", "Mina");
-    }
 }

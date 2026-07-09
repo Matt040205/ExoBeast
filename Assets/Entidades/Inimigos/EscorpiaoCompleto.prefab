@@ -110,7 +110,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: -8987182849631250749, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: GlobalObjectIdHash
-      value: 3597747980
+      value: 733047146
       objectReference: {fileID: 0}
     - target: {fileID: 2759551096013480, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       propertyPath: m_PropertySheet.m_Vector3f.m_Array.Array.data[0].m_Value.y
@@ -297,7 +297,9 @@ PrefabInstance:
       value: 0.071152456
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 4723723226853623873, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
+    - {fileID: 1881180898542956724, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
     m_AddedGameObjects:
     - targetCorrespondingSourceObject: {fileID: 1035349113437046572, guid: 2609fcee3f9469b4b8c35180db30fb4d, type: 3}
       insertIndex: -1
