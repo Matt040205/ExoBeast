@@ -25,6 +25,8 @@ public class MenuManager : MonoBehaviour
     [Header("Multiplayer")]
     [SerializeField] private Button botaoJogarSolo;
     [SerializeField] private Button botaoJogarOnline;
+    [SerializeField] private Button botaoOptions;
+    [SerializeField] private Button botaoCreditos;
 
     private bool _sceneChangeInProgress;
 
@@ -121,8 +123,27 @@ public class MenuManager : MonoBehaviour
 
     public void Options()
     {
+        // MenuScene: usa transição animada via pilha de navegação.
+        if (MenuTabSlider.Instance != null)
+        {
+            MenuTabSlider.Instance.NavigateTo("Options");
+            return;
+        }
+
+        // Fallback legado (PauseMenu sem TabSlider)
         StopAllCoroutines();
         StartCoroutine(ForcarAberturaOptions());
+    }
+
+    /// <summary>Abre o painel de créditos com slide animado.</summary>
+    public void Creditos()
+    {
+        if (MenuTabSlider.Instance != null)
+        {
+            MenuTabSlider.Instance.NavigateTo("Credits");
+            return;
+        }
+        Debug.LogWarning("[MenuManager] MenuTabSlider não encontrado. Fallback sem animação.");
     }
 
     private IEnumerator ForcarAberturaOptions()
@@ -145,6 +166,14 @@ public class MenuManager : MonoBehaviour
 
     public void BotaoBack()
     {
+        // MenuScene: usa Back() da pilha de navegação animada.
+        if (MenuTabSlider.Instance != null)
+        {
+            MenuTabSlider.Instance.Back();
+            return;
+        }
+
+        // Comportamento legado para PauseMenu
         if (optionsPanel) optionsPanel.SetActive(false);
         SetPauseButtonsState(true);
     }
@@ -196,15 +225,13 @@ public class MenuManager : MonoBehaviour
     {
         TryAutoBindButton(ref botaoJogarSolo, "Singleplayer");
         TryAutoBindButton(ref botaoJogarOnline, "Multiplayer");
+        TryAutoBindButton(ref botaoOptions, "options");
+        TryAutoBindButton(ref botaoCreditos, "Creditos");
 
         if (botaoJogarSolo != null)
         {
             botaoJogarSolo.onClick = new Button.ButtonClickedEvent();
             botaoJogarSolo.onClick.AddListener(() => GameModeManager.EnsureInstance().StartSingleplayer());
-        }
-        else
-        {
-            Debug.LogError("[MenuManager] Nao foi possivel encontrar o botao 'Singleplayer' na MenuScene.");
         }
 
         if (botaoJogarOnline != null)
@@ -212,9 +239,31 @@ public class MenuManager : MonoBehaviour
             botaoJogarOnline.onClick = new Button.ButtonClickedEvent();
             botaoJogarOnline.onClick.AddListener(() => GameModeManager.EnsureInstance().StartMultiplayer());
         }
-        else
+
+        if (botaoOptions != null)
         {
-            Debug.LogError("[MenuManager] Nao foi possivel encontrar o botao 'Multiplayer' na MenuScene.");
+            botaoOptions.onClick = new Button.ButtonClickedEvent();
+            botaoOptions.onClick.AddListener(() => Options());
+        }
+
+        if (botaoCreditos != null)
+        {
+            botaoCreditos.onClick = new Button.ButtonClickedEvent();
+            botaoCreditos.onClick.AddListener(() => Creditos());
+        }
+
+        BindBackButtonsInPanels();
+    }
+
+    private void BindBackButtonsInPanels()
+    {
+        foreach (Button btn in FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (btn != null && btn.gameObject.scene == gameObject.scene && btn.gameObject.name == "Back")
+            {
+                btn.onClick.RemoveListener(BotaoBack);
+                btn.onClick.AddListener(BotaoBack);
+            }
         }
     }
 
