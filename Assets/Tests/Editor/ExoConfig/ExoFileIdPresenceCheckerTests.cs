@@ -82,4 +82,53 @@ public class ExoFileIdPresenceCheckerTests
     {
         Assert.That(ExoFileIdPresenceChecker.ContainsFileId(yamlText, fileId), Is.False);
     }
+
+    // Fase 6, item 4 do escopo: as duas amostras abaixo NAO sao YAML
+    // inventado - sao trechos REAIS, capturados via
+    // File.ReadAllText/script de scratch, de prefabs de Torre e Monstro
+    // gerados de verdade pelo pipeline corrigido nesta fase
+    // (ExoPrefabBuilder.ConfigureAsTower/ConfigureAsEnemy +
+    // CopySerializedValuesAndRelink + FindModelChild + ExoRelinkPathMapper),
+    // no cenario que antes quebrava (FBX renomeado entre duas execucoes,
+    // ex.: "ScratchTower" -> "ScratchTower 2"). Cada "&<fileId> stripped"
+    // e a forma como Unity serializa, dentro do YAML do prefab CONTAINER,
+    // uma referencia para um objeto que vive DENTRO de um NESTED PREFAB
+    // (aqui, o modelo/FBX relinkado) - exatamente o tipo de referencia que
+    // a regra duravel do projeto ("fileID precisa aparecer literalmente no
+    // YAML, nao so resolver via AssetDatabase no Editor") existe para
+    // proteger. Provam que ExoFileIdPresenceChecker se aplica ao cenario
+    // real que esta fase introduz - nao so a amostras sinteticas.
+    [Test]
+    public void ContainsFileId_FindsRealRelinkedTowerModelReferenceFromFase6Scratch()
+    {
+        string yaml =
+            "fileID: 0}\n" +
+            "--- !u!1 &5761318791579385680 stripped\n" +
+            "GameObject:\n" +
+            "  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: bb9169f4834045c4c945cd8b939d21aa, type: 3}\n" +
+            "  m_PrefabInstance: {fileID: 4842839901715169793}\n" +
+            "  m_PrefabAsset: {fileID: 0}\n" +
+            "--- !u!95 &6863327163324087805\n" +
+            "Animator:\n" +
+            "  seriali";
+
+        Assert.That(ExoFileIdPresenceChecker.ContainsFileId(yaml, "5761318791579385680"), Is.True);
+    }
+
+    [Test]
+    public void ContainsFileId_FindsRealRelinkedEnemyModelReferenceFromFase6Scratch()
+    {
+        string yaml =
+            ", type: 3}\n" +
+            "--- !u!1 &554868142279659221 stripped\n" +
+            "GameObject:\n" +
+            "  m_CorrespondingSourceObject: {fileID: 919132149155446097, guid: 0e48889b6bcce3c48b0920468ec675a2, type: 3}\n" +
+            "  m_PrefabInstance: {fileID: 824757361428116356}\n" +
+            "  m_PrefabAsset: {fileID: 0}\n" +
+            "--- !u!4 &934665208884024431 stripped\n" +
+            "Transform:\n" +
+            "  m";
+
+        Assert.That(ExoFileIdPresenceChecker.ContainsFileId(yaml, "554868142279659221"), Is.True);
+    }
 }

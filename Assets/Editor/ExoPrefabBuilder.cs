@@ -648,49 +648,201 @@ public class ExoPrefabBuilder
         }
     }
 
+    /// <summary>
+    /// Acha o prefab TEMPLATE original de uma entidade, para
+    /// CopySerializedValuesAndRelink copiar referencias dele. Primeiro tenta
+    /// o caminho EXATO que esta execucao esta prestes a gravar (prefabPath) -
+    /// o caso comum: a entidade ja tem um prefab real com o mesmo nome de
+    /// sempre. Se isso falhar (ex.: o FBX foi reimportado com um nome
+    /// diferente, como "Samurai" virando "Samurai 2" - Unity sufixa nomes
+    /// para nao sobrescrever um arquivo existente), procura por nome
+    /// "limpo" dentro de "folder".
+    ///
+    /// Fase 6: a busca por nome limpo agora prioriza IGUALDADE EXATA
+    /// (ExoOriginalPrefabMatcher.Classify, que usa ExoNaming.CleanEntityName
+    /// nos dois lados) sobre a pasta inteira, antes de aceitar qualquer
+    /// correspondencia aproximada (Contains) - e so usa aproximada como
+    /// FALLBACK, sempre com aviso explicito (nunca em silencio). Antes desta
+    /// fase, o primeiro candidato que desse Contains "ganhava", na ordem
+    /// (NAO deterministica) de AssetDatabase.FindAssets - um risco JA
+    /// CONFIRMADO no disco deste projeto: Assets/Entidades/Inimigos/ tem
+    /// tanto "Aguia.prefab" quanto "Aguiaa.prefab", tanto "Aranha.prefab"
+    /// quanto "Aranhaa.prefab". Buscar por "Aguia" podia relinkar contra o
+    /// TEMPLATE ERRADO ("Aguiaa") sem nenhum aviso - pior que o bug de
+    /// relink em si, porque produz valores plausiveis mas incorretos em vez
+    /// de referencias nulas obvias. Ver ExoOriginalPrefabMatcher para o
+    /// raciocinio completo da comparacao.
+    /// </summary>
     private static GameObject FindOriginalPrefab(string prefabPath, string entityName, string folder)
     {
         GameObject go = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
         if (go != null) return go;
 
-        string cleanEntity = entityName.Replace("Torreta", "").Replace("Variant", "").Replace("Completo", "").Trim();
-        cleanEntity = System.Text.RegularExpressions.Regex.Replace(cleanEntity, @"\d+$", "").Trim();
+        bool lookingForTower = entityName.StartsWith("Torreta");
 
         string[] guids = AssetDatabase.FindAssets("t:Prefab", new[] { folder });
+
+        string exactPath = null;
+        string fuzzyPath = null;
+        string fuzzyName = null;
+        List<string> otherFuzzyNames = null;
+
         foreach (string guid in guids)
         {
             string path = AssetDatabase.GUIDToAssetPath(guid);
             string name = Path.GetFileNameWithoutExtension(path);
-            
-            if (name.ToLower().Contains(cleanEntity.ToLower()))
+
+            bool isTowerPrefab = name.StartsWith("Torreta");
+            if (lookingForTower != isTowerPrefab) continue;
+
+            ExoOriginalPrefabMatchKind kind = ExoOriginalPrefabMatcher.Classify(name, entityName);
+            if (kind == ExoOriginalPrefabMatchKind.Exact)
             {
-                bool lookingForTower = entityName.StartsWith("Torreta");
-                bool isTowerPrefab = name.StartsWith("Torreta");
-                
-                if (lookingForTower == isTowerPrefab)
+                exactPath = path;
+                break; // nomes de arquivo sao unicos numa pasta - exato nunca e ambiguo, pode parar aqui.
+            }
+            if (kind == ExoOriginalPrefabMatchKind.Fuzzy)
+            {
+                if (fuzzyPath == null)
                 {
-                    return AssetDatabase.LoadAssetAtPath<GameObject>(path);
+                    fuzzyPath = path;
+                    fuzzyName = name;
+                }
+                else
+                {
+                    if (otherFuzzyNames == null) otherFuzzyNames = new List<string>();
+                    otherFuzzyNames.Add(name);
                 }
             }
+        }
+
+        if (exactPath != null)
+            return AssetDatabase.LoadAssetAtPath<GameObject>(exactPath);
+
+        if (fuzzyPath != null)
+        {
+            string ambiguityNote = otherFuzzyNames != null
+                ? " Outros candidatos tambem aproximados (ordem de AssetDatabase.FindAssets NAO e deterministica): " + string.Join(", ", otherFuzzyNames) + "."
+                : "";
+            string msg = "[ExoConfig] Nenhum prefab original com nome EXATO para \"" + entityName + "\" encontrado em \"" + folder +
+                "\" - usando correspondencia APROXIMADA \"" + fuzzyName + "\" (substring, pode ser o prefab errado)." + ambiguityNote +
+                " Confira manualmente se as referencias relinkadas fazem sentido.";
+            Debug.LogWarning(msg);
+            return AssetDatabase.LoadAssetAtPath<GameObject>(fuzzyPath);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Fase 6: encontra o filho DIRETO de "root" que e o modelo/FBX
+    /// instanciado (ex.: PrefabUtility.InstantiatePrefab(fbxModel), como
+    /// ConfigureAsTower e ConfigureAsEnemy fazem), identificado pela
+    /// IDENTIDADE ESTRUTURAL do objeto (e uma instancia de um Model Prefab)
+    /// - nunca pelo NOME do arquivo nem por uma pasta fixa chamada "Pivot".
+    ///
+    /// Substitui a suposicao antiga "o modelo esta sob um filho chamado
+    /// Pivot" (so era verdade para Personagem - e Personagem, desde a Fase
+    /// 5, nem chama mais este caminho de relink). ConfigureAsTower e
+    /// ConfigureAsEnemy NUNCA criam nenhum "Pivot": o modelo e sempre
+    /// parentado diretamente no root, ao lado de GameObjects vazios/
+    /// primitivos que o proprio builder cria ("GameObject"/"CirculoSeletor"
+    /// em ConfigureAsTower; "DamagePopupPosition"/"Sphere"/"Indicador_Aggro"/
+    /// "Dissolvevfx" em ConfigureAsEnemy). Nenhum desses e instancia de
+    /// prefab (sao "new GameObject(...)" ou GameObject.CreatePrimitive),
+    /// entao nunca sao confundidos com o modelo.
+    ///
+    /// USA PrefabUtility.GetCorrespondingObjectFromSource(child.gameObject) != null
+    /// como o teste - NAO PrefabUtility.GetPrefabAssetType(child.gameObject) == PrefabAssetType.Model,
+    /// que foi a primeira tentativa desta fase e SE MOSTROU ERRADA por
+    /// experimento real (script de scratch, nao suposicao): GetPrefabAssetType
+    /// e GetPrefabInstanceStatus respondem "como este objeto esta sendo visto
+    /// AGORA", nao "qual e a identidade estrutural dele" - e essas duas
+    /// perguntas DIVERGEM entre os dois contextos em que este metodo precisa
+    /// funcionar:
+    ///
+    /// - Sobre uma hierarquia VIVA em memoria, ainda nao salva (ex.: o
+    ///   targetRoot logo apos ConfigureAsTower/ConfigureAsEnemy, antes de
+    ///   SaveAsPrefabAsset): o filho do modelo e uma PrefabInstance solta,
+    ///   GetPrefabAssetType devolve corretamente Model e GetPrefabInstanceStatus
+    ///   devolve Connected.
+    /// - Sobre um Prefab ASSET ja salvo e recarregado do disco via
+    ///   AssetDatabase.LoadAssetAtPath (ex.: o template original devolvido
+    ///   por FindOriginalPrefab, o "sourceRoot" do relink): confirmado por
+    ///   script de scratch nesta fase que, NESSE caso, GetPrefabAssetType
+    ///   devolve Regular (o tipo do prefab CONTAINER, "TorretaScratch.prefab"
+    ///   no experimento - um prefab comum, criado do zero, nunca ele mesmo
+    ///   instanciado de outro prefab) para TODOS os filhos, inclusive o
+    ///   modelo - e GetPrefabInstanceStatus devolve NotAPrefab. Ou seja: as
+    ///   duas APIs "esquecem" a fronteira do nested prefab assim que o
+    ///   container e recarregado puramente como asset (fora de Prefab
+    ///   Mode/de uma instancia de cena) - eram exatamente o tipo de
+    ///   suposicao nao verificada que este briefing pediu para provar, nao
+    ///   assumir, e a suposicao inicial (GetPrefabAssetType) FALHOU nesse
+    ///   teste real (FindOriginalPrefab.FindModelChild(sourceRoot) devolvia
+    ///   null para o template recarregado, quebrando o relink de origem -
+    ///   confirmado via log antes deste fix).
+    ///
+    /// GetCorrespondingObjectFromSource, por outro lado, devolveu o MESMO
+    /// resultado (nao-nulo, apontando para o asset do FBX de origem) nos
+    /// DOIS contextos, no mesmo experimento - porque a correspondencia de um
+    /// nested prefab e dado PERSISTENTE serializado junto com o
+    /// PrefabInstance aninhado (m_SourcePrefab + mapa de correspondencia),
+    /// nao um estado transitorio de "como estou sendo visualizado agora".
+    /// Para os GameObjects vazios/primitivos irmaos do modelo (nunca
+    /// instanciados de nenhum prefab), GetCorrespondingObjectFromSource
+    /// devolve null nos dois contextos, sem falsos positivos observados.
+    /// Ver relatorio da Fase 6 para a tabela completa (PrefabAssetType vs.
+    /// PrefabInstanceStatus vs. GetCorrespondingObjectFromSource, live vs.
+    /// reloaded) que embasou esta escolha.
+    ///
+    /// Devolve null se nenhum filho direto tiver correspondencia de origem
+    /// (nao deveria acontecer com ConfigureAsTower/ConfigureAsEnemy tal como
+    /// existem hoje, mas evita NullReferenceException se a estrutura mudar
+    /// no futuro) - os chamadores tratam null como "sem nome de modelo para
+    /// mapear" (ExoRelinkPathMapper.MapRelativePath vira no-op quando o nome
+    /// vem vazio - mesma postura defensiva que o codigo antigo tinha para
+    /// origFbxName/newFbxName vazios).
+    /// </summary>
+    private static Transform FindModelChild(Transform root)
+    {
+        for (int i = 0; i < root.childCount; i++)
+        {
+            Transform child = root.GetChild(i);
+            if (PrefabUtility.GetCorrespondingObjectFromSource(child.gameObject) != null)
+                return child;
         }
         return null;
     }
 
+    /// <summary>
+    /// Copia valores serializados e referencias do prefab TEMPLATE original
+    /// (sourceRoot) para a hierarquia recem-construida (targetRoot),
+    /// remapeando qualquer referencia que aponte para DENTRO do modelo
+    /// antigo para o objeto equivalente dentro do modelo novo - mesmo que o
+    /// modelo tenha sido renomeado entre as duas execucoes (ex.: FBX
+    /// reimportado como "Samurai 2").
+    ///
+    /// So chamada pela metade de Torre e Monstro de BuildCharacterPrefab
+    /// (ConfigureAsTower/ConfigureAsEnemy) - Personagem usa
+    /// BuildOrUpdateCharacterVariant desde a Fase 5 e nunca passa por aqui
+    /// (confirmado via grep nesta fase - unico chamador de
+    /// CopySerializedValuesAndRelink continua sendo BuildCharacterPrefab,
+    /// nos dois pontos do ramo nao-Personagem/ramo de Torre).
+    ///
+    /// Fase 6: origFbxName/newFbxName agora vem de FindModelChild (identidade
+    /// estrutural), nao mais de "sourceRoot.transform.Find(\"Pivot\")"
+    /// (Torre/Monstro nunca tem Pivot - essa suposicao so "funcionava", por
+    /// acidente, quando o nome do modelo nao mudava entre execucoes). Ver
+    /// FindModelChild e ExoRelinkPathMapper para o raciocinio completo.
+    /// </summary>
     private static void CopySerializedValuesAndRelink(GameObject sourceRoot, GameObject targetRoot)
     {
-        string origFbxName = "";
-        Transform sourcePivot = sourceRoot.transform.Find("Pivot");
-        if (sourcePivot != null && sourcePivot.childCount > 0)
-        {
-            origFbxName = sourcePivot.GetChild(0).name;
-        }
+        Transform sourceModel = FindModelChild(sourceRoot.transform);
+        Transform targetModel = FindModelChild(targetRoot.transform);
 
-        string newFbxName = "";
-        Transform targetPivot = targetRoot.transform.Find("Pivot");
-        if (targetPivot != null && targetPivot.childCount > 0)
-        {
-            newFbxName = targetPivot.GetChild(0).name;
-        }
+        string origFbxName = sourceModel != null ? sourceModel.name : "";
+        string newFbxName = targetModel != null ? targetModel.name : "";
 
         CopyComponentsAndRelink(sourceRoot, targetRoot, sourceRoot, targetRoot, origFbxName, newFbxName);
 
@@ -699,7 +851,7 @@ public class ExoPrefabBuilder
         {
             if (origT == sourceRoot.transform) continue;
             string path = GetRelativePath(sourceRoot.transform, origT);
-            string mappedPath = MapRelativePath(path, origFbxName, newFbxName);
+            string mappedPath = ExoRelinkPathMapper.MapRelativePath(path, origFbxName, newFbxName);
             
             Transform newT = targetRoot.transform.Find(mappedPath);
             if (newT != null)
@@ -803,7 +955,7 @@ public class ExoPrefabBuilder
                 if (IsChildOf(sourceRoot, refGo))
                 {
                     string relPath = GetRelativePath(sourceRoot.transform, refGo.transform);
-                    string mappedPath = MapRelativePath(relPath, origFbxName, newFbxName);
+                    string mappedPath = ExoRelinkPathMapper.MapRelativePath(relPath, origFbxName, newFbxName);
                     
                     if (mappedPath == refGo.name && refGo == sourceRoot)
                     {
@@ -825,7 +977,7 @@ public class ExoPrefabBuilder
                 if (IsChildOf(sourceRoot, refComp.gameObject))
                 {
                     string relPath = GetRelativePath(sourceRoot.transform, refComp.gameObject.transform);
-                    string mappedPath = MapRelativePath(relPath, origFbxName, newFbxName);
+                    string mappedPath = ExoRelinkPathMapper.MapRelativePath(relPath, origFbxName, newFbxName);
                     
                     GameObject targetTargetGo = null;
                     if (mappedPath == refComp.gameObject.name && refComp.gameObject == sourceRoot)
@@ -879,20 +1031,6 @@ public class ExoPrefabBuilder
                 case SerializedPropertyType.AnimationCurve: targetProp.animationCurveValue = sourceProp.animationCurveValue; break;
             }
         }
-    }
-
-    private static string MapRelativePath(string origPath, string origFbxName, string newFbxName)
-    {
-        if (string.IsNullOrEmpty(origFbxName) || string.IsNullOrEmpty(newFbxName)) return origPath;
-        
-        string origToken = "Pivot/" + origFbxName;
-        string newToken = "Pivot/" + newFbxName;
-        
-        if (origPath.StartsWith(origToken))
-        {
-            return newToken + origPath.Substring(origToken.Length);
-        }
-        return origPath;
     }
 
     private static string GetRelativePath(Transform root, Transform target)
