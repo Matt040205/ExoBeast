@@ -1,103 +1,182 @@
 ﻿using UnityEngine;
 using UnityEditor;
 using System.IO;
-using System.Text;
-using System.Text.RegularExpressions;
+using System.Collections.Generic;
+using System.Linq;
 using System;
+using ExoBeasts.ExoConfig.Core;
 
 public class ExoPrefabMenu
 {
+    /// <summary>
+    /// Ponto de entrada publico - assinatura preservada intacta pela Fase 4
+    /// (o picker "Assets/Exo Prefabs/Organizar..." depende dela, ver
+    /// AbrirOrganizarPicker mais abaixo). A partir da Fase 4, so monta o
+    /// ExoBuildContext e delega para RunPipeline com DryRun=false; toda a
+    /// logica de organizar/montar em si mora agora em
+    /// Assets/Editor/ExoConfig/Pipeline/ (ExoBuildPipeline + os 4 steps desta
+    /// fase: ResolvePathsStep, ImportAssetsStep, MaterialStep,
+    /// BuildPrefabStep).
+    /// </summary>
     public static void ExecutarOrganizar(string categoria, string nome)
     {
+        RunPipeline(categoria, nome, dryRun: false);
+    }
+
+    /// <summary>
+    /// Nucleo comum de ExecutarOrganizar, com DryRun explicito. "internal"
+    /// (nao private) pelo mesmo motivo de BuildPickerItems logo abaixo:
+    /// existe para permitir exercitar o pipeline em modo diagnostico (ver
+    /// Assets/Diretrizes_Multiagente.md - nunca mover assets reais do
+    /// projeto so para testar) sem duplicar a montagem do ExoBuildPipeline
+    /// em outro arquivo, inclusive por um script de diagnostico temporario
+    /// no mesmo assembly implicito. A assinatura PUBLICA que o picker
+    /// depende (ExecutarOrganizar(string, string)) fica intocada acima.
+    ///
+    /// Devolve o ExoBuildReport da execucao (nunca null) para quem chamar
+    /// programaticamente poder inspecionar Messages/HasErrors/HasWarnings
+    /// sem depender so do que foi parar no console. Devolve null apenas no
+    /// caso defensivo de nada estar selecionado no Project (mesmo guard
+    /// silencioso que ExecutarOrganizar sempre teve - no uso normal via
+    /// menu, ValidarAbrirOrganizarPicker ja impede isso).
+    /// </summary>
+    internal static ExoBuildReport RunPipeline(string categoria, string nome, bool dryRun)
+    {
         UnityEngine.Object selected = Selection.activeObject;
-        if (selected == null) return;
+        if (selected == null) return null;
 
         string sourcePath = AssetDatabase.GetAssetPath(selected);
-        string fileName = Path.GetFileNameWithoutExtension(sourcePath);
-        string folderPath = Path.GetDirectoryName(sourcePath).Replace("\\", "/");
 
-        string prefix = categoria + "_" + nome + "_";
-        string tModels = EditorPrefs.GetString(prefix + "Mod");
-        string tTextures = EditorPrefs.GetString(prefix + "Tex");
-        string tPrefabs = EditorPrefs.GetString(prefix + "Pre");
-        string tMaterials = EditorPrefs.GetString(prefix + "Mat");
+        ExoBuildReport report = new ExoBuildReport();
+        ExoBuildContext context = new ExoBuildContext(categoria, nome, sourcePath, dryRun, report);
 
-        if (string.IsNullOrEmpty(tModels) || string.IsNullOrEmpty(tPrefabs))
+        ExoBuildPipeline pipeline = new ExoBuildPipeline()
+            .Add(new ResolvePathsStep())
+            .Add(new ImportAssetsStep())
+            .Add(new MaterialStep())
+            .Add(new BuildPrefabStep());
+
+        pipeline.Run(context);
+
+        DumpReport(report);
+        return report;
+    }
+
+    /// <summary>
+    /// Despeja o ExoBuildReport no console Unity de uma vez, no fim da
+    /// execucao, preservando a severidade de cada mensagem (Info -> Debug.Log,
+    /// Warning -> Debug.LogWarning, Error -> Debug.LogError). Nenhum step do
+    /// pipeline chama Debug.* diretamente (ver IExoBuildStep) - só este
+    /// metodo, no lado do menu, decide como exibir o relatorio.
+    /// </summary>
+    private static void DumpReport(ExoBuildReport report)
+    {
+        foreach (ExoBuildMessage msg in report.Messages)
         {
-            Debug.LogError($"Diretorios nao configurados para {nome}. Verifique o Exo Config.");
-            return;
+            switch (msg.Severity)
+            {
+                case ExoBuildMessageSeverity.Error:
+                    Debug.LogError("[ExoConfig] " + msg);
+                    break;
+                case ExoBuildMessageSeverity.Warning:
+                    Debug.LogWarning("[ExoConfig] " + msg);
+                    break;
+                default:
+                    Debug.Log("[ExoConfig] " + msg);
+                    break;
+            }
         }
-
-        string destModel = Path.Combine(tModels, fileName + ".fbx").Replace("\\", "/");
-        AssetDatabase.MoveAsset(sourcePath, destModel);
-
-        string sourceTex = Path.Combine(folderPath, fileName + "T.png").Replace("\\", "/");
-        if (File.Exists(sourceTex))
-        {
-            AssetDatabase.MoveAsset(sourceTex, Path.Combine(tTextures, fileName + "T.png").Replace("\\", "/"));
-        }
-
-        AssetDatabase.SaveAssets();
-        AssetDatabase.Refresh();
-
-        ExoPrefabProfile profile = LoadProfile(categoria, nome);
-        ExoPrefabBuilder.BuildCharacterPrefab(destModel, tPrefabs, tMaterials, profile, categoria);
     }
 
     public static ExoPrefabProfile LoadProfile(string categoria, string nome)
     {
-        string key = categoria + "_" + nome + "_Profile";
-        string profilePath = EditorPrefs.GetString(key, "");
-        if (string.IsNullOrEmpty(profilePath)) return null;
-        return AssetDatabase.LoadAssetAtPath<ExoPrefabProfile>(profilePath);
+        if (!ExoCategoryParser.TryParse(categoria, out ExoCategory categoriaEnum))
+            return null;
+
+        ExoToolConfig config = ExoToolConfig.Load();
+        ExoToolConfigEntry entry = config?.FindEntry(categoriaEnum, nome);
+        if (entry == null || string.IsNullOrEmpty(entry.ProfileAssetPath))
+            return null;
+
+        return AssetDatabase.LoadAssetAtPath<ExoPrefabProfile>(entry.ProfileAssetPath);
     }
 
-    public static void GenerateMenus()
+    /// <summary>
+    /// Validacao do item de menu unico "Assets/Exo Prefabs/Organizar..."
+    /// (Fase 3 - substitui os N pares de [MenuItem] que
+    /// Assets/Editor/ExoGeneratedMenus.cs gerava em disco). Mesma regra que
+    /// o codegen usava para cada entidade: so habilita quando o objeto
+    /// selecionado no Project e um .fbx.
+    /// </summary>
+    [MenuItem("Assets/Exo Prefabs/Organizar...", true)]
+    private static bool ValidarAbrirOrganizarPicker()
     {
-        string path = "Assets/Editor/ExoGeneratedMenus.cs";
-        StringBuilder sb = new StringBuilder();
-
-        sb.AppendLine("// ARQUIVO GERADO AUTOMATICAMENTE. NAO EDITE.");
-        sb.AppendLine("using UnityEditor;");
-        sb.AppendLine("using UnityEngine;");
-        sb.AppendLine("using System.IO;");
-        sb.AppendLine("");
-        sb.AppendLine("public static class ExoGeneratedMenus");
-        sb.AppendLine("{");
-
-        AppendMenuMethods(sb, "Personagens", "Entities/Characters/");
-        AppendMenuMethods(sb, "Monstros", "Entities/Enemies/");
-        AppendMenuMethods(sb, "Environment", "Environment/");
-
-        sb.AppendLine("}");
-
-        File.WriteAllText(path, sb.ToString());
-        AssetDatabase.Refresh();
-        Debug.Log("Menus customizados atualizados com sucesso!");
+        string path = AssetDatabase.GetAssetPath(Selection.activeObject);
+        return !string.IsNullOrEmpty(path) && Path.GetExtension(path).ToLower() == ".fbx";
     }
 
-    private static void AppendMenuMethods(StringBuilder sb, string categoria, string menuPath)
+    /// <summary>
+    /// Item de menu unico que abre um picker (GenericMenu) com todas as
+    /// entidades do ExoToolConfig, agrupadas por categoria - a substituicao
+    /// da Fase 3 para os N [MenuItem] hardcoded que
+    /// Assets/Editor/ExoGeneratedMenus.cs mantinha em disco (um par
+    /// validate+execute por entidade, regenerado via GenerateMenus toda vez
+    /// que a config mudava). GenericMenu le a config em tempo de execucao a
+    /// cada clique: nao ha arquivo gerado para divergir do gerador, nem
+    /// recompilacao necessaria quando uma entidade e adicionada/removida em
+    /// ExoConfigWindow.
+    ///
+    /// "Organizar..." (com reticencias) segue a convencao do Editor da
+    /// Unity para itens que abrem uma escolha adicional antes de executar
+    /// (ex.: "File/Build Settings...") - sinaliza que clicar aqui nao
+    /// executa a acao direto, primeiro pede qual entidade. O verbo
+    /// "Organizar" (em vez de "Configurar") foi escolhido para bater com o
+    /// nome do metodo que a acao de fato dispara (ExecutarOrganizar) e com o
+    /// botao "Organizar v" que ja existe em ExoConfigWindow - evita
+    /// confusao com o menu "Exo Config > Edit", que configura a FERRAMENTA
+    /// (cadastro de entidades/pastas), nao organiza um asset selecionado.
+    /// </summary>
+    [MenuItem("Assets/Exo Prefabs/Organizar...", false, 20)]
+    private static void AbrirOrganizarPicker()
     {
-        string rawList = EditorPrefs.GetString(categoria, "");
-        if (string.IsNullOrEmpty(rawList)) return;
+        List<ExoPickerItem> itens = BuildPickerItems();
 
-        string[] entities = rawList.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-        foreach (string entity in entities)
+        if (itens.Count == 0)
         {
-            string safeName = Regex.Replace(entity, "[^a-zA-Z0-9_]", "");
-
-            sb.AppendLine($"    [MenuItem(\"Assets/Exo Prefabs/{menuPath}{entity}\", true)]");
-            sb.AppendLine($"    static bool Val_{categoria}_{safeName}()");
-            sb.AppendLine("    {");
-            sb.AppendLine("        string path = AssetDatabase.GetAssetPath(Selection.activeObject);");
-            sb.AppendLine("        return !string.IsNullOrEmpty(path) && Path.GetExtension(path).ToLower() == \".fbx\";");
-            sb.AppendLine("    }");
-
-            sb.AppendLine($"    [MenuItem(\"Assets/Exo Prefabs/{menuPath}{entity}\", false, 20)]");
-            sb.AppendLine($"    public static void Org_{categoria}_{safeName}()");
-            sb.AppendLine("    {");
-            sb.AppendLine($"        ExoPrefabMenu.ExecutarOrganizar(\"{categoria}\", \"{entity}\");");
-            sb.AppendLine("    }");
+            Debug.LogWarning("[ExoConfig] Nenhuma entidade cadastrada em ExoToolConfig. Abra o menu \"Exo Config > Edit\" e cadastre pelo menos uma entidade antes de organizar um FBX.");
+            EditorUtility.DisplayDialog(
+                "Exo Config",
+                "Nenhuma entidade cadastrada no Exo Config.\n\nAbra o menu \"Exo Config > Edit\" e cadastre pelo menos uma entidade antes de organizar este FBX.",
+                "OK");
+            return;
         }
+
+        GenericMenu menu = new GenericMenu();
+        foreach (ExoPickerItem item in itens)
+        {
+            menu.AddItem(new GUIContent(item.MenuPath), false, () => ExecutarOrganizar(item.Categoria.ToString(), item.Nome));
+        }
+        menu.ShowAsContext();
+    }
+
+    /// <summary>
+    /// Le o ExoToolConfig atual e monta a lista ordenada/agrupada de itens do
+    /// picker (delegando a montagem em si para ExoPickerItemBuilder.BuildItems,
+    /// no Core - puro, testado). Extraido como metodo separado (em vez de
+    /// inline em AbrirOrganizarPicker) para poder ser exercitado - inclusive
+    /// por um [MenuItem] de diagnostico temporario, como na Fase 3 - sem
+    /// precisar renderizar o GenericMenu de fato (popup nativo do SO, fora
+    /// do alcance de automacao/inspecao programatica).
+    ///
+    /// "internal" (nao private): visivel para outros scripts do mesmo
+    /// assembly implicito (Assembly-CSharp-Editor, que cobre todo
+    /// Assets/Editor/ sem asmdef proprio) - inclusive um script de
+    /// diagnostico temporario usado para provar o picker em execucao.
+    /// </summary>
+    internal static List<ExoPickerItem> BuildPickerItems()
+    {
+        ExoToolConfig config = ExoToolConfig.Load();
+        IEnumerable<ExoEntityDefinition> definicoes = config?.Entries.Select(e => e?.Definition);
+        return ExoPickerItemBuilder.BuildItems(definicoes);
     }
 }

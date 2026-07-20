@@ -1,11 +1,6 @@
 {
-    "name": "ExoBeasts.EditorTests",
-    "references": [
-        "ExoBeasts.ExoConfig.Core"
-    ],
-    "optionalUnityReferences": [
-        "TestAssemblies"
-    ],
+    "name": "ExoBeasts.ExoConfig.Core",
+    "references": [],
     "includePlatforms": [
         "Editor"
     ],
@@ -16,5 +11,5 @@
     "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [],
-    "noEngineReferences": false
+    "noEngineReferences": true
 }

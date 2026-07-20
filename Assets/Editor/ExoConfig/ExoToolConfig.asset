@@ -1,0 +1,97 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0e802192f584d2a418aab8fd9ca66708, type: 3}
+  m_Name: ExoToolConfig
+  m_EditorClassIdentifier: Assembly-CSharp-Editor::ExoToolConfig
+  entries:
+  - Definition:
+      Nome: Ayame
+      Categoria: Personagens
+      FolderOverrides: []
+    ProfileAssetPath: 
+    CreatedTicks: 639198502363591494
+    ModifiedTicks: 639198502363591494
+  - Definition:
+      Nome: Brunhilde
+      Categoria: Personagens
+      FolderOverrides: []
+    ProfileAssetPath: 
+    CreatedTicks: 639198502364623396
+    ModifiedTicks: 639198502364623396
+  - Definition:
+      Nome: Coral
+      Categoria: Personagens
+      FolderOverrides: []
+    ProfileAssetPath: 
+    CreatedTicks: 639198502366985101
+    ModifiedTicks: 639198502366985101
+  - Definition:
+      Nome: Sylvie
+      Categoria: Personagens
+      FolderOverrides:
+      - Tipo: Animacao
+        Pasta: "Assets/Personagens/Sylvie/Anima\xE7\xE3o/Terranomas/Arqueira"
+    ProfileAssetPath: 
+    CreatedTicks: 639198502368048852
+    ModifiedTicks: 639198502369146212
+  - Definition:
+      Nome: "\xC1guia"
+      Categoria: Monstros
+      FolderOverrides:
+      - Tipo: Prefabs
+        Pasta: Assets/Entidades/Inimigos
+    ProfileAssetPath: 
+    CreatedTicks: 639198502370242755
+    ModifiedTicks: 639198502376631379
+  - Definition:
+      Nome: Aranha
+      Categoria: Monstros
+      FolderOverrides:
+      - Tipo: Prefabs
+        Pasta: Assets/Entidades/Inimigos
+    ProfileAssetPath: 
+    CreatedTicks: 639198502371288429
+    ModifiedTicks: 639198502377644609
+  - Definition:
+      Nome: Capanga
+      Categoria: Monstros
+      FolderOverrides:
+      - Tipo: Prefabs
+        Pasta: Assets/Entidades/Inimigos
+    ProfileAssetPath: 
+    CreatedTicks: 639198502373539529
+    ModifiedTicks: 639198502378731474
+  - Definition:
+      Nome: "Escorpi\xE3o"
+      Categoria: Monstros
+      FolderOverrides:
+      - Tipo: Prefabs
+        Pasta: Assets/Entidades/Inimigos
+    ProfileAssetPath: 
+    CreatedTicks: 639198502374571857
+    ModifiedTicks: 639198502379865627
+  - Definition:
+      Nome: Monstro
+      Categoria: Monstros
+      FolderOverrides:
+      - Tipo: Prefabs
+        Pasta: Assets/Entidades/Inimigos
+    ProfileAssetPath: 
+    CreatedTicks: 639198502375618940
+    ModifiedTicks: 639198502380972735
+  - Definition:
+      Nome: Ponte
+      Categoria: Environment
+      FolderOverrides: []
+    ProfileAssetPath: 
+    CreatedTicks: 639198502382053773
+    ModifiedTicks: 639198502382053773

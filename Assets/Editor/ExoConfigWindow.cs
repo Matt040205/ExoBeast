@@ -1,31 +1,45 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEditor;
 using System.Collections.Generic;
 using System.Linq;
 using System;
 using System.IO;
+using ExoBeasts.ExoConfig.Core;
 
+/// <summary>
+/// Janela de edicao da config da Exo Config. Fase 2: fonte de dados trocada
+/// de EditorPrefs para ExoToolConfig (asset versionado - ver
+/// Assets/Editor/ExoConfig/ExoToolConfig.cs). A UI em si (layout, botoes,
+/// cores) nao foi redesenhada nesta fase - so a fonte dos dados mudou -,
+/// exceto pela secao de caminhos de pasta: como os caminhos agora sao
+/// DERIVADOS por convencao (ExoPathResolver) em vez de texto livre por
+/// entidade, a janela mostra o caminho resolvido e um botao explicito para
+/// criar/remover override, em vez de 5 campos de texto sempre editaveis (ver
+/// DrawFolderRow).
+/// </summary>
 public class ExoConfigWindow : EditorWindow
 {
-    private string currentTab = "Personagens";
+    private static readonly ExoCategory[] CATEGORIAS = (ExoCategory[])Enum.GetValues(typeof(ExoCategory));
+    private static readonly ExoAssetType[] TIPOS_ASSET = (ExoAssetType[])Enum.GetValues(typeof(ExoAssetType));
+
+    private ExoToolConfig config;
+    private ExoCategory currentCategoria = ExoCategory.Personagens;
     private string newEntityName = "";
     private string selectedEntity = "";
-
-    private static readonly string[] TABS = { "Personagens", "Monstros", "Environment" };
-
-    private List<string> GetList(string key) => new List<string>((EditorPrefs.GetString(key, "")).Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries));
-
-    private void SaveList(string key, List<string> list)
-    {
-        EditorPrefs.SetString(key, string.Join(",", list));
-        ExoPrefabMenu.GenerateMenus();
-    }
 
     [MenuItem("Exo Config/Edit", false, 1000)]
     public static void ShowWindow() => GetWindow<ExoConfigWindow>("Exo Config");
 
+    private void OnEnable()
+    {
+        config = ExoToolConfig.LoadOrCreate();
+    }
+
     private void OnGUI()
     {
+        if (config == null)
+            config = ExoToolConfig.LoadOrCreate();
+
         GUILayout.BeginHorizontal();
         DrawSidebar();
         GUILayout.BeginVertical();
@@ -38,17 +52,12 @@ public class ExoConfigWindow : EditorWindow
     {
         GUILayout.BeginVertical(GUILayout.Width(130));
 
-        foreach (string tab in TABS)
+        foreach (ExoCategory categoria in CATEGORIAS)
         {
-            GUI.backgroundColor = currentTab == tab ? new Color(0.4f, 0.7f, 1f) : Color.white;
-            if (GUILayout.Button(tab, GUILayout.Height(30))) { currentTab = tab; selectedEntity = ""; }
+            GUI.backgroundColor = currentCategoria == categoria ? new Color(0.4f, 0.7f, 1f) : Color.white;
+            if (GUILayout.Button(categoria.ToString(), GUILayout.Height(30))) { currentCategoria = categoria; selectedEntity = ""; }
         }
 
-        GUI.backgroundColor = Color.white;
-        GUILayout.Space(20);
-        GUI.backgroundColor = new Color(0.4f, 1f, 0.5f);
-        if (GUILayout.Button("Atualizar Menus", GUILayout.Height(40)))
-            ExoPrefabMenu.GenerateMenus();
         GUI.backgroundColor = Color.white;
 
         GUILayout.EndVertical();
@@ -56,20 +65,16 @@ public class ExoConfigWindow : EditorWindow
 
     private void DrawMainPanel()
     {
-        GUILayout.Label(currentTab, EditorStyles.boldLabel);
+        GUILayout.Label(currentCategoria.ToString(), EditorStyles.boldLabel);
 
         GUILayout.BeginHorizontal();
         newEntityName = EditorGUILayout.TextField(newEntityName);
 
         if (GUILayout.Button("Adicionar"))
         {
-            var list = GetList(currentTab);
-            if (!string.IsNullOrEmpty(newEntityName) && !list.Contains(newEntityName))
+            if (!string.IsNullOrEmpty(newEntityName) && config.FindEntry(currentCategoria, newEntityName) == null)
             {
-                list.Add(newEntityName);
-                EditorPrefs.SetString("Created_" + currentTab + "_" + newEntityName, DateTime.Now.Ticks.ToString());
-                EditorPrefs.SetString("Modified_" + currentTab + "_" + newEntityName, DateTime.Now.Ticks.ToString());
-                SaveList(currentTab, list);
+                config.AddEntity(currentCategoria, newEntityName);
             }
             newEntityName = "";
         }
@@ -77,25 +82,33 @@ public class ExoConfigWindow : EditorWindow
         if (GUILayout.Button("Organizar v"))
         {
             GenericMenu menu = new GenericMenu();
-            menu.AddItem(new GUIContent("A-Z"), false, () => SortList((a, b) => a.CompareTo(b)));
-            menu.AddItem(new GUIContent("Data Criacao (Antigo-Novo)"), false, () => SortList((a, b) => GetTicks("Created", a).CompareTo(GetTicks("Created", b))));
-            menu.AddItem(new GUIContent("Data Modificacao (Novo-Antigo)"), false, () => SortList((a, b) => GetTicks("Modified", b).CompareTo(GetTicks("Modified", a))));
+            menu.AddItem(new GUIContent("A-Z"), false, () =>
+                config.SortCategoria(currentCategoria, (a, b) => string.Compare(a.Definition.Nome, b.Definition.Nome, StringComparison.Ordinal)));
+            menu.AddItem(new GUIContent("Data Criacao (Antigo-Novo)"), false, () =>
+                config.SortCategoria(currentCategoria, (a, b) => a.CreatedTicks.CompareTo(b.CreatedTicks)));
+            menu.AddItem(new GUIContent("Data Modificacao (Novo-Antigo)"), false, () =>
+                config.SortCategoria(currentCategoria, (a, b) => b.ModifiedTicks.CompareTo(a.ModifiedTicks)));
             menu.ShowAsContext();
         }
         GUILayout.EndHorizontal();
 
-        var entities = GetList(currentTab);
-        foreach (var entity in entities.ToList())
+        // ToList() tira uma copia antes de iterar: o botao "X" abaixo pode
+        // chamar config.RemoveEntity, que muta a lista interna de config -
+        // iterar direto sobre config.GetByCategoria (IEnumerable preguicoso
+        // via LINQ Where) enquanto ela e mutada lançaria
+        // InvalidOperationException. Mesmo cuidado que o codigo original ja
+        // tinha (GetList(currentTab).ToList()) sobre a lista do EditorPrefs.
+        List<ExoToolConfigEntry> entidades = config.GetByCategoria(currentCategoria).ToList();
+        foreach (ExoToolConfigEntry entry in entidades)
         {
+            string entity = entry.Definition.Nome;
             GUILayout.BeginHorizontal();
             GUI.backgroundColor = selectedEntity == entity ? new Color(0.4f, 0.7f, 1f) : Color.white;
             if (GUILayout.Button(entity)) selectedEntity = entity;
             GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
             if (GUILayout.Button("X", GUILayout.Width(25)))
             {
-                var list = GetList(currentTab);
-                list.Remove(entity);
-                SaveList(currentTab, list);
+                config.RemoveEntity(currentCategoria, entity);
                 if (selectedEntity == entity) selectedEntity = "";
             }
             GUI.backgroundColor = Color.white;
@@ -104,43 +117,103 @@ public class ExoConfigWindow : EditorWindow
 
         if (!string.IsNullOrEmpty(selectedEntity))
         {
-            EditorGUILayout.Space(10);
-            DrawEntityConfig(selectedEntity);
+            ExoToolConfigEntry selected = config.FindEntry(currentCategoria, selectedEntity);
+            if (selected != null)
+            {
+                EditorGUILayout.Space(10);
+                DrawEntityConfig(selected);
+            }
+            else
+            {
+                // Selecionada foi removida (ex.: pelo botao X acima nesta
+                // mesma passada de OnGUI) - limpa a selecao em vez de
+                // desenhar uma secao para uma entidade que nao existe mais.
+                selectedEntity = "";
+            }
         }
     }
 
-    private void DrawEntityConfig(string entity)
+    private void DrawEntityConfig(ExoToolConfigEntry entry)
     {
-        string prefix = currentTab + "_" + entity + "_";
-
         EditorGUILayout.LabelField("--- Caminhos de Pasta ---", EditorStyles.boldLabel);
-        EditorGUI.BeginChangeCheck();
 
-        if (currentTab != "Environment")
-            EditorPrefs.SetString(prefix + "Ani", EditorGUILayout.TextField("Animacoes:", EditorPrefs.GetString(prefix + "Ani")));
+        foreach (ExoAssetType tipo in TIPOS_ASSET)
+        {
+            if (!ExoPathResolver.SupportsAssetType(currentCategoria, tipo))
+                continue;
 
-        EditorPrefs.SetString(prefix + "Mat", EditorGUILayout.TextField("Materiais:", EditorPrefs.GetString(prefix + "Mat")));
-        EditorPrefs.SetString(prefix + "Mod", EditorGUILayout.TextField("Modelos:", EditorPrefs.GetString(prefix + "Mod")));
-        EditorPrefs.SetString(prefix + "Pre", EditorGUILayout.TextField("Prefabs:", EditorPrefs.GetString(prefix + "Pre")));
-        EditorPrefs.SetString(prefix + "Tex", EditorGUILayout.TextField("Texturas:", EditorPrefs.GetString(prefix + "Tex")));
-
-        if (EditorGUI.EndChangeCheck())
-            EditorPrefs.SetString("Modified_" + currentTab + "_" + entity, DateTime.Now.Ticks.ToString());
+            DrawFolderRow(entry, tipo);
+        }
 
         EditorGUILayout.Space(10);
-        DrawProfileSection(prefix, entity);
+        DrawProfileSection(entry);
     }
 
-    private void DrawProfileSection(string prefix, string entity)
+    /// <summary>
+    /// Uma linha de caminho de pasta. Sem override: mostra o caminho
+    /// resolvido pela convencao (ExoPathResolver via config.ResolveFolder),
+    /// campo desabilitado/cinza, com botao "Sobrescrever" que semeia um
+    /// override igual ao caminho atual (ponto de partida sao para editar).
+    /// Com override: campo editavel com fundo amarelo e sufixo "[override]",
+    /// mais botao "Reverter" que remove o override e volta pra convencao.
+    /// Satisfaz o pedido da Fase 2 de "mostrar o caminho resolvido e permitir
+    /// override explicito" e "marcar visualmente quando um valor e override
+    /// vs convencao", sem pedir os 5 caminhos na mao como antes.
+    /// </summary>
+    private void DrawFolderRow(ExoToolConfigEntry entry, ExoAssetType tipo)
+    {
+        string nome = entry.Definition.Nome;
+        string label = LabelFor(tipo);
+        bool hasOverride = entry.TryGetFolderOverride(tipo, out string overridePasta);
+
+        GUILayout.BeginHorizontal();
+
+        if (hasOverride)
+        {
+            GUI.backgroundColor = new Color(1f, 0.92f, 0.55f);
+            EditorGUI.BeginChangeCheck();
+            string edited = EditorGUILayout.TextField(label + " [override]", overridePasta);
+            if (EditorGUI.EndChangeCheck())
+                config.SetFolderOverride(currentCategoria, nome, tipo, edited);
+            GUI.backgroundColor = Color.white;
+
+            if (GUILayout.Button("Reverter", GUILayout.Width(70)))
+                config.ClearFolderOverride(currentCategoria, nome, tipo);
+        }
+        else
+        {
+            string resolved = config.ResolveFolder(currentCategoria, nome, tipo);
+            GUI.enabled = false;
+            EditorGUILayout.TextField(label + " (convencao)", resolved);
+            GUI.enabled = true;
+
+            if (GUILayout.Button("Sobrescrever", GUILayout.Width(90)))
+                config.SetFolderOverride(currentCategoria, nome, tipo, resolved);
+        }
+
+        GUILayout.EndHorizontal();
+    }
+
+    private static string LabelFor(ExoAssetType tipo)
+    {
+        switch (tipo)
+        {
+            case ExoAssetType.Animacao: return "Animacoes:";
+            case ExoAssetType.Materiais: return "Materiais:";
+            case ExoAssetType.Modelos: return "Modelos:";
+            case ExoAssetType.Prefabs: return "Prefabs:";
+            case ExoAssetType.Texturas: return "Texturas:";
+            default: return tipo + ":";
+        }
+    }
+
+    private void DrawProfileSection(ExoToolConfigEntry entry)
     {
         EditorGUILayout.LabelField("--- Perfil de Componentes ---", EditorStyles.boldLabel);
 
-        string profileKey = prefix + "Profile";
-        string profilePath = EditorPrefs.GetString(profileKey, "");
-
         ExoPrefabProfile profile = null;
-        if (!string.IsNullOrEmpty(profilePath))
-            profile = AssetDatabase.LoadAssetAtPath<ExoPrefabProfile>(profilePath);
+        if (!string.IsNullOrEmpty(entry.ProfileAssetPath))
+            profile = AssetDatabase.LoadAssetAtPath<ExoPrefabProfile>(entry.ProfileAssetPath);
 
         EditorGUI.BeginChangeCheck();
         ExoPrefabProfile newProfile = (ExoPrefabProfile)EditorGUILayout.ObjectField(
@@ -148,10 +221,8 @@ public class ExoConfigWindow : EditorWindow
 
         if (EditorGUI.EndChangeCheck())
         {
-            if (newProfile != null)
-                EditorPrefs.SetString(profileKey, AssetDatabase.GetAssetPath(newProfile));
-            else
-                EditorPrefs.DeleteKey(profileKey);
+            config.SetProfileAssetPath(currentCategoria, entry.Definition.Nome,
+                newProfile != null ? AssetDatabase.GetAssetPath(newProfile) : string.Empty);
         }
 
         GUILayout.BeginHorizontal();
@@ -159,14 +230,13 @@ public class ExoConfigWindow : EditorWindow
         GUI.backgroundColor = new Color(0.5f, 0.9f, 0.5f);
         if (GUILayout.Button("Criar Perfil"))
         {
-            string targetFolder = ResolveProfileFolder(prefix);
+            string targetFolder = config.ResolveFolder(currentCategoria, entry.Definition.Nome, ExoAssetType.Prefabs);
             if (!string.IsNullOrEmpty(targetFolder))
             {
                 if (!Directory.Exists(targetFolder))
                     Directory.CreateDirectory(targetFolder);
 
-                string assetPath = targetFolder + "/ExoPrefabProfile_" + entity + ".asset";
-                assetPath = assetPath.Replace("\\", "/");
+                string assetPath = (targetFolder + "/ExoPrefabProfile_" + entry.Definition.Nome + ".asset").Replace("\\", "/");
 
                 ExoPrefabProfile existing = AssetDatabase.LoadAssetAtPath<ExoPrefabProfile>(assetPath);
                 if (existing != null)
@@ -177,16 +247,16 @@ public class ExoConfigWindow : EditorWindow
                 else
                 {
                     ExoPrefabProfile newAsset = ScriptableObject.CreateInstance<ExoPrefabProfile>();
-                    newAsset.entityType = currentTab == "Monstros" ? ExoEntityType.Monstro
-                                       : currentTab == "Environment" ? ExoEntityType.Edificio
+                    newAsset.entityType = currentCategoria == ExoCategory.Monstros ? ExoEntityType.Monstro
+                                       : currentCategoria == ExoCategory.Environment ? ExoEntityType.Edificio
                                        : ExoEntityType.Personagem;
 
-                    if (currentTab == "Monstros")
+                    if (currentCategoria == ExoCategory.Monstros)
                     {
                         newAsset.gameObjectTag = "Enemy";
                         newAsset.gameObjectLayer = 7;
                     }
-                    else if (currentTab == "Environment")
+                    else if (currentCategoria == ExoCategory.Environment)
                     {
                         newAsset.gameObjectTag = "Untagged";
                         newAsset.gameObjectLayer = 0;
@@ -194,14 +264,14 @@ public class ExoConfigWindow : EditorWindow
 
                     AssetDatabase.CreateAsset(newAsset, assetPath);
                     AssetDatabase.SaveAssets();
-                    EditorPrefs.SetString(prefix + "Profile", assetPath);
+                    config.SetProfileAssetPath(currentCategoria, entry.Definition.Nome, assetPath);
                     EditorGUIUtility.PingObject(newAsset);
                     Debug.Log("[ExoConfig] Perfil criado em: " + assetPath);
                 }
             }
             else
             {
-                Debug.LogError("[ExoConfig] Configure a pasta de Prefabs da entidade antes de criar o perfil.");
+                Debug.LogError("[ExoConfig] Nao foi possivel resolver a pasta de Prefabs da entidade antes de criar o perfil.");
             }
         }
         GUI.backgroundColor = Color.white;
@@ -233,22 +303,4 @@ public class ExoConfigWindow : EditorWindow
                 MessageType.None);
         }
     }
-
-    private string ResolveProfileFolder(string prefix)
-    {
-        string prefabFolder = EditorPrefs.GetString(prefix + "Pre", "");
-        if (!string.IsNullOrEmpty(prefabFolder)) return prefabFolder;
-        string modFolder = EditorPrefs.GetString(prefix + "Mod", "");
-        if (!string.IsNullOrEmpty(modFolder)) return modFolder;
-        return "";
-    }
-
-    private void SortList(Comparison<string> comparison)
-    {
-        var list = GetList(currentTab);
-        list.Sort(comparison);
-        SaveList(currentTab, list);
-    }
-
-    private long GetTicks(string type, string name) => long.Parse(EditorPrefs.GetString(type + "_" + currentTab + "_" + name, "0"));
 }

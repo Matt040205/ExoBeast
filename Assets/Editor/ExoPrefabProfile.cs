@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEditor;
 
 public enum ExoEntityType { Personagem, Monstro, Edificio }
 
@@ -7,6 +8,23 @@ public class ExoPrefabProfile : ScriptableObject
 {
     [Header("Tipo de Entidade")]
     public ExoEntityType entityType = ExoEntityType.Personagem;
+
+    // Fase 5 da refatoracao Exo Config: estrategia de Prefab Variant para
+    // Personagem (ver Assets/Editor/ExoPrefabBuilder.cs,
+    // BuildOrUpdateCharacterVariant). basePrefab e OBRIGATORIO quando
+    // entityType == Personagem - sem ele, o builder reporta Error e nao
+    // cria/atualiza nada (sem fallback silencioso, mesmo espirito da decisao
+    // de shader da Fase 4). Nenhuma das 4 entidades reais de Personagem
+    // (Ayame/Brunhilde/Coral/Sylvie) tem profile hoje em ExoToolConfig.asset
+    // (confirmado - ProfileAssetPath vazio nas 4) - configurar um profile com
+    // basePrefab (ex.: Assets/Personagens/Player 1.prefab) e um pre-requisito
+    // novo para usar a ferramenta em Personagem a partir desta fase.
+    [Header("Prefab Base - Prefab Variant nativo (Personagem)")]
+    [Tooltip("Prefab do qual o Personagem herda via Prefab Variant nativo (ex.: Assets/Personagens/Player 1.prefab). OBRIGATORIO quando entityType == Personagem.")]
+    public GameObject basePrefab;
+
+    [Tooltip("Scripts de habilidade especificos desta entidade (ex.: VooGraciosoLogic para a Sylvie, NAO para a Ayame). Adicionados ao root do Personagem somente na CRIACAO (entidade nova) - update-in-place preserva os componentes de habilidade ja existentes sem mexer. Cada MonoScript precisa resolver para um Component valido; senao um Warning e registrado no report e o script e pulado.")]
+    public MonoScript[] abilityScripts;
 
     [Header("Dados")]
     public CharacterBase characterData;

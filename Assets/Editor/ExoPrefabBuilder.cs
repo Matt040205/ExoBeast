@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEditor;
-using UnityEngine.InputSystem;
 using Unity.Netcode;
 using Unity.Netcode.Components;
 using UnityEngine.AI;
@@ -9,11 +8,15 @@ using System.IO;
 using System.Collections.Generic;
 using ExoBeasts.Multiplayer.Sync;
 using UnityEngine.Animations.Rigging;
+using ExoBeasts.ExoConfig.Core;
 
 public class ExoPrefabBuilder
 {
-    private const string INPUT_ACTIONS_PATH = "Assets/Configuracoes/Settings/InputSystem_Actions.inputactions";
-    private const string INPUT_ACTIONS_PATH_ALT = "Assets/Configurações/Settings/InputSystem_Actions.inputactions";
+    // Fase 5: INPUT_ACTIONS_PATH/INPUT_ACTIONS_PATH_ALT e o "using
+    // UnityEngine.InputSystem" removidos - eram usados so por
+    // ConfigureAsCharacter (tambem removido nesta fase). PlayerInput.actions
+    // do Personagem agora vem herdado de profile.basePrefab (ver
+    // BuildOrUpdateCharacterVariant) - nunca mais resolvido/atribuido aqui.
 
     public static void BuildCharacterPrefab(string fbxPath, string prefabFolder, string matFolder)
     {
@@ -26,6 +29,19 @@ public class ExoPrefabBuilder
     }
 
     public static void BuildCharacterPrefab(string fbxPath, string prefabFolder, string matFolder, ExoPrefabProfile profile, string categoria)
+    {
+        BuildCharacterPrefab(fbxPath, prefabFolder, matFolder, profile, categoria, null);
+    }
+
+    /// <summary>
+    /// Fase 5: overload com ExoBuildReport opcional (default null, preserva
+    /// compatibilidade com os overloads acima e com qualquer chamador
+    /// existente). BuildPrefabStep.cs passa context.Report explicitamente -
+    /// e o unico jeito de Warnings de ApplyAbilityScripts (ex.: MonoScript
+    /// que nao resolve para Component valido) chegarem no relatorio
+    /// estruturado do pipeline em vez de só Debug.LogWarning.
+    /// </summary>
+    public static void BuildCharacterPrefab(string fbxPath, string prefabFolder, string matFolder, ExoPrefabProfile profile, string categoria, ExoBuildReport report)
     {
         GameObject fbxModel = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath);
         if (fbxModel == null)
@@ -52,20 +68,19 @@ public class ExoPrefabBuilder
 
         if (entityType == ExoEntityType.Personagem)
         {
-            GameObject originalChar = FindOriginalPrefab(prefabPath, entityName, prefabFolder);
-
-            GameObject fbxChar = (GameObject)PrefabUtility.InstantiatePrefab(fbxModel);
-            ApplyMaterial(fbxChar, mat);
-            GameObject charRoot = ConfigureAsCharacter(fbxChar, profile, entityName + " Variant");
-            
-            if (originalChar != null)
+            GameObject savedCharPrefab = BuildOrUpdateCharacterVariant(fbxModel, mat, profile, entityName, prefabPath, report);
+            if (savedCharPrefab == null)
             {
-                CopySerializedValuesAndRelink(originalChar, charRoot);
-                Debug.Log("[ExoConfig] Referencias copiadas do template original para o Personagem.");
+                // Error ja reportado (Debug.LogError + report.Error) dentro de
+                // BuildOrUpdateCharacterVariant - profile ausente ou sem
+                // basePrefab. Aborta ANTES de montar a Torre ou de tocar o
+                // vinculo em CharacterBase: sem fallback silencioso (mesmo
+                // espirito da Fase 4) - nao monta uma Torre "orfa" de um
+                // Personagem que falhou, e sobretudo nao sobrescreve
+                // commanderPrefab/towerPrefab existentes com valores
+                // obsoletos/nulos so porque esta execucao falhou.
+                return;
             }
-
-            PrefabUtility.SaveAsPrefabAsset(charRoot, prefabPath);
-            Object.DestroyImmediate(charRoot);
             Debug.Log("[ExoConfig] Prefab Personagem montado: " + prefabPath);
 
             string towerName = "Torreta" + char.ToUpper(entityName[0]) + entityName.Substring(1);
@@ -88,9 +103,11 @@ public class ExoPrefabBuilder
 
             if (profile != null && profile.characterData != null)
             {
-                GameObject savedCharPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+                // savedCharPrefab ja veio de BuildOrUpdateCharacterVariant (o
+                // GameObject asset devolvido por PrefabUtility.SaveAsPrefabAsset)
+                // - nao precisa recarregar via AssetDatabase.LoadAssetAtPath.
                 GameObject savedTowerPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(towerPath);
-                
+
                 profile.characterData.commanderPrefab = savedCharPrefab;
                 profile.characterData.towerPrefab = savedTowerPrefab;
                 
@@ -136,102 +153,204 @@ public class ExoPrefabBuilder
         }
     }
 
-    private static GameObject ConfigureAsCharacter(GameObject fbxInstance, ExoPrefabProfile profile, string entityName)
+    /// <summary>
+    /// Fase 5 da refatoracao Exo Config: substitui ConfigureAsCharacter +
+    /// SetupCameraHierarchy (removidos - ver historico no fim deste
+    /// comentario) para a metade de PERSONAGEM de BuildCharacterPrefab. A
+    /// metade de TORRE (ConfigureAsTower, mais abaixo) e o Monstro
+    /// (ConfigureAsEnemy) NAO mudam nesta fase - continuam reconstruindo a
+    /// hierarquia do zero e usando CopySerializedValuesAndRelink.
+    ///
+    /// Estrategia nova (Personagem apenas): em vez de montar uma hierarquia
+    /// do zero e salvar como prefab PLANO, instancia profile.basePrefab
+    /// (PrefabUtility.InstantiatePrefab) - que ja tem Pivot, SwordPoint,
+    /// CameraTarget, CM_Normal, CM_Aim e todos os componentes de
+    /// personagem/rede (CharacterController, NetworkObject, PlayerMovement,
+    /// PlayerHealthSystem, PlayerShooting, MeleeCombatSystem,
+    /// PlayerCombatManager, CommanderAbilityController, PlayerInput,
+    /// ClientNetworkTransform, PlayerNetworkSetup, NavMeshObstacle,
+    /// ShaderInteractor, SpiderWebDebuffPlayer, VerificadorQueda,
+    /// LocalPlayerInputBridge etc. - CONFIRMADO via inspecao do YAML de
+    /// Assets/Personagens/Player 1.prefab nesta fase, nao um pressuposto) -
+    /// e so troca o modelo sob Pivot + material (+ Animator.runtimeAnimatorController,
+    /// se o profile tiver um). PrefabUtility.SaveAsPrefabAsset sobre uma
+    /// instancia que se origina de InstantiatePrefab produz nativamente um
+    /// Prefab Variant de basePrefab (confirmado empiricamente via script de
+    /// diagnostico de scratch nesta fase, ver relato da Fase 5) - a heranca
+    /// resolve sozinha, sem precisar de CopySerializedValuesAndRelink.
+    ///
+    /// IMPORTANTE (confirmado via YAML, nao suposto): no Player 1.prefab
+    /// REAL, SwordPoint/CameraTarget/CM_Normal/CM_Aim sao IRMAOS de Pivot
+    /// (filhos do root), nao filhos de Pivot como o ConfigureAsCharacter
+    /// antigo construia. Como agora herdamos a hierarquia do basePrefab em
+    /// vez de reconstrui-la, esse detalhe do codigo antigo deixa de importar
+    /// - a estrutura real do basePrefab e que manda, e MeleeCombatSystem.attackPoint
+    /// (que ja aponta pra SwordPoint dentro de Player 1.prefab) vem de graca,
+    /// sem nenhum relink manual.
+    ///
+    /// basePrefab e OBRIGATORIO: ver guard clause logo no inicio deste
+    /// metodo e o comentario em ExoPrefabProfile.basePrefab.
+    ///
+    /// Devolve o GameObject do prefab ASSET salvo (o mesmo que
+    /// PrefabUtility.SaveAsPrefabAsset devolve - nao uma instancia de cena),
+    /// ou null se abortou por falta de basePrefab.
+    /// </summary>
+    private static GameObject BuildOrUpdateCharacterVariant(GameObject fbxModel, Material mat, ExoPrefabProfile profile, string entityName, string prefabPath, ExoBuildReport report)
     {
-        GameObject root = new GameObject(entityName);
-        root.tag = profile != null ? profile.gameObjectTag : "Player";
-        int layer = profile != null ? profile.gameObjectLayer : LayerMask.NameToLayer("Player");
-        if (layer == -1) layer = 0;
-        root.layer = layer;
+        if (profile == null || profile.basePrefab == null)
+        {
+            string msg = "[ExoConfig] basePrefab nao configurado no ExoPrefabProfile de \"" + entityName + "\". Prefab de Personagem NAO foi criado/atualizado - sem fallback silencioso (configure ExoPrefabProfile.basePrefab, ex.: Assets/Personagens/Player 1.prefab).";
+            Debug.LogError(msg);
+            report?.Error(msg, entityName);
+            return null;
+        }
 
-        GameObject pivot = new GameObject("Pivot");
-        pivot.transform.SetParent(root.transform, false);
-        pivot.layer = layer;
+        bool alreadyExists = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath) != null;
 
-        fbxInstance.transform.SetParent(pivot.transform, false);
+        // LoadPrefabContents (update-in-place) preserva o vinculo de Variant
+        // do proprio arquivo ja salvo; InstantiatePrefab(basePrefab) (criacao)
+        // e o que faz SaveAsPrefabAsset produzir um Variant NOVO, ligado a
+        // basePrefab - ver comentario da classe acima. Ambos devolvem um
+        // GameObject "vivo" e editavel, so a origem/ciclo-de-vida difere
+        // (por isso os dois branches do finally abaixo).
+        GameObject root = alreadyExists
+            ? PrefabUtility.LoadPrefabContents(prefabPath)
+            : (GameObject)PrefabUtility.InstantiatePrefab(profile.basePrefab);
 
-        GameObject swordPoint = new GameObject("SwordPoint");
-        swordPoint.transform.SetParent(pivot.transform, false);
-        swordPoint.transform.localPosition = new Vector3(0f, 0f, 1f);
-        swordPoint.layer = layer;
+        try
+        {
+            ReplaceModelUnderPivot(root, fbxModel, profile);
+            ApplyMaterial(root, mat);
+
+            // Achado confirmado via YAML real (Player 1.prefab e Samurai
+            // Variant.prefab) durante o teste de scratch desta fase: objetos
+            // customizados presos a um osso do MODELO (ex.: "AimTarget_Fixo",
+            // "GripRig", "GripRig hint", "firepoint" minusculo dentro de
+            // Samurai Variant.prefab - todos filhos, via m_Father, de um osso
+            // DENTRO da instancia aninhada do modelo, nao irmaos de Pivot) sao
+            // destruidos junto quando o modelo troca, porque Unity destroi a
+            // subarvore inteira do filho antigo de Pivot. Qualquer campo que
+            // apontava para dentro dessa subarvore (confirmado no scratch:
+            // PlayerMovement.aimRig/aimTarget/aimConstraint,
+            // PlayerShooting.firePoint; Samurai Variant.prefab real tambem
+            // tem WeaponGripIK.gripRig na mesma situacao) fica nulo. Isso NAO
+            // e uma regressao introduzida por esta fase - o ConfigureAsCharacter
+            // antigo tinha a MESMA lacuna (CopySerializedValuesAndRelink so
+            // copia COMPONENTES para objetos que ja existem no alvo por
+            // caminho igual; nunca cria um GameObject novo - "AimTarget_Fixo"
+            // nao existiria no charRoot recem-construido do zero, logo nunca
+            // seria encontrado por CopyComponentsAndRelink e seria
+            // silenciosamente descartado mesmo pelo codigo antigo) - mas nunca
+            // tinha sido confirmado nem documentado explicitamente antes desta
+            // fase. Sem fallback silencioso: avisar em vez de deixar essas
+            // referencias quebrarem sem ninguem perceber.
+            string rigWarning = "[ExoConfig] Modelo sob Pivot foi trocado em \"" + entityName + "\" - qualquer referencia que apontava para DENTRO do modelo antigo " +
+                "(ex.: PlayerMovement.aimRig/aimTarget/aimConstraint, PlayerShooting.firePoint, WeaponGripIK.gripRig, ou objetos customizados presos a um osso do " +
+                "modelo antigo, como \"AimTarget_Fixo\"/\"GripRig\"/\"GripRig hint\") pode ter ficado nula ou ter sido removida - confira manualmente antes de publicar.";
+            Debug.LogWarning(rigWarning);
+            report?.Warning(rigWarning, entityName);
+
+            // Ability scripts e o rename do root so acontecem na CRIACAO.
+            // Update-in-place e a garantia central pedida nesta fase: "troca
+            // so modelo sob Pivot + material + Animator.runtimeAnimatorController,
+            // nada mais e tocado" - reexportar um modelo nao deve
+            // adicionar/alterar componentes de habilidade nem renomear um
+            // prefab que o game designer ja pode ter customizado.
+            if (!alreadyExists)
+            {
+                ApplyAbilityScripts(root, profile, entityName, report);
+                root.name = entityName + " Variant";
+            }
+
+            return PrefabUtility.SaveAsPrefabAsset(root, prefabPath);
+        }
+        finally
+        {
+            if (alreadyExists)
+                PrefabUtility.UnloadPrefabContents(root);
+            else
+                Object.DestroyImmediate(root);
+        }
+    }
+
+    /// <summary>
+    /// Troca o(s) filho(s) de "Pivot" pelo modelo novo (fbxModel), sem tocar
+    /// em nenhum outro filho do root (SwordPoint/CameraTarget/CM_Normal/CM_Aim
+    /// - todos irmaos de Pivot, nao filhos - ver comentario de
+    /// BuildOrUpdateCharacterVariant). Destroi os filhos existentes de Pivot
+    /// ANTES de instanciar o novo (snapshot em array antes de destruir, nunca
+    /// um while sobre childCount - ver
+    /// Assets/Editor/ExoConfig/... e a memoria do projeto
+    /// "feedback_destroy_childcount.md": DestroyImmediate em contexto de
+    /// Editor e sincrono, mas ainda assim mutar uma colecao enquanto itera e
+    /// fragil por construcao).
+    ///
+    /// Cria Pivot se o basePrefab nao tiver um por algum motivo (defesa - nao
+    /// deveria acontecer com Player 1.prefab, mas evita NullReferenceException
+    /// se um basePrefab customizado no futuro nao seguir a convencao).
+    /// </summary>
+    private static void ReplaceModelUnderPivot(GameObject root, GameObject fbxModel, ExoPrefabProfile profile)
+    {
+        Transform pivot = root.transform.Find("Pivot");
+        if (pivot == null)
+        {
+            GameObject pivotGo = new GameObject("Pivot");
+            pivotGo.transform.SetParent(root.transform, false);
+            pivotGo.layer = root.layer;
+            pivot = pivotGo.transform;
+        }
+
+        Transform[] existingChildren = new Transform[pivot.childCount];
+        for (int i = 0; i < existingChildren.Length; i++)
+            existingChildren[i] = pivot.GetChild(i);
+        foreach (Transform child in existingChildren)
+            Object.DestroyImmediate(child.gameObject);
+
+        GameObject fbxInstance = (GameObject)PrefabUtility.InstantiatePrefab(fbxModel);
+        fbxInstance.transform.SetParent(pivot, false);
+        fbxInstance.layer = pivot.gameObject.layer;
 
         SetupMeshChildComponents(fbxInstance, profile);
+    }
 
-        CharacterController cc = EnsureComponent<CharacterController>(root);
-        cc.center = profile != null ? profile.capsuleCenter : new Vector3(0f, 1f, 0f);
-        cc.radius = profile != null ? profile.capsuleRadius : 0.3f;
-        cc.height = profile != null ? profile.capsuleHeight : 2f;
+    /// <summary>
+    /// Fase 5, item 4 do escopo: substitui o array fixo "logicScripts" (13
+    /// nomes, que o ConfigureAsCharacter antigo adicionava via
+    /// System.Type.GetType a QUALQUER Personagem - inclusive scripts de
+    /// outro personagem, ex.: a Ayame recebia VooGraciosoLogic/
+    /// CacadoraNoturnaLogic, que sao da Sylvie - Assets/Personagens/Sylvie/CoreScripts/
+    /// - confirmado nesta fase) por uma lista type-safe POR PERFIL
+    /// (profile.abilityScripts, MonoScript[] - sobrevive a rename de classe,
+    /// ao contrario de Type.GetType("Nome, Assembly-CSharp")).
+    ///
+    /// So chamado no caminho de CRIACAO (ver BuildOrUpdateCharacterVariant).
+    ///
+    /// MonoScript.GetClass() devolve null se o script nao compilou ou nao
+    /// define nenhuma classe correspondente ao nome do arquivo. Nesses casos,
+    /// e quando a classe resolvida nao e um Component (ex.: um
+    /// ScriptableObject foi arrastado no array por engano), registra Warning
+    /// no report e pula - nunca lanca excecao, nunca trava o pipeline (mesma
+    /// filosofia defensiva de CopyComponentsAndRelink com Missing Script).
+    /// </summary>
+    private static void ApplyAbilityScripts(GameObject root, ExoPrefabProfile profile, string entityName, ExoBuildReport report)
+    {
+        if (profile.abilityScripts == null) return;
 
-        PlayerMovement movement = EnsureComponent<PlayerMovement>(root);
-        if (profile != null && profile.characterData != null)
+        foreach (MonoScript script in profile.abilityScripts)
         {
-            movement.walkSpeed = profile.characterData.moveSpeed;
-            movement.runSpeed = profile.characterData.moveSpeed * 1.8f;
+            if (script == null) continue;
+
+            System.Type type = script.GetClass();
+            if (type == null || !typeof(Component).IsAssignableFrom(type))
+            {
+                string msg = "[ExoConfig] Ability script \"" + script.name + "\" nao resolve para um Component valido - pulando.";
+                Debug.LogWarning(msg);
+                report?.Warning(msg, entityName);
+                continue;
+            }
+
+            EnsureComponent(root, type);
         }
-
-        PlayerHealthSystem health = EnsureComponent<PlayerHealthSystem>(root);
-        if (profile != null) health.characterData = profile.characterData;
-
-        PlayerShooting shooting = EnsureComponent<PlayerShooting>(root);
-        if (profile != null)
-        {
-            shooting.characterData = profile.characterData;
-            shooting.hitLayers = profile.playerHitLayers;
-        }
-
-        MeleeCombatSystem melee = EnsureComponent<MeleeCombatSystem>(root);
-        if (profile != null)
-        {
-            melee.characterData = profile.characterData;
-            melee.hitLayers = profile.meleeHitLayers;
-        }
-
-        PlayerCombatManager combatManager = EnsureComponent<PlayerCombatManager>(root);
-        if (profile != null) combatManager.characterData = profile.characterData;
-        combatManager.shootingSystem = shooting;
-        combatManager.meleeSystem = melee;
-        combatManager.healthSystem = health;
-
-        CommanderAbilityController abilityCtrl = EnsureComponent<CommanderAbilityController>(root);
-        if (profile != null) abilityCtrl.characterData = profile.characterData;
-
-        SetupCameraHierarchy(root);
-
-        EnsureComponent<VerificadorQueda>(root);
-        EnsureComponent<LocalPlayerInputBridge>(root);
-
-        PlayerInput playerInput = EnsureComponent<PlayerInput>(root);
-        InputActionAsset actionsAsset = AssetDatabase.LoadAssetAtPath<InputActionAsset>(INPUT_ACTIONS_PATH_ALT);
-        if (actionsAsset == null)
-            actionsAsset = AssetDatabase.LoadAssetAtPath<InputActionAsset>(INPUT_ACTIONS_PATH);
-        if (actionsAsset != null)
-        {
-            playerInput.actions = actionsAsset;
-            playerInput.defaultActionMap = "Player";
-        }
-
-        EnsureComponent<NetworkObject>(root);
-        EnsureComponent<ClientNetworkTransform>(root);
-        EnsureComponent<PlayerNetworkSetup>(root);
-
-        EnsureComponent<NavMeshObstacle>(root);
-        EnsureComponent<ShaderInteractor>(root);
-        EnsureComponent<SpiderWebDebuffPlayer>(root);
-        root.AddComponent<SpiderWebDebuffPlayer>();
-
-        string[] logicScripts = {
-            "DebugDamage", "CommanderController", "InventarioFrascos", "PauseControl", "WeaponGripIK", "MeshTrail",
-            "VooGraciosoLogic", "CacadoraNoturnaLogic", "PeaceOfMindLogic", "CuttingBladeLogic", 
-            "NineTailsDanceLogic", "HealingSkillController", "HealVFXReactor"
-        };
-        foreach(var scriptName in logicScripts)
-        {
-            System.Type t = System.Type.GetType(scriptName + ", Assembly-CSharp");
-            if (t == null) t = System.Type.GetType(scriptName);
-            if (t != null) EnsureComponent(root, t);
-        }
-
-        return root;
     }
 
     private static GameObject ConfigureAsTower(GameObject fbxInstance, ExoPrefabProfile profile, string towerName)
@@ -405,44 +524,83 @@ public class ExoPrefabBuilder
         }
     }
 
-    private static void SetupCameraHierarchy(GameObject root)
-    {
-        GameObject cameraTargetObj = GetOrCreateChild(root, "CameraTarget");
-        cameraTargetObj.layer = root.layer;
+    /// <summary>
+    /// Shader usado para o material de TODAS as categorias (decisao da Fase
+    /// 4 da refatoracao Exo Config). Antes desta fase, Environment tentava
+    /// "Toon/Toon" primeiro. NENHUM asset do projeto (Assets/) declara esse
+    /// nome, mas Shader.Find("Toon/Toon") NAO retornava null mesmo assim:
+    /// verificado em runtime (Fase 4, via script de diagnostico temporario)
+    /// que ele resolve para
+    /// Packages/com.unity.toonshader/Runtime/Integrated/Shaders/UnityToon.shader
+    /// - o shader generico do pacote oficial "com.unity.toonshader",
+    /// instalado neste projeto mas SEM NENHUMA RELACAO com o
+    /// ToonExobeasts.shadergraph proprio do ExoBeasts. Ou seja: o fallback
+    /// para "Universal Render Pipeline/Lit" (o segundo Shader.Find, removido
+    /// nesta fase) era CODIGO MORTO - nunca executava, porque o primeiro
+    /// Shader.Find ja "tinha sucesso" contra o shader errado. O bug real
+    /// nao era "cai em silencio pro URP/Lit", e sim "usa em silencio um
+    /// shader toon GENERICO de terceiros, visualmente inconsistente com o
+    /// toon shading proprio do projeto" - uma inconsistencia pior de
+    /// diagnosticar (o material nao fica magenta/quebrado, so "parece" toon
+    /// e nao bate com o resto). Personagens/Monstros ja usavam "Shader
+    /// Graphs/ToonExobeasts" (existe em
+    /// Assets/ShadersGlobais/Toon/ToonExobeasts.shadergraph, confirmado via
+    /// m_Path: "Shader Graphs" e os m_DefaultReferenceName do proprio
+    /// .shadergraph - _BaseMap, _shadingMap, _ShadowColor,
+    /// _OuterShadowColor, _OuterShadowWidth, _LightSmooth, _FlashAmount,
+    /// _FlashColor - todos usados abaixo). Unificar para as 3 categorias
+    /// elimina o fallback silencioso: se este shader nao existir,
+    /// BuildMaterial agora reporta Error (via ExoBuildReport) e retorna
+    /// null em vez de produzir um material com shader errado que parece
+    /// certo.
+    /// </summary>
+    internal const string ToonShaderName = "Shader Graphs/ToonExobeasts";
 
-        CameraController camCtrl = EnsureComponent<CameraController>(cameraTargetObj);
-
-        GameObject cmNormalObj = GetOrCreateChild(root, "CM_Normal");
-        cmNormalObj.transform.localPosition = new Vector3(0f, 1.5f, -4f);
-        CinemachineCamera cmNormal = EnsureComponent<CinemachineCamera>(cmNormalObj);
-        CinemachineThirdPersonFollow normalFollow = EnsureComponent<CinemachineThirdPersonFollow>(cmNormalObj);
-        normalFollow.ShoulderOffset = new Vector3(0f, 1.8f, 0f);
-        normalFollow.CameraDistance = 4f;
-        EnsureComponent<CinemachineImpulseListener>(cmNormalObj);
-
-        GameObject cmAimObj = GetOrCreateChild(root, "CM_Aim");
-        cmAimObj.transform.localPosition = new Vector3(1.16f, 0.33f, -2f);
-        CinemachineCamera cmAim = EnsureComponent<CinemachineCamera>(cmAimObj);
-        CinemachineThirdPersonFollow aimFollow = EnsureComponent<CinemachineThirdPersonFollow>(cmAimObj);
-        aimFollow.ShoulderOffset = new Vector3(1.16f, 0.33f, -2f);
-        aimFollow.CameraDistance = 2f;
-        EnsureComponent<CinemachineImpulseListener>(cmAimObj);
-
-        camCtrl.normalCamera = cmNormal;
-        camCtrl.aimCamera = cmAim;
-    }
-
-    private static Material BuildMaterial(string fbxPath, string matFolder, string entityName, ExoPrefabProfile profile, ExoEntityType entityType)
+    /// <summary>
+    /// Cria ou atualiza o material da entidade. "internal" (era "private"
+    /// ate a Fase 4): tambem chamado por
+    /// Assets/Editor/ExoConfig/Pipeline/Steps/MaterialStep.cs, no mesmo
+    /// assembly implicito (Assembly-CSharp-Editor) - MaterialStep e quem
+    /// decide ABORTAR o pipeline se "report" vier com HasErrors=true (ver
+    /// ExoBuildPipeline.Run). A chamada interna ja existente logo abaixo, em
+    /// BuildCharacterPrefab, continua identica e sem "report" (fica null por
+    /// padrao) - por construcao do pipeline (steps executam em ordem, param
+    /// no primeiro erro), essa segunda chamada so acontece depois que
+    /// MaterialStep ja validou o shader com sucesso e ja criou/atualizou o
+    /// material; quando isso ocorre, esta funcao apenas reatualiza as mesmas
+    /// propriedades no material ja existente (idempotente - nao recria, nao
+    /// troca GUID).
+    ///
+    /// Fase 4 tambem corrigiu dois problemas aqui: (1) sempre recriava o
+    /// material via AssetDatabase.CreateAsset, trocando o GUID e quebrando
+    /// qualquer referencia externa ja apontando para ele - agora, se o
+    /// material ja existe em matPath, atualiza as propriedades no objeto
+    /// existente em vez de recriar; (2) "_MainTex" era setado a toa -
+    /// ToonExobeasts nao expõe essa propriedade (confirmado: nenhum
+    /// m_DefaultReferenceName do .shadergraph e "_MainTex"), entao
+    /// Material.SetTexture virava no-op silencioso (a API nao lanca erro
+    /// para propriedade inexistente no shader ativo). Isso so fazia sentido
+    /// enquanto Environment podia cair no fallback de Universal Render
+    /// Pipeline/Lit (que tem _MainTex de verdade); sem fallback, nunca mais
+    /// faz sentido manter, entao foi removido.
+    /// </summary>
+    internal static Material BuildMaterial(string fbxPath, string matFolder, string entityName, ExoPrefabProfile profile, ExoEntityType entityType, ExoBuildReport report = null)
     {
         string matPath = Path.Combine(matFolder, entityName + "_Mat.mat").Replace("\\", "/");
 
-        string shaderName = "Shader Graphs/ToonExobeasts";
-        if (entityType == ExoEntityType.Edificio) shaderName = "Toon/Toon";
+        Shader shader = Shader.Find(ToonShaderName);
+        if (shader == null)
+        {
+            report?.Error("Shader \"" + ToonShaderName + "\" nao encontrado no projeto. Material nao foi criado/atualizado - sem fallback silencioso para outro shader.", entityName);
+            return null;
+        }
 
-        Shader shader = Shader.Find(shaderName);
-        if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
-
-        Material mat = new Material(shader);
+        Material mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+        bool isNew = mat == null;
+        if (isNew)
+            mat = new Material(shader);
+        else if (mat.shader != shader)
+            mat.shader = shader;
 
         Texture2D baseTex = null;
         if (profile != null && profile.baseMapTexture != null) baseTex = profile.baseMapTexture;
@@ -455,7 +613,6 @@ public class ExoPrefabBuilder
         if (baseTex != null)
         {
             mat.SetTexture("_BaseMap", baseTex);
-            mat.SetTexture("_MainTex", baseTex);
         }
 
         if (profile != null && entityType != ExoEntityType.Edificio)
@@ -469,8 +626,13 @@ public class ExoPrefabBuilder
             mat.SetColor("_FlashColor", Color.white);
         }
 
-        AssetDatabase.CreateAsset(mat, matPath);
+        if (isNew)
+            AssetDatabase.CreateAsset(mat, matPath);
+        else
+            EditorUtility.SetDirty(mat);
+
         AssetDatabase.SaveAssets();
+        report?.Info("Material " + (isNew ? "criado" : "atualizado") + " em: " + matPath, entityName);
         return AssetDatabase.LoadAssetAtPath<Material>(matPath);
     }
 
