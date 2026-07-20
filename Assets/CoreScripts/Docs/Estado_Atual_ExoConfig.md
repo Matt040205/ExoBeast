@@ -1,8 +1,8 @@
 # Estado Atual — Refatoração Exo Config
 
-Status: ativo — refatoração em andamento, Fases 1–5 de 9 concluídas
+Status: ativo — refatoração em andamento, Fases 1–7 de 9 concluídas
 Público: Claude (Sonnet 5), Codex, Gemini — qualquer agente que retome este trabalho
-Última atualização: 17 Jul 2026, handoff para sessão em outra máquina
+Última atualização: 20 Jul 2026, sessão em máquina nova (clone fresco) — Fases 6 e 7 executadas e commitadas nesta sessão (commits `362aa467` e `bf379782`)
 Não usar como fonte de verdade: o dossiê `message.txt` que o usuário colou no início desta refatoração (descreve o comportamento ANTIGO/quebrado do plugin, não o atual)
 
 Leia este documento inteiro antes de tocar em qualquer arquivo `Assets/Editor/Exo*.cs` ou `Assets/Editor/ExoConfig/`. Ele existe porque a sessão anterior rodou numa máquina diferente da que vai continuar este trabalho — o plano original (`~/.claude/plans/...md`) e a memória entre sessões do Claude Code são **locais à máquina antiga** e não viajam com o `git pull`. Este arquivo é a única fonte de contexto garantida de chegar na próxima máquina.
@@ -46,12 +46,16 @@ Ou seja: **Sonnet 5 fez tanto a execução (subagentes) quanto a validação (ch
 
 ## 3. Estado atual (resumo executivo)
 
-- **Branch:** `exo-config-refactor` (local). **Sem commits próprios ainda até este handoff** — todo o trabalho das Fases 1–5 estava em working tree não commitado (ver seção 9 sobre o commit que acompanha este documento).
-- **Sem branch remota ainda** (`origin/exo-config-refactor` não existe até o push que acompanha este handoff).
-- **Testes:** 139 passando, 0 falhas, assembly `ExoBeasts.EditorTests` (rodar via `mcp__UnityMCP__run_tests` + `mcp__UnityMCP__get_test_job`). Este número é a baseline que a Fase 6 em diante NÃO pode regredir.
-- **Nota atual (autoavaliação Sonnet, sem revisão Opus completa):**
+- **Branch:** `exo-config-refactor`, com remoto (`origin/exo-config-refactor` existe e está sincronizado — commits até `bf379782` já dados push nesta sessão).
+- **Máquina desta sessão é NOVA** (clone fresco, diferente das duas anteriores) — **sem bridge MCP-Unity conectado** (o pacote `com.coplaydev.unity-mcp` está em `Packages/manifest.json`, mas não há ferramentas `mcp__UnityMCP__*` disponíveis nesta sessão de Claude Code). Toda validação de Fases 6 e 7 usou Unity em modo batch via linha de comando em vez de MCP:
+  ```
+  "<EditorPath>\Unity.exe" -batchmode -nographics -projectPath "<projeto>" -runTests -testPlatform EditMode -assemblyNames ExoBeasts.EditorTests -testResults "<xml>" -logFile "<log>"
+  ```
+  para testes, e `-executeMethod <Classe>.<Metodo> -quit` para rodar um script de scratch temporário quando precisa de código sob medida. Funciona bem, mas **só uma instância do Unity pode segurar o lock do projeto por vez** — se o Editor estiver aberto (GUI, MPPM, etc.), todo comando batch falha com erro de lock até fechar.
+- **Testes:** 192 passando, 0 falhas, assembly `ExoBeasts.EditorTests`. Baseline que a Fase 8 em diante NÃO pode regredir. Progressão: 139 (fim da Fase 5) → 165 (Fase 6, +26) → 192 (Fase 7, +27).
+- **Nota do plano (Funcionalidade/Clean Code/Escalabilidade/Organização):** não recalculada nesta sessão (a tabela abaixo é histórica, até Fase 5). Fases 6–7 não passaram por revisão adversarial Opus — ver seção 8, ainda pendente.
 
-| Critério | Peso | Nota |
+| Critério | Peso | Nota (até Fase 5) |
 |---|---|---|
 | Funcionalidade | 35% | 7,5 |
 | Clean Code | 25% | 8,0 |
@@ -59,9 +63,9 @@ Ou seja: **Sonnet 5 fez tanto a execução (subagentes) quanto a validação (ch
 | Organização | 15% | 7,0 |
 | **Geral (ponderado)** | | **~7,5 / 10** |
 
-Progressão por fase: 2,4 (início) → 3,2 (Fase 1) → 4,6 (Fase 2) → 6,5 (Fase 3) → 6,5 (Fase 4) → **7,5 (Fase 5, atual)**.
+Progressão por fase: 2,4 (início) → 3,2 (Fase 1) → 4,6 (Fase 2) → 6,5 (Fase 3) → 6,5 (Fase 4) → 7,5 (Fase 5) → Fases 6–7 concluídas, nota não recalculada.
 
-- **Próxima ação pendente:** Fase 6 (relink de Torre/Monstro). **Não foi iniciada** — três tentativas de lançar o subagente falharam com `"claude-sonnet-5 is temporarily unavailable, so auto mode cannot determine the safety of Agent"` (indisponibilidade transitória do classificador de segurança do harness, não um bloqueio de design). O prompt completo já está escrito — ver seção 6.
+- **Próxima ação pendente:** Fase 8 (corrigir `Ayame.asset.towerPrefab` órfão) — ver seção 7. Fase 6 (relink Torre/Monstro) e Fase 7 (Animator/NetworkRegistration/Validate) estão concluídas, commitadas e com push feito — ver seções 6 e 6.1.
 
 ---
 
@@ -158,110 +162,36 @@ Outras correções: `AssetDatabase.MoveAsset` tinha o retorno de erro ignorado (
 
 ---
 
-## 6. Fase 6 — PRÓXIMA AÇÃO (bloqueada só por infra, não por design)
+## 6. Fase 6 — CONCLUÍDA (relink de Torre/Monstro)
 
-**Não foi iniciada.** Três tentativas de `Agent(model: "sonnet", run_in_background: true, ...)` falharam com o mesmo erro: `"claude-sonnet-5 is temporarily unavailable, so auto mode cannot determine the safety of Agent right now."` — isso é o classificador de segurança do harness (não o modelo de chat da sessão) temporariamente fora do ar. **Só tentar de novo** — na sessão anterior isso se resolveu sozinho depois de alguns minutos para outras chamadas (`read_console` chegou a falhar e depois funcionar sem nenhuma mudança de contexto).
+Commit `362aa467`. Corrigia o bug que só funcionava por acidente para Personagem: `MapRelativePath` assumia literalmente um nó `"Pivot/"`, mas `ConfigureAsTower`/`ConfigureAsEnemy` nunca criam Pivot — referências para dentro do modelo eram gravadas como null em silêncio sempre que o FBX era reimportado com nome diferente (cenário `samurai` → `samurai 2`).
 
-### Objetivo
-Corrigir o relink de referências para **Torre** e **Monstro** (Environment não usa relink — sem template original, é sempre criação nova via `ConfigureAsBuilding`). Hoje o relink só funciona, por acidente de estrutura, para Personagem (que a Fase 5 já corrigiu de outro jeito — nem usa mais esse relink).
+- **`ExoPrefabBuilder.FindModelChild`** (novo): acha o filho-modelo por identidade estrutural (`PrefabUtility.GetCorrespondingObjectFromSource(child) != null`), não por nome de pasta fixo. A primeira tentativa (`GetPrefabAssetType == Model`) parecia certa e passava nos testes, mas falhou no teste de scratch com FBX renomeado — `GetPrefabAssetType`/`GetPrefabInstanceStatus` respondem "como está sendo visto agora", que diverge entre uma hierarquia viva e um Prefab Asset recarregado do disco. `GetCorrespondingObjectFromSource` é a API estável nos dois contextos.
+- **`ExoRelinkPathMapper`** (novo, Core): `MapRelativePath` puro e testado, ancorado no nome do nó-modelo em vez de `"Pivot/"`.
+- **`ExoOriginalPrefabMatcher`** (novo, Core) + `FindOriginalPrefab` reescrito: prioriza igualdade exata sobre fuzzy-`Contains`, corrigindo colisão real (`Aguia`/`Aguiaa`, `Aranha`/`Aranhaa` — ambos existem em `Assets/Entidades/Inimigos/`) que podia relinkar contra o template errado em silêncio. Fuzzy virou fallback com aviso explícito.
 
-### O bug exato (ainda vivo em `ConfigureAsTower`/`ConfigureAsEnemy`)
-```csharp
-string origToken = "Pivot/" + origFbxName;
-string newToken = "Pivot/" + newFbxName;
-if (origPath.StartsWith(origToken)) return newToken + origPath.Substring(origToken.Length);
-return origPath;
-```
-(`ExoPrefabBuilder.MapRelativePath` — releia o arquivo atual, os números de linha mudaram bastante desde a Fase 5). Isso só remapeia caminhos que começam literalmente com `"Pivot/"`. `ConfigureAsTower`/`ConfigureAsEnemy` não criam nenhum `Pivot` — o modelo é filho direto do root. `origFbxName`/`newFbxName` ficam vazios, `MapRelativePath` devolve o caminho intocado, o `Find` falha, e a referência é gravada como **null** em silêncio. Modo de falha nº1 do plugin original.
+Personagem (Fase 5) e Environment intocados. 139 → 165 testes (26 novos).
 
-### PROMPT COMPLETO, pronto para reenviar via `Agent` (copiar literalmente)
+## 6.1. Fase 7 — CONCLUÍDA (AnimatorStep + NetworkRegistrationStep + ValidateStep)
 
-```
-Você está executando a Fase 6 da refatoração do plugin Exo Config. Projeto Unity: C:\Users\zegil\Documents\GitHub\ExoBeasts_V3\PI3D, branch exo-config-refactor.
+Commit `bf379782`. Acrescenta 3 steps ao pipeline: `ResolvePaths → ImportAssets → Material → BuildPrefab → Animator → NetworkRegistration → Validate`.
 
-## Objetivo da Fase 6
-Corrigir o relink de referências para Torre e Monstro (Environment não usa relink hoje — sem template original a copiar, é sempre criação nova). Hoje o relink funciona, por acidente, só para Personagem, e destrói referências em silêncio para Torre e Monstro.
+- **AnimatorStep**: move `.anim` soltos para a pasta `Animação`, atribui `RuntimeAnimatorController` por convenção (`<Nome>Animator.controller`, novo em `ExoNaming`), respeita override de `ExoPrefabProfile.animatorController`. Só organiza/atribui — nunca cria controller nem máquina de estados. Degrada com Warning (nunca Error) quando a entidade não tem controller ainda (caso real: Brunhilde/Coral).
+- **NetworkRegistrationStep**: registra o(s) prefab(s) montados em `Assets/Multiplayer/Setup/DefaultNetworkPrefabs.asset` (confirmado por GUID, não só por nome, que é o `NetworkPrefabsList` referenciado de verdade por `MenuScene.unity` — o da raiz do projeto é órfão), sem duplicar. Substitui o `Debug.LogWarning("ACAO NECESSARIA...")` antigo em `ExoPrefabBuilder`.
+- **ValidateStep**: liga o `ExoFileIdPresenceChecker` (Fase 5, existia desde então mas sem chamador) como guard real — confirma que o fileID gravado em `CharacterBase`/`EnemyDataSO` aparece literalmente no YAML do prefab recém-salvo. Nunca usa Error (é o último step, sem rollback; SO não configurada ainda é estado normal, não falha).
+- `ExoPrefabBuilder.BuildCharacterPrefab` (5 sobrecargas) passou de `void` para `List<string>` (`ExoBuildContext.BuiltPrefabPaths`) — os novos steps precisam saber exatamente quais prefabs a execução tocou (Personagem monta 2: ele mesmo + a Torre derivada, sempre juntos, nessa ordem).
 
-## O bug exato (confirmado, não hipótese)
-ExoPrefabBuilder.MapRelativePath (releia o arquivo atual — a Fase 5 já mudou bastante o arquivo, não confie em números de linha antigos) faz isto:
-    string origToken = "Pivot/" + origFbxName;
-    string newToken = "Pivot/" + newFbxName;
-    if (origPath.StartsWith(origToken)) return newToken + origPath.Substring(origToken.Length);
-    return origPath;
-Isso só remapeia caminhos que começam literalmente com "Pivot/". ConfigureAsTower e ConfigureAsEnemy não criam nenhum Pivot — o modelo é filho direto do root. Então origFbxName/newFbxName (calculados a partir do primeiro filho de um nó chamado "Pivot", ver CopySerializedValuesAndRelink) ficam vazios para Torre/Monstro, MapRelativePath devolve o caminho intocado, o Find(mappedPath) falha, e CopyPropertyAndRelink grava a referência como null — silenciosamente. É o modo de falha nº1 do plugin original.
+**Dois bugs reais encontrados e corrigidos durante a verificação** (o subagente que implementou nunca chegou a rodar nada — o Editor estava aberto pelo usuário; achados vieram da minha verificação independente depois, com teste de scratch real, não hipótese):
+1. `MaterialStep`/`BuildMaterial` (código da Fase 4) nunca criava a pasta `Materiais` antes de salvar o material — mesma lacuna que `ImportAssetsStep` já corrigia para Modelos/Texturas, nunca replicada aqui. Só não aparecia porque toda entidade já cadastrada em produção já tem a pasta; quebrou no primeiro teste com uma entidade genuinamente nova.
+2. `ExoFileIdPresenceChecker`/`ValidateStep` verificavam só o número do fileID, nunca o guid. Confirmado com dados reais: o fileID `919132149155446097` (convenção da Unity para a raiz de um modelo importado) se repete em pelo menos 2 FBX distintos deste projeto — sem checar o guid, `ValidateStep` podia confirmar "certo" uma referência apontando pro asset ERRADO, um falso positivo pior que não validar nada. `ExoScriptableObjectReferenceParser.ExtractGuid` (novo) + guard de guid em `ValidateStep` (confere guid antes de aceitar o fileID) corrigem isso.
 
-## Estado atual (Fases 1–5 validadas — NÃO refaça)
-Assets/Editor/ExoConfig/Core/ (asmdef puro, noEngineReferences: true): ExoCategory, ExoPathResolver, ExoNaming, ExoEntityDefinition, ExoEnumParsing, ExoBuildReport, ExoOverrideMapBuilder, ExoLegacyPrefsMigration, ExoPickerItemBuilder, ExoInputActionsResolver, ExoFileIdPresenceChecker (novo na Fase 5 — verifica se um fileID aparece literalmente no YAML de um prefab; ainda não usado por nenhum step).
+**Achado importante, NÃO corrigido nesta fase (característica real do Unity, não bug do ValidateStep — vale registrar para quem for configurar profiles):** a raiz de um Personagem Variant só ganha fileID literal no YAML se algo nela for sobrescrito em relação ao `basePrefab`. Hoje, só `ExoPrefabProfile.abilityScripts` faz isso — confirmado ao vivo que renomear a raiz (que `BuildOrUpdateCharacterVariant` sempre faz) não basta. Ou seja: **qualquer personagem cujo profile fique com `abilityScripts` vazio terá `commanderPrefab` marcado por `ValidateStep` como possível `null` em build standalone.** Não é um bug — é o guard fazendo exatamente o que devia — mas é algo a checar quando alguém configurar os profiles de Ayame/Brunhilde/Coral/Sylvie (nenhuma tem profile hoje, ver Fase 5 acima). Relacionado: `commanderPrefab` agora é atribuído a partir de um `AssetDatabase.LoadAssetAtPath` fresco (como `towerPrefab` já fazia), não do retorno bruto de `SaveAsPrefabAsset` — melhoria real, mas não resolve sozinha o ponto acima.
 
-Assets/Editor/ExoConfig/Pipeline/: ExoBuildContext, IExoBuildStep, ExoBuildPipeline, Steps/{ResolvePathsStep,ImportAssetsStep,MaterialStep,BuildPrefabStep}.
-
-Assets/Editor/ExoPrefabBuilder.cs: a Fase 5 reescreveu a metade de Personagem (BuildOrUpdateCharacterVariant, ReplaceModelUnderPivot, ApplyAbilityScripts — releia, é código novo) e deletou ConfigureAsCharacter/SetupCameraHierarchy. A metade de Torre (ConfigureAsTower) e o caminho de Monstro (ConfigureAsEnemy) continuam EXATAMENTE como no código original do Mateus — é isso que você vai corrigir agora. CopySerializedValuesAndRelink, CopyComponentsAndRelink, CopyPropertyAndRelink, GetRelativePath, MapRelativePath, IsChildOf, FindOriginalPrefab — todos intocados até agora, ainda usados por Torre/Monstro.
-
-ExoPrefabProfile.cs ganhou basePrefab (GameObject) e abilityScripts (MonoScript[]) na Fase 5 — esses campos são só para Personagem, não mude o comportamento de Torre/Monstro por causa deles.
-
-Baseline: 139 testes passando, 0 falhas. Não pode regredir.
-
-## Escopo desta fase
-
-### 1. Ancorar o relink na identidade do modelo, não no literal "Pivot/"
-A ideia do plano original era usar PrefabUtility.GetCorrespondingObjectFromSource — mas investigue primeiro se isso se aplica aqui: essa API resolve a correspondência entre uma instância e o prefab de origem dela (útil quando os dois objetos vêm do MESMO prefab source), o que não é exatamente o caso aqui (estamos comparando um prefab TEMPLATE antigo com um prefab NOVO recém-instanciado a partir de um FBX diferente). Avalie se a abordagem certa é:
-- (a) ancorar por identidade estrutural do nó-raiz do modelo (em vez de assumir literalmente "Pivot/<nome>", descubra dinamicamente qual filho do root é o modelo/FBX instanciado — ex.: o único filho que é uma instância de prefab/FBX, não um GameObject vazio criado pelo builder) tanto para Torre (ConfigureAsTower: modelo é filho direto do root, junto com GameObject/CirculoSeletor) quanto para Monstro (ConfigureAsEnemy: modelo é filho direto do root, junto com DamagePopupPosition/Sphere/Indicador_Aggro/Dissolvevfx); ou
-- (b) alguma outra estratégia que você julgue mais robusta, desde que funcione para as DUAS estruturas (Torre e Monstro) sem assumir um nome de pasta fixo.
-
-Documente a decisão e por quê. O objetivo: MapRelativePath/o mecanismo equivalente precisa saber "qual é o nó-modelo" em QUALQUER uma das 3 estruturas (Personagem com Pivot — já resolvido diferente na Fase 5 — Torre sem Pivot, Monstro sem Pivot), não só a que tem uma pasta chamada "Pivot".
-
-### 2. Escopo estrito: só Torre e Monstro
-Não toque na metade de Personagem (Fase 5, já aprovada). Não toque em Environment (não usa relink — ConfigureAsBuilding não tem template original, é sempre NavMeshModifier novo).
-
-### 3. FindOriginalPrefab usa Contains fuzzy — risco real, documentado no plano
-    if (name.ToLower().Contains(cleanEntity.ToLower())) { ... }
-Isso já é um risco conhecido: Assets/Entidades/Inimigos/ tem tanto Aguia.prefab quanto Aguiaa.prefab, tanto Aranha.prefab quanto Aranhaa.prefab, e a ordem de AssetDatabase.FindAssets não é determinística. Corrigir isso pertence ao escopo desta fase se e somente se for necessário para o relink funcionar corretamente — avalie e decida. Se decidir corrigir, prefira comparação exata (ou exata + fallback fuzzy só como aviso, nunca como match silencioso) e explique. Se decidir NÃO mexer nisso agora (por ser um problema ortogonal ao bug do relink), documente explicitamente por que está ficando pra depois e não deixe a lacuna sem registro.
-
-### 4. Usar o ExoFileIdPresenceChecker (Fase 5) como guard real
-Agora que Torre/Monstro também vão gerar Variants efetivamente (ou pelo menos ter relink correto), adicione um teste/validação que usa ExoFileIdPresenceChecker.ContainsFileId para confirmar que um fileID relinkado (não apenas herdado) realmente aparece no YAML salvo — não precisa virar um step formal do pipeline ainda (isso é Fase 7/ValidateStep), mas prove que o checker se aplica ao cenário real que essa fase introduz.
-
-## Como provar com segurança
-Não regenere entidades reais de Monstro/Torre em produção (Aranha, Águia, Escorpião, Capanga, Monstro, e as torres derivadas de Personagem como TorretaSamurai) sem cuidado extremo — são prefabs referenciados por EnemyDataSO/CharacterBase/listas de rede. Prove a correção com uma entidade descartável de scratch (mesma disciplina da Fase 5: copie um FBX pequeno para uma pasta temporária, rode a lógica de verdade sobre a cópia, confirme via leitura de YAML que o relink funcionou — incluindo o cenário que hoje QUEBRA: um segundo run com o FBX trocado de nome, tipo o samurai→samurai 2 que o comentário original do dossiê citava), e delete tudo no final.
-
-Se quiser confirmar contra um caso real só de leitura (sem escrever), pode inspecionar o YAML de prefabs de Monstro já existentes (ex.: comparar Assets/Entidades/Inimigos/Aranha.prefab como ele é hoje) para embasar o desenho — isso é seguro, é só leitura.
-
-## Contrato do projeto (Assets/Diretrizes_Multiagente.md)
-Confirmar nomes reais antes de citar/editar (o código mudou bastante na Fase 5, releia tudo). Preservar mudanças existentes. Marcar incerteza quando não puder confirmar algo.
-
-## Armadilhas conhecidas
-- execute_code do UnityMCP pode estar QUEBRADO neste ambiente (era o caso na máquina anterior — testar de novo nesta máquina, não assumir) — se estiver, use create_script + [MenuItem] temporário + execute_menu_item, delete no fim.
-- git ls-tree não lista diretório vazio — use disco (ls/find).
-- Bridge MCP-Unity pode ficar instável — instância PI3D pode sumir e voltar, e o classificador de segurança do harness também já ficou temporariamente indisponível para chamadas de tool nesta sessão. Se algo falhar com "instance not found" ou "temporarily unavailable", tente de novo — geralmente resolve.
-- Se run_tests/get_test_job continuarem falhando após várias tentativas, você pode ler C:\Users\zegil\AppData\LocalLow\DefaultCompany\PI3D\TestResults.xml diretamente do disco como evidência do último run (confira o timestamp start-time/end-time pra garantir que é posterior às suas mudanças) — mas prefira sempre confirmar com uma chamada MCP fresca primeiro.
-
-## Definição de pronto
-1. Relink funciona para Torre E Monstro num teste de scratch com nome de FBX trocado (o cenário que hoje quebra).
-2. Metade de Personagem (Fase 5) e Environment não tocados.
-3. Zero diff em prefabs/assets reais de produção (Torre/Monstro existentes).
-4. Testes via MCP: run_tests (mode EditMode, assembly ExoBeasts.EditorTests) + get_test_job (wait_timeout 60). Baseline 139 — não pode regredir. Adicione testes para toda lógica pura extraída.
-5. read_console (types: ["error"]) sem erro de compilação.
-6. Nenhum script/artefato de scratch sobrando.
-
-## Relatório final (obrigatório)
-O que você decidiu para "ancorar por identidade" e por quê (com o que descartou e por quê). O que mudou em cada arquivo. Transcrição completa do teste de scratch, incluindo o cenário de nome trocado. Decisão sobre FindOriginalPrefab/Contains fuzzy (corrigiu ou não, e por quê). Números de teste antes/depois. Estado do console. git status --short final. O que não conseguiu confirmar. Se discordar de algo do briefing, diga por quê em vez de implementar contrariado.
-```
-
-### Como validar a Fase 6 depois que ela rodar (metodologia usada nas fases 1–5, repita)
-1. **Não confie no relatório do subagente sozinho.** Leia o diff real (`git diff Assets/Editor/ExoPrefabBuilder.cs`) e confirme que só a metade de Torre/Monstro mudou.
-2. Rode `mcp__UnityMCP__run_tests` (mode EditMode, assembly `ExoBeasts.EditorTests`) + `mcp__UnityMCP__get_test_job` (wait_timeout 60) você mesmo — não aceite o número que o subagente diz sem reproduzir.
-3. `mcp__UnityMCP__read_console` (types: ["error"]) — confirmar console limpo.
-4. `git status --short` — confirmar que nenhum arquivo de produção (prefabs reais de Monstro/Torre, `EnemyDataSO`, listas de rede) tem diff inesperado.
-5. Procure por artefatos de scratch esquecidos (`find Assets -iname "*Scratch*" -o -iname "*Diagnostic*" -o -iname "*TEMP*"`).
-6. Leia o código novo do relink (a função de "ancorar por identidade") e confirme que faz sentido pras duas estruturas (Torre e Monstro), não só uma.
+165 → 192 testes (27 novos).
 
 ---
 
-## 7. Fases restantes (7, 8, 9) — ainda não iniciadas
-
-### Fase 7 — AnimatorStep + NetworkRegistrationStep + ValidateStep
-- **AnimatorStep**: move `.anim`/FBX de animação pra pasta resolvida (`ExoPathResolver` já resolve `ExoAssetType.Animacao` pra Personagem/Monstro) e resolve o controller por convenção (`<Nome>Animator.controller`) com override no profile. Escopo honesto: organiza e atribui, não gera máquina de estados (controllers são autorais). Brunhilde e Coral não têm nenhuma animação/controller hoje — degradar com warning, não exceção.
-- **NetworkRegistrationStep**: registra o prefab na lista viva `Assets/Multiplayer/Setup/DefaultNetworkPrefabs.asset` (confirmado: é a referenciada pela `MenuScene`; `Assets/DefaultNetworkPrefabs.asset` na raiz é órfã, não referenciada em nenhuma cena/prefab do projeto). Substitui o `Debug.LogWarning("ACAO NECESSARIA: Arraste os prefabs...")` que ainda existe em `ExoPrefabBuilder.BuildCharacterPrefab`.
-- **ValidateStep**: liga o `ExoFileIdPresenceChecker` (Fase 5) como step de verdade no pipeline — depois de salvar um prefab de Personagem/Torre/Monstro, ler o fileID gravado no `CharacterBase`/`EnemyDataSO` correspondente e confirmar que existe literalmente no YAML salvo. Isso transforma a regra de memória do projeto (fileID virtual quebra em build standalone) numa checagem automática, não só numa lembrança.
+## 7. Fases restantes (8, 9) — ainda não iniciadas
 
 ### Fase 8 — Corrigir dado de produção: `Ayame.asset → towerPrefab` órfão
 **Ainda não corrigido.** Confirmado na sondagem original: `Ayame.asset.towerPrefab` aponta pro GUID `fd0bbd1c417566a43800d83168a82c10`, que **não existe em nenhum `.meta` do repositório** — foi provavelmente produzido por uma execução real e nunca commitada do plugin antigo (`samurai 3`/4/5 na raiz de `Assets/` são as sobras dessa execução). Fix: restaurar pro `TorretaSamurai.prefab`, fileID `3333250326587255744` (validado nesta sessão anterior: presente 12× no YAML do prefab real). É o único estrago de dado real que a sondagem original encontrou que precisa correção — todo o resto (grafias de pasta divergentes, `Mina` no registro sem pasta, `Assets/DefaultNetworkPrefabs.asset` órfão) fica como está, por decisão já confirmada com o usuário (sem normalização de assets existentes).
@@ -273,13 +203,15 @@ O que você decidiu para "ancorar por identidade" e por quê (com o que descarto
 
 ## 8. Tarefa pendente separada: revisão adversarial completa por Opus
 
-Registrada como tarefa própria durante a sessão anterior (não uma fase numerada do plano — é sobre TODAS as fases já feitas). Objetivo: reler os diffs de cada fase (1–6 em diante) linha a linha contra a intenção declarada de cada uma; conferir que nenhuma referência de prefab virou null; checar que os caminhos acentuados (`Configurações`, `Animação`, `Escorpião`, `Águia`) foram cobertos por teste real; confirmar que os guards de segurança (arquivo gerado, fileID de Variant) seguem funcionando; reavaliar a nota com os critérios do plano em vez de aceitar as autochecagens do Sonnet como validação final.
+Registrada como tarefa própria durante a sessão anterior (não uma fase numerada do plano — é sobre TODAS as fases já feitas, agora 1–7). Objetivo: reler os diffs de cada fase linha a linha contra a intenção declarada de cada uma; conferir que nenhuma referência de prefab virou null; checar que os caminhos acentuados (`Configurações`, `Animação`, `Escorpião`, `Águia`) foram cobertos por teste real; confirmar que os guards de segurança (arquivo gerado, fileID de Variant, guid em `ValidateStep`) seguem funcionando; reavaliar a nota com os critérios do plano em vez de aceitar as autochecagens do Sonnet como validação final.
 
 **Estado:** não executada. O usuário confirmou (na mensagem que originou este handoff) que a continuação também será em Sonnet 5 — ou seja, essa revisão pode não acontecer da forma originalmente planejada (Opus, sessão direta). Se o usuário quiser uma segunda opinião independente sem trocar de modelo, `/code-review ultra` (revisão multi-agente na nuvem, cobrada à parte, roda sobre o branch atual) é a alternativa mais próxima disponível — mas é acionada pelo usuário, não por um agente.
 
 ---
 
-## 9. Sobre o commit que acompanha este handoff
+## 9. Sobre o commit que acompanha este handoff (histórico — Fases 1–5)
+
+Nota (20 Jul 2026): a partir da Fase 6, cada fase virou um commit próprio já com push (`362aa467` = Fase 6, `bf379782` = Fase 7) — não um único commit "de handoff" acumulado como abaixo. O texto original desta seção (sobre o PRIMEIRO commit da refatoração, que juntou as Fases 1–5) fica como histórico.
 
 Até este ponto, **nenhuma das Fases 1–5 tinha sido commitada** — tudo vivia em working tree não versionado na branch local `exo-config-refactor` (que também não tinha remoto ainda). O commit que acompanha este documento inclui:
 - Todos os arquivos `Assets/Editor/Exo*.cs` modificados/deletados (Fases 1–5)
@@ -298,10 +230,10 @@ Esses dois arquivos de fonte apareceram modificados (timestamps de hoje) provave
 
 ## 10. Checklist rápido para quem retomar
 
-- [ ] Confirmar que `git log --oneline -3` mostra o commit desta refatoração no topo da branch `exo-config-refactor`
-- [ ] Rodar os 139 testes (`ExoBeasts.EditorTests`, EditMode) e confirmar que passam nesta máquina antes de tocar em qualquer coisa
-- [ ] Relançar a Fase 6 com o prompt da seção 6 (retry se der erro de classificador indisponível — é transitório)
-- [ ] Validar a Fase 6 de forma independente (seção 6, "Como validar")
-- [ ] Seguir pra Fase 7 → 8 → 9, mesma disciplina de validação a cada fase
-- [ ] Antes de considerar o plugin "pronto para uso real": alguém (game designer ou o próprio usuário) precisa criar `ExoPrefabProfile` para Ayame/Brunhilde/Coral/Sylvie com `basePrefab = Player 1.prefab` e a lista certa de `abilityScripts` por personagem — sem isso a ferramenta recusa operar em qualquer Personagem real (por design, não é bug)
+- [x] Fases 6 e 7 concluídas, commitadas e com push (`362aa467`, `bf379782`)
+- [ ] Confirmar que `git log --oneline -3` mostra `bf379782` no topo da branch `exo-config-refactor`
+- [ ] Rodar os 192 testes (`ExoBeasts.EditorTests`, EditMode) e confirmar que passam nesta máquina antes de tocar em qualquer coisa
+- [ ] Se não houver bridge MCP-Unity conectado na sua sessão, usar Unity em modo batch via CLI (ver seção 3) em vez de `mcp__UnityMCP__*` — funciona bem, só exige rodar tudo em sequência (um Unity por vez segurando o lock do projeto)
+- [ ] Seguir pra Fase 8 → 9, mesma disciplina de validação a cada fase (implementar → provar com scratch descartável → reproduzir testes você mesmo, não confiar só no relatório do subagente → `git status --short` limpo)
+- [ ] Antes de considerar o plugin "pronto para uso real": alguém (game designer ou o próprio usuário) precisa criar `ExoPrefabProfile` para Ayame/Brunhilde/Coral/Sylvie com `basePrefab = Player 1.prefab` e a lista certa de `abilityScripts` por personagem — sem isso a ferramenta recusa operar em qualquer Personagem real (por design, não é bug). **Atenção (achado da Fase 7):** se algum personagem ficar com `abilityScripts` vazio, `ValidateStep` vai avisar que `commanderPrefab` pode virar null em build standalone — não é bug da ferramenta, é a raiz do Variant genuinamente sem fileID literal; considere se isso precisa de solução antes de publicar.
 - [ ] Ao final de tudo, se o usuário quiser uma segunda opinião independente de verdade: sugerir `/code-review ultra` ou aguardar Opus disponível para a revisão da seção 8
