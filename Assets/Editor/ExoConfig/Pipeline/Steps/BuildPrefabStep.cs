@@ -1,10 +1,16 @@
 using ExoBeasts.ExoConfig.Core;
 
 /// <summary>
-/// Ultimo step: embrulha a chamada atual para
-/// ExoPrefabBuilder.BuildCharacterPrefab. A montagem de GameObjects/
-/// componentes em si continua fora deste step (dentro de ExoPrefabBuilder) -
-/// so muda O QUE ele faz internamente:
+/// Embrulha a chamada atual para ExoPrefabBuilder.BuildCharacterPrefab. A
+/// montagem de GameObjects/componentes em si continua fora deste step
+/// (dentro de ExoPrefabBuilder) - so muda O QUE ele faz internamente:
+///
+/// Fase 7: deixou de ser o ultimo step do pipeline - AnimatorStep,
+/// NetworkRegistrationStep e ValidateStep rodam depois dele (ver
+/// ExoPrefabMenu.RunPipeline), todos dependendo de context.BuiltPrefabPaths
+/// (populado abaixo, a partir do retorno de BuildCharacterPrefab - antes da
+/// Fase 7 esse metodo devolvia void) para saber EXATAMENTE quais prefab(s)
+/// esta execucao tocou.
 ///
 /// Fase 5 trocou a metade de PERSONAGEM (ConfigureAsCharacter/
 /// SetupCameraHierarchy, removidos - ver ExoPrefabBuilder.BuildOrUpdateCharacterVariant)
@@ -52,7 +58,7 @@ public sealed class BuildPrefabStep : IExoBuildStep
             return;
         }
 
-        ExoPrefabBuilder.BuildCharacterPrefab(
+        context.BuiltPrefabPaths = ExoPrefabBuilder.BuildCharacterPrefab(
             context.DestFbxPath, context.PrefabsFolder, context.MateriaisFolder, context.Profile, context.CategoriaRaw, context.Report);
 
         context.Report.Info("Prefab(s) de \"" + context.Nome + "\" montados em \"" + context.PrefabsFolder + "\".", context.Nome);

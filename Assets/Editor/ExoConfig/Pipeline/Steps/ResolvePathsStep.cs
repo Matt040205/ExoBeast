@@ -69,6 +69,19 @@ public sealed class ResolvePathsStep : IExoBuildStep
             context.TexturasFolder = config.ResolveFolder(categoria, context.Nome, ExoAssetType.Texturas, context.Report);
             context.PrefabsFolder = config.ResolveFolder(categoria, context.Nome, ExoAssetType.Prefabs, context.Report);
             context.MateriaisFolder = config.ResolveFolder(categoria, context.Nome, ExoAssetType.Materiais, context.Report);
+
+            // Fase 7 (AnimatorStep): Animacao so se aplica a Personagens/
+            // Monstros (ExoPathResolver.SupportsAssetType - Environment nao
+            // tem essa subpasta na convencao real do projeto). Ao contrario
+            // dos 4 tipos acima, NAO chamamos ResolveFolder incondicionalmente
+            // aqui: ResolveFolder lanca InvalidOperationException para um
+            // tipo que a categoria nao suporta (ver ExoPathResolver.ResolveFolder),
+            // e isso cairia no catch abaixo como um Report.Error - errado
+            // para Environment, onde "nao ter pasta de Animacao" e esperado,
+            // nao uma falha. Guard explicito em vez de depender do catch.
+            context.AnimacaoFolder = ExoPathResolver.SupportsAssetType(categoria, ExoAssetType.Animacao)
+                ? config.ResolveFolder(categoria, context.Nome, ExoAssetType.Animacao, context.Report)
+                : null;
         }
         catch (Exception ex)
         {

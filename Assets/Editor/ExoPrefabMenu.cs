@@ -14,9 +14,11 @@ public class ExoPrefabMenu
     /// AbrirOrganizarPicker mais abaixo). A partir da Fase 4, so monta o
     /// ExoBuildContext e delega para RunPipeline com DryRun=false; toda a
     /// logica de organizar/montar em si mora agora em
-    /// Assets/Editor/ExoConfig/Pipeline/ (ExoBuildPipeline + os 4 steps desta
-    /// fase: ResolvePathsStep, ImportAssetsStep, MaterialStep,
-    /// BuildPrefabStep).
+    /// Assets/Editor/ExoConfig/Pipeline/ (ExoBuildPipeline + os steps em
+    /// Assets/Editor/ExoConfig/Pipeline/Steps/ - ResolvePathsStep,
+    /// ImportAssetsStep, MaterialStep, BuildPrefabStep da Fase 4;
+    /// AnimatorStep, NetworkRegistrationStep, ValidateStep acrescentados na
+    /// Fase 7 - ver RunPipeline logo abaixo para a ordem e a justificativa).
     /// </summary>
     public static void ExecutarOrganizar(string categoria, string nome)
     {
@@ -39,6 +41,23 @@ public class ExoPrefabMenu
     /// caso defensivo de nada estar selecionado no Project (mesmo guard
     /// silencioso que ExecutarOrganizar sempre teve - no uso normal via
     /// menu, ValidarAbrirOrganizarPicker ja impede isso).
+    ///
+    /// Fase 7: acrescenta AnimatorStep, NetworkRegistrationStep e
+    /// ValidateStep, NESSA ORDEM, depois de BuildPrefabStep. Justificativa da
+    /// ordem (ver o comentario de cada step para o detalhe completo):
+    ///   - AnimatorStep so pode rodar DEPOIS de BuildPrefabStep porque o
+    ///     componente Animator so existe depois que o prefab e montado/salvo
+    ///     (confirmado lendo ExoPrefabBuilder nesta fase, nao presumido).
+    ///   - NetworkRegistrationStep tambem depende de BuiltPrefabPaths
+    ///     (populado por BuildPrefabStep) e nao tem nenhuma dependencia de
+    ///     dado em relacao a AnimatorStep - a ordem entre os dois nao afeta
+    ///     corretude, mas "terminar de configurar o prefab (Animator) antes
+    ///     de registra-lo para uso em rede" e a sequencia mais legivel.
+    ///   - ValidateStep roda por ULTIMO deliberadamente: e um GATE de
+    ///     verificacao, nao uma etapa de montagem - so faz sentido conferir o
+    ///     estado final (fileID no YAML do prefab JA salvo, incluindo
+    ///     qualquer efeito colateral dos steps anteriores) depois que tudo o
+    ///     mais rodou.
     /// </summary>
     internal static ExoBuildReport RunPipeline(string categoria, string nome, bool dryRun)
     {
@@ -54,7 +73,10 @@ public class ExoPrefabMenu
             .Add(new ResolvePathsStep())
             .Add(new ImportAssetsStep())
             .Add(new MaterialStep())
-            .Add(new BuildPrefabStep());
+            .Add(new BuildPrefabStep())
+            .Add(new AnimatorStep())
+            .Add(new NetworkRegistrationStep())
+            .Add(new ValidateStep());
 
         pipeline.Run(context);
 

@@ -132,4 +132,35 @@ public class ExoNamingTests
     {
         Assert.Throws<ArgumentException>(() => ExoNaming.TextureFileName(fbxName));
     }
+
+    // Fase 7 (AnimatorStep): confirmado contra o unico Animator Controller
+    // real do projeto - Assets/Personagens/Ayame/Animação/AyameAnimator.controller.
+    [TestCase("Ayame", "AyameAnimator.controller")]
+    [TestCase("Águia", "ÁguiaAnimator.controller")]
+    public void AnimatorControllerFileName_AppendsAnimatorControllerSuffix(string nome, string expected)
+    {
+        Assert.That(ExoNaming.AnimatorControllerFileName(nome), Is.EqualTo(expected));
+    }
+
+    [Test]
+    public void AnimatorControllerFileName_UsesEntityNameNotFbxName()
+    {
+        // Divergencia deliberada dos demais metodos desta classe: ao
+        // contrario de ModelFileName/TextureFileName/etc. (que recebem o
+        // nome TRANSIENTE do arquivo FBX sendo importado, ex.: "samurai 3"),
+        // AnimatorControllerFileName recebe o nome ESTAVEL da entidade (ex.:
+        // "Ayame"). Nao ha "samurai 3Animator.controller" nem
+        // "SamuraiAnimator.controller" em lugar nenhum do projeto - so
+        // "AyameAnimator.controller", nomeado a partir do nome cadastrado em
+        // ExoToolConfig, nao do FBX de origem daquela execucao especifica.
+        Assert.That(ExoNaming.AnimatorControllerFileName("Ayame"), Is.EqualTo("AyameAnimator.controller"));
+        Assert.That(ExoNaming.AnimatorControllerFileName("samurai 3"), Is.EqualTo("samurai 3Animator.controller"));
+    }
+
+    [TestCase("")]
+    [TestCase(null)]
+    public void AnimatorControllerFileName_ThrowsOnNullOrEmpty(string nome)
+    {
+        Assert.Throws<ArgumentException>(() => ExoNaming.AnimatorControllerFileName(nome));
+    }
 }

@@ -18,19 +18,19 @@ public class ExoPrefabBuilder
     // do Personagem agora vem herdado de profile.basePrefab (ver
     // BuildOrUpdateCharacterVariant) - nunca mais resolvido/atribuido aqui.
 
-    public static void BuildCharacterPrefab(string fbxPath, string prefabFolder, string matFolder)
+    public static List<string> BuildCharacterPrefab(string fbxPath, string prefabFolder, string matFolder)
     {
-        BuildCharacterPrefab(fbxPath, prefabFolder, matFolder, null, "");
+        return BuildCharacterPrefab(fbxPath, prefabFolder, matFolder, null, "");
     }
 
-    public static void BuildCharacterPrefab(string fbxPath, string prefabFolder, string matFolder, ExoPrefabProfile profile)
+    public static List<string> BuildCharacterPrefab(string fbxPath, string prefabFolder, string matFolder, ExoPrefabProfile profile)
     {
-        BuildCharacterPrefab(fbxPath, prefabFolder, matFolder, profile, "");
+        return BuildCharacterPrefab(fbxPath, prefabFolder, matFolder, profile, "");
     }
 
-    public static void BuildCharacterPrefab(string fbxPath, string prefabFolder, string matFolder, ExoPrefabProfile profile, string categoria)
+    public static List<string> BuildCharacterPrefab(string fbxPath, string prefabFolder, string matFolder, ExoPrefabProfile profile, string categoria)
     {
-        BuildCharacterPrefab(fbxPath, prefabFolder, matFolder, profile, categoria, null);
+        return BuildCharacterPrefab(fbxPath, prefabFolder, matFolder, profile, categoria, null);
     }
 
     /// <summary>
@@ -40,14 +40,27 @@ public class ExoPrefabBuilder
     /// e o unico jeito de Warnings de ApplyAbilityScripts (ex.: MonoScript
     /// que nao resolve para Component valido) chegarem no relatorio
     /// estruturado do pipeline em vez de só Debug.LogWarning.
+    ///
+    /// Fase 7: devolve os caminhos do(s) prefab(s) efetivamente
+    /// montados/atualizados nesta chamada (vazio se abortou antes de montar
+    /// qualquer coisa) - AnimatorStep/NetworkRegistrationStep/ValidateStep
+    /// (Assets/Editor/ExoConfig/Pipeline/Steps/) precisam saber EXATAMENTE
+    /// quais arquivos esta execucao tocou (prefabFolder sozinho nao diz
+    /// isso - pode conter prefabs de execucoes anteriores). Antes desta
+    /// fase o metodo devolvia void; nenhum chamador de producao dependia do
+    /// retorno (confirmado via grep - o unico call site real e
+    /// BuildPrefabStep.cs), entao mudar void->List&lt;string&gt; em todos os
+    /// overloads e seguro.
     /// </summary>
-    public static void BuildCharacterPrefab(string fbxPath, string prefabFolder, string matFolder, ExoPrefabProfile profile, string categoria, ExoBuildReport report)
+    public static List<string> BuildCharacterPrefab(string fbxPath, string prefabFolder, string matFolder, ExoPrefabProfile profile, string categoria, ExoBuildReport report)
     {
+        List<string> builtPrefabPaths = new List<string>();
+
         GameObject fbxModel = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath);
         if (fbxModel == null)
         {
             Debug.LogError("[ExoConfig] FBX nao encontrado em: " + fbxPath);
-            return;
+            return builtPrefabPaths;
         }
 
         string entityName = fbxModel.name;
@@ -79,8 +92,29 @@ public class ExoPrefabBuilder
                 // Personagem que falhou, e sobretudo nao sobrescreve
                 // commanderPrefab/towerPrefab existentes com valores
                 // obsoletos/nulos so porque esta execucao falhou.
-                return;
+                return builtPrefabPaths;
             }
+
+            // Recarrega do disco em vez de usar o retorno bruto de
+            // BuildOrUpdateCharacterVariant/PrefabUtility.SaveAsPrefabAsset
+            // direto (como este metodo fazia ate agora) - mesmo padrao que
+            // savedTowerPrefab ja usava logo abaixo (AssetDatabase.LoadAssetAtPath),
+            // so nunca replicado aqui. Achado real da Fase 7 (nao hipotese):
+            // ValidateStep (novo, valida fileID contra o YAML salvo)
+            // encontrou que characterData.commanderPrefab, atribuido com o
+            // retorno "vivo" de SaveAsPrefabAsset, serializa com um fileID
+            // que NAO aparece no YAML do proprio prefab - exatamente a
+            // "regra duravel do projeto" (fileID tolerado no Editor mas
+            // virtual/nao-literal, quebra em build standalone). Confirmado
+            // no teste de scratch: towerPrefab (ja recarregado) bate certo;
+            // commanderPrefab (retorno bruto) nao batia, mesmo apontando
+            // para o MESMO objeto por igualdade de referencia (==) - a
+            // igualdade de referencia do Editor tolera identidade que o
+            // fileID literalmente serializado nao tem. Recarregar via
+            // AssetDatabase.LoadAssetAtPath forca a referencia gravada a
+            // vir do estado JA SERIALIZADO em disco, nao do objeto
+            // transiente que SaveAsPrefabAsset devolve.
+            savedCharPrefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
             Debug.Log("[ExoConfig] Prefab Personagem montado: " + prefabPath);
 
             string towerName = "Torreta" + char.ToUpper(entityName[0]) + entityName.Substring(1);
@@ -100,6 +134,13 @@ public class ExoPrefabBuilder
             PrefabUtility.SaveAsPrefabAsset(towerRoot, towerPath);
             Object.DestroyImmediate(towerRoot);
             Debug.Log("[ExoConfig] Prefab Torre montado: " + towerPath);
+
+            // Contrato de ordem documentado em ExoBuildContext.BuiltPrefabPaths:
+            // [0] = Personagem, [1] = Torre - ValidateStep (Fase 7) depende
+            // desta ordem para saber qual indice validar contra
+            // commanderPrefab vs towerPrefab.
+            builtPrefabPaths.Add(prefabPath);
+            builtPrefabPaths.Add(towerPath);
 
             if (profile != null && profile.characterData != null)
             {
@@ -143,14 +184,23 @@ public class ExoPrefabBuilder
             PrefabUtility.SaveAsPrefabAsset(prefabRoot, prefabPath);
             Object.DestroyImmediate(prefabRoot);
             Debug.Log("[ExoConfig] Prefab montado: " + prefabPath);
+
+            builtPrefabPaths.Add(prefabPath);
         }
 
         AssetDatabase.Refresh();
 
-        if (entityType != ExoEntityType.Edificio)
-        {
-            Debug.LogWarning("[ExoConfig] ACAO NECESSARIA: Arraste os prefabs para Assets/Multiplayer/Setup/DefaultNetworkPrefabs.asset para funcionar em rede.");
-        }
+        // Fase 7: o aviso manual "ACAO NECESSARIA: Arraste os prefabs para
+        // Assets/Multiplayer/Setup/DefaultNetworkPrefabs.asset" que existia
+        // aqui (mesma condicao "entityType != ExoEntityType.Edificio") foi
+        // REMOVIDO - Assets/Editor/ExoConfig/Pipeline/Steps/NetworkRegistrationStep.cs
+        // agora cobre exatamente o mesmo caso de forma automatica (registra
+        // builtPrefabPaths em Assets/Multiplayer/Setup/DefaultNetworkPrefabs.asset,
+        // sem duplicar, para qualquer EntityType != Edificio). Confirmado
+        // antes de remover: NetworkRegistrationStep usa a MESMA condicao de
+        // guarda que este aviso usava.
+
+        return builtPrefabPaths;
     }
 
     /// <summary>
@@ -627,7 +677,27 @@ public class ExoPrefabBuilder
         }
 
         if (isNew)
+        {
+            // Mesma lacuna que ImportAssetsStep.MoveAsset ja corrigia desde a
+            // Fase 4 para Modelos/Texturas (AssetDatabase.MoveAsset falhava
+            // em silencio quando a pasta de destino nao existia), so que
+            // nunca replicada aqui para a pasta de Materiais - nao
+            // manifestava em uso real porque toda entidade ja cadastrada em
+            // ExoToolConfig ja tem sua pasta Materiais fisicamente presente
+            // no disco. Exposto pelo teste de scratch da Fase 7 (a primeira
+            // vez que o pipeline completo roda contra uma entidade
+            // GENUINAMENTE nova, sem nenhuma pasta pre-existente):
+            // AssetDatabase.CreateAsset lanca UnityException ("Parent
+            // directory must exist") em vez de criar a pasta, ao contrario
+            // de AssetDatabase.MoveAsset (que so devolve uma string de erro,
+            // nunca lanca).
+            if (!Directory.Exists(matFolder))
+            {
+                Directory.CreateDirectory(matFolder);
+                AssetDatabase.Refresh();
+            }
             AssetDatabase.CreateAsset(mat, matPath);
+        }
         else
             EditorUtility.SetDirty(mat);
 

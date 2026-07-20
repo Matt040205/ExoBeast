@@ -31,6 +31,7 @@ public class ExoPrefabProfile : ScriptableObject
     public EnemyDataSO enemyData;
 
     [Header("Animacoes")]
+    [Tooltip("Override manual do Animator Controller. Se vazio, AnimatorStep (Fase 7) resolve por convencao: \"<Nome>Animator.controller\" dentro da pasta Animacao da entidade (ex.: Assets/Personagens/Ayame/Animação/AyameAnimator.controller). Controllers sao sempre autorais - nem este campo nem a convencao criam um novo.")]
     public RuntimeAnimatorController animatorController;
 
     [Header("Material - Shader ToonExobeasts")]

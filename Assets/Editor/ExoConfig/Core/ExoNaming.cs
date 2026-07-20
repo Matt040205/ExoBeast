@@ -147,6 +147,36 @@ namespace ExoBeasts.ExoConfig.Core
         }
 
         /// <summary>
+        /// Nome do arquivo do Animator Controller de uma entidade (Personagem
+        /// ou Monstro), por convencao. Ex.: "Ayame" vira
+        /// "AyameAnimator.controller".
+        ///
+        /// Fase 7 da refatoracao Exo Config (AnimatorStep). Confirmado contra
+        /// o UNICO Animator Controller real que existe no projeto hoje:
+        /// Assets/Personagens/Ayame/Animação/AyameAnimator.controller - nome
+        /// da entidade ("Ayame", exatamente como cadastrado em
+        /// ExoToolConfig.asset) + "Animator" + ".controller", sem nenhuma
+        /// outra transformacao (sem CleanEntityName, sem trocar case).
+        ///
+        /// IMPORTANTE: "nome" aqui e o NOME DA ENTIDADE
+        /// (ExoBuildContext.Nome/ExoEntityDefinition.Nome - ex.: "Ayame"), e
+        /// DELIBERADAMENTE NAO "fbxName" (ExoBuildContext.FbxFileName - ex.:
+        /// "samurai 3") como todos os outros metodos desta classe. Os dois
+        /// costumam divergir: o FBX de origem pode ser reimportado com nomes
+        /// diferentes ao longo do tempo ("samurai", "samurai 2", "samurai 3"
+        /// - confirmado em Assets/Personagens/Ayame/Modelos/), mas o Animator
+        /// Controller e AUTORAL, colocado a mao pelo game designer UMA VEZ, e
+        /// nomeado a partir do nome ESTAVEL da entidade - exatamente o que a
+        /// evidencia real acima confirma ("Ayame", nao "Samurai"/"TorretaSamurai").
+        /// Ver AnimatorStep (Assets/Editor/ExoConfig/Pipeline/Steps/AnimatorStep.cs).
+        /// </summary>
+        public static string AnimatorControllerFileName(string nome)
+        {
+            RequireNome(nome);
+            return nome + "Animator.controller";
+        }
+
+        /// <summary>
         /// "Nome limpo" de uma entidade: remove os marcadores "Torreta",
         /// "Variant" e "Completo" (qualquer ocorrencia da substring, case
         /// sensitive), remove digitos finais e remove espacos nas pontas.
@@ -176,6 +206,19 @@ namespace ExoBeasts.ExoConfig.Core
         {
             if (string.IsNullOrEmpty(fbxName))
                 throw new ArgumentException("[ExoConfig] nome do FBX nao pode ser nulo ou vazio.", nameof(fbxName));
+        }
+
+        /// <summary>
+        /// Mesmo guard de RequireFbxName, mensagem de erro separada porque o
+        /// parametro representa uma coisa DIFERENTE (nome de ENTIDADE, nao de
+        /// FBX - ver AnimatorControllerFileName acima). Espelha
+        /// ExoPathResolver.RequireNome (mesmo nome, classe diferente - sem
+        /// conflito).
+        /// </summary>
+        private static void RequireNome(string nome)
+        {
+            if (string.IsNullOrEmpty(nome))
+                throw new ArgumentException("[ExoConfig] nome da entidade nao pode ser nulo ou vazio.", nameof(nome));
         }
     }
 }
