@@ -126,7 +126,7 @@ public class MenuManager : MonoBehaviour
         // MenuScene: usa transição animada via pilha de navegação.
         if (MenuTabSlider.Instance != null)
         {
-            MenuTabSlider.Instance.NavigateTo("Options");
+            MenuTabSlider.Instance.NavigateTo("Opções");
             return;
         }
 
@@ -140,7 +140,7 @@ public class MenuManager : MonoBehaviour
     {
         if (MenuTabSlider.Instance != null)
         {
-            MenuTabSlider.Instance.NavigateTo("Credits");
+            MenuTabSlider.Instance.NavigateTo("Creditos");
             return;
         }
         Debug.LogWarning("[MenuManager] MenuTabSlider não encontrado. Fallback sem animação.");
@@ -226,7 +226,7 @@ public class MenuManager : MonoBehaviour
         TryAutoBindButton(ref botaoJogarSolo, "Singleplayer");
         TryAutoBindButton(ref botaoJogarOnline, "Multiplayer");
         TryAutoBindButton(ref botaoOptions, "options");
-        TryAutoBindButton(ref botaoCreditos, "Creditos");
+        TryAutoBindButton(ref botaoCreditos, "Credits", "Creditos");
 
         if (botaoJogarSolo != null)
         {
@@ -259,9 +259,9 @@ public class MenuManager : MonoBehaviour
     {
         foreach (Button btn in FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
-            if (btn != null && btn.gameObject.scene == gameObject.scene && btn.gameObject.name == "Back")
+            if (btn != null && btn.gameObject.scene == gameObject.scene && (btn.gameObject.name == "Back" || btn.gameObject.name.ToLower().Contains("voltar")))
             {
-                btn.onClick.RemoveListener(BotaoBack);
+                btn.onClick = new Button.ButtonClickedEvent();
                 btn.onClick.AddListener(BotaoBack);
             }
         }
@@ -284,4 +284,16 @@ public class MenuManager : MonoBehaviour
             }
         }
     }
+
+    /// <summary>
+    /// Overload que tenta o nome principal primeiro, depois o fallback.
+    /// Útil para botões que podem ter nomes em PT ou EN.
+    /// </summary>
+    private void TryAutoBindButton(ref Button button, string primaryName, string fallbackName)
+    {
+        TryAutoBindButton(ref button, primaryName);
+        if (button == null)
+            TryAutoBindButton(ref button, fallbackName);
+    }
 }
+

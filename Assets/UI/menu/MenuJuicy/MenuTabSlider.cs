@@ -225,6 +225,7 @@ public class MenuTabSlider : MonoBehaviour
         List<RectTransform> leavingGroup = GetGroupForContainer(leaving);
 
         // Posiciona o painel de destino fora da tela à DIREITA (+1920)
+        targetPanel.DOKill();
         targetPanel.anchoredPosition = new Vector2(targetOnScreen.x + dist, targetOnScreen.y);
         targetPanel.gameObject.SetActive(true);
 
@@ -232,6 +233,7 @@ public class MenuTabSlider : MonoBehaviour
         foreach (var item in leavingGroup)
         {
             if (item == null) continue;
+            item.DOKill();
             Vector2 onScreen = GetOnScreenPosition(item);
             item.DOAnchorPosX(onScreen.x - dist, transitionDuration)
                 .SetEase(transitionEase).SetUpdate(true);
@@ -268,12 +270,14 @@ public class MenuTabSlider : MonoBehaviour
         foreach (var item in enteringGroup)
         {
             if (item == null) continue;
+            item.DOKill();
             Vector2 onScreen = GetOnScreenPosition(item);
             item.anchoredPosition = new Vector2(onScreen.x - dist, onScreen.y);
             item.gameObject.SetActive(true);
         }
 
         // Move a página atual para a direita por exatamente 'dist' pixels
+        leaving.DOKill();
         leaving.DOAnchorPosX(leavingOnScreen.x + dist, transitionDuration)
                .SetEase(transitionEase).SetUpdate(true);
 
@@ -282,8 +286,7 @@ public class MenuTabSlider : MonoBehaviour
         foreach (var item in enteringGroup)
         {
             if (item == null) continue;
-            Vector2 onScreen = GetOnScreenPosition(item);
-            lastTween = item.DOAnchorPos(onScreen, transitionDuration)
+            lastTween = item.DOAnchorPos(GetOnScreenPosition(item), transitionDuration)
                             .SetEase(transitionEase).SetUpdate(true);
         }
 
@@ -359,11 +362,40 @@ public class MenuTabSlider : MonoBehaviour
     private RectTransform FindPanelById(string id)
     {
         if (string.IsNullOrEmpty(id)) return null;
+
+        // Busca direta (case-insensitive)
         foreach (var entry in registeredPanels)
         {
             if (entry.id != null && entry.id.Equals(id, System.StringComparison.OrdinalIgnoreCase) && entry.panel != null)
                 return entry.panel;
         }
+
+        // Fallback: tenta aliases PT↔EN comuns para não quebrar se o ID estiver em outro idioma
+        string alias = GetAlias(id);
+        if (!string.IsNullOrEmpty(alias))
+        {
+            foreach (var entry in registeredPanels)
+            {
+                if (entry.id != null && entry.id.Equals(alias, System.StringComparison.OrdinalIgnoreCase) && entry.panel != null)
+                    return entry.panel;
+            }
+        }
+
         return null;
+    }
+
+    private static string GetAlias(string id)
+    {
+        if (id == null) return null;
+        string lower = id.ToLowerInvariant();
+        switch (lower)
+        {
+            case "options": return "Opções";
+            case "opções": return "Options";
+            case "credits": return "Creditos";
+            case "creditos": return "Credits";
+            case "créditos": return "Credits";
+            default: return null;
+        }
     }
 }

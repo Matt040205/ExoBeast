@@ -11,6 +11,7 @@ using DG.Tweening;
 ///
 /// NOTA IMPORTANTE: Desativa temporariamente ou permanentemente o LayoutGroup (Vertical/Horizontal/Grid)
 /// do container para permitir que os RectTransforms dos botões sejam movidos livremente pelo DOTween.
+/// Também desativa automaticamente o SequentialFade se encontrado, para evitar conflito de alpha.
 /// </summary>
 public class MenuButtonsEntrance : MonoBehaviour
 {
@@ -36,7 +37,57 @@ public class MenuButtonsEntrance : MonoBehaviour
 
     private void Start()
     {
+        // Desativa IMEDIATAMENTE o SequentialFade para evitar conflito de alpha nos botões
+        DisableSequentialFade();
+
         StartCoroutine(SetupAndPlayEntrance());
+    }
+
+    /// <summary>
+    /// Procura e desativa o SequentialFade no mesmo GameObject, no pai, ou em qualquer
+    /// ancestral até o Canvas, para evitar que ele zere o alpha dos botões.
+    /// Também reseta o alpha de todos os filhos para 1.
+    /// </summary>
+    private void DisableSequentialFade()
+    {
+        // Procura SequentialFade nos ancestrais (ele pode estar no mesmo objeto ou no Canvas/Manager)
+        SequentialFade[] fades = GetComponentsInParent<SequentialFade>(true);
+        foreach (var fade in fades)
+        {
+            if (fade != null)
+            {
+                fade.StopAllCoroutines();
+                fade.enabled = false;
+                Debug.Log($"[MenuButtonsEntrance] Desativou SequentialFade em '{fade.gameObject.name}' para evitar conflito de alpha.");
+            }
+        }
+
+        // Também procura no pai (caso esteja em um irmão do Canvas)
+        if (transform.parent != null)
+        {
+            SequentialFade parentFade = transform.parent.GetComponentInChildren<SequentialFade>(true);
+            if (parentFade != null)
+            {
+                parentFade.StopAllCoroutines();
+                parentFade.enabled = false;
+                Debug.Log($"[MenuButtonsEntrance] Desativou SequentialFade (sibling) em '{parentFade.gameObject.name}'.");
+            }
+        }
+
+        // Reseta o alpha de TODOS os gráficos dos filhos para 1 (desfaz o hideOnStart)
+        foreach (Transform child in transform)
+        {
+            if (child == null) continue;
+            foreach (var graphic in child.GetComponentsInChildren<Graphic>(true))
+            {
+                if (graphic != null)
+                {
+                    Color c = graphic.color;
+                    c.a = 1f;
+                    graphic.color = c;
+                }
+            }
+        }
     }
 
     private IEnumerator SetupAndPlayEntrance()
@@ -51,6 +102,14 @@ public class MenuButtonsEntrance : MonoBehaviour
         if (layoutGroup != null)
         {
             layoutGroup.enabled = false;
+            Debug.Log("[MenuButtonsEntrance] VerticalLayoutGroup desativado para permitir animação DOTween.");
+        }
+
+        // Também desativa ContentSizeFitter se existir
+        ContentSizeFitter fitter = GetComponent<ContentSizeFitter>();
+        if (fitter != null)
+        {
+            fitter.enabled = false;
         }
 
         // 3. Salva as posições calculadas pelo layout

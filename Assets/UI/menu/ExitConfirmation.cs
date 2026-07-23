@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections;
 
 public class ExitConfirmation : MonoBehaviour
@@ -27,12 +27,14 @@ public class ExitConfirmation : MonoBehaviour
 
     public void Show()
     {
+        if (!enabled || MenuTabSlider.Instance != null) return;
         gameObject.SetActive(true);
         StartCoroutine(AnimatePanel(hiddenPosition, visiblePosition));
     }
 
     public void Hide()
     {
+        if (!enabled || MenuTabSlider.Instance != null) return;
         StartCoroutine(AnimatePanel(visiblePosition, hiddenPosition, true));
     }
 
