@@ -18,13 +18,13 @@ public class ButtonHoverEffect : MonoBehaviour, IPointerEnterHandler, IPointerEx
     public float slideDistanceX = -18f;
 
     [Tooltip("Duração da animação de entrada do hover.")]
-    public float slideInDuration = 0.15f;
+    public float slideInDuration = 0.22f;
 
     [Tooltip("Duração da animação de retorno do hover.")]
-    public float slideOutDuration = 0.22f;
+    public float slideOutDuration = 0.35f;
 
-    public Ease slideInEase = Ease.OutQuad;
-    public Ease slideOutEase = Ease.InOutQuad;
+    public Ease slideInEase = Ease.OutSine;
+    public Ease slideOutEase = Ease.InOutSine;
 
     private RectTransform _rt;
     private Vector2 _basePosition;

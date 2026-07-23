@@ -10,10 +10,10 @@ public class MenuButtonFloat : MonoBehaviour
 {
     [Header("Flutuação")]
     [Tooltip("Amplitude máxima do deslocamento vertical (em pixels).")]
-    public float amplitude = 12f;
+    public float amplitude = 9f;
 
     [Tooltip("Duração de um ciclo completo de flutuação (subida + descida).")]
-    public float cycleDuration = 1.0f;
+    public float cycleDuration = 2.8f;
 
     [Tooltip("Offset de fase em segundos, para desincronizar botões. " +
              "Deixe -1 para gerar aleatoriamente.")]

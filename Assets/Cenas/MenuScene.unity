@@ -5548,8 +5548,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ae1688df418334343a453746781691b0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonFloat
-  amplitude: 12
-  cycleDuration: 1
+  amplitude: 9
+  cycleDuration: 2.8
   phaseOffsetSeconds: -1
 --- !u!114 &132794732
 MonoBehaviour:
@@ -5565,8 +5565,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ButtonHoverEffect
   hoverParticles: {fileID: 0}
   slideDistanceX: -18
-  slideInDuration: 0.15
-  slideOutDuration: 0.22
+  slideInDuration: 0.22
+  slideOutDuration: 0.35
   slideInEase: 6
   slideOutEase: 7
 --- !u!1 &136511810
@@ -22445,8 +22445,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ButtonHoverEffect
   hoverParticles: {fileID: 0}
   slideDistanceX: -18
-  slideInDuration: 0.15
-  slideOutDuration: 0.22
+  slideInDuration: 0.22
+  slideOutDuration: 0.35
   slideInEase: 6
   slideOutEase: 7
 --- !u!114 &751058870
@@ -22462,8 +22462,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonsEntrance
   slideFromOffsetX: -1200
-  durationPerButton: 0.45
-  delayBetweenButtons: 0.09
+  durationPerButton: 0.6
+  delayBetweenButtons: 0.12
   initialDelay: 0.2
   enterEase: 27
 --- !u!114 &751058871
@@ -22478,8 +22478,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ae1688df418334343a453746781691b0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonFloat
-  amplitude: 12
-  cycleDuration: 1
+  amplitude: 9
+  cycleDuration: 2.8
   phaseOffsetSeconds: -1
 --- !u!1 &782204762
 GameObject:
@@ -23197,8 +23197,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ButtonHoverEffect
   hoverParticles: {fileID: 0}
   slideDistanceX: -18
-  slideInDuration: 0.15
-  slideOutDuration: 0.22
+  slideInDuration: 0.22
+  slideOutDuration: 0.35
   slideInEase: 6
   slideOutEase: 7
 --- !u!114 &866111946
@@ -23214,8 +23214,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonsEntrance
   slideFromOffsetX: -1200
-  durationPerButton: 0.45
-  delayBetweenButtons: 0.09
+  durationPerButton: 0.6
+  delayBetweenButtons: 0.12
   initialDelay: 0.2
   enterEase: 27
 --- !u!114 &866111947
@@ -23230,8 +23230,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ae1688df418334343a453746781691b0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonFloat
-  amplitude: 12
-  cycleDuration: 1
+  amplitude: 9
+  cycleDuration: 2.8
   phaseOffsetSeconds: -1
 --- !u!1 &872062429
 GameObject:
@@ -23455,8 +23455,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ae1688df418334343a453746781691b0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonFloat
-  amplitude: 12
-  cycleDuration: 1
+  amplitude: 9
+  cycleDuration: 2.8
   phaseOffsetSeconds: -1
 --- !u!114 &873198204
 MonoBehaviour:
@@ -23472,8 +23472,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ButtonHoverEffect
   hoverParticles: {fileID: 0}
   slideDistanceX: -18
-  slideInDuration: 0.15
-  slideOutDuration: 0.22
+  slideInDuration: 0.22
+  slideOutDuration: 0.35
   slideInEase: 6
   slideOutEase: 7
 --- !u!1 &878181286
@@ -23916,8 +23916,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ButtonHoverEffect
   hoverParticles: {fileID: 0}
   slideDistanceX: -18
-  slideInDuration: 0.15
-  slideOutDuration: 0.22
+  slideInDuration: 0.22
+  slideOutDuration: 0.35
   slideInEase: 6
   slideOutEase: 7
 --- !u!114 &895839261
@@ -23933,8 +23933,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonsEntrance
   slideFromOffsetX: -1200
-  durationPerButton: 0.45
-  delayBetweenButtons: 0.09
+  durationPerButton: 0.6
+  delayBetweenButtons: 0.12
   initialDelay: 0.2
   enterEase: 27
 --- !u!114 &895839262
@@ -23949,8 +23949,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ae1688df418334343a453746781691b0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonFloat
-  amplitude: 12
-  cycleDuration: 1
+  amplitude: 9
+  cycleDuration: 2.8
   phaseOffsetSeconds: -1
 --- !u!1 &908456401
 GameObject:
@@ -24401,8 +24401,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ButtonHoverEffect
   hoverParticles: {fileID: 0}
   slideDistanceX: -18
-  slideInDuration: 0.15
-  slideOutDuration: 0.22
+  slideInDuration: 0.22
+  slideOutDuration: 0.35
   slideInEase: 6
   slideOutEase: 7
 --- !u!114 &992834261
@@ -24418,8 +24418,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonsEntrance
   slideFromOffsetX: -1200
-  durationPerButton: 0.45
-  delayBetweenButtons: 0.09
+  durationPerButton: 0.6
+  delayBetweenButtons: 0.12
   initialDelay: 0.2
   enterEase: 27
 --- !u!114 &992834262
@@ -24434,8 +24434,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ae1688df418334343a453746781691b0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonFloat
-  amplitude: 12
-  cycleDuration: 1
+  amplitude: 9
+  cycleDuration: 2.8
   phaseOffsetSeconds: -1
 --- !u!1 &1002386458
 GameObject:
@@ -35450,8 +35450,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ButtonHoverEffect
   hoverParticles: {fileID: 0}
   slideDistanceX: -18
-  slideInDuration: 0.15
-  slideOutDuration: 0.22
+  slideInDuration: 0.22
+  slideOutDuration: 0.35
   slideInEase: 6
   slideOutEase: 7
 --- !u!114 &1182084865
@@ -35467,8 +35467,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonsEntrance
   slideFromOffsetX: -1200
-  durationPerButton: 0.45
-  delayBetweenButtons: 0.09
+  durationPerButton: 0.6
+  delayBetweenButtons: 0.12
   initialDelay: 0.2
   enterEase: 27
 --- !u!114 &1182084866
@@ -35483,8 +35483,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ae1688df418334343a453746781691b0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuButtonFloat
-  amplitude: 12
-  cycleDuration: 1
+  amplitude: 9
+  cycleDuration: 2.8
   phaseOffsetSeconds: -1
 --- !u!1 &1193158337
 GameObject:
@@ -46725,7 +46725,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Creditos
+  m_text: "Cr\xE9ditos"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 7f6c71d74f03f6f46b44ab1ba71e572c, type: 2}
   m_sharedMaterial: {fileID: -9189605547023192048, guid: 7f6c71d74f03f6f46b44ab1ba71e572c, type: 2}

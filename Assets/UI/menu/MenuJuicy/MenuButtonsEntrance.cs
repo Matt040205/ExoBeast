@@ -20,16 +20,16 @@ public class MenuButtonsEntrance : MonoBehaviour
     public float slideFromOffsetX = -1200f;
 
     [Tooltip("Duração da animação de entrada de cada botão.")]
-    public float durationPerButton = 0.45f;
+    public float durationPerButton = 0.6f;
 
     [Tooltip("Delay entre a entrada de cada botão consecutivo.")]
-    public float delayBetweenButtons = 0.09f;
+    public float delayBetweenButtons = 0.12f;
 
     [Tooltip("Delay inicial antes do primeiro botão começar a entrar.")]
     public float initialDelay = 0.2f;
 
     [Tooltip("Easing da animação de entrada.")]
-    public Ease enterEase = Ease.OutBack;
+    public Ease enterEase = Ease.OutCubic;
 
     // Posições originais de cada botão para referência de outros sistemas (float, hover)
     private readonly List<RectTransform> _buttonRects = new List<RectTransform>();

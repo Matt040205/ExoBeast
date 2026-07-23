@@ -35,6 +35,10 @@ public class LobbySceneUI : MonoBehaviour
     [SerializeField] private GameObject painelCriarLobby;   // Config: nome, max jogadores, publico
     [SerializeField] private GameObject painelJogadores;    // Sala de espera: jogadores, iniciar
 
+    [Header("Painel Public Lobby")]
+    [SerializeField] private GameObject panelPublicLobby;   // Painel de Lobbies Públicos
+    [SerializeField] private GameObject btnBackToMenu;      // Botão de voltar ao menu principal (ex: BackMenu)
+
     [Header("Botões de navegação Host/Cliente")]
     [SerializeField] private Button btnCriarHost;
     [SerializeField] private Button btnEntrarCliente;
@@ -123,6 +127,12 @@ public class LobbySceneUI : MonoBehaviour
         if (painelLobby      == null) painelLobby      = FindGO("painel Lobby");
         if (painelCriarLobby == null) painelCriarLobby = FindGO("painel CriarLobby");
         if (painelJogadores  == null) painelJogadores  = FindGO("painel Jogadores");
+        if (panelPublicLobby == null) panelPublicLobby = FindGO("PanelPublicLobby");
+        if (panelPublicLobby == null) panelPublicLobby = FindGO("painel PublicLobby");
+        if (panelPublicLobby == null) panelPublicLobby = FindGO("painelPublicLobby");
+        if (btnBackToMenu == null)    btnBackToMenu    = FindGO("BackMenu");
+        if (btnBackToMenu == null)    btnBackToMenu    = FindGO("BtnBackMenu");
+        if (btnBackToMenu == null)    btnBackToMenu    = FindGO("BackToMenu");
 
         // Botões de navegação
         if (btnCriarHost     == null) btnCriarHost     = FindIn<Button>("BtnCriarHost");
@@ -241,10 +251,12 @@ public class LobbySceneUI : MonoBehaviour
         LobbyButtonBinder.WireBtn(this, "EntrarLobby",    EntrarPorId);
 
         // Buscar salas públicas (está no painel Lobby)
-        LobbyButtonBinder.WireBtn(this, "BtnBuscarSalas", BuscarSalas);
-        LobbyButtonBinder.WireBtn(this, "BuscarSalas",    BuscarSalas);
-        LobbyButtonBinder.WireBtn(this, "LobbyPublico",   BuscarSalas);
-        LobbyButtonBinder.WireBtn(this, "LobbyPulbico",   BuscarSalas);  // nome real na cena (typo)
+        LobbyButtonBinder.WireBtn(this, "BtnBuscarSalas", PublicServers);
+        LobbyButtonBinder.WireBtn(this, "BuscarSalas",    PublicServers);
+        LobbyButtonBinder.WireBtn(this, "LobbyPublico",   PublicServers);
+        LobbyButtonBinder.WireBtn(this, "LobbyPulbico",   PublicServers);  // nome real na cena (typo)
+        LobbyButtonBinder.WireBtn(this, "PublicServers",    PublicServers);
+        LobbyButtonBinder.WireBtn(this, "BtnPublicServers", PublicServers);
 
         // Sala
         LobbyButtonBinder.WireBtn(this, "Copiar",         CopiarId);
@@ -258,6 +270,12 @@ public class LobbySceneUI : MonoBehaviour
         LobbyButtonBinder.WireBtn(this, "VoltarMenuPrincipal",    IrParaMenuPrincipal);
         LobbyButtonBinder.WireBtn(this, "BtnMenu",                IrParaMenuPrincipal);
         LobbyButtonBinder.WireBtn(this, "BackMenu",               IrParaMenuPrincipal);  // nome real na cena
+
+        // Voltar ao painel Lobby vindo do Public Lobby
+        LobbyButtonBinder.WireBtn(this, "BackToLobby",    BackToLobby);
+        LobbyButtonBinder.WireBtn(this, "BtnBackToLobby", BackToLobby);
+        LobbyButtonBinder.WireBtn(this, "VoltarLobby",    BackToLobby);
+        LobbyButtonBinder.WireBtn(this, "BtnVoltarLobby", BackToLobby);
 
         // Inspector refs diretos
         if (btnLogin != null) { btnLogin.onClick = new Button.ButtonClickedEvent(); btnLogin.onClick.AddListener(Login); }
@@ -358,6 +376,48 @@ public class LobbySceneUI : MonoBehaviour
 
     public void AumentarMaxPlayers() => AlterarMaxPlayers(1);
     public void DiminuirMaxPlayers() => AlterarMaxPlayers(-1);
+
+    public void PublicServers()
+    {
+        if (panelPublicLobby != null)
+        {
+            panelPublicLobby.SetActive(true);
+        }
+        else
+        {
+            Debug.LogWarning("[LobbySceneUI] PanelPublicLobby não atribuído no Inspector!");
+        }
+
+        if (btnBackToMenu != null)
+        {
+            btnBackToMenu.SetActive(false);
+        }
+
+        if (painelLobby != null)
+        {
+            painelLobby.SetActive(false);
+        }
+
+        BuscarSalas();
+    }
+
+    public void BackToLobby()
+    {
+        if (panelPublicLobby != null)
+        {
+            panelPublicLobby.SetActive(false);
+        }
+
+        if (btnBackToMenu != null)
+        {
+            btnBackToMenu.SetActive(true);
+        }
+
+        if (painelLobby != null)
+        {
+            painelLobby.SetActive(true);
+        }
+    }
 
     public void BuscarSalas()
     {

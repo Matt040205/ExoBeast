@@ -191,6 +191,17 @@ public class MenuManager : MonoBehaviour
         _sceneChangeInProgress = true;
         PauseControl.isPaused = false;
 
+        if (SceneFader.Instance != null)
+        {
+            yield return SceneFader.Instance.FadeOutRoutine();
+        }
+        else
+        {
+            var go = new GameObject("SceneFader");
+            var fader = go.AddComponent<SceneFader>();
+            yield return fader.FadeOutRoutine();
+        }
+
         bool isMenuDestination = nomeDaCena.ToLower().Contains("menu");
         bool isSelectionDestination = nomeDaCena.ToLower().Contains("escolherpersonagem");
 
