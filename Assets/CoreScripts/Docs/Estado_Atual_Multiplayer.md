@@ -8,6 +8,27 @@ Nao usar como fonte de verdade: docs historicas, planos antigos e nomes removido
 Documento canonico do multiplayer atual. Leia este arquivo para entender o que existe hoje,
 o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como atuais.
 
+## Ultima atualizacao: estabilizacao Menu/Lobby/Selecao (2026-07-25)
+
+- `MenuManager` rebinda os botoes principais por nome sem depender de maiusculas/minusculas e usa os IDs atuais do `MenuTabSlider` (`Options` e `Credits`).
+- `LobbySceneUI` aceita aliases reais da cena nova, incluindo `IniciarPartida`, campo `ID`, painel publico com variacoes de nome e botao `EntrarLobbyTransferencia`.
+- O botao de iniciar no lobby fica visivel apenas para o host e interagivel apenas quando todos os membros do lobby estao prontos.
+- Ao entrar em `EscolherPersonagem` no multiplayer, o ready herdado do lobby e resetado para `false`; o jogador precisa escolher comandante e primeira torre antes de poder marcar pronto para a partida.
+- `SelecaoManager.MostrarCaminhoDeUpgrade(int)` foi restaurado como API publica de compatibilidade para listeners antigos da cena de selecao.
+- Validacao MCP em Play Mode com 1 jogador: `MenuScene` -> `LobbyScene` -> login EOS Device ID -> `LobbySceneUI.CriarSala()` -> ready -> host match -> `EscolherPersonagem` -> selecao minima host -> `CenaMapaNOVO` via `NetworkManager.SceneManager`. Resultado confirmado: cena ativa `CenaMapaNOVO` com host NGO ativo.
+- Limitacao observada no MCP: `execute_code` falha neste projeto com `mono.exe: O nome do arquivo ou a extensao e muito grande`. Para o smoke test foi usado um harness temporario de Editor, removido ao final.
+
+## Ultima atualizacao: reparo FMOD em maquina nova (2026-07-25)
+
+- Sintoma: popup `Repair FMOD Libraries` bloqueava o Unity/MCP indicando line endings incorretos nos bundles macOS do FMOD.
+- Causa confirmada: os arquivos `Contents/Info.plist` dentro de `Assets/Plugins/FMOD/platforms/mac/lib/*.bundle` estavam com CRLF. A regra antiga `*.bundle binary` nao protegia arquivos internos do diretorio `.bundle`.
+- Correcao aplicada: os tres `Info.plist` foram normalizados para LF-only e `.gitattributes` passou a forcar `Assets/Plugins/FMOD/platforms/mac/lib/**/*.plist text eol=lf`.
+- Arquivos FMOD reparados:
+  - `Assets/Plugins/FMOD/platforms/mac/lib/fmodstudio.bundle/Contents/Info.plist`
+  - `Assets/Plugins/FMOD/platforms/mac/lib/fmodstudioL.bundle/Contents/Info.plist`
+  - `Assets/Plugins/FMOD/platforms/mac/lib/resonanceaudio.bundle/Contents/Info.plist`
+- Validacao: cada `Info.plist` ficou com `CRLF=0`, `CR=0`, `LF=36`; o popup foi fechado com `Repair` e o Unity MCP voltou a responder `manage_scene/read_console`.
+
 ## Docs ativos relacionados
 
 - `Assets/CoreScripts/Docs/ONBOARDING.md` - guia de primeiro acesso para devs novos

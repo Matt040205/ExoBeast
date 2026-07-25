@@ -150,6 +150,8 @@ public class SelecaoManager : NetworkBehaviour
         {
             GameDataManager.Instance.LimparSelecao();
         }
+
+        ResetReadyForSelectionStage();
         
         ConfigurarBotoesPrincipais();
         CriarGridEquipe();
@@ -402,7 +404,11 @@ public class SelecaoManager : NetworkBehaviour
         {
             // Habilita o Toggle Pronto se o jogador local escolheu os 2 chars
             if (togglePronto != null)
+            {
                 togglePronto.interactable = localPronto;
+                if (!localPronto && _isReady)
+                    SetSelectionReady(false, true);
+            }
 
             // Apenas o Host vê o botão de iniciar (ele será habilitado quando todos estiverem prontos)
             var lobby = LobbyManager.Instance?.GetCurrentLobby();
@@ -500,12 +506,7 @@ public class SelecaoManager : NetworkBehaviour
             
             togglePronto.onValueChanged.RemoveAllListeners();
             togglePronto.onValueChanged.AddListener((isOn) => {
-                _isReady = isOn;
-                if (GameModeManager.CurrentMode == GameMode.Multiplayer && LobbyManager.Instance != null)
-                {
-                    LobbyManager.Instance.SetReady(_isReady);
-                    Debug.Log($"[SelecaoManager] Jogador marcou pronto: {_isReady}");
-                }
+                SetSelectionReady(isOn, true);
             });
         }
 
@@ -536,6 +537,28 @@ public class SelecaoManager : NetworkBehaviour
         botaoVoltarDosDetalhes.onClick.AddListener(VoltarParaPainelEscolha);
         if (botaoRemover != null)
             botaoRemover.onClick.AddListener(ToggleRemoveMode);
+    }
+
+    private void ResetReadyForSelectionStage()
+    {
+        if (GameModeManager.CurrentMode != GameMode.Multiplayer)
+            return;
+
+        SetSelectionReady(false, true);
+    }
+
+    private void SetSelectionReady(bool ready, bool notifyLobby)
+    {
+        _isReady = ready;
+
+        if (togglePronto != null)
+            togglePronto.SetIsOnWithoutNotify(ready);
+
+        if (notifyLobby && GameModeManager.CurrentMode == GameMode.Multiplayer && LobbyManager.Instance != null)
+        {
+            LobbyManager.Instance.SetReady(ready);
+            Debug.Log($"[SelecaoManager] Jogador marcou pronto: {ready}");
+        }
     }
 
     private IEnumerator IniciarPartidaSingleplayer()
@@ -827,22 +850,7 @@ public class SelecaoManager : NetworkBehaviour
                 if (img != null) img.color = (index == 0) ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
 
                 // Interliga os botões Dano/Velocidade/Proteção para alternar o texto exibido e a cor
-                botoesCaminhoTorre[index].onClick.AddListener(() => {
-                    for(int j = 0; j < botoesCaminhoTorre.Count; j++)
-                    {
-                        if (textosCaminho.Length > j && textosCaminho[j] != null)
-                            textosCaminho[j].gameObject.SetActive(j == index);
-
-                        if (botoesCaminhoTorre[j] != null)
-                        {
-                            var bImg = botoesCaminhoTorre[j].GetComponent<Image>();
-                            if (bImg != null)
-                            {
-                                bImg.color = (j == index) ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
-                            }
-                        }
-                    }
-                });
+                botoesCaminhoTorre[index].onClick.AddListener(() => MostrarCaminhoDeUpgrade(index));
             }
             else
             {
@@ -856,6 +864,24 @@ public class SelecaoManager : NetworkBehaviour
         }
     }
     
+    public void MostrarCaminhoDeUpgrade(int index)
+    {
+        TextMeshProUGUI[] textosCaminho = { textoCaminho1, textoCaminho2, textoCaminho3 };
+
+        for (int j = 0; j < botoesCaminhoTorre.Count; j++)
+        {
+            if (textosCaminho.Length > j && textosCaminho[j] != null)
+                textosCaminho[j].gameObject.SetActive(j == index && painelUpgradesTorre.activeSelf);
+
+            if (botoesCaminhoTorre[j] != null)
+            {
+                var bImg = botoesCaminhoTorre[j].GetComponent<Image>();
+                if (bImg != null)
+                    bImg.color = (j == index) ? Color.white : new Color(0.5f, 0.5f, 0.5f, 1f);
+            }
+        }
+    }
+
     void ToggleRemoveMode() { isRemoveMode = !isRemoveMode; if (botaoRemover != null) botaoRemover.image.color = isRemoveMode ? corModoRemover : corOriginalBotaoRemover; }
 
     private bool AllConnectedPlayersHaveCommanderChoice()

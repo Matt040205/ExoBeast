@@ -126,7 +126,7 @@ public class MenuManager : MonoBehaviour
         // MenuScene: usa transição animada via pilha de navegação.
         if (MenuTabSlider.Instance != null)
         {
-            MenuTabSlider.Instance.NavigateTo("Opções");
+            MenuTabSlider.Instance.NavigateTo("Options");
             return;
         }
 
@@ -140,7 +140,7 @@ public class MenuManager : MonoBehaviour
     {
         if (MenuTabSlider.Instance != null)
         {
-            MenuTabSlider.Instance.NavigateTo("Creditos");
+            MenuTabSlider.Instance.NavigateTo("Credits");
             return;
         }
         Debug.LogWarning("[MenuManager] MenuTabSlider não encontrado. Fallback sem animação.");
@@ -236,7 +236,7 @@ public class MenuManager : MonoBehaviour
     {
         TryAutoBindButton(ref botaoJogarSolo, "Singleplayer");
         TryAutoBindButton(ref botaoJogarOnline, "Multiplayer");
-        TryAutoBindButton(ref botaoOptions, "options");
+        TryAutoBindButton(ref botaoOptions, "Options", "options");
         TryAutoBindButton(ref botaoCreditos, "Credits", "Creditos");
 
         if (botaoJogarSolo != null)
@@ -270,12 +270,19 @@ public class MenuManager : MonoBehaviour
     {
         foreach (Button btn in FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
-            if (btn != null && btn.gameObject.scene == gameObject.scene && (btn.gameObject.name == "Back" || btn.gameObject.name.ToLower().Contains("voltar")))
+            if (btn != null && btn.gameObject.scene == gameObject.scene && IsBackButtonName(btn.gameObject.name))
             {
                 btn.onClick = new Button.ButtonClickedEvent();
                 btn.onClick.AddListener(BotaoBack);
             }
         }
+    }
+
+    private static bool IsBackButtonName(string objectName)
+    {
+        string normalized = (objectName ?? "").Trim();
+        return normalized.Equals("Back", System.StringComparison.OrdinalIgnoreCase) ||
+               normalized.IndexOf("voltar", System.StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private void TryAutoBindButton(ref Button button, string expectedName)
@@ -287,7 +294,7 @@ public class MenuManager : MonoBehaviour
         {
             if (candidate != null &&
                 candidate.gameObject.scene == gameObject.scene &&
-                candidate.gameObject.name == expectedName)
+                candidate.gameObject.name.Trim().Equals(expectedName.Trim(), System.StringComparison.OrdinalIgnoreCase))
             {
                 button = candidate;
                 Debug.LogWarning($"[MenuManager] Botao '{expectedName}' nao estava serializado na MenuScene. Referencia reconstituida automaticamente por nome.");

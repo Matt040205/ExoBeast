@@ -10,7 +10,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         {
             foreach (var b in mono.GetComponentsInChildren<Button>(true))
             {
-                if (b.gameObject.name.Trim() != goName.Trim()) continue;
+                if (!NameMatches(b.gameObject.name, goName)) continue;
                 // Cria um novo evento limpando tudo o que possa estar erradamente "injetado" no Inspecionar!
                 b.onClick = new Button.ButtonClickedEvent();
                 b.onClick.AddListener(() => handler());
@@ -42,7 +42,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             if (parent == null) return;
             foreach (var b in parent.GetComponentsInChildren<Button>(true))
             {
-                if (b.gameObject.name.Trim() != btnName.Trim()) continue;
+                if (!NameMatches(b.gameObject.name, btnName)) continue;
                 b.onClick = new Button.ButtonClickedEvent();
                 b.onClick.AddListener(() => handler());
             }
@@ -51,8 +51,14 @@ namespace ExoBeasts.Multiplayer.Lobby
         private static GameObject FindGO(MonoBehaviour mono, string goName)
         {
             foreach (var t in mono.GetComponentsInChildren<Transform>(true))
-                if (t.gameObject.name.Trim() == goName.Trim()) return t.gameObject;
+                if (NameMatches(t.gameObject.name, goName)) return t.gameObject;
             return null;
+        }
+
+        private static bool NameMatches(string actualName, string expectedName)
+        {
+            return (actualName ?? "").Trim()
+                .Equals((expectedName ?? "").Trim(), StringComparison.OrdinalIgnoreCase);
         }
     }
 }

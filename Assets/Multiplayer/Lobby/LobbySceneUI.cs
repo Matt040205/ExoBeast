@@ -127,12 +127,8 @@ public class LobbySceneUI : MonoBehaviour
         if (painelLobby      == null) painelLobby      = FindGO("painel Lobby");
         if (painelCriarLobby == null) painelCriarLobby = FindGO("painel CriarLobby");
         if (painelJogadores  == null) painelJogadores  = FindGO("painel Jogadores");
-        if (panelPublicLobby == null) panelPublicLobby = FindGO("PanelPublicLobby");
-        if (panelPublicLobby == null) panelPublicLobby = FindGO("painel PublicLobby");
-        if (panelPublicLobby == null) panelPublicLobby = FindGO("painelPublicLobby");
-        if (btnBackToMenu == null)    btnBackToMenu    = FindGO("BackMenu");
-        if (btnBackToMenu == null)    btnBackToMenu    = FindGO("BtnBackMenu");
-        if (btnBackToMenu == null)    btnBackToMenu    = FindGO("BackToMenu");
+        if (panelPublicLobby == null) panelPublicLobby = FindGO("PanelPublicLobby", "painel PublicLobby", "painelPublicLobby", "painel Lobby publico", "painel Lobby p\u00fablico");
+        if (btnBackToMenu == null)    btnBackToMenu    = FindGO("BackMenu", "BtnBackMenu", "BackToMenu");
 
         // Botões de navegação
         if (btnCriarHost     == null) btnCriarHost     = FindIn<Button>("BtnCriarHost");
@@ -143,8 +139,7 @@ public class LobbySceneUI : MonoBehaviour
         // InputFields
         if (nickField      == null) nickField      = FindIn<TMP_InputField>("DigitarNick");
         if (lobbyNameField == null) lobbyNameField = FindIn<TMP_InputField>("DigitarNomeSala");
-        if (joinIdField    == null) joinIdField    = FindIn<TMP_InputField>("ProcurarLobbyID");
-        if (joinIdField    == null) joinIdField    = FindIn<TMP_InputField>("PrcurarLobbyID");
+        if (joinIdField    == null) joinIdField    = FindIn<TMP_InputField>("ProcurarLobbyID", "PrcurarLobbyID", "ID", "LobbyID", "LobbyId");
 
         // Texto
         if (maxPlayersText == null) maxPlayersText = FindIn<TMP_Text>("MaxJogadores");
@@ -157,7 +152,7 @@ public class LobbySceneUI : MonoBehaviour
 
         // Botões
         if (btnLogin    == null) btnLogin    = FindIn<Button>("BtnLogin");
-        if (iniciarPartidaButton == null) iniciarPartidaButton = FindIn<Button>("BtnIniciarPartida");
+        if (iniciarPartidaButton == null) iniciarPartidaButton = FindIn<Button>("BtnIniciarPartida", "IniciarPartida");
 
         // Slots / Lista
         if (playerSlotsContent == null)
@@ -172,18 +167,30 @@ public class LobbySceneUI : MonoBehaviour
         }
     }
 
-    private T FindIn<T>(string goName) where T : Component
+    private T FindIn<T>(params string[] goNames) where T : Component
     {
         foreach (var c in GetComponentsInChildren<T>(true))
-            if (c.gameObject.name.Trim() == goName.Trim()) return c;
+            if (NameMatches(c.gameObject.name, goNames)) return c;
         return null;
     }
 
-    private GameObject FindGO(string goName)
+    private GameObject FindGO(params string[] goNames)
     {
         foreach (var t in GetComponentsInChildren<Transform>(true))
-            if (t.gameObject.name.Trim() == goName.Trim()) return t.gameObject;
+            if (NameMatches(t.gameObject.name, goNames)) return t.gameObject;
         return null;
+    }
+
+    private static bool NameMatches(string actualName, params string[] expectedNames)
+    {
+        string actual = (actualName ?? "").Trim();
+        foreach (string expectedName in expectedNames)
+        {
+            string expected = (expectedName ?? "").Trim();
+            if (actual.Equals(expected, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
     }
 
     private void DisableButtonLabelRaycasts()
@@ -249,6 +256,7 @@ public class LobbySceneUI : MonoBehaviour
         LobbyButtonBinder.WireBtn(this, "BtnEntrarId",    EntrarPorId);
         LobbyButtonBinder.WireBtn(this, "EntrarId",       EntrarPorId);
         LobbyButtonBinder.WireBtn(this, "EntrarLobby",    EntrarPorId);
+        LobbyButtonBinder.WireBtn(this, "EntrarLobbyTransfer\u00eancia", EntrarPorId);
 
         // Buscar salas públicas (está no painel Lobby)
         LobbyButtonBinder.WireBtn(this, "BtnBuscarSalas", PublicServers);
@@ -346,7 +354,11 @@ public class LobbySceneUI : MonoBehaviour
             mapName    = "EscolherPersonagem",
         });
 
-        if (!sucesso) return;
+        if (!sucesso)
+        {
+            _isCreatingLobby = false;
+            return;
+        }
         
         SetStatus("Criando sala...");
 
@@ -593,6 +605,7 @@ public class LobbySceneUI : MonoBehaviour
         if (painelLobby      != null) painelLobby.SetActive(inMenu);
         if (painelCriarLobby != null) painelCriarLobby.SetActive(inHost);
         if (painelJogadores  != null) painelJogadores.SetActive(inSala);
+        if (panelPublicLobby != null && !inMenu) panelPublicLobby.SetActive(false);
 
         // Nick e login visíveis apenas no menu inicial
         if (nickField != null) nickField.gameObject.SetActive(inMenu);
@@ -622,10 +635,7 @@ public class LobbySceneUI : MonoBehaviour
             && lobby.hostProductUserId == localUid;
 
         iniciarPartidaButton.gameObject.SetActive(isHost);
-        if (isHost)
-        {
-            iniciarPartidaButton.interactable = AllMembersReady();
-        }
+        iniciarPartidaButton.interactable = isHost && AllMembersReady();
     }
 
     private bool AllMembersReady()
