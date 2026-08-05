@@ -203,7 +203,7 @@ public class MenuManager : MonoBehaviour
         }
 
         bool isMenuDestination = nomeDaCena.ToLower().Contains("menu");
-        bool isSelectionDestination = nomeDaCena.ToLower().Contains("escolherpersonagem");
+        bool isSelectionDestination = nomeDaCena.ToLower().Contains("escolherpersonagem") || nomeDaCena.ToLower().Contains("cenasele");
 
         if (isMenuDestination && GameDataManager.Instance != null)
         {

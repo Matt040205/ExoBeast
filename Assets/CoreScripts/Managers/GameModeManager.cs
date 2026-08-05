@@ -26,7 +26,7 @@ namespace ExoBeasts.Managers
         public static bool HasInstance => Instance != null;
         public static GameModeManager TryGetExistingInstance() => Instance;
 
-        [SerializeField] private string escolherPersonagemScene = "EscolherPersonagem";
+        [SerializeField] private string escolherPersonagemScene = "CenaSeleçao";
         [SerializeField] private string lobbyScene = "LobbyScene";
 
         private Coroutine _sceneTransitionRoutine;

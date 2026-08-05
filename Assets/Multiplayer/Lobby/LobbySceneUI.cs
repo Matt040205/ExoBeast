@@ -351,7 +351,7 @@ public class LobbySceneUI : MonoBehaviour
             lobbyName  = nome,
             maxPlayers = _maxPlayers,
             isPublic   = publicoToggle != null ? publicoToggle.isOn : true,
-            mapName    = "EscolherPersonagem",
+            mapName    = "CenaSeleçao",
         });
 
         if (!sucesso)

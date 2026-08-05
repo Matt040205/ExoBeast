@@ -195,7 +195,36 @@ public class GameSetupManager : NetworkBehaviour
         {
             characterEscolhido = biblioteca[charIndex];
             prefabToSpawn = characterEscolhido?.commanderPrefab;
+            if (prefabToSpawn == null) prefabToSpawn = characterEscolhido?.towerPrefab;
             Debug.Log($"[GameSetupManager] Spawn resolvido via CharacterChoiceCache: clientId={clientId}, charIndex={charIndex}, personagem={characterEscolhido?.name}");
+        }
+
+        // Fallback 1: Equipe Selecionada no GameDataManager
+        if (prefabToSpawn == null && GameDataManager.Instance != null && GameDataManager.Instance.equipeSelecionada != null && GameDataManager.Instance.equipeSelecionada.Length > 0)
+        {
+            var comandanteEquipe = GameDataManager.Instance.equipeSelecionada[0];
+            if (comandanteEquipe != null)
+            {
+                characterEscolhido = comandanteEquipe;
+                prefabToSpawn = comandanteEquipe.commanderPrefab ?? comandanteEquipe.towerPrefab;
+                Debug.Log($"[GameSetupManager] Prefab resolvido via GameDataManager.equipeSelecionada[0]: {comandanteEquipe.name}");
+            }
+        }
+
+        // Fallback 2: Busca qualquer personagem com prefab válido na biblioteca ou em cena
+        if (prefabToSpawn == null)
+        {
+            var todos = Resources.FindObjectsOfTypeAll<CharacterBase>();
+            foreach (var c in todos)
+            {
+                if (c != null && (c.commanderPrefab != null || c.towerPrefab != null))
+                {
+                    characterEscolhido = c;
+                    prefabToSpawn = c.commanderPrefab ?? c.towerPrefab;
+                    Debug.LogWarning($"[GameSetupManager] Prefab resolvido via Fallback Global: {c.name}");
+                    break;
+                }
+            }
         }
 
         if (prefabToSpawn == null)

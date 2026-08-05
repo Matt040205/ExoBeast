@@ -13,6 +13,7 @@ namespace ExoBeasts.Editor
             "Assets/Cenas/NetworkBootstrap.unity",
             "Assets/Cenas/MenuScene.unity",
             "Assets/Cenas/EscolherPersonagem.unity",
+            "Assets/Cenas/CenaSeleçao.unity",
             "Assets/Cenas/LobbyScene.unity",
             "Assets/Cenas/Rastros.unity",
             "Assets/Cenas/Lose.unity",
