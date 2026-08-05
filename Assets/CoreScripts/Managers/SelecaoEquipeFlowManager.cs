@@ -15,8 +15,8 @@ using Unity.Collections;
 /// ── SelecaoEquipeFlowManager ──────────────────────────────
 /// Gerenciador completo do fluxo da CenaSeleção.
 ///
-///  ▸ O pedestal de Preview 3D (Capsule/Modelo) e Nome/Ícone são GLOBAIS.
-///  ▸ Suporta o campo `olharParaAlvo` para definir a rotação/olhar do modelo no pedestal.
+///  ▸ Exibe os Sprites dos ícones de Habilidades (Passiva, Hab1, Hab2, Ultimate) ao clicar no Comandante.
+///  ▸ Exibe os Sprites dos Upgrades nos 5 Níveis de cada Caminho da Torre.
 /// ──────────────────────────────────────────────────────────
 /// </summary>
 public class SelecaoEquipeFlowManager : MonoBehaviour
@@ -547,22 +547,48 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
     private void AtualizarAbaTorresEquipadas()
     {
-        // Container 1 (Slots 1 a 4 = até 4 torres)
         AtualizarContainerSlotsTorres(estagioTorres.abaTorresEquipadas1_4, 0, 4, true);
-        
-        // Container 2 (Slots 5 a 7 = até 3 torres)
         AtualizarContainerSlotsTorres(estagioTorres.abaTorresEquipadas5_7, 4, 3, true);
     }
 
     // ────────────────────────────────────────────────────
-    // CONFIGURAÇÃO DO HOVER ÚNICO (Habilidades & Níveis 1 a 5)
+    // CONFIGURAÇÃO DO HOVER ÚNICO E ÍCONES DE HABILIDADES
     // ────────────────────────────────────────────────────
     private void ConfigurarHoverHabilidades(CharacterBase p)
     {
+        // 1. Aplica Sprites dos Ícones Visuais de Habilidade na UI
+        DefinirImagemNoIconeHabilidade(estagioComandante.iconPassiva, p.passive?.icon);
+        DefinirImagemNoIconeHabilidade(estagioComandante.iconHabilidade1, p.ability1?.icon);
+        DefinirImagemNoIconeHabilidade(estagioComandante.iconHabilidade2, p.ability2?.icon);
+        DefinirImagemNoIconeHabilidade(estagioComandante.iconUltimate, p.ultimate?.icon);
+
+        // 2. Configurar Triggers de Hover Tooltip
         ConfigurarTriggerHover(estagioComandante.iconPassiva, p.passive?.abilityName ?? "Passiva", p.passive?.description ?? "", estagioComandante.abaHoverTooltip, estagioComandante.textoHoverNome, estagioComandante.textoHoverConteudo);
         ConfigurarTriggerHover(estagioComandante.iconHabilidade1, p.ability1?.abilityName ?? "Habilidade 1", p.ability1?.description ?? "", estagioComandante.abaHoverTooltip, estagioComandante.textoHoverNome, estagioComandante.textoHoverConteudo);
         ConfigurarTriggerHover(estagioComandante.iconHabilidade2, p.ability2?.abilityName ?? "Habilidade 2", p.ability2?.description ?? "", estagioComandante.abaHoverTooltip, estagioComandante.textoHoverNome, estagioComandante.textoHoverConteudo);
         ConfigurarTriggerHover(estagioComandante.iconUltimate, p.ultimate?.abilityName ?? "Ultimate", p.ultimate?.description ?? "", estagioComandante.abaHoverTooltip, estagioComandante.textoHoverNome, estagioComandante.textoHoverConteudo);
+    }
+
+    private void DefinirImagemNoIconeHabilidade(GameObject containerIcone, Sprite spriteHabilidade)
+    {
+        if (containerIcone == null) return;
+
+        Image img = containerIcone.GetComponent<Image>();
+        if (img == null) img = containerIcone.GetComponentInChildren<Image>(true);
+
+        if (img != null)
+        {
+            if (spriteHabilidade != null)
+            {
+                img.sprite = spriteHabilidade;
+                img.enabled = true;
+                img.color = Color.white;
+            }
+            else
+            {
+                img.enabled = (img.sprite != null);
+            }
+        }
     }
 
     private void ConfigurarHoverCaminhosTorreItem(CaminhoTorreUIItem item, int pathIndex, List<UpgradePath> paths, GameObject abaTooltip, TextMeshProUGUI textoNome, TextMeshProUGUI textoConteudo)
