@@ -10,7 +10,7 @@ Guia operacional atual para configurar cenas, prefabs e testes do multiplayer.
 ## Fluxo atual
 
 ```text
-NetworkBootstrap.unity -> MenuScene.unity -> LobbyScene.unity -> EscolherPersonagem.unity -> CenaMapaNOVO.unity
+NetworkBootstrap.unity -> MenuScene.unity -> LobbyScene.unity -> CenaSeleçao.unity -> CenaMapaNOVO.unity
 ```
 
 Cenas de teste isolado:
@@ -19,7 +19,7 @@ Cenas de teste isolado:
 
 - `LobbyScene.unity` e a cena de entrada do fluxo multiplayer.
 - `CenaMapaNOVO.unity` e a cena de gameplay carregada pela rede (o nome `CenaMapaTeste` e legado).
-- `EscolherPersonagem.unity` e carregada pelo NGO entre o lobby e a partida.
+- `CenaSeleçao.unity` e carregada pelo NGO entre o lobby e a partida.
 - `NetworkBootstrap.unity` nao existe neste repositorio; o bootstrap e feito via componente `NetworkBootstrap.cs` na cena `NetworkBootstrap.unity` em `Assets/Cenas/`.
 
 ## LobbyScene.unity
@@ -146,7 +146,7 @@ Garanta que estas cenas existam no build (use os nomes exatos que aparecem nas s
 - `NetworkBootstrap`
 - `MenuScene`
 - `LobbyScene`
-- `EscolherPersonagem`
+- `CenaSeleçao`
 - `CenaMapaNOVO`
 - `EOSAuthTest`
 - `Network Test`
@@ -161,7 +161,7 @@ Garanta que estas cenas existam no build (use os nomes exatos que aparecem nas s
 4. No clone MPPM, entre no mesmo lobby.
 5. Verifique se o host publica os dados de conexao.
 6. Inicie a partida.
-7. Confirme que ambos carregam `EscolherPersonagem.unity` → `CenaMapaNOVO.unity`.
+7. Confirme que ambos carregam `CenaSeleçao.unity` → `CenaMapaNOVO.unity`.
 
 O que checar:
 

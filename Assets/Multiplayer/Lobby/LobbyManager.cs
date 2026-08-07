@@ -340,18 +340,23 @@ namespace ExoBeasts.Multiplayer.Lobby
                 return;
             }
 
-            if (!string.IsNullOrEmpty(filter.lobbyName))
+            if (!AddSearchStringParameter(
+                    searchHandle,
+                    LobbyAttributes.LOBBY_STATE,
+                    LobbyState.WaitingForPlayers.ToString(),
+                    ComparisonOp.Equal))
             {
-                var param = new LobbySearchSetParameterOptions
-                {
-                    Parameter = new AttributeData
-                    {
-                        Key = LobbyAttributes.LOBBY_NAME,
-                        Value = new AttributeDataValue { AsUtf8 = filter.lobbyName },
-                    },
-                    ComparisonOp = ComparisonOp.Contains,
-                };
-                searchHandle.SetParameter(ref param);
+                searchHandle.Release();
+                OnError?.Invoke("Falha ao configurar busca de salas publicas");
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(filter.lobbyName) &&
+                !AddSearchStringParameter(searchHandle, LobbyAttributes.LOBBY_NAME, filter.lobbyName, ComparisonOp.Contains))
+            {
+                searchHandle.Release();
+                OnError?.Invoke("Falha ao configurar filtro por nome da sala");
+                return;
             }
 
             var findOpts = new LobbySearchFindOptions { LocalUserId = localUserId };
@@ -360,8 +365,9 @@ namespace ExoBeasts.Multiplayer.Lobby
                 if (info.ResultCode != Result.Success && info.ResultCode != Result.NotFound)
                 {
                     searchHandle.Release();
-                    Debug.LogError($"[LobbyManager] Erro na busca: {info.ResultCode}");
                     OnLobbiesFound?.Invoke(new List<LobbyInfo>());
+                    Debug.LogError($"[LobbyManager] Erro na busca: {info.ResultCode}");
+                    OnError?.Invoke($"Falha ao buscar salas publicas: {info.ResultCode}. Tente entrar pelo ID da sala.");
                     return;
                 }
 
@@ -427,6 +433,32 @@ namespace ExoBeasts.Multiplayer.Lobby
             OnLobbiesFound?.Invoke(new List<LobbyInfo>());
 #endif
         }
+
+#if !EOS_DISABLE
+        private static bool AddSearchStringParameter(
+            LobbySearch searchHandle,
+            string key,
+            string value,
+            ComparisonOp comparisonOp)
+        {
+            var param = new LobbySearchSetParameterOptions
+            {
+                Parameter = new AttributeData
+                {
+                    Key = key,
+                    Value = new AttributeDataValue { AsUtf8 = value },
+                },
+                ComparisonOp = comparisonOp,
+            };
+
+            var result = searchHandle.SetParameter(ref param);
+            if (result == Result.Success)
+                return true;
+
+            Debug.LogWarning($"[LobbyManager] Falha ao aplicar filtro de busca '{key}': {result}");
+            return false;
+        }
+#endif
 
         /// <summary>
         /// Invalida o cache de SearchLobbies. A proxima chamada dispara nova request

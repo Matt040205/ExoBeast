@@ -21,6 +21,8 @@ using Unity.Collections;
 /// </summary>
 public class SelecaoEquipeFlowManager : MonoBehaviour
 {
+    private const string k_CharChoiceMsg = "ExoBeasts.CharacterChoice";
+
     // ── CONFIGURAÇÃO DE PERSONAGENS ─────────────────────
     [Header(" Configuração da Lista de Personagens")]
     [Tooltip("Lista de personagens disponíveis. Se estiver vazia, usará automaticamente GameDataManager.Instance.personagensDoJogador")]
@@ -172,6 +174,28 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     [Header(" ESTÁGIO 3: CONFIRMAÇÃO FINAL DA EQUIPE")]
     public EstagioConfirmacaoFinalData estagioConfirmacao;
 
+    [System.Serializable]
+    public class MultiplayerSelectionData
+    {
+        [Header("Painel de Jogadores")]
+        public GameObject painelOutrosJogadores;
+        public Transform containerListaJogadores;
+        public TextMeshProUGUI textoStatus;
+        public Button botaoPronto;
+        public TextMeshProUGUI textoBotaoPronto;
+    }
+
+    [Header(" MULTIPLAYER: STATUS E PRONTO")]
+    public MultiplayerSelectionData multiplayerUi = new MultiplayerSelectionData();
+
+    [Header("Cores dos Jogadores")]
+    public Color[] coresPorJogador = new Color[] {
+        new Color(0.9764706f, 0.5921569f, 0.9803922f, 1f),
+        new Color(0.5921569f, 0.8352941f, 0.9803922f, 1f),
+        new Color(0.6980392f, 0.9803922f, 0.5921569f, 1f),
+        new Color(0.9803922f, 0.9098039f, 0.5921569f, 1f)
+    };
+
     // ── ESTADO INTERNO DE SELEÇÃO ───────────────────────
     private CharacterBase _comandanteSelecionado;
     private CharacterBase _personagemVisualizacaoComandante;
@@ -180,10 +204,15 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     private GameObject _modeloPreviewAtual;
     private List<GameObject> _modelosFinalInstanciados = new List<GameObject>();
     private int _maxTorres = 7;
+    private readonly List<int> _slotsPermitidos = new List<int> { 0, 1, 2, 3, 4, 5, 6, 7 };
+    private bool _isReady;
+    private bool _multiplayerCallbacksRegistered;
+    private bool _selectionSceneInitialized;
 
     // ────────────────────────────────────────────────────
     void Start()
     {
+        InicializarSelecaoMultiplayer();
         IniciarFluxo();
     }
 
@@ -197,6 +226,8 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         ConfigurarBotoesEstagio1();
         ConfigurarBotoesEstagio2();
         ConfigurarBotoesEstagio3();
+        ConfigurarPainelMultiplayer();
+        AtualizarEstadoProntoEInicio();
 
         StartCoroutine(CarregarPersonagensEPopularGrids());
     }
@@ -240,7 +271,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     private void ExibirEstagioComandante()
     {
         if (estagioComandante.cmPersonagem != null) estagioComandante.cmPersonagem.gameObject.SetActive(true);
-        if (estagioComandante.canvasPersonagem != null) estagioComandante.canvasPersonagem.SetActive(true);
+        SetCanvasPersonagemActive(true);
 
         if (capsulePlaceholder != null) capsulePlaceholder.SetActive(true);
         if (estagioComandante.abaTipoPersonagem != null) estagioComandante.abaTipoPersonagem.SetActive(false);
@@ -378,13 +409,10 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         if (estagioComandante.popupConfirmacao != null)
             estagioComandante.popupConfirmacao.SetActive(false);
 
-        if (GameDataManager.Instance != null)
-        {
-            GameDataManager.Instance.equipeSelecionada[0] = _comandanteSelecionado;
-            GameDataManager.Instance.SaveGame();
-        }
+        SalvarSelecaoLocalNoGameData();
 
         RegistrarEscolhaComandanteRede(_comandanteSelecionado);
+        AtualizarEstadoProntoEInicio();
 
         Debug.Log($"[SelecaoEquipeFlowManager] Comandante confirmado: {_comandanteSelecionado.name}.");
     }
@@ -392,7 +420,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     private void OcultarEstagioComandante()
     {
         if (estagioComandante.cmPersonagem != null) estagioComandante.cmPersonagem.gameObject.SetActive(false);
-        if (estagioComandante.canvasPersonagem != null) estagioComandante.canvasPersonagem.SetActive(false);
+        SetCanvasPersonagemActive(false);
     }
 
     // ────────────────────────────────────────────────────
@@ -404,6 +432,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         ExibirEstagioTorres();
         PopularGridTorres();
         AtualizarAbaTorresEquipadas();
+        AtualizarEstadoProntoEInicio();
     }
 
     private void ExibirEstagioTorres()
@@ -533,15 +562,18 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     {
         if (_torreVisualizacaoTorres == null) return;
 
-        if (_torresEquipadas.Count < _maxTorres)
+        int maxTorresPermitidas = GetMaxTorresPermitidas();
+        if (_torresEquipadas.Count < maxTorresPermitidas)
         {
             _torresEquipadas.Add(_torreVisualizacaoTorres);
+            SalvarSelecaoLocalNoGameData();
             AtualizarAbaTorresEquipadas();
-            Debug.Log($"[SelecaoEquipeFlowManager] Torre equipada: {_torreVisualizacaoTorres.name} (Total equipadas: {_torresEquipadas.Count}/{_maxTorres})");
+            AtualizarEstadoProntoEInicio();
+            Debug.Log($"[SelecaoEquipeFlowManager] Torre equipada: {_torreVisualizacaoTorres.name} (Total equipadas: {_torresEquipadas.Count}/{maxTorresPermitidas})");
         }
         else
         {
-            Debug.LogWarning("[SelecaoEquipeFlowManager] Limite máximo de 7 torres atingido.");
+            Debug.LogWarning($"[SelecaoEquipeFlowManager] Limite maximo de {maxTorresPermitidas} torres atingido.");
         }
     }
 
@@ -672,6 +704,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
         MontarPreviewEquipe3DFinal();
         AtualizarAbaResumoEquipeUI();
+        AtualizarEstadoProntoEInicio();
     }
 
     private void ExibirEstagioConfirmacao()
@@ -728,7 +761,9 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                                 if (indexParaRemover < _torresEquipadas.Count)
                                 {
                                     _torresEquipadas.RemoveAt(indexParaRemover);
+                                    SalvarSelecaoLocalNoGameData();
                                     AtualizarAbaTorresEquipadas();
+                                    AtualizarEstadoProntoEInicio();
                                 }
                             });
                         }
@@ -776,7 +811,9 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                                 if (indexParaRemover < _torresEquipadas.Count)
                                 {
                                     _torresEquipadas.RemoveAt(indexParaRemover);
+                                    SalvarSelecaoLocalNoGameData();
                                     AtualizarAbaTorresEquipadas();
+                                    AtualizarEstadoProntoEInicio();
                                 }
                             });
                         }
@@ -833,27 +870,12 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
     private void ConfirmarFinalEIniciarPartida()
     {
-        if (_comandanteSelecionado == null && GameDataManager.Instance != null && GameDataManager.Instance.equipeSelecionada != null && GameDataManager.Instance.equipeSelecionada[0] != null)
-        {
-            _comandanteSelecionado = GameDataManager.Instance.equipeSelecionada[0];
-        }
-
         if (_comandanteSelecionado == null && personagensDisponiveis != null && personagensDisponiveis.Count > 0)
         {
             _comandanteSelecionado = personagensDisponiveis[0];
         }
 
-        if (GameDataManager.Instance != null)
-        {
-            if (GameDataManager.Instance.equipeSelecionada == null || GameDataManager.Instance.equipeSelecionada.Length == 0)
-                GameDataManager.Instance.equipeSelecionada = new CharacterBase[8];
-
-            GameDataManager.Instance.equipeSelecionada[0] = _comandanteSelecionado;
-            for (int i = 0; i < _torresEquipadas.Count && (i + 1) < GameDataManager.Instance.equipeSelecionada.Length; i++)
-                GameDataManager.Instance.equipeSelecionada[i + 1] = _torresEquipadas[i];
-            
-            GameDataManager.Instance.SaveGame();
-        }
+        SalvarSelecaoLocalNoGameData();
 
         RegistrarEscolhaComandanteRede(_comandanteSelecionado);
 
@@ -863,7 +885,28 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         }
 
         var nm = NetworkManager.Singleton;
-        if (nm != null && nm.IsServer)
+        if (GameModeManager.CurrentMode == GameMode.Multiplayer)
+        {
+            AtualizarEstadoProntoEInicio();
+
+            if (nm == null || !nm.IsServer)
+            {
+                Debug.Log("[SelecaoEquipeFlowManager] Cliente aguardando o host iniciar a partida.");
+                return;
+            }
+
+            if (!PodeHostIniciarPartida())
+            {
+                Debug.LogWarning("[SelecaoEquipeFlowManager] Partida bloqueada: selecao local, ready do lobby ou cache autoritativo incompleto.");
+                return;
+            }
+
+            if (ExoBeasts.Managers.Loading.LoadingScreenUI.Instance != null)
+                ExoBeasts.Managers.Loading.LoadingScreenUI.Instance.Show();
+
+            nm.SceneManager.LoadScene(estagioConfirmacao.nomeDaCenaDoJogo, LoadSceneMode.Single);
+        }
+        else if (nm != null && nm.IsServer)
         {
             if (ExoBeasts.Managers.Loading.LoadingScreenUI.Instance != null)
                 ExoBeasts.Managers.Loading.LoadingScreenUI.Instance.Show();
@@ -978,24 +1021,435 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                 indexBib = bibData.Count - 1;
             }
 
-            CharacterChoiceCache.SetHostCharacterIndex(indexBib, "SelecaoEquipeFlowManager");
-
             var nm = NetworkManager.Singleton;
-            if (nm != null)
-            {
-                if (LobbyManager.Instance != null)
-                    LobbyManager.Instance.SelectCharacter(indexBib);
+            if (LobbyManager.Instance != null)
+                LobbyManager.Instance.SelectCharacter(indexBib);
 
-                if (nm.IsClient && !nm.IsServer)
+            if (nm == null || nm.IsServer)
+            {
+                CharacterChoiceCache.SetHostCharacterIndex(indexBib, "SelecaoEquipeFlowManager");
+            }
+            else if (nm.IsClient)
+            {
+                if (nm.CustomMessagingManager != null)
                 {
                     var writer = new FastBufferWriter(sizeof(int), Unity.Collections.Allocator.Temp);
                     writer.WriteValueSafe(indexBib);
-                    nm.CustomMessagingManager.SendNamedMessage("ExoBeasts.CharacterChoice", NetworkManager.ServerClientId, writer);
+                    nm.CustomMessagingManager.SendNamedMessage(k_CharChoiceMsg, NetworkManager.ServerClientId, writer);
                     writer.Dispose();
                 }
             }
 
             Debug.Log($"[SelecaoEquipeFlowManager] Registrou escolha de comandante autoritativa: index={indexBib} ({cleanName})");
+        }
+    }
+
+    private void InicializarSelecaoMultiplayer()
+    {
+        if (_selectionSceneInitialized) return;
+        _selectionSceneInitialized = true;
+
+        CalcularSlotsPermitidos();
+
+        if (GameModeManager.CurrentMode != GameMode.Multiplayer)
+            return;
+
+        if (LobbyManager.Instance != null)
+        {
+            LobbyManager.Instance.OnMemberUpdated += OnLobbyMemberChanged;
+            LobbyManager.Instance.OnMemberJoined += OnLobbyMemberChanged;
+        }
+
+        var nm = NetworkManager.Singleton;
+        if (nm != null && nm.IsServer && nm.CustomMessagingManager != null)
+        {
+            nm.CustomMessagingManager.RegisterNamedMessageHandler(k_CharChoiceMsg, OnCharacterChoiceReceived);
+            _multiplayerCallbacksRegistered = true;
+        }
+
+        SetSelectionReady(false, true);
+    }
+
+    private void ConfigurarPainelMultiplayer()
+    {
+        EnsurePainelMultiplayerBound();
+
+        bool isMultiplayer = GameModeManager.CurrentMode == GameMode.Multiplayer;
+        if (multiplayerUi.painelOutrosJogadores != null)
+            multiplayerUi.painelOutrosJogadores.SetActive(isMultiplayer);
+
+        if (!isMultiplayer)
+            return;
+
+        EnsureRuntimeMultiplayerPanel();
+
+        if (multiplayerUi.botaoPronto != null)
+        {
+            multiplayerUi.botaoPronto.onClick.RemoveAllListeners();
+            multiplayerUi.botaoPronto.onClick.AddListener(() => SetSelectionReady(!_isReady, true));
+        }
+
+        AtualizarListaJogadoresMultiplayer();
+    }
+
+    private void EnsurePainelMultiplayerBound()
+    {
+        if (multiplayerUi == null)
+            multiplayerUi = new MultiplayerSelectionData();
+
+        if (multiplayerUi.painelOutrosJogadores == null)
+        {
+            Transform found = FindSceneTransformByName("AbaDeOutrosJogadores");
+            if (found != null)
+                multiplayerUi.painelOutrosJogadores = found.gameObject;
+        }
+    }
+
+    private void EnsureRuntimeMultiplayerPanel()
+    {
+        if (multiplayerUi.painelOutrosJogadores == null) return;
+
+        RectTransform panelRect = multiplayerUi.painelOutrosJogadores.GetComponent<RectTransform>();
+        if (panelRect != null)
+        {
+            panelRect.anchorMin = new Vector2(0.02f, 0.55f);
+            panelRect.anchorMax = new Vector2(0.28f, 0.95f);
+            panelRect.offsetMin = Vector2.zero;
+            panelRect.offsetMax = Vector2.zero;
+        }
+
+        Image panelImage = multiplayerUi.painelOutrosJogadores.GetComponent<Image>();
+        if (panelImage != null)
+            panelImage.color = new Color(0.04f, 0.06f, 0.08f, 0.76f);
+
+        VerticalLayoutGroup layout = multiplayerUi.painelOutrosJogadores.GetComponent<VerticalLayoutGroup>();
+        if (layout == null)
+            layout = multiplayerUi.painelOutrosJogadores.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(12, 12, 12, 12);
+        layout.spacing = 8f;
+        layout.childControlHeight = true;
+        layout.childControlWidth = true;
+        layout.childForceExpandHeight = false;
+        layout.childForceExpandWidth = true;
+
+        if (multiplayerUi.textoStatus == null)
+            multiplayerUi.textoStatus = GetOrCreateText(multiplayerUi.painelOutrosJogadores.transform, "StatusMultiplayer", 18, FontStyles.Bold);
+
+        if (multiplayerUi.containerListaJogadores == null)
+        {
+            GameObject container = GetOrCreateChild(multiplayerUi.painelOutrosJogadores.transform, "ListaJogadoresMultiplayer");
+            if (container.GetComponent<VerticalLayoutGroup>() == null)
+            {
+                VerticalLayoutGroup containerLayout = container.AddComponent<VerticalLayoutGroup>();
+                containerLayout.spacing = 4f;
+                containerLayout.childControlHeight = true;
+                containerLayout.childControlWidth = true;
+                containerLayout.childForceExpandHeight = false;
+                containerLayout.childForceExpandWidth = true;
+            }
+            multiplayerUi.containerListaJogadores = container.transform;
+        }
+
+        if (multiplayerUi.botaoPronto == null)
+        {
+            GameObject buttonObj = GetOrCreateChild(multiplayerUi.painelOutrosJogadores.transform, "BotaoProntoSelecao");
+            Image image = buttonObj.GetComponent<Image>();
+            if (image == null) image = buttonObj.AddComponent<Image>();
+            image.color = new Color(0.8f, 0.8f, 0.8f, 1f);
+            multiplayerUi.botaoPronto = buttonObj.GetComponent<Button>();
+            if (multiplayerUi.botaoPronto == null) multiplayerUi.botaoPronto = buttonObj.AddComponent<Button>();
+
+            RectTransform buttonRect = buttonObj.GetComponent<RectTransform>();
+            if (buttonRect != null)
+                buttonRect.sizeDelta = new Vector2(0f, 42f);
+        }
+
+        if (multiplayerUi.textoBotaoPronto == null)
+            multiplayerUi.textoBotaoPronto = GetOrCreateText(multiplayerUi.botaoPronto.transform, "TextoPronto", 17, FontStyles.Bold);
+    }
+
+    private TextMeshProUGUI GetOrCreateText(Transform parent, string name, int fontSize, FontStyles style)
+    {
+        Transform existing = parent.Find(name);
+        GameObject obj = existing != null ? existing.gameObject : new GameObject(name, typeof(RectTransform));
+        if (existing == null)
+            obj.transform.SetParent(parent, false);
+
+        TextMeshProUGUI text = obj.GetComponent<TextMeshProUGUI>();
+        if (text == null)
+            text = obj.AddComponent<TextMeshProUGUI>();
+
+        text.fontSize = fontSize;
+        text.fontStyle = style;
+        text.color = Color.white;
+        text.raycastTarget = false;
+        text.alignment = TextAlignmentOptions.MidlineLeft;
+        return text;
+    }
+
+    private GameObject GetOrCreateChild(Transform parent, string name)
+    {
+        Transform existing = parent.Find(name);
+        if (existing != null)
+            return existing.gameObject;
+
+        GameObject obj = new GameObject(name, typeof(RectTransform));
+        obj.transform.SetParent(parent, false);
+        return obj;
+    }
+
+    private Transform FindSceneTransformByName(string objectName)
+    {
+        Transform[] allTransforms = Resources.FindObjectsOfTypeAll<Transform>();
+        foreach (Transform candidate in allTransforms)
+        {
+            if (candidate == null || candidate.gameObject.scene != gameObject.scene)
+                continue;
+            if (candidate.gameObject.name == objectName)
+                return candidate;
+        }
+        return null;
+    }
+
+    private void CalcularSlotsPermitidos()
+    {
+        _slotsPermitidos.Clear();
+
+        if (GameModeManager.CurrentMode != GameMode.Multiplayer || LobbyManager.Instance == null)
+        {
+            _slotsPermitidos.AddRange(new[] { 0, 1, 2, 3, 4, 5, 6, 7 });
+            return;
+        }
+
+        List<LobbyMember> membros = LobbyManager.Instance.GetOrderedMembers();
+        string meuId = ExoBeasts.Multiplayer.Auth.SessionManager.Instance?.GetUserId() ?? "";
+        int meuIndice = LobbyManager.Instance.GetCanonicalMemberIndex(meuId);
+        List<int> slots = PartySlotLayout.GetSlots(membros != null ? membros.Count : 1, meuIndice);
+        _slotsPermitidos.AddRange(slots);
+
+        if (GameDataManager.Instance != null && membros != null)
+            GameDataManager.Instance.totalDeJogadores = membros.Count;
+    }
+
+    private int GetCommanderSlot()
+    {
+        return _slotsPermitidos.Count > 0 ? _slotsPermitidos[0] : 0;
+    }
+
+    private int GetMaxTorresPermitidas()
+    {
+        if (GameModeManager.CurrentMode == GameMode.Multiplayer)
+            return Mathf.Max(0, _slotsPermitidos.Count - 1);
+
+        return _maxTorres;
+    }
+
+    private bool HasLocalCommanderAndFirstTowerSelected()
+    {
+        return _comandanteSelecionado != null && _torresEquipadas.Count > 0;
+    }
+
+    private void SalvarSelecaoLocalNoGameData()
+    {
+        if (GameDataManager.Instance == null)
+            return;
+
+        if (GameDataManager.Instance.equipeSelecionada == null || GameDataManager.Instance.equipeSelecionada.Length < 8)
+            GameDataManager.Instance.equipeSelecionada = new CharacterBase[8];
+
+        CharacterBase[] equipe = GameDataManager.Instance.equipeSelecionada;
+
+        if (GameModeManager.CurrentMode == GameMode.Multiplayer)
+        {
+            foreach (int slot in _slotsPermitidos)
+            {
+                if (slot >= 0 && slot < equipe.Length)
+                    equipe[slot] = null;
+            }
+
+            int commanderSlot = GetCommanderSlot();
+            if (commanderSlot >= 0 && commanderSlot < equipe.Length)
+                equipe[commanderSlot] = _comandanteSelecionado;
+
+            for (int i = 0; i < _torresEquipadas.Count && (i + 1) < _slotsPermitidos.Count; i++)
+            {
+                int slot = _slotsPermitidos[i + 1];
+                if (slot >= 0 && slot < equipe.Length)
+                    equipe[slot] = _torresEquipadas[i];
+            }
+        }
+        else
+        {
+            equipe[0] = _comandanteSelecionado;
+            for (int i = 1; i < equipe.Length; i++)
+                equipe[i] = null;
+            for (int i = 0; i < _torresEquipadas.Count && (i + 1) < equipe.Length; i++)
+                equipe[i + 1] = _torresEquipadas[i];
+        }
+
+        GameDataManager.Instance.SaveGame();
+    }
+
+    private void AtualizarEstadoProntoEInicio()
+    {
+        bool localComplete = HasLocalCommanderAndFirstTowerSelected();
+
+        if (!localComplete && _isReady)
+            SetSelectionReady(false, true);
+
+        bool isMultiplayer = GameModeManager.CurrentMode == GameMode.Multiplayer;
+        bool isHost = IsLocalLobbyHost();
+
+        if (multiplayerUi.painelOutrosJogadores != null)
+            multiplayerUi.painelOutrosJogadores.SetActive(isMultiplayer);
+
+        if (multiplayerUi.botaoPronto != null)
+            multiplayerUi.botaoPronto.interactable = isMultiplayer && localComplete;
+
+        if (multiplayerUi.textoBotaoPronto != null)
+            multiplayerUi.textoBotaoPronto.text = _isReady ? "Pronto" : localComplete ? "Ficar pronto" : "Escolha comandante + torre";
+
+        if (multiplayerUi.botaoPronto != null)
+        {
+            Image image = multiplayerUi.botaoPronto.GetComponent<Image>();
+            if (image != null)
+                image.color = _isReady ? new Color(0.2f, 0.65f, 0.25f, 1f) : new Color(0.8f, 0.8f, 0.8f, 1f);
+        }
+
+        if (multiplayerUi.textoStatus != null)
+        {
+            multiplayerUi.textoStatus.text = isMultiplayer
+                ? localComplete ? "Selecao local completa" : "Escolha comandante e primeira torre"
+                : "";
+        }
+
+        if (estagioConfirmacao.botaoIniciarPartida != null)
+        {
+            if (isMultiplayer)
+            {
+                estagioConfirmacao.botaoIniciarPartida.gameObject.SetActive(isHost);
+                estagioConfirmacao.botaoIniciarPartida.interactable = isHost && PodeHostIniciarPartida();
+            }
+            else
+            {
+                estagioConfirmacao.botaoIniciarPartida.gameObject.SetActive(true);
+                estagioConfirmacao.botaoIniciarPartida.interactable = localComplete;
+            }
+        }
+
+        AtualizarListaJogadoresMultiplayer();
+    }
+
+    private void AtualizarListaJogadoresMultiplayer()
+    {
+        if (GameModeManager.CurrentMode != GameMode.Multiplayer || multiplayerUi.containerListaJogadores == null)
+            return;
+
+        foreach (Transform child in multiplayerUi.containerListaJogadores)
+            Destroy(child.gameObject);
+
+        List<LobbyMember> members = LobbyManager.Instance?.GetOrderedMembers() ?? new List<LobbyMember>();
+        string localUid = ExoBeasts.Multiplayer.Auth.SessionManager.Instance?.GetUserId() ?? "";
+        LobbyInfo lobby = LobbyManager.Instance?.GetCurrentLobby();
+
+        for (int i = 0; i < members.Count; i++)
+        {
+            LobbyMember member = members[i];
+            TextMeshProUGUI row = GetOrCreateText(multiplayerUi.containerListaJogadores, $"Jogador_{i + 1}", 15, FontStyles.Normal);
+            bool isMe = member.productUserId == localUid;
+            bool isHost = lobby != null && lobby.hostProductUserId == member.productUserId;
+            string ready = member.isReady ? "OK" : "...";
+            string host = isHost ? " Host" : "";
+            string me = isMe ? " Voce" : "";
+            row.text = $"{i + 1}. {member.displayName}{host}{me} [{ready}]";
+            row.color = isMe ? Color.yellow : member.isReady ? Color.green : Color.white;
+        }
+    }
+
+    private bool IsLocalLobbyHost()
+    {
+        LobbyInfo lobby = LobbyManager.Instance?.GetCurrentLobby();
+        string localUid = ExoBeasts.Multiplayer.Auth.SessionManager.Instance?.GetUserId() ?? "";
+        return lobby != null && !string.IsNullOrEmpty(localUid) && lobby.hostProductUserId == localUid;
+    }
+
+    private bool PodeHostIniciarPartida()
+    {
+        if (!HasLocalCommanderAndFirstTowerSelected())
+            return false;
+
+        if (GameModeManager.CurrentMode != GameMode.Multiplayer)
+            return true;
+
+        if (!IsLocalLobbyHost())
+            return false;
+
+        List<LobbyMember> members = LobbyManager.Instance?.GetOrderedMembers();
+        if (members == null || members.Count == 0 || !members.TrueForAll(m => m.isReady))
+            return false;
+
+        var nm = NetworkManager.Singleton;
+        if (nm == null || !nm.IsServer)
+            return false;
+
+        foreach (ulong clientId in nm.ConnectedClientsIds)
+        {
+            if (!CharacterChoiceCache.HasChoice(clientId))
+                return false;
+        }
+
+        return true;
+    }
+
+    private void SetSelectionReady(bool ready, bool notifyLobby)
+    {
+        if (ready && !HasLocalCommanderAndFirstTowerSelected())
+            ready = false;
+
+        _isReady = ready;
+
+        if (notifyLobby && GameModeManager.CurrentMode == GameMode.Multiplayer && LobbyManager.Instance != null)
+            LobbyManager.Instance.SetReady(ready);
+
+        AtualizarEstadoProntoEInicio();
+    }
+
+    private void OnLobbyMemberChanged(LobbyMember _)
+    {
+        CalcularSlotsPermitidos();
+        AtualizarEstadoProntoEInicio();
+    }
+
+    private void OnCharacterChoiceReceived(ulong senderId, FastBufferReader reader)
+    {
+        reader.ReadValueSafe(out int charIdx);
+        CharacterChoiceCache.SetClientCharacterIndex(senderId, charIdx, "SelecaoEquipeFlowManager.CustomMessage");
+        AtualizarEstadoProntoEInicio();
+        Debug.Log($"[SelecaoEquipeFlowManager] Commander choice registered: clientId={senderId}, index={charIdx}");
+    }
+
+    private void SetCanvasPersonagemActive(bool active)
+    {
+        if (estagioComandante.canvasPersonagem == null)
+            return;
+
+        EnsurePainelMultiplayerBound();
+
+        bool keepMultiplayerPanel = GameModeManager.CurrentMode == GameMode.Multiplayer &&
+                                    multiplayerUi.painelOutrosJogadores != null &&
+                                    multiplayerUi.painelOutrosJogadores.transform.IsChildOf(estagioComandante.canvasPersonagem.transform);
+
+        if (!keepMultiplayerPanel)
+        {
+            estagioComandante.canvasPersonagem.SetActive(active);
+            return;
+        }
+
+        estagioComandante.canvasPersonagem.SetActive(true);
+        foreach (Transform child in estagioComandante.canvasPersonagem.transform)
+        {
+            bool isPanel = child.gameObject == multiplayerUi.painelOutrosJogadores;
+            child.gameObject.SetActive(active || isPanel);
         }
     }
 
@@ -1034,7 +1488,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
         foreach (var mb in obj.GetComponentsInChildren<MonoBehaviour>())
         {
-            if (mb == null || mb is Animator) continue;
+            if (mb == null) continue;
             mb.enabled = false;
         }
 
@@ -1051,6 +1505,16 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (LobbyManager.Instance != null)
+        {
+            LobbyManager.Instance.OnMemberUpdated -= OnLobbyMemberChanged;
+            LobbyManager.Instance.OnMemberJoined -= OnLobbyMemberChanged;
+        }
+
+        var nm = NetworkManager.Singleton;
+        if (_multiplayerCallbacksRegistered && nm != null && nm.IsServer && nm.CustomMessagingManager != null)
+            nm.CustomMessagingManager.UnregisterNamedMessageHandler(k_CharChoiceMsg);
+
         if (_modeloPreviewAtual != null) Destroy(_modeloPreviewAtual);
         foreach (var m in _modelosFinalInstanciados)
             if (m != null) Destroy(m);

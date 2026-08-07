@@ -239,7 +239,7 @@ MonoBehaviour:
       m_Calls:
       - m_Target: {fileID: 1526759489}
         m_TargetAssemblyTypeName: LobbySceneUI, Assembly-CSharp
-        m_MethodName: IrParaCriarLobby
+        m_MethodName: EntrarPorId
         m_Mode: 1
         m_Arguments:
           m_ObjectArgument: {fileID: 0}
@@ -5505,7 +5505,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_RaycastTarget: 1
+  m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
@@ -10038,7 +10038,7 @@ MonoBehaviour:
   maxPlayersText: {fileID: 1221880240}
   publicoToggle: {fileID: 67169773}
   joinIdField: {fileID: 0}
-  lobbyListContent: {fileID: 539157520}
+  lobbyListContent: {fileID: 1248859614}
   lobbyCardPrefab: {fileID: 0}
   lobbyCopyIdText: {fileID: 209938719}
   lobbyNameText: {fileID: 294837104}

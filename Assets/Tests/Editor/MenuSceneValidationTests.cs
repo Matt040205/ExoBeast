@@ -16,7 +16,7 @@ public class MenuSceneValidationTests
     {
         "Assets/Cenas/NetworkBootstrap.unity",
         "Assets/Cenas/MenuScene.unity",
-        "Assets/Cenas/EscolherPersonagem.unity",
+        "Assets/Cenas/CenaSeleçao.unity",
         SupportedLobbyScenePath,
         "Assets/Cenas/Rastros.unity",
         "Assets/Cenas/Lose.unity",
@@ -115,7 +115,7 @@ public class MenuSceneValidationTests
     {
         WithScene(SupportedLobbyScenePath, scene =>
         {
-            string[] guardedButtonNames = { "EntrarLobby", "LobbyPublico" };
+            string[] guardedButtonNames = { "EntrarLobbyTransferência", "LobbyPublico" };
 
             foreach (string buttonName in guardedButtonNames)
             {

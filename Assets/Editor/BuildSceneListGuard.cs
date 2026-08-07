@@ -12,7 +12,6 @@ namespace ExoBeasts.Editor
         {
             "Assets/Cenas/NetworkBootstrap.unity",
             "Assets/Cenas/MenuScene.unity",
-            "Assets/Cenas/EscolherPersonagem.unity",
             "Assets/Cenas/CenaSeleçao.unity",
             "Assets/Cenas/LobbyScene.unity",
             "Assets/Cenas/Rastros.unity",
@@ -84,8 +83,8 @@ namespace ExoBeasts.Editor
                 // BUG FIX (2026-05-21): MPPM clone usa cache de Library/ separada e pode nao re-ler
                 // ProjectSettings/EditorBuildSettings.asset apos SaveAssets. Sem este Refresh,
                 // o clone entra em Play Mode com lista de cenas dessincronizada e NGO SceneManager
-                // falha ao resolver "EscolherPersonagem" quando host chama LoadScene durante a partida.
-                // Sintoma: cliente MPPM nao acompanha host na transicao LobbyScene -> EscolherPersonagem.
+                // falha ao resolver "CenaSeleçao" quando host chama LoadScene durante a partida.
+                // Sintoma: cliente MPPM nao acompanha host na transicao LobbyScene -> CenaSeleçao.
                 AssetDatabase.Refresh(ImportAssetOptions.ForceUpdate);
                 Debug.Log("[BuildSceneListGuard] Build Scene List reparada para a lista canonica do projeto.");
             }
