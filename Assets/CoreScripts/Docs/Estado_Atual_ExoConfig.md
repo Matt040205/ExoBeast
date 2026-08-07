@@ -196,8 +196,8 @@ Commit `bf379782`. Acrescenta 3 steps ao pipeline: `ResolvePaths → ImportAsset
 ### Fase 8 — Corrigir dado de produção: `Ayame.asset → towerPrefab` órfão
 **Ainda não corrigido.** Confirmado na sondagem original: `Ayame.asset.towerPrefab` aponta pro GUID `fd0bbd1c417566a43800d83168a82c10`, que **não existe em nenhum `.meta` do repositório** — foi provavelmente produzido por uma execução real e nunca commitada do plugin antigo (`samurai 3`/4/5 na raiz de `Assets/` são as sobras dessa execução). Fix: restaurar pro `TorretaSamurai.prefab`, fileID `3333250326587255744` (validado nesta sessão anterior: presente 12× no YAML do prefab real). É o único estrago de dado real que a sondagem original encontrou que precisa correção — todo o resto (grafias de pasta divergentes, `Mina` no registro sem pasta, `Assets/DefaultNetworkPrefabs.asset` órfão) fica como está, por decisão já confirmada com o usuário (sem normalização de assets existentes).
 
-### Fase 9 — Atualizar documentação
-`Assets/Diretrizes_Multiagente.md` diz "se um comportamento mudar, atualizar a documentação afetada" — isso ainda não foi feito. Não existe hoje, dentro do repositório git, nenhum documento equivalente ao dossiê `message.txt` que o usuário colou no início (esse dossiê é um arquivo local em `Downloads/`, fora do repo, e descreve o comportamento ANTIGO). Esta fase deveria: (a) criar a versão correta/atual desse dossiê dentro do repo (provavelmente `Assets/CoreScripts/Docs/` ou `Assets/Editor/ExoConfig/`), descrevendo o comportamento real pós-refatoração; (b) atualizar este próprio arquivo (`Estado_Atual_ExoConfig.md`) removendo o que virou histórico.
+### Fase 9 — CONCLUÍDA (documentação operacional)
+`Assets/CoreScripts/Docs/GUIA_EXO_CONFIG.md` agora cobre o uso prático do plugin para a equipe. `Assets/Diretrizes_Multiagente.md` continua apontando este arquivo como fonte técnica de estado, e o guia novo como manual operacional. Este documento segue como histórico técnico da refatoração.
 
 ---
 
