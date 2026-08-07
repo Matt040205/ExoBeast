@@ -86,7 +86,7 @@ Para simular dois jogadores sem precisar de dois computadores:
 NetworkBootstrap.unity
   └─► MenuScene.unity
         └─► LobbyScene.unity          ← lobby EOS, selecao de sala
-              └─► EscolherPersonagem.unity  ← selecao de personagem (via NGO)
+              └─► CenaSeleçao.unity         ← selecao de personagem (via NGO)
                     └─► CenaMapaNOVO.unity  ← partida de jogo
 ```
 

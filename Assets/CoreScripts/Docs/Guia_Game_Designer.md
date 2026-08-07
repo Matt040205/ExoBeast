@@ -402,7 +402,7 @@ Para os scripts ainda pendentes, quando migrar:
        ├──► Clientes detectam via OnLobbyAttributeUpdated
        │         chamam ConnectAsClient*
        │
-       └──► WaitForAllClientsAndLoadScene("EscolherPersonagem")
+       └──► WaitForAllClientsAndLoadScene("CenaSeleçao")
                NGO carrega cena para todos → selecao de personagem
                → LobbyManager.StartMatch(mapName="CenaMapaNOVO")
                → CenaMapaNOVO carregada
@@ -478,7 +478,7 @@ Alertas corrigidos (removidos desta lista):
 5. **No Editor**: criar lobby, escolher personagem, clicar "Pronto"
 6. **No clone MPPM**: entrar no mesmo lobby, escolher personagem, clicar "Pronto"
 7. **No Editor** (host): clicar "Iniciar Partida" (botao habilita quando todos prontos)
-8. Ambos devem carregar `EscolherPersonagem` → confirmar personagem → carregar `CenaMapaNOVO`
+8. Ambos devem carregar `CenaSeleçao` → confirmar personagem → carregar `CenaMapaNOVO`
 
 **O que verificar apos entrar na partida:**
 - Ambos veem o personagem do outro?
@@ -546,7 +546,7 @@ Para torres e armadilhas:
 | CharacterChoiceCache | Cache server-side da escolha de personagem de cada jogador ate o spawn |
 | EosLobbyModHelper | Helpers internos para modificar atributos de lobby e membro via EOS (Sprint 7) |
 | CenaMapaNOVO | Nome canônico atual da cena de jogo (o nome CenaMapaTeste e legado) |
-| EscolherPersonagem | Cena de selecao de personagem carregada pelo NGO antes da partida |
+| CenaSeleçao | Cena canonica de selecao de personagem carregada pelo NGO antes da partida |
 
 ## Docs relacionados
 

@@ -25,6 +25,8 @@ public class MenuManager : MonoBehaviour
     [Header("Multiplayer")]
     [SerializeField] private Button botaoJogarSolo;
     [SerializeField] private Button botaoJogarOnline;
+    [SerializeField] private Button botaoOptions;
+    [SerializeField] private Button botaoCreditos;
 
     private bool _sceneChangeInProgress;
 
@@ -121,8 +123,27 @@ public class MenuManager : MonoBehaviour
 
     public void Options()
     {
+        // MenuScene: usa transição animada via pilha de navegação.
+        if (MenuTabSlider.Instance != null)
+        {
+            MenuTabSlider.Instance.NavigateTo("Options");
+            return;
+        }
+
+        // Fallback legado (PauseMenu sem TabSlider)
         StopAllCoroutines();
         StartCoroutine(ForcarAberturaOptions());
+    }
+
+    /// <summary>Abre o painel de créditos com slide animado.</summary>
+    public void Creditos()
+    {
+        if (MenuTabSlider.Instance != null)
+        {
+            MenuTabSlider.Instance.NavigateTo("Credits");
+            return;
+        }
+        Debug.LogWarning("[MenuManager] MenuTabSlider não encontrado. Fallback sem animação.");
     }
 
     private IEnumerator ForcarAberturaOptions()
@@ -145,6 +166,14 @@ public class MenuManager : MonoBehaviour
 
     public void BotaoBack()
     {
+        // MenuScene: usa Back() da pilha de navegação animada.
+        if (MenuTabSlider.Instance != null)
+        {
+            MenuTabSlider.Instance.Back();
+            return;
+        }
+
+        // Comportamento legado para PauseMenu
         if (optionsPanel) optionsPanel.SetActive(false);
         SetPauseButtonsState(true);
     }
@@ -162,8 +191,19 @@ public class MenuManager : MonoBehaviour
         _sceneChangeInProgress = true;
         PauseControl.isPaused = false;
 
+        if (SceneFader.Instance != null)
+        {
+            yield return SceneFader.Instance.FadeOutRoutine();
+        }
+        else
+        {
+            var go = new GameObject("SceneFader");
+            var fader = go.AddComponent<SceneFader>();
+            yield return fader.FadeOutRoutine();
+        }
+
         bool isMenuDestination = nomeDaCena.ToLower().Contains("menu");
-        bool isSelectionDestination = nomeDaCena.ToLower().Contains("escolherpersonagem");
+        bool isSelectionDestination = nomeDaCena.ToLower().Contains("escolherpersonagem") || nomeDaCena.ToLower().Contains("cenasele");
 
         if (isMenuDestination && GameDataManager.Instance != null)
         {
@@ -196,15 +236,13 @@ public class MenuManager : MonoBehaviour
     {
         TryAutoBindButton(ref botaoJogarSolo, "Singleplayer");
         TryAutoBindButton(ref botaoJogarOnline, "Multiplayer");
+        TryAutoBindButton(ref botaoOptions, "Options", "options");
+        TryAutoBindButton(ref botaoCreditos, "Credits", "Creditos");
 
         if (botaoJogarSolo != null)
         {
             botaoJogarSolo.onClick = new Button.ButtonClickedEvent();
             botaoJogarSolo.onClick.AddListener(() => GameModeManager.EnsureInstance().StartSingleplayer());
-        }
-        else
-        {
-            Debug.LogError("[MenuManager] Nao foi possivel encontrar o botao 'Singleplayer' na MenuScene.");
         }
 
         if (botaoJogarOnline != null)
@@ -212,10 +250,39 @@ public class MenuManager : MonoBehaviour
             botaoJogarOnline.onClick = new Button.ButtonClickedEvent();
             botaoJogarOnline.onClick.AddListener(() => GameModeManager.EnsureInstance().StartMultiplayer());
         }
-        else
+
+        if (botaoOptions != null)
         {
-            Debug.LogError("[MenuManager] Nao foi possivel encontrar o botao 'Multiplayer' na MenuScene.");
+            botaoOptions.onClick = new Button.ButtonClickedEvent();
+            botaoOptions.onClick.AddListener(() => Options());
         }
+
+        if (botaoCreditos != null)
+        {
+            botaoCreditos.onClick = new Button.ButtonClickedEvent();
+            botaoCreditos.onClick.AddListener(() => Creditos());
+        }
+
+        BindBackButtonsInPanels();
+    }
+
+    private void BindBackButtonsInPanels()
+    {
+        foreach (Button btn in FindObjectsByType<Button>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            if (btn != null && btn.gameObject.scene == gameObject.scene && IsBackButtonName(btn.gameObject.name))
+            {
+                btn.onClick = new Button.ButtonClickedEvent();
+                btn.onClick.AddListener(BotaoBack);
+            }
+        }
+    }
+
+    private static bool IsBackButtonName(string objectName)
+    {
+        string normalized = (objectName ?? "").Trim();
+        return normalized.Equals("Back", System.StringComparison.OrdinalIgnoreCase) ||
+               normalized.IndexOf("voltar", System.StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private void TryAutoBindButton(ref Button button, string expectedName)
@@ -227,7 +294,7 @@ public class MenuManager : MonoBehaviour
         {
             if (candidate != null &&
                 candidate.gameObject.scene == gameObject.scene &&
-                candidate.gameObject.name == expectedName)
+                candidate.gameObject.name.Trim().Equals(expectedName.Trim(), System.StringComparison.OrdinalIgnoreCase))
             {
                 button = candidate;
                 Debug.LogWarning($"[MenuManager] Botao '{expectedName}' nao estava serializado na MenuScene. Referencia reconstituida automaticamente por nome.");
@@ -235,4 +302,16 @@ public class MenuManager : MonoBehaviour
             }
         }
     }
+
+    /// <summary>
+    /// Overload que tenta o nome principal primeiro, depois o fallback.
+    /// Útil para botões que podem ter nomes em PT ou EN.
+    /// </summary>
+    private void TryAutoBindButton(ref Button button, string primaryName, string fallbackName)
+    {
+        TryAutoBindButton(ref button, primaryName);
+        if (button == null)
+            TryAutoBindButton(ref button, fallbackName);
+    }
 }
+

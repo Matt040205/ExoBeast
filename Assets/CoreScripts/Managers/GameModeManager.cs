@@ -26,7 +26,7 @@ namespace ExoBeasts.Managers
         public static bool HasInstance => Instance != null;
         public static GameModeManager TryGetExistingInstance() => Instance;
 
-        [SerializeField] private string escolherPersonagemScene = "EscolherPersonagem";
+        [SerializeField] private string escolherPersonagemScene = "CenaSeleçao";
         [SerializeField] private string lobbyScene = "LobbyScene";
 
         private Coroutine _sceneTransitionRoutine;
@@ -219,6 +219,17 @@ namespace ExoBeasts.Managers
 
         private IEnumerator SceneTransitionRoutine(GameMode targetMode, string sceneName)
         {
+            if (SceneFader.Instance != null)
+            {
+                yield return SceneFader.Instance.FadeOutRoutine();
+            }
+            else
+            {
+                var go = new GameObject("SceneFader");
+                var fader = go.AddComponent<SceneFader>();
+                yield return fader.FadeOutRoutine();
+            }
+
             yield return MultiplayerRuntimeReset.ResetToOfflineLocal();
 
             CurrentMode = targetMode;

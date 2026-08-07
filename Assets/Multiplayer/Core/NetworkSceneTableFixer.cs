@@ -438,7 +438,7 @@ namespace ExoBeasts.Multiplayer.Core
         /// XXHash32 portado de <c>Unity.Netcode.XXHash.Hash32(byte*, int, uint)</c> com seed=0.
         /// Necessário porque a classe XXHash do NGO é internal, então não dá pra chamar direto
         /// de outro assembly. Implementação validada contra targets observados nos logs:
-        /// "Assets/Cenas/EscolherPersonagem.unity" -> hash observado para o path canonico;
+        /// "Assets/Cenas/CenaSeleçao.unity" -> hash observado para o path canonico;
         /// "Assets/Cenas/LobbyScene.unity" -> hash observado para o path canonico.
         /// </summary>
         public static uint Hash32(string text)
