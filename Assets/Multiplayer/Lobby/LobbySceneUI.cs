@@ -72,7 +72,7 @@ public class LobbySceneUI : MonoBehaviour
     [SerializeField] private GameObject playerSlotPrefab;
 
     // ── Estado Interno ────────────────────────────────────────────────────
-    private enum State { LobbyMenu, HostConfig, Sala }
+    private enum State { LobbyMenu, HostConfig, PublicList, Sala }
 
     private State  _state        = State.LobbyMenu;
     private string _lobbyId      = "";
@@ -165,6 +165,7 @@ public class LobbySceneUI : MonoBehaviour
             var go = FindGO("LobbyListContent");
             if (go != null) lobbyListContent = go.transform;
         }
+        EnsurePublicLobbyListContent();
     }
 
     private T FindIn<T>(params string[] goNames) where T : Component
@@ -179,6 +180,52 @@ public class LobbySceneUI : MonoBehaviour
         foreach (var t in GetComponentsInChildren<Transform>(true))
             if (NameMatches(t.gameObject.name, goNames)) return t.gameObject;
         return null;
+    }
+
+    private void EnsurePublicLobbyListContent()
+    {
+        if (panelPublicLobby == null) return;
+
+        bool currentIsPublicList = lobbyListContent != null &&
+            lobbyListContent.IsChildOf(panelPublicLobby.transform);
+        if (currentIsPublicList && IsPreferredLobbyListContent(lobbyListContent)) return;
+
+        var publicList = FindPublicLobbyListContent();
+        if (publicList == null)
+        {
+            Debug.LogWarning("[LobbySceneUI] LobbyListContent do painel publico nao encontrado.");
+            return;
+        }
+
+        lobbyListContent = publicList;
+    }
+
+    private Transform FindPublicLobbyListContent()
+    {
+        if (panelPublicLobby == null) return null;
+
+        Transform fallback = null;
+        foreach (var t in panelPublicLobby.GetComponentsInChildren<Transform>(true))
+        {
+            if (!NameMatches(t.gameObject.name, "LobbyListContent"))
+                continue;
+
+            fallback ??= t;
+            if (IsPreferredLobbyListContent(t))
+                return t;
+        }
+
+        return fallback;
+    }
+
+    private static bool IsPreferredLobbyListContent(Transform content)
+    {
+        string parentName = content != null && content.parent != null
+            ? (content.parent.gameObject.name ?? "").Trim()
+            : "";
+
+        return parentName.Equals("Page", StringComparison.OrdinalIgnoreCase) ||
+            parentName.EndsWith("gina", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool NameMatches(string actualName, params string[] expectedNames)
@@ -222,6 +269,7 @@ public class LobbySceneUI : MonoBehaviour
         LobbyButtonBinder.WireBtn(this, "Pronto",     ToggleReady);
         LobbyButtonBinder.WireBtn(this, "BtnReady",   ToggleReady);
         LobbyButtonBinder.WireBtn(this, "Ready",      ToggleReady);
+        WireReadyToggles();
 
         // Criar Lobby (busca resiliente dentro do painel diretamente, ignorando espaços no nome do painel)
         if (painelCriarLobby != null)
@@ -301,6 +349,19 @@ public class LobbySceneUI : MonoBehaviour
     // ──────────────────────────────────────────────────────────────────────
     // API pública — botões do Inspector chamam estes
     // ──────────────────────────────────────────────────────────────────────
+
+    private void WireReadyToggles()
+    {
+        if (painelJogadores == null) return;
+
+        foreach (var toggle in painelJogadores.GetComponentsInChildren<Toggle>(true))
+        {
+            if (!IsReadyControlName(toggle.gameObject.name)) continue;
+            toggle.onValueChanged.RemoveAllListeners();
+            toggle.onValueChanged.AddListener(SetReady);
+            toggle.SetIsOnWithoutNotify(_isReady);
+        }
+    }
 
     public void Login()
     {
@@ -391,44 +452,14 @@ public class LobbySceneUI : MonoBehaviour
 
     public void PublicServers()
     {
-        if (panelPublicLobby != null)
-        {
-            panelPublicLobby.SetActive(true);
-        }
-        else
-        {
-            Debug.LogWarning("[LobbySceneUI] PanelPublicLobby não atribuído no Inspector!");
-        }
-
-        if (btnBackToMenu != null)
-        {
-            btnBackToMenu.SetActive(false);
-        }
-
-        if (painelLobby != null)
-        {
-            painelLobby.SetActive(false);
-        }
-
+        EnsurePublicLobbyListContent();
+        SetState(State.PublicList);
         BuscarSalas();
     }
 
     public void BackToLobby()
     {
-        if (panelPublicLobby != null)
-        {
-            panelPublicLobby.SetActive(false);
-        }
-
-        if (btnBackToMenu != null)
-        {
-            btnBackToMenu.SetActive(true);
-        }
-
-        if (painelLobby != null)
-        {
-            painelLobby.SetActive(true);
-        }
+        SetState(State.LobbyMenu);
     }
 
     public void BuscarSalas()
@@ -444,9 +475,18 @@ public class LobbySceneUI : MonoBehaviour
     public void EntrarPorId()
     {
         AtualizarNickLocal();
-        if (_lobby == null || joinIdField == null) return;
-        string id = joinIdField.text.Trim();
+        if (_lobby == null) return;
+
+        string id = joinIdField != null ? joinIdField.text.Trim() : "";
+        if (string.IsNullOrEmpty(id))
+        {
+            id = (GUIUtility.systemCopyBuffer ?? "").Trim();
+            if (!string.IsNullOrEmpty(id))
+                Debug.Log("[LobbySceneUI] Usando ID da area de transferencia para entrar no lobby.");
+        }
+
         if (string.IsNullOrEmpty(id)) { SetStatus("Cole o ID da sala!"); return; }
+        Debug.Log($"[LobbySceneUI] EntrarPorId acionado. LobbyId={id}");
         SetStatus($"Entrando...");
         _lobby.JoinLobby(id);
     }
@@ -459,6 +499,7 @@ public class LobbySceneUI : MonoBehaviour
 
     public void IniciarPartida()
     {
+        Debug.Log("[LobbySceneUI] IniciarPartida acionado.");
         SetStatus("Iniciando partida... aguardando rede");
         _lobby?.StartMatch();
     }
@@ -477,7 +518,19 @@ public class LobbySceneUI : MonoBehaviour
 
     public void ToggleReady()
     {
-        _isReady = !_isReady;
+        SetReady(!_isReady);
+    }
+
+    private void SetReady(bool ready)
+    {
+        if (_isReady == ready)
+        {
+            AtualizarBotaoReady();
+            AtualizarBotaoIniciar();
+            return;
+        }
+
+        _isReady = ready;
         _lobby?.SetReady(_isReady);
         AtualizarBotaoReady();
         AtualizarBotaoIniciar();
@@ -489,13 +542,28 @@ public class LobbySceneUI : MonoBehaviour
         if (painelJogadores == null) return;
         foreach (var btn in painelJogadores.GetComponentsInChildren<Button>(true))
         {
-            string n = btn.gameObject.name.Trim();
-            if (n != "BtnPronto" && n != "Pronto" && n != "BtnReady" && n != "Ready") continue;
+            if (!IsReadyControlName(btn.gameObject.name)) continue;
             var txt = btn.GetComponentInChildren<TMP_Text>();
             if (txt != null) txt.text = _isReady ? "✓ Pronto" : "Ficar Pronto";
             var img = btn.GetComponent<UnityEngine.UI.Image>();
             if (img != null) img.color = _isReady ? new Color(0.2f, 0.7f, 0.2f, 1f) : new Color(0.8f, 0.8f, 0.8f, 1f);
         }
+
+        foreach (var toggle in painelJogadores.GetComponentsInChildren<Toggle>(true))
+        {
+            if (!IsReadyControlName(toggle.gameObject.name)) continue;
+            toggle.SetIsOnWithoutNotify(_isReady);
+            var txt = toggle.GetComponentInChildren<TMP_Text>();
+            if (txt != null) txt.text = _isReady ? "Pronto" : "Ficar Pronto";
+            var img = toggle.GetComponent<UnityEngine.UI.Image>();
+            if (img != null) img.color = _isReady ? new Color(0.2f, 0.7f, 0.2f, 1f) : new Color(0.8f, 0.8f, 0.8f, 1f);
+        }
+    }
+
+    private static bool IsReadyControlName(string controlName)
+    {
+        string n = (controlName ?? "").Trim();
+        return n == "BtnPronto" || n == "Pronto" || n == "BtnReady" || n == "Ready";
     }
 
     public void AbrirModoHost()    => SetState(State.HostConfig);
@@ -519,21 +587,21 @@ public class LobbySceneUI : MonoBehaviour
         _isCreatingLobby = false;
         CancelCreateTimeout();
         _lobbyId = lobby.lobbyId; _lobbyNome = lobby.lobbyName;
-        _isReady = false; // nova sala — host começa como não-pronto
+        _isReady = false; // ready nao e requisito para iniciar a partida
         SetState(State.Sala);
         AtualizarInfoSala();
         AtualizarBotaoReady();
-        SetStatus($"Sala '{lobby.lobbyName}' criada! Clique 'Ficar Pronto' para liberar o início.");
+        SetStatus($"Sala '{lobby.lobbyName}' criada! O host pode iniciar a partida.");
     }
 
     private void OnLobbyJoined(LobbyInfo lobby)
     {
         _lobbyId = lobby.lobbyId; _lobbyNome = lobby.lobbyName;
-        _isReady = false; // entrou numa sala existente — começa como não-pronto
+        _isReady = false; // ready nao e requisito para iniciar a partida
         SetState(State.Sala);
         AtualizarInfoSala();
         AtualizarBotaoReady();
-        SetStatus($"Entrou em '{lobby.lobbyName}'. Clique 'Ficar Pronto' quando estiver pronto.");
+        SetStatus($"Entrou em '{lobby.lobbyName}'. Aguarde o host iniciar a partida.");
     }
 
     private void OnLobbyLeft()
@@ -599,13 +667,15 @@ public class LobbySceneUI : MonoBehaviour
 
         bool inMenu = s == State.LobbyMenu;
         bool inHost = s == State.HostConfig;
+        bool inPublic = s == State.PublicList;
         bool inSala = s == State.Sala;
 
         // Cada estado mostra exatamente UM painel
         if (painelLobby      != null) painelLobby.SetActive(inMenu);
         if (painelCriarLobby != null) painelCriarLobby.SetActive(inHost);
+        if (panelPublicLobby != null) panelPublicLobby.SetActive(inPublic);
         if (painelJogadores  != null) painelJogadores.SetActive(inSala);
-        if (panelPublicLobby != null && !inMenu) panelPublicLobby.SetActive(false);
+        if (btnBackToMenu    != null) btnBackToMenu.SetActive(inMenu);
 
         // Nick e login visíveis apenas no menu inicial
         if (nickField != null) nickField.gameObject.SetActive(inMenu);
@@ -635,15 +705,7 @@ public class LobbySceneUI : MonoBehaviour
             && lobby.hostProductUserId == localUid;
 
         iniciarPartidaButton.gameObject.SetActive(isHost);
-        iniciarPartidaButton.interactable = isHost && AllMembersReady();
-    }
-
-    private bool AllMembersReady()
-    {
-        if (_lobby == null) return false;
-        var members = _lobby.GetMembers();
-        if (members == null || members.Count == 0) return false;
-        return members.TrueForAll(m => m.isReady);
+        iniciarPartidaButton.interactable = isHost && lobby != null;
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -756,6 +818,7 @@ public class LobbySceneUI : MonoBehaviour
             // Capacidade
             AddText(card, $"{info.currentPlayers}/{info.maxPlayers}", 60, 16, Color.cyan);
         }
+        SetUiLayerRecursive(card);
 
         // Botão Entrar
         var btn = card.GetComponentInChildren<Button>();
@@ -778,9 +841,19 @@ public class LobbySceneUI : MonoBehaviour
         btn.onClick.AddListener(() =>
         {
             AtualizarNickLocal();
+            Debug.Log($"[LobbySceneUI] Clique em entrar no lobby publico: {lobbyId}");
             SetStatus($"Entrando em '{info.lobbyName}'...");
             _lobby?.JoinLobby(lobbyId);
         });
+    }
+
+    private void SetUiLayerRecursive(GameObject root)
+    {
+        if (root == null) return;
+
+        int uiLayer = gameObject.layer;
+        foreach (var t in root.GetComponentsInChildren<Transform>(true))
+            t.gameObject.layer = uiLayer;
     }
 
     private static GameObject AddText(GameObject parent, string content, float width, float size, Color color)

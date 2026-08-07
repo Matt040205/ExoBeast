@@ -8,6 +8,17 @@ Nao usar como fonte de verdade: docs historicas, planos antigos e nomes removido
 Documento canonico do multiplayer atual. Leia este arquivo para entender o que existe hoje,
 o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como atuais.
 
+## Ultima atualizacao: LobbyScene sem ready gate e entrada MPPM corrigida (2026-08-07)
+
+- `LobbySceneUI` nao exige mais ready no lobby para habilitar `IniciarPartida`: o botao fica visivel e interagivel para o host quando ha lobby EOS valido e o usuario local e o host.
+- O ready do lobby permanece suportado como API/compatibilidade (`ToggleReady`, `SetReady`, `IS_READY`), mas nao e requisito para sair da `LobbyScene`; validacoes de selecao/pronto continuam concentradas na `CenaSelecao`.
+- `IniciarPartida()` chama `LobbyManager.StartMatch()` diretamente apos o clique do host. O contrato autoritativo de host continua dentro de `LobbyManager.StartMatch()` e nao foi alterado.
+- `LobbyManager.SearchLobbiesEos()` passou a sempre aplicar filtro `LOBBY_STATE == WaitingForPlayers`, evitando erro EOS de busca vazia (`InvalidParameters`) em buscas publicas sem nome.
+- `LobbySceneUI.PublicServers()` abre um estado dedicado de lista publica e garante que os cards sejam criados no `LobbyListContent` correto do painel publico, nao no painel oculto de criacao.
+- O botao `EntrarLobbyTransferencia` da cena chama `EntrarPorId()`. Quando nao ha campo de ID serializado, `EntrarPorId()` usa `GUIUtility.systemCopyBuffer`, permitindo ao Player 2 entrar pelo ID copiado pelo host.
+- A cena `LobbyScene.unity` foi ajustada para apontar `lobbyListContent` ao container publico correto e para remover o listener antigo que mandava o botao de transferencia para o painel de criacao.
+- Validacao local desta rodada: `dotnet build ExoBeast.sln` concluiu com `0 Erro(s)`; teste manual MPPM confirmou que o host consegue iniciar a partida sem botao de ready no lobby.
+
 ## Ultima atualizacao: CenaSelecao canonica no fluxo multiplayer (2026-08-07)
 
 - `CenaSeleçao` substitui `EscolherPersonagem` como cena canonica de selecao para singleplayer e multiplayer.
@@ -21,7 +32,7 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 
 - `MenuManager` rebinda os botoes principais por nome sem depender de maiusculas/minusculas e usa os IDs atuais do `MenuTabSlider` (`Options` e `Credits`).
 - `LobbySceneUI` aceita aliases reais da cena nova, incluindo `IniciarPartida`, campo `ID`, painel publico com variacoes de nome e botao `EntrarLobbyTransferencia`.
-- O botao de iniciar no lobby fica visivel apenas para o host e interagivel apenas quando todos os membros do lobby estao prontos.
+- O botao de iniciar no lobby fica visivel apenas para o host e interagivel quando ha lobby EOS valido; ready de lobby nao e requisito para iniciar.
 - Ao entrar em `CenaSeleçao` no multiplayer, o ready herdado do lobby e resetado para `false`; o jogador precisa escolher comandante e primeira torre antes de poder marcar pronto para a partida.
 - `SelecaoManager.MostrarCaminhoDeUpgrade(int)` foi restaurado como API publica de compatibilidade para listeners antigos da cena de selecao.
 - Validacao historica MCP em Play Mode com 1 jogador usava `EscolherPersonagem`; para validacoes novas, usar `MenuScene` -> `LobbyScene` -> login EOS Device ID -> `LobbySceneUI.CriarSala()` -> ready -> host match -> `CenaSeleçao` -> selecao minima host -> `CenaMapaNOVO` via `NetworkManager.SceneManager`.
