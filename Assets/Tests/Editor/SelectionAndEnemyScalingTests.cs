@@ -9,7 +9,7 @@ using UnityEngine.UI;
 
 public class SelectionAndEnemyScalingTests
 {
-    private const string SelectionScenePath = "Assets/Cenas/EscolherPersonagem.unity";
+    private const string SelectionScenePath = "Assets/Cenas/CenaSeleçao.unity";
     private const string TeamSlotPrefabPath = "Assets/CoreScripts/Managers/Saves/slotPersonagemPrefab.prefab";
     private const string CommanderSlotPrefabPath = "Assets/CoreScripts/Managers/Saves/slotPersonagemPrefabComando.prefab";
 
@@ -39,7 +39,7 @@ public class SelectionAndEnemyScalingTests
     }
 
     [Test]
-    public void EscolherPersonagemSceneHasExpectedPlayerColors()
+    public void CenaSelecaoSceneHasExpectedPlayerColors()
     {
         WithSelectionScene(selectionManager =>
         {
@@ -98,9 +98,9 @@ public class SelectionAndEnemyScalingTests
             Scene scene = EditorSceneManager.OpenScene(SelectionScenePath, OpenSceneMode.Single);
             MonoBehaviour selectionManager = scene.GetRootGameObjects()
                 .SelectMany(root => root.GetComponentsInChildren<MonoBehaviour>(true))
-                .FirstOrDefault(component => component != null && component.GetType().Name == "SelecaoManager");
+                .FirstOrDefault(component => component != null && component.GetType().Name == "SelecaoEquipeFlowManager");
 
-            Assert.That(selectionManager, Is.Not.Null, "SelecaoManager nao encontrado em EscolherPersonagem.");
+            Assert.That(selectionManager, Is.Not.Null, "SelecaoEquipeFlowManager nao encontrado em CenaSeleçao.");
             assertion(selectionManager);
         }
         finally
@@ -149,5 +149,26 @@ public class SelectionAndEnemyScalingTests
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             return new SceneSetup[0];
         }
+    }
+
+    [Test]
+    public void CenaSelecaoSceneHasMultiplayerPanelAndStartButton()
+    {
+        WithSelectionScene(selectionManager =>
+        {
+            SerializedObject serializedObject = new SerializedObject(selectionManager);
+            Assert.That(serializedObject.FindProperty("multiplayerUi"), Is.Not.Null, "Campo multiplayerUi nao encontrado.");
+
+            GameObject[] roots = SceneManager.GetActiveScene().GetRootGameObjects();
+            bool hasOtherPlayersPanel = roots
+                .SelectMany(root => root.GetComponentsInChildren<Transform>(true))
+                .Any(transform => transform.gameObject.name == "AbaDeOutrosJogadores");
+            bool hasStartButton = roots
+                .SelectMany(root => root.GetComponentsInChildren<Button>(true))
+                .Any(button => button.gameObject.name == "Iniciar");
+
+            Assert.That(hasOtherPlayersPanel, Is.True, "AbaDeOutrosJogadores precisa existir na CenaSeleçao.");
+            Assert.That(hasStartButton, Is.True, "Botao Iniciar precisa existir na CenaSeleçao.");
+        });
     }
 }

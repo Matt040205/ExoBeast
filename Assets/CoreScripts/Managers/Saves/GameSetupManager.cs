@@ -129,7 +129,7 @@ public class GameSetupManager : NetworkBehaviour
             NetworkManager.Singleton.OnClientConnectedCallback += OnClientConnected;
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
             // Spawna todos os clientes já conectados (cobre o caso onde NGO iniciou em cena anterior,
-            // como EscolherPersonagem, e OnClientConnected não dispara novamente ao carregar esta cena)
+            // como CenaSeleçao, e OnClientConnected não dispara novamente ao carregar esta cena)
             foreach (var clientId in NetworkManager.Singleton.ConnectedClientsIds)
                 SpawnPlayerServerSide(clientId);
 

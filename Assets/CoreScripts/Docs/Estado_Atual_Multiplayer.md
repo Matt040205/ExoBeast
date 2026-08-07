@@ -8,14 +8,23 @@ Nao usar como fonte de verdade: docs historicas, planos antigos e nomes removido
 Documento canonico do multiplayer atual. Leia este arquivo para entender o que existe hoje,
 o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como atuais.
 
+## Ultima atualizacao: CenaSelecao canonica no fluxo multiplayer (2026-08-07)
+
+- `CenaSeleçao` substitui `EscolherPersonagem` como cena canonica de selecao para singleplayer e multiplayer.
+- `EscolherPersonagem.unity` fica como asset legado/historico e nao deve ser usada em novos fluxos, build settings canonicos ou testes de validacao.
+- `SelecaoEquipeFlowManager` e a interface ativa da selecao nova; ele preserva o contrato multiplayer de comandante autoritativo via `CharacterChoiceCache`, `LobbyManager.SelectCharacter`, `PartySlotLayout` e ready por membro do lobby.
+- No multiplayer, cada jogador continua limitado aos slots de `PartySlotLayout`: primeiro slot local e comandante; slots restantes sao torres daquele jogador.
+- `AbaDeOutrosJogadores` dentro da `CenaSeleçao` e o painel oficial para status multiplayer, lista de membros e botao de pronto durante a selecao.
+- O host so inicia `CenaMapaNOVO` pela selecao quando todos os membros estao prontos e todos os clients conectados possuem escolha autoritativa em `CharacterChoiceCache`.
+
 ## Ultima atualizacao: estabilizacao Menu/Lobby/Selecao (2026-07-25)
 
 - `MenuManager` rebinda os botoes principais por nome sem depender de maiusculas/minusculas e usa os IDs atuais do `MenuTabSlider` (`Options` e `Credits`).
 - `LobbySceneUI` aceita aliases reais da cena nova, incluindo `IniciarPartida`, campo `ID`, painel publico com variacoes de nome e botao `EntrarLobbyTransferencia`.
 - O botao de iniciar no lobby fica visivel apenas para o host e interagivel apenas quando todos os membros do lobby estao prontos.
-- Ao entrar em `EscolherPersonagem` no multiplayer, o ready herdado do lobby e resetado para `false`; o jogador precisa escolher comandante e primeira torre antes de poder marcar pronto para a partida.
+- Ao entrar em `CenaSeleçao` no multiplayer, o ready herdado do lobby e resetado para `false`; o jogador precisa escolher comandante e primeira torre antes de poder marcar pronto para a partida.
 - `SelecaoManager.MostrarCaminhoDeUpgrade(int)` foi restaurado como API publica de compatibilidade para listeners antigos da cena de selecao.
-- Validacao MCP em Play Mode com 1 jogador: `MenuScene` -> `LobbyScene` -> login EOS Device ID -> `LobbySceneUI.CriarSala()` -> ready -> host match -> `EscolherPersonagem` -> selecao minima host -> `CenaMapaNOVO` via `NetworkManager.SceneManager`. Resultado confirmado: cena ativa `CenaMapaNOVO` com host NGO ativo.
+- Validacao historica MCP em Play Mode com 1 jogador usava `EscolherPersonagem`; para validacoes novas, usar `MenuScene` -> `LobbyScene` -> login EOS Device ID -> `LobbySceneUI.CriarSala()` -> ready -> host match -> `CenaSeleçao` -> selecao minima host -> `CenaMapaNOVO` via `NetworkManager.SceneManager`.
 - Limitacao observada no MCP: `execute_code` falha neste projeto com `mono.exe: O nome do arquivo ou a extensao e muito grande`. Para o smoke test foi usado um harness temporario de Editor, removido ao final.
 
 ## Ultima atualizacao: reparo FMOD em maquina nova (2026-07-25)

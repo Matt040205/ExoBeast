@@ -661,7 +661,7 @@ namespace ExoBeasts.Multiplayer.GameServer
             // CRÍTICO: regenerar HashToBuildIndex ANTES do primeiro Update do NGO processar
             // o SceneEventType.Synchronize que o servidor manda imediatamente após StartClient.
             // Se a tabela ficou parcial no construtor de NetworkSceneManager, o cliente lança
-            // exception ao tentar resolver LobbyScene/EscolherPersonagem hash → buildIndex.
+            // exception ao tentar resolver LobbyScene/CenaSeleçao hash -> buildIndex.
             NetworkSceneTableFixer.EnsureHashTablePopulated(nmClient, "StartClient");
         }
 
