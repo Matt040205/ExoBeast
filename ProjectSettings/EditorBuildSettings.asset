@@ -12,23 +12,26 @@ EditorBuildSettings:
     path: Assets/Cenas/MenuScene.unity
     guid: 7f932158e8823b44cafc002298a17b6f
   - enabled: 1
-    path: "Assets/Cenas/CenaSele\xE7ao.unity"
-    guid: 9151b365af359df46b77c13697abf6d5
-  - enabled: 1
     path: Assets/Cenas/LobbyScene.unity
     guid: 5ea820e70f1c5bc4da6edd7b825faa6c
   - enabled: 1
+    path: "Assets/Cenas/CenaSele\xE7ao.unity"
+    guid: 9151b365af359df46b77c13697abf6d5
+  - enabled: 0
     path: Assets/Cenas/Rastros.unity
     guid: 09ffe242ca7a451429730bc7f11ebc06
+  - enabled: 1
+    path: Assets/Cenas/EscolherCaminho.unity
+    guid: d1cc00ce552bff44cb06aad18aa7d87d
+  - enabled: 1
+    path: Assets/Cenas/CenaMapaNOVO.unity
+    guid: e36a5a77355919c4b82f4f9dfc65fe20
   - enabled: 1
     path: Assets/Cenas/Lose.unity
     guid: 24ada1431a20db544810192e5310b291
   - enabled: 1
     path: Assets/Cenas/Win.unity
     guid: dedd2e0b1ece75d47828ae8c6c50459d
-  - enabled: 1
-    path: Assets/Cenas/CenaMapaNOVO.unity
-    guid: e36a5a77355919c4b82f4f9dfc65fe20
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

@@ -5,6 +5,17 @@ public enum EnemyType { Terrestre, Voador }
 [CreateAssetMenu(fileName = "New Enemy Data", menuName = "ScriptableObjects/Base de Dados/Enemy")]
 public class EnemyDataSO : ScriptableObject
 {
+    [Header("Exibição (UI)")]
+    [Tooltip("Nome exibido no painel de monstros da tela EscolherCaminho")]
+    public string nomeExibicao;
+
+    [Tooltip("Ícone exibido no grid de monstros da tela EscolherCaminho")]
+    public Sprite icone;
+
+    [Tooltip("Descrição narrativa/lore exibida na aba de detalhes do monstro")]
+    [TextArea(2, 5)]
+    public string descricao;
+
     [Header("Prefab")]
     public GameObject enemyPrefab;
 

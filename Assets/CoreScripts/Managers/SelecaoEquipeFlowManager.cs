@@ -169,6 +169,10 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
         [Header("Cena do Jogo")]
         public string nomeDaCenaDoJogo = "CenaMapaNOVO";
+
+        [Header("Cena de Seleção de Caminho")]
+        [Tooltip("Cena intermediária EscolherCaminho — carregada após confirmar equipe no modo singleplayer")]
+        public string nomeDaCenaEscolherCaminho = "EscolherCaminho";
     }
 
     [Header(" ESTÁGIO 3: CONFIRMAÇÃO FINAL DA EQUIPE")]
@@ -875,6 +879,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
             _comandanteSelecionado = personagensDisponiveis[0];
         }
 
+        // Persiste toda a seleção no GameDataManager (ícone do comandante fica acessível em EscolherCaminho)
         SalvarSelecaoLocalNoGameData();
 
         RegistrarEscolhaComandanteRede(_comandanteSelecionado);
@@ -887,6 +892,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         var nm = NetworkManager.Singleton;
         if (GameModeManager.CurrentMode == GameMode.Multiplayer)
         {
+            // Multiplayer: mantém fluxo original (host controla carregamento via rede)
             AtualizarEstadoProntoEInicio();
 
             if (nm == null || !nm.IsServer)
@@ -908,6 +914,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         }
         else if (nm != null && nm.IsServer)
         {
+            // Networkmanager ativo como servidor mas não multiplayer: mantém fluxo legado
             if (ExoBeasts.Managers.Loading.LoadingScreenUI.Instance != null)
                 ExoBeasts.Managers.Loading.LoadingScreenUI.Instance.Show();
 
@@ -915,8 +922,35 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         }
         else
         {
-            StartCoroutine(IniciarPartidaSingleplayer());
+            // Singleplayer: vai para EscolherCaminho antes do jogo
+            StartCoroutine(IrParaEscolherCaminho());
         }
+    }
+
+    /// <summary>
+    /// Singleplayer: salva dados e vai para a cena EscolherCaminho.
+    /// O NetworkManager é desligado primeiro se estiver ativo (cleanup).
+    /// </summary>
+    private IEnumerator IrParaEscolherCaminho()
+    {
+        var nm = NetworkManager.Singleton;
+        if (nm != null && nm.IsListening)
+        {
+            nm.Shutdown();
+            float elapsed = 0f;
+            while (nm.IsListening && elapsed < 3f)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        string cenaDestino = string.IsNullOrEmpty(estagioConfirmacao.nomeDaCenaEscolherCaminho)
+            ? "EscolherCaminho"
+            : estagioConfirmacao.nomeDaCenaEscolherCaminho;
+
+        Debug.Log($"[SelecaoEquipeFlowManager] Equipe salva. Indo para: {cenaDestino}");
+        SceneManager.LoadScene(cenaDestino);
     }
 
     private IEnumerator IniciarPartidaSingleplayer()

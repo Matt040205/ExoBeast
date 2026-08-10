@@ -12,12 +12,27 @@ namespace ExoBeasts.Editor
         {
             "Assets/Cenas/NetworkBootstrap.unity",
             "Assets/Cenas/MenuScene.unity",
-            "Assets/Cenas/CenaSeleçao.unity",
             "Assets/Cenas/LobbyScene.unity",
+            "Assets/Cenas/CenaSeleçao.unity",
             "Assets/Cenas/Rastros.unity",
+            "Assets/Cenas/EscolherCaminho.unity",
+            "Assets/Cenas/CenaMapaNOVO.unity",
             "Assets/Cenas/Lose.unity",
             "Assets/Cenas/Win.unity",
-            "Assets/Cenas/CenaMapaNOVO.unity"
+        };
+
+        // true = cena ativa no build | false = cena na lista mas desabilitada
+        public static readonly bool[] CanonicalEnabledStates =
+        {
+            true,  // NetworkBootstrap
+            true,  // MenuScene
+            true,  // LobbyScene
+            true,  // CenaSeleçao
+            false, // Rastros — presente na lista mas desabilitada
+            true,  // EscolherCaminho
+            true,  // CenaMapaNOVO
+            true,  // Lose
+            true,  // Win
         };
 
         static BuildSceneListGuard()
@@ -165,24 +180,30 @@ namespace ExoBeasts.Editor
 
         private static EditorBuildSettingsScene[] CreateCanonicalSceneList()
         {
-            return CanonicalScenePaths
-                .Select(scenePath => new EditorBuildSettingsScene(scenePath, enabled: true))
-                .ToArray();
+            var list = new EditorBuildSettingsScene[CanonicalScenePaths.Length];
+            for (int i = 0; i < CanonicalScenePaths.Length; i++)
+            {
+                bool enabled = (CanonicalEnabledStates != null && i < CanonicalEnabledStates.Length)
+                    ? CanonicalEnabledStates[i]
+                    : true;
+                list[i] = new EditorBuildSettingsScene(CanonicalScenePaths[i], enabled);
+            }
+            return list;
         }
 
         private static bool SceneListMatches(EditorBuildSettingsScene[] scenes)
         {
             if (scenes == null || scenes.Length != CanonicalScenePaths.Length)
-            {
                 return false;
-            }
 
             for (int i = 0; i < CanonicalScenePaths.Length; i++)
             {
-                if (!scenes[i].enabled || scenes[i].path != CanonicalScenePaths[i])
-                {
+                bool expectedEnabled = (CanonicalEnabledStates != null && i < CanonicalEnabledStates.Length)
+                    ? CanonicalEnabledStates[i]
+                    : true;
+
+                if (scenes[i].path != CanonicalScenePaths[i] || scenes[i].enabled != expectedEnabled)
                     return false;
-                }
             }
 
             return true;
