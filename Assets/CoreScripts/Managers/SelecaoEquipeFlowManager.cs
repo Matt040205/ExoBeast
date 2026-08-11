@@ -101,6 +101,8 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         public Button botaoConfirmarComandante;
         [Tooltip("Botão Próxima Etapa: Transiciona a câmera e o canvas para a Seleção de Torres")]
         public Button botaoProximaEtapa;
+        [Tooltip("Botão Voltar: Regressa à cena do Menu Principal (MenuScene)")]
+        public Button botaoVoltar;
 
         [Header("Pop-Up de Confirmação (Opcional)")]
         public GameObject popupConfirmacao;
@@ -143,6 +145,8 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         public TextMeshProUGUI textoNomeTorreEmFoco;
         [Tooltip("Botão Próxima Etapa: Transiciona a câmera e o canvas para a Confirmação Final")]
         public Button botaoProximaEtapa;
+        [Tooltip("Botão Voltar: Regressa ao Estágio 1 (Seleção de Comandante)")]
+        public Button botaoVoltar;
     }
 
     [Header(" ESTÁGIO 2: SELEÇÃO DE TORRES")]
@@ -164,8 +168,10 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         public Transform abaResumoEquipe1_4;
         public Transform abaResumoEquipe5_7;
 
-        [Header("Botão Iniciar Partida")]
+        [Header("Botão Iniciar Partida & Navegação")]
         public Button botaoIniciarPartida;
+        [Tooltip("Botão Voltar: Regressa ao Estágio 2 (Seleção de Torres)")]
+        public Button botaoVoltar;
 
         [Header("Cena do Jogo")]
         public string nomeDaCenaDoJogo = "CenaMapaNOVO";
@@ -299,6 +305,12 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         if (estagioComandante.botaoProximaEtapa != null)
             estagioComandante.botaoProximaEtapa.onClick.AddListener(TransicionarParaEstagioTorres);
 
+        if (estagioComandante.botaoVoltar != null)
+        {
+            estagioComandante.botaoVoltar.onClick.RemoveAllListeners();
+            estagioComandante.botaoVoltar.onClick.AddListener(VoltarParaMenuPrincipal);
+        }
+
         if (estagioComandante.botaoPopupConfirmar != null)
             estagioComandante.botaoPopupConfirmar.onClick.AddListener(ConfirmarComandante);
 
@@ -325,9 +337,12 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                     filho.gameObject.SetActive(true);
                     DefinirImagemNoCard(filho.gameObject, p.characterIcon);
 
+                    bool isComandante = (_comandanteSelecionado != null && p.name.Replace("(Clone)", "").Trim() == _comandanteSelecionado.name.Replace("(Clone)", "").Trim());
+                    AplicarEstiloSelecaoCard(filho.gameObject, isComandante);
+
                     Button btn = filho.GetComponent<Button>();
                     if (btn == null) btn = filho.GetComponentInChildren<Button>(true);
-                    if (btn != null)
+                    if (btn != null && !isComandante)
                     {
                         btn.onClick.RemoveAllListeners();
                         btn.onClick.AddListener(() => AoSelecionarPersonagemComandante(p));
@@ -352,9 +367,12 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                 GameObject card = Instantiate(cardPrefab, container);
                 DefinirImagemNoCard(card, capturedP.characterIcon);
 
+                bool isComandante = (_comandanteSelecionado != null && capturedP.name.Replace("(Clone)", "").Trim() == _comandanteSelecionado.name.Replace("(Clone)", "").Trim());
+                AplicarEstiloSelecaoCard(card, isComandante);
+
                 Button btn = card.GetComponent<Button>();
                 if (btn == null) btn = card.GetComponentInChildren<Button>(true);
-                if (btn != null)
+                if (btn != null && !isComandante)
                 {
                     btn.onClick.RemoveAllListeners();
                     btn.onClick.AddListener(() => AoSelecionarPersonagemComandante(capturedP));
@@ -414,6 +432,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
             estagioComandante.popupConfirmacao.SetActive(false);
 
         SalvarSelecaoLocalNoGameData();
+        PopularGridComandante(); // Atualiza a opacidade do comandante no grid!
 
         RegistrarEscolhaComandanteRede(_comandanteSelecionado);
         AtualizarEstadoProntoEInicio();
@@ -432,12 +451,51 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     // ────────────────────────────────────────────────────
     private void TransicionarParaEstagioTorres()
     {
+        if (_comandanteSelecionado == null)
+        {
+            Debug.LogWarning("[SelecaoEquipeFlowManager] É necessário selecionar um comandante antes de avançar para as torres!");
+            return;
+        }
+
         OcultarEstagioComandante();
         ExibirEstagioTorres();
         PopularGridTorres();
         AtualizarAbaTorresEquipadas();
         AtualizarEstadoProntoEInicio();
     }
+
+    private void VoltarParaMenuPrincipal()
+    {
+        Debug.Log("[SelecaoEquipeFlowManager] Voltando para o Menu Scene...");
+        UnityEngine.SceneManagement.SceneManager.LoadScene("MenuScene");
+    }
+
+    private void TransicionarParaEstagioComandante()
+    {
+        foreach (var m in _modelosFinalInstanciados)
+            if (m != null) Destroy(m);
+        _modelosFinalInstanciados.Clear();
+
+        OcultarEstagioTorres();
+        OcultarEstagioConfirmacao();
+        ExibirEstagioComandante();
+        AtualizarEstadoProntoEInicio();
+    }
+
+    private void TransicionarDeConfirmacaoParaTorres()
+    {
+        foreach (var m in _modelosFinalInstanciados)
+            if (m != null) Destroy(m);
+        _modelosFinalInstanciados.Clear();
+
+        OcultarEstagioConfirmacao();
+        ExibirEstagioTorres();
+        PopularGridTorres();
+        AtualizarAbaTorresEquipadas();
+        AtualizarEstadoProntoEInicio();
+    }
+
+
 
     private void ExibirEstagioTorres()
     {
@@ -461,6 +519,12 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
         if (estagioTorres.botaoProximaEtapa != null)
             estagioTorres.botaoProximaEtapa.onClick.AddListener(TransicionarParaEstagioConfirmacao);
+
+        if (estagioTorres.botaoVoltar != null)
+        {
+            estagioTorres.botaoVoltar.onClick.RemoveAllListeners();
+            estagioTorres.botaoVoltar.onClick.AddListener(TransicionarParaEstagioComandante);
+        }
     }
 
     private void PopularGridTorres()
@@ -480,24 +544,18 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                     filho.gameObject.SetActive(true);
                     DefinirImagemNoCard(filho.gameObject, p.characterIcon);
 
+                    bool isComandante = (_comandanteSelecionado != null && p.name.Replace("(Clone)", "").Trim() == _comandanteSelecionado.name.Replace("(Clone)", "").Trim());
+                    bool jaEquipada = _torresEquipadas.Exists(t => t != null && t.name.Replace("(Clone)", "").Trim() == p.name.Replace("(Clone)", "").Trim());
+                    bool indisponivel = isComandante || jaEquipada;
+
+                    AplicarEstiloSelecaoCard(filho.gameObject, indisponivel);
+
                     Button btn = filho.GetComponent<Button>();
                     if (btn == null) btn = filho.GetComponentInChildren<Button>(true);
-
-                    bool isComandante = (_comandanteSelecionado != null && p.name == _comandanteSelecionado.name);
-                    if (isComandante)
+                    if (btn != null && !indisponivel)
                     {
-                        Image img = filho.GetComponentInChildren<Image>(true);
-                        if (img != null) img.color = new Color(0.3f, 0.3f, 0.3f, 0.7f);
-                        if (btn != null) btn.interactable = false;
-                    }
-                    else
-                    {
-                        if (btn != null)
-                        {
-                            btn.interactable = true;
-                            btn.onClick.RemoveAllListeners();
-                            btn.onClick.AddListener(() => AoSelecionarPersonagemTorre(p));
-                        }
+                        btn.onClick.RemoveAllListeners();
+                        btn.onClick.AddListener(() => AoSelecionarPersonagemTorre(p));
                     }
                 }
                 else
@@ -519,26 +577,46 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                 GameObject card = Instantiate(cardPrefab, container);
                 DefinirImagemNoCard(card, capturedP.characterIcon);
 
+                bool isComandante = (_comandanteSelecionado != null && capturedP.name.Replace("(Clone)", "").Trim() == _comandanteSelecionado.name.Replace("(Clone)", "").Trim());
+                bool jaEquipada = _torresEquipadas.Exists(t => t != null && t.name.Replace("(Clone)", "").Trim() == capturedP.name.Replace("(Clone)", "").Trim());
+                bool indisponivel = isComandante || jaEquipada;
+
+                AplicarEstiloSelecaoCard(card, indisponivel);
+
                 Button btn = card.GetComponent<Button>();
                 if (btn == null) btn = card.GetComponentInChildren<Button>(true);
-
-                bool isComandante = (_comandanteSelecionado != null && capturedP.name == _comandanteSelecionado.name);
-                if (isComandante)
+                if (btn != null && !indisponivel)
                 {
-                    Image img = card.GetComponentInChildren<Image>(true);
-                    if (img != null) img.color = new Color(0.3f, 0.3f, 0.3f, 0.7f);
-                    if (btn != null) btn.interactable = false;
-                }
-                else
-                {
-                    if (btn != null)
-                    {
-                        btn.interactable = true;
-                        btn.onClick.RemoveAllListeners();
-                        btn.onClick.AddListener(() => AoSelecionarPersonagemTorre(capturedP));
-                    }
+                    btn.onClick.RemoveAllListeners();
+                    btn.onClick.AddListener(() => AoSelecionarPersonagemTorre(capturedP));
                 }
             }
+        }
+    }
+
+    private void AplicarEstiloSelecaoCard(GameObject card, bool estaSelecionado)
+    {
+        if (card == null) return;
+
+        // Garante que o CanvasGroup mantenha alpha 1.0f (sem nenhuma transparência)
+        CanvasGroup cg = card.GetComponent<CanvasGroup>();
+        if (cg != null) cg.alpha = 1.0f;
+
+        Button btn = card.GetComponent<Button>();
+        if (btn == null) btn = card.GetComponentInChildren<Button>(true);
+        if (btn != null)
+        {
+            btn.interactable = !estaSelecionado;
+        }
+
+        // Altera apenas o tom de cor RGB (escurecido se selecionado) mantendo o alpha em 1.0f
+        Image[] imagens = card.GetComponentsInChildren<Image>(true);
+        foreach (var img in imagens)
+        {
+            if (img == null) continue;
+            img.color = estaSelecionado
+                ? new Color(0.4f, 0.4f, 0.4f, 1.0f) // RGB escurecido a 40%, Alpha 1.0f (100% opaco)
+                : new Color(1.0f, 1.0f, 1.0f, 1.0f);
         }
     }
 
@@ -566,12 +644,20 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     {
         if (_torreVisualizacaoTorres == null) return;
 
+        string nomeFoco = _torreVisualizacaoTorres.name.Replace("(Clone)", "").Trim();
+        if (_torresEquipadas.Exists(t => t != null && t.name.Replace("(Clone)", "").Trim() == nomeFoco))
+        {
+            Debug.LogWarning($"[SelecaoEquipeFlowManager] A torre '{nomeFoco}' já está equipada!");
+            return;
+        }
+
         int maxTorresPermitidas = GetMaxTorresPermitidas();
         if (_torresEquipadas.Count < maxTorresPermitidas)
         {
             _torresEquipadas.Add(_torreVisualizacaoTorres);
             SalvarSelecaoLocalNoGameData();
             AtualizarAbaTorresEquipadas();
+            PopularGridTorres(); // Atualiza o grid de torres para desabilitar a torre recém-equipada!
             AtualizarEstadoProntoEInicio();
             Debug.Log($"[SelecaoEquipeFlowManager] Torre equipada: {_torreVisualizacaoTorres.name} (Total equipadas: {_torresEquipadas.Count}/{maxTorresPermitidas})");
         }
@@ -697,13 +783,25 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     // ────────────────────────────────────────────────────
     private void TransicionarParaEstagioConfirmacao()
     {
+        if (_comandanteSelecionado == null || _torresEquipadas.Count == 0)
+        {
+            Debug.LogWarning("[SelecaoEquipeFlowManager] É necessário selecionar um comandante e pelo menos 1 torre antes de avançar!");
+            return;
+        }
+
+        // Destrói o modelo individual de preview do pedestal para não ter modelo duplicado no Estágio 3
+        if (_modeloPreviewAtual != null)
+        {
+            Destroy(_modeloPreviewAtual);
+            _modeloPreviewAtual = null;
+        }
+
         OcultarEstagioTorres();
         ExibirEstagioConfirmacao();
 
         if (_comandanteSelecionado != null)
         {
             AtualizarNomeEIconeGlobal(_comandanteSelecionado);
-            AtualizarPreview3D(_comandanteSelecionado.commanderPrefab, spawnPontoPreview, capsulePlaceholder);
         }
 
         MontarPreviewEquipe3DFinal();
@@ -727,6 +825,12 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     {
         if (estagioConfirmacao.botaoIniciarPartida != null)
             estagioConfirmacao.botaoIniciarPartida.onClick.AddListener(ConfirmarFinalEIniciarPartida);
+
+        if (estagioConfirmacao.botaoVoltar != null)
+        {
+            estagioConfirmacao.botaoVoltar.onClick.RemoveAllListeners();
+            estagioConfirmacao.botaoVoltar.onClick.AddListener(TransicionarDeConfirmacaoParaTorres);
+        }
     }
 
     private void AtualizarAbaResumoEquipeUI()
@@ -767,6 +871,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                                     _torresEquipadas.RemoveAt(indexParaRemover);
                                     SalvarSelecaoLocalNoGameData();
                                     AtualizarAbaTorresEquipadas();
+                                    PopularGridTorres(); // Atualiza o grid para re-habilitar a torre removida
                                     AtualizarEstadoProntoEInicio();
                                 }
                             });
@@ -817,6 +922,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                                     _torresEquipadas.RemoveAt(indexParaRemover);
                                     SalvarSelecaoLocalNoGameData();
                                     AtualizarAbaTorresEquipadas();
+                                    PopularGridTorres(); // Atualiza o grid para re-habilitar a torre removida
                                     AtualizarEstadoProntoEInicio();
                                 }
                             });
@@ -854,6 +960,10 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         if (_comandanteSelecionado != null && _comandanteSelecionado.commanderPrefab != null && estagioConfirmacao.spawnComandanteFinal != null)
         {
             var modeloComandante = Instantiate(_comandanteSelecionado.commanderPrefab, estagioConfirmacao.spawnComandanteFinal.position, estagioConfirmacao.spawnComandanteFinal.rotation);
+            if (olharParaAlvo != null)
+            {
+                modeloComandante.transform.LookAt(olharParaAlvo.position);
+            }
             DesativarScriptsDeGameplay(modeloComandante);
             _modelosFinalInstanciados.Add(modeloComandante);
         }
@@ -866,6 +976,10 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                 if (torre == null || torre.towerPrefab == null || estagioConfirmacao.spawnTorresFinal[i] == null) continue;
 
                 var modeloTorre = Instantiate(torre.towerPrefab, estagioConfirmacao.spawnTorresFinal[i].position, estagioConfirmacao.spawnTorresFinal[i].rotation);
+                if (olharParaAlvo != null)
+                {
+                    modeloTorre.transform.LookAt(olharParaAlvo.position);
+                }
                 DesativarScriptsDeGameplay(modeloTorre);
                 _modelosFinalInstanciados.Add(modeloTorre);
             }
@@ -1004,6 +1118,18 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     private void DefinirImagemNoCard(GameObject card, Sprite icone)
     {
         if (card == null || icone == null) return;
+
+        SlotEquipeUI slotUI = card.GetComponent<SlotEquipeUI>();
+        if (slotUI != null)
+        {
+            slotUI.GarantirBotaoERaycasts();
+            if (slotUI.imagemDoPersonagem != null)
+            {
+                slotUI.imagemDoPersonagem.sprite = icone;
+                slotUI.imagemDoPersonagem.gameObject.SetActive(true);
+                return;
+            }
+        }
 
         Image[] imagens = card.GetComponentsInChildren<Image>(true);
         if (imagens == null || imagens.Length == 0) return;
@@ -1285,13 +1411,13 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
     private void SalvarSelecaoLocalNoGameData()
     {
-        if (GameDataManager.Instance == null)
-            return;
+        var gdm = GameDataManager.EnsureInstance();
+        gdm.GarantirBibliotecaOriginal();
 
-        if (GameDataManager.Instance.equipeSelecionada == null || GameDataManager.Instance.equipeSelecionada.Length < 8)
-            GameDataManager.Instance.equipeSelecionada = new CharacterBase[8];
+        if (gdm.equipeSelecionada == null || gdm.equipeSelecionada.Length < 8)
+            gdm.equipeSelecionada = new CharacterBase[8];
 
-        CharacterBase[] equipe = GameDataManager.Instance.equipeSelecionada;
+        CharacterBase[] equipe = gdm.equipeSelecionada;
 
         if (GameModeManager.CurrentMode == GameMode.Multiplayer)
         {
@@ -1321,7 +1447,8 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                 equipe[i + 1] = _torresEquipadas[i];
         }
 
-        GameDataManager.Instance.SaveGame();
+        gdm.SaveGame();
+        Debug.Log($"[SelecaoEquipeFlowManager] SalvarSelecaoLocalNoGameData concluído: Comandante='{(_comandanteSelecionado != null ? _comandanteSelecionado.name : "null")}'");
     }
 
     private void AtualizarEstadoProntoEInicio()
@@ -1355,6 +1482,17 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
             multiplayerUi.textoStatus.text = isMultiplayer
                 ? localComplete ? "Selecao local completa" : "Escolha comandante e primeira torre"
                 : "";
+        }
+
+        // Validação de botões de Próxima Etapa (Guarda de Seleção)
+        if (estagioComandante.botaoProximaEtapa != null)
+        {
+            estagioComandante.botaoProximaEtapa.interactable = (_comandanteSelecionado != null);
+        }
+
+        if (estagioTorres.botaoProximaEtapa != null)
+        {
+            estagioTorres.botaoProximaEtapa.interactable = (_comandanteSelecionado != null && _torresEquipadas.Count >= 1);
         }
 
         if (estagioConfirmacao.botaoIniciarPartida != null)

@@ -12,6 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b99c2fcabcc0ff9418ea43cf94220c11, type: 3}
   m_Name: "Escorpi\xE3o"
   m_EditorClassIdentifier: 
+  nomeExibicao: "Escorpi\xE3o"
+  icone: {fileID: 0}
+  descricao: Envenena seus inimigos com sua picada
   enemyPrefab: {fileID: 7123626439960702019, guid: 504da9bc40ab18f4a87b5624850dd64b, type: 3}
   enemyType: 0
   baseHP: 4

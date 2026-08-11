@@ -55,6 +55,7 @@ public class GameDataManager : MonoBehaviour
     public CharacterBase[] equipeSelecionada = new CharacterBase[8];
     public CharacterBase personagemParaRastros;
     public bool vindoDeRastros = false;
+    public int nivelAtualCaminho = 0;
 
     [Header("Personagens Desbloqueados (SinglePlayer)")]
     public List<string> personagensDesbloqueados = new List<string> { "Naoyoshi" };
@@ -221,7 +222,12 @@ public class GameDataManager : MonoBehaviour
 
     public void RestaurarSelecao()
     {
-        if (_savedTeamSelection == null || bibliotecaOriginalPersonagens == null) return;
+        if (_savedTeamSelection == null || _savedTeamSelection.Length == 0) return;
+
+        GarantirBibliotecaOriginal();
+
+        if (equipeSelecionada == null || equipeSelecionada.Length < 8)
+            equipeSelecionada = new CharacterBase[8];
 
         int count = Mathf.Min(_savedTeamSelection.Length, equipeSelecionada.Length);
         for (int i = 0; i < count; i++)
@@ -229,10 +235,19 @@ public class GameDataManager : MonoBehaviour
             if (string.IsNullOrEmpty(_savedTeamSelection[i])) continue;
             if (equipeSelecionada[i] != null) continue; // respeita seleção já feita na sessão
 
-            CharacterBase found = personagensDoJogador.Find(c => c.name.Replace("(Clone)", "") == _savedTeamSelection[i]);
+            string targetName = _savedTeamSelection[i].Trim();
+
+            CharacterBase found = null;
+            if (personagensDoJogador != null)
+                found = personagensDoJogador.Find(c => c != null && c.name.Replace("(Clone)", "").Trim() == targetName);
+
+            if (found == null && bibliotecaOriginalPersonagens != null)
+                found = bibliotecaOriginalPersonagens.Find(c => c != null && c.name.Replace("(Clone)", "").Trim() == targetName);
+
             if (found != null)
             {
-                equipeSelecionada[i] = found; // Reaproveita a cópia mestra sem recriar
+                equipeSelecionada[i] = found;
+                Debug.Log($"[GameDataManager] RestaurarSelecao: slot {i} restaurado com '{found.name}'");
             }
         }
     }
@@ -278,8 +293,7 @@ public class GameDataManager : MonoBehaviour
             bibliotecaOriginalPersonagens = new List<CharacterBase>(_bootstrapLibrary);
         }
 
-        if (bibliotecaOriginalPersonagens == null)
-            bibliotecaOriginalPersonagens = new List<CharacterBase>();
+        GarantirBibliotecaOriginal();
 
         _bootstrapLibrary = null;
 
@@ -291,6 +305,35 @@ public class GameDataManager : MonoBehaviour
 
         RebuildRuntimeCharacterRoster();
         LoadGame();
+    }
+
+    /// <summary>
+    /// Garante que bibliotecaOriginalPersonagens contenha todos os ScriptableObjects de personagens do projeto.
+    /// Chamado automaticamente caso a lista esteja vazia no Inspector.
+    /// </summary>
+    public void GarantirBibliotecaOriginal()
+    {
+        if (bibliotecaOriginalPersonagens == null)
+            bibliotecaOriginalPersonagens = new List<CharacterBase>();
+
+        if (bibliotecaOriginalPersonagens.Count == 0)
+        {
+            CharacterBase[] carregados = Resources.FindObjectsOfTypeAll<CharacterBase>();
+            if (carregados != null && carregados.Length > 0)
+            {
+                var ordenados = carregados
+                    .Where(c => c != null && !c.name.Contains("(Clone)"))
+                    .OrderBy(c => c.name)
+                    .ToList();
+
+                foreach (var c in ordenados)
+                {
+                    if (!bibliotecaOriginalPersonagens.Contains(c))
+                        bibliotecaOriginalPersonagens.Add(c);
+                }
+            }
+            Debug.Log($"[GameDataManager] bibliotecaOriginalPersonagens auto-populada com {bibliotecaOriginalPersonagens.Count} personagem(ns).");
+        }
     }
 
     private void RebuildRuntimeCharacterRoster()

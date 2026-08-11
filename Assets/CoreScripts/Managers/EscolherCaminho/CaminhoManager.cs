@@ -142,6 +142,10 @@ public class CaminhoManager : MonoBehaviour
     private ModificacaoData _modPositivaSorteada;
     private ModificacaoData _modNegativaSorteada;
 
+    // Nível de progressão: 0 = primeiro par de nós disponível, 1 = segundo, etc.
+    // Nós com nivelDoNo > NivelAtualDoCaminho ficam bloqueados.
+    public int NivelAtualDoCaminho { get; private set; } = 0;
+
     // ─────────────────────────────────────────────────────────
     // Unity Lifecycle
     // ─────────────────────────────────────────────────────────
@@ -169,6 +173,15 @@ public class CaminhoManager : MonoBehaviour
         RegistrarBotao(botaoFecharModificacoes, FecharPainelModificacoes);
 
         CarregarIconeComandante();
+
+        // Recupera o nível atual do caminho salvo
+        if (GameDataManager.Instance != null)
+        {
+            // Sincroniza nível atual
+            NivelAtualDoCaminho = GameDataManager.Instance.nivelAtualCaminho;
+        }
+
+        NotificarNosDeProgressao();
     }
 
     private void OnDestroy()
@@ -205,16 +218,46 @@ public class CaminhoManager : MonoBehaviour
     // ─────────────────────────────────────────────────────────
     private void CarregarIconeComandante()
     {
-        if (iconeJogador == null) return;
+        if (iconeJogador == null)
+        {
+            Debug.LogWarning("[CaminhoManager] iconeJogador não está serializado no Inspector!");
+            return;
+        }
+
+        var gdm = GameDataManager.EnsureInstance();
+        gdm.GarantirBibliotecaOriginal();
+
+        if (gdm.equipeSelecionada == null || gdm.equipeSelecionada.Length == 0 || gdm.equipeSelecionada[0] == null)
+        {
+            gdm.RestaurarSelecao();
+        }
 
         Sprite icone = null;
 
-        if (GameDataManager.Instance != null &&
-            GameDataManager.Instance.equipeSelecionada != null &&
-            GameDataManager.Instance.equipeSelecionada.Length > 0 &&
-            GameDataManager.Instance.equipeSelecionada[0] != null)
+        if (gdm.equipeSelecionada != null &&
+            gdm.equipeSelecionada.Length > 0 &&
+            gdm.equipeSelecionada[0] != null)
         {
-            icone = GameDataManager.Instance.equipeSelecionada[0].characterIcon;
+            var slot0 = gdm.equipeSelecionada[0];
+            string nomeBase = slot0.name.Replace("(Clone)", "").Trim();
+
+            // Tenta pegar o ícone do slot
+            icone = slot0.characterIcon;
+
+            // Fallback: busca o ScriptableObject original na biblioteca se o clone não tiver ícone
+            if (icone == null && gdm.bibliotecaOriginalPersonagens != null)
+            {
+                var original = gdm.bibliotecaOriginalPersonagens
+                    .Find(c => c != null && c.name.Replace("(Clone)", "").Trim() == nomeBase);
+                if (original != null)
+                    icone = original.characterIcon;
+            }
+
+            Debug.Log($"[CaminhoManager] CarregarIconeComandante: slot0='{slot0.name}' (nomeBase='{nomeBase}'), iconeEncontrado={(icone != null ? icone.name : "null")}");
+        }
+        else
+        {
+            Debug.LogWarning("[CaminhoManager] GameDataManager ou equipeSelecionada[0] está ausente ao tentar carregar ícone!");
         }
 
         iconeJogador.sprite = icone != null ? icone : spriteIconePadrao;
@@ -291,23 +334,55 @@ public class CaminhoManager : MonoBehaviour
     {
         LimparGridMonstros();
 
-        if (gridMonstros == null || prefabSlotMonstro == null || monstros == null) return;
+        if (gridMonstros == null)
+        {
+            Debug.LogError("[CaminhoManager] gridMonstros não está serializado no Inspector!");
+            return;
+        }
+        if (prefabSlotMonstro == null)
+        {
+            Debug.LogError("[CaminhoManager] prefabSlotMonstro não está serializado no Inspector!");
+            return;
+        }
+        if (monstros == null || monstros.Count == 0)
+        {
+            Debug.LogWarning("[CaminhoManager] Nenhum monstro na lista deste mapa!");
+            return;
+        }
 
+        int criados = 0;
         foreach (var monster in monstros)
         {
+            // Ignora entradas nulas na lista de monstros
             if (monster == null) continue;
+
             GameObject slot = Instantiate(prefabSlotMonstro, gridMonstros);
             var slotUI = slot.GetComponent<MonsterSlotUI>();
-            if (slotUI != null) slotUI.Configurar(monster, this);
+            if (slotUI == null)
+            {
+                slotUI = slot.AddComponent<MonsterSlotUI>();
+            }
+            slotUI.Configurar(monster, this);
             _slotsInstanciados.Add(slot);
+            criados++;
         }
+
+        Debug.Log($"[CaminhoManager] Grid populado com {criados} slot(s) de monstro.");
     }
 
     private void LimparGridMonstros()
     {
-        foreach (var slot in _slotsInstanciados)
+        if (gridMonstros != null)
         {
-            if (slot != null) Destroy(slot);
+            // Destrói todos os objetos filhos do grid (inclusive placeholders estáticos da cena)
+            for (int i = gridMonstros.childCount - 1; i >= 0; i--)
+            {
+                var child = gridMonstros.GetChild(i);
+                if (child != null)
+                {
+                    Destroy(child.gameObject);
+                }
+            }
         }
         _slotsInstanciados.Clear();
     }
@@ -320,6 +395,8 @@ public class CaminhoManager : MonoBehaviour
     public void AbrirAbaDetalhesMonstro(EnemyDataSO monster)
     {
         if (monster == null) return;
+
+        Debug.Log($"[CaminhoManager] Exibindo detalhes do monstro: {monster.name}");
 
         if (textoNomeMonstro != null)
             textoNomeMonstro.text = string.IsNullOrEmpty(monster.nomeExibicao)
@@ -337,7 +414,11 @@ public class CaminhoManager : MonoBehaviour
                 $"⚔ Dano: {monster.baseATQ}\n" +
                 $"💨 Velocidade: {monster.moveSpeed}";
 
-        DefinirAtivo(abaDetalhesMonstro, true);
+        if (abaDetalhesMonstro != null)
+        {
+            abaDetalhesMonstro.transform.SetAsLastSibling();
+            DefinirAtivo(abaDetalhesMonstro, true);
+        }
     }
 
     public void FecharAbaDetalhesMonstro()
@@ -465,8 +546,46 @@ public class CaminhoManager : MonoBehaviour
             return;
         }
 
+        // Avança o nível de progressão
+        NivelAtualDoCaminho++;
+        if (GameDataManager.Instance != null)
+        {
+            GameDataManager.Instance.nivelAtualCaminho = NivelAtualDoCaminho;
+            GameDataManager.Instance.SaveGame();
+        }
+        NotificarNosDeProgressao();
+
         _carregandoCena = true;
         StartCoroutine(CarregarCenaComFade(_mapaAtual.destinationScene));
+    }
+
+    /// <summary>
+    /// Notifica todos os PathNodeUI da cena para reavaliarem seu estado (Concluido, Disponivel, Futuro).
+    /// </summary>
+    public void NotificarNosDeProgressao()
+    {
+        var nos = FindObjectsOfType<PathNodeUI>();
+        Debug.Log($"[CaminhoManager] Notificando {nos.Length} nó(s). Nível Atual = {NivelAtualDoCaminho}");
+        foreach (var no in nos)
+        {
+            no.AtualizarEstadoBloqueio();
+            Debug.Log($"[CaminhoManager] Nó '{no.gameObject.name}' [nivelDoNo={no.nivelDoNo}] -> Estado: {no.EstadoAtual}");
+        }
+    }
+
+    /// <summary>
+    /// Reseta a progressão do caminho para o início (Nível 0).
+    /// Chamado ao iniciar uma nova partida/run.
+    /// </summary>
+    public void ResetarProgressoCaminho()
+    {
+        NivelAtualDoCaminho = 0;
+        if (GameDataManager.Instance != null)
+        {
+            GameDataManager.Instance.nivelAtualCaminho = 0;
+            GameDataManager.Instance.SaveGame();
+        }
+        NotificarNosDeProgressao();
     }
 
     private IEnumerator CarregarCenaComFade(string nomeCena)
@@ -494,6 +613,69 @@ public class CaminhoManager : MonoBehaviour
         }
 
         Debug.Log($"[CaminhoManager] Carregando cena: {nomeCena}");
+
+        // Registra o comandante no CharacterChoiceCache ANTES de StartHost
+        // para garantir que o GameSetupManager spawne o personagem correto.
+        RegistrarComandanteNoCache();
+
+        // Inicia o NetworkManager como host antes de carregar a cena do jogo
+        var nm = Unity.Netcode.NetworkManager.Singleton;
+        if (nm != null && !nm.IsListening)
+        {
+            bool started = nm.StartHost();
+            if (started)
+            {
+                nm.SceneManager.LoadScene(nomeCena, UnityEngine.SceneManagement.LoadSceneMode.Single);
+                yield break;
+            }
+            Debug.LogWarning("[CaminhoManager] StartHost() falhou — carregando cena diretamente.");
+        }
+
         SceneManager.LoadScene(nomeCena);
+    }
+
+    /// <summary>
+    /// Registra o índice do comandante selecionado no CharacterChoiceCache.
+    /// Deve ser chamado antes de StartHost para que o GameSetupManager
+    /// saiba qual personagem spawnar para o host.
+    /// </summary>
+    private void RegistrarComandanteNoCache()
+    {
+        var gdm = GameDataManager.EnsureInstance();
+        gdm.GarantirBibliotecaOriginal();
+
+        if (gdm.equipeSelecionada == null || gdm.equipeSelecionada.Length == 0 || gdm.equipeSelecionada[0] == null)
+        {
+            gdm.RestaurarSelecao();
+        }
+
+        var slot0 = gdm.equipeSelecionada != null && gdm.equipeSelecionada.Length > 0
+            ? gdm.equipeSelecionada[0]
+            : null;
+
+        if (slot0 == null)
+        {
+            Debug.LogWarning("[CaminhoManager] equipeSelecionada[0] é null — CharacterChoiceCache não registrado.");
+            return;
+        }
+
+        var biblioteca = gdm.bibliotecaOriginalPersonagens;
+        if (biblioteca == null || biblioteca.Count == 0)
+        {
+            Debug.LogWarning("[CaminhoManager] bibliotecaOriginalPersonagens está vazia — CharacterChoiceCache não registrado.");
+            return;
+        }
+
+        string nomeBase = slot0.name.Replace("(Clone)", "").Trim();
+        int index = biblioteca.FindIndex(c => c != null && c.name.Replace("(Clone)", "").Trim() == nomeBase);
+
+        if (index < 0)
+        {
+            Debug.LogWarning($"[CaminhoManager] Personagem '{nomeBase}' não encontrado na biblioteca. CharacterChoiceCache não registrado.");
+            return;
+        }
+
+        ExoBeasts.Multiplayer.Core.CharacterChoiceCache.SetHostCharacterIndex(index, "CaminhoManager");
+        Debug.Log($"[CaminhoManager] CharacterChoiceCache registrado com sucesso: index={index} ({nomeBase})");
     }
 }

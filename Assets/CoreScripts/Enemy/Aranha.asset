@@ -12,6 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b99c2fcabcc0ff9418ea43cf94220c11, type: 3}
   m_Name: Aranha
   m_EditorClassIdentifier: 
+  nomeExibicao: Aranha
+  icone: {fileID: 0}
+  descricao: Prende seus inimigos com sua poderosa teia
   enemyPrefab: {fileID: 8676188461304220958, guid: e246350e14706304a82d941bf54faf0c, type: 3}
   enemyType: 0
   baseHP: 3

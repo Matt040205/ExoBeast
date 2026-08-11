@@ -5,7 +5,6 @@ using UnityEngine.UI;
 /// Componente colocado em cada ícone/botão de monstro dentro do grid do PainelMonstros.
 /// Ao clicar, notifica o CaminhoManager para exibir a aba de detalhes deste inimigo.
 /// </summary>
-[RequireComponent(typeof(UnityEngine.UI.Button))]
 public class MonsterSlotUI : MonoBehaviour
 {
     [Tooltip("Dados do inimigo representado por este slot (EnemyDataSO do projeto)")]
@@ -15,45 +14,92 @@ public class MonsterSlotUI : MonoBehaviour
     public Image iconeImagem;
 
     private CaminhoManager _caminhoManager;
-    private UnityEngine.UI.Button _botao;
+    private Button _botao;
 
     private void Awake()
     {
-        _botao = GetComponent<UnityEngine.UI.Button>();
-        if (iconeImagem == null)
-            iconeImagem = GetComponent<Image>();
+        GarantirReferencias();
     }
 
     private void Start()
     {
-        _caminhoManager = FindObjectOfType<CaminhoManager>();
+        if (_caminhoManager == null)
+            _caminhoManager = FindObjectOfType<CaminhoManager>();
 
         if (_caminhoManager == null)
             Debug.LogWarning($"[MonsterSlotUI] CaminhoManager não encontrado na cena! Slot: {gameObject.name}");
 
-        _botao.onClick.AddListener(OnSlotClicked);
         AplicarIcone();
     }
 
+    private void GarantirReferencias()
+    {
+        if (_botao == null)
+            _botao = GetComponent<Button>();
+
+        if (_botao == null)
+            _botao = GetComponentInChildren<Button>(true);
+
+        if (iconeImagem == null)
+            iconeImagem = GetComponent<Image>();
+
+        if (iconeImagem == null)
+            iconeImagem = GetComponentInChildren<Image>(true);
+
+        if (_botao != null)
+        {
+            _botao.onClick.RemoveListener(OnSlotClicked);
+            _botao.onClick.AddListener(OnSlotClicked);
+        }
+        else
+        {
+            Debug.LogWarning($"[MonsterSlotUI] Nenhum componente Button foi encontrado em '{gameObject.name}' ou seus filhos!");
+        }
+    }
+
     /// <summary>
-    /// Configura este slot com um EnemyDataSO (chamado pelo CaminhoManager ao popular o grid).
+    /// Configura este slot com um EnemyDataSO — chamado pelo CaminhoManager ao popular o grid.
     /// </summary>
     public void Configurar(EnemyDataSO dados, CaminhoManager manager)
     {
         enemyData = dados;
         _caminhoManager = manager;
+
+        GarantirReferencias();
         AplicarIcone();
     }
 
     private void AplicarIcone()
     {
-        if (iconeImagem != null && enemyData != null && enemyData.icone != null)
-            iconeImagem.sprite = enemyData.icone;
+        if (iconeImagem != null)
+        {
+            iconeImagem.enabled = true;
+            if (enemyData != null && enemyData.icone != null)
+            {
+                iconeImagem.sprite = enemyData.icone;
+            }
+        }
     }
 
     private void OnSlotClicked()
     {
-        if (_caminhoManager == null || enemyData == null) return;
+        Debug.Log($"[MonsterSlotUI] Slot clicado! Monstro: {(enemyData != null ? enemyData.name : "null")}");
+
+        if (_caminhoManager == null)
+            _caminhoManager = FindObjectOfType<CaminhoManager>();
+
+        if (_caminhoManager == null)
+        {
+            Debug.LogWarning("[MonsterSlotUI] CaminhoManager não encontrado ao clicar no slot!");
+            return;
+        }
+
+        if (enemyData == null)
+        {
+            Debug.LogWarning("[MonsterSlotUI] enemyData é null ao clicar no slot!");
+            return;
+        }
+
         _caminhoManager.AbrirAbaDetalhesMonstro(enemyData);
     }
 

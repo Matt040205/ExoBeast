@@ -37,6 +37,8 @@ public class SelecaoManager : NetworkBehaviour
     public Button botaoJogar;
     public Toggle togglePronto;
     public string nomeDaCenaDoJogo = "CenaMapaNOVO";
+    [Tooltip("Cena intermediária de seleção de caminho (singleplayer)")]
+    public string nomeDaCenaEscolherCaminho = "EscolherCaminho";
 
     [Header("Lista de Jogadores da Sala")]
     public GameObject painelJogadoresLobby; // O painel base que contém a lista
@@ -531,7 +533,7 @@ public class SelecaoManager : NetworkBehaviour
                 }
             }
             else
-                StartCoroutine(IniciarPartidaSingleplayer());
+                StartCoroutine(IrParaEscolherCaminho()); // Singleplayer: passa por EscolherCaminho
         });
         botaoVoltarDaEscolha.onClick.AddListener(VoltarParaPainelEquipe);
         botaoVoltarDosDetalhes.onClick.AddListener(VoltarParaPainelEscolha);
@@ -559,6 +561,32 @@ public class SelecaoManager : NetworkBehaviour
             LobbyManager.Instance.SetReady(ready);
             Debug.Log($"[SelecaoManager] Jogador marcou pronto: {ready}");
         }
+    }
+
+    /// <summary>
+    /// Singleplayer: vai para EscolherCaminho sem iniciar o NetworkManager.
+    /// O NetworkManager só é iniciado quando o jogador confirma o mapa.
+    /// </summary>
+    private IEnumerator IrParaEscolherCaminho()
+    {
+        var nm = NetworkManager.Singleton;
+        if (nm != null && nm.IsListening)
+        {
+            nm.Shutdown();
+            float elapsed = 0f;
+            while (nm.IsListening && elapsed < 3f)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        string destino = string.IsNullOrEmpty(nomeDaCenaEscolherCaminho)
+            ? "EscolherCaminho"
+            : nomeDaCenaEscolherCaminho;
+
+        Debug.Log($"[SelecaoManager] Indo para seleção de caminho: {destino}");
+        UnityEngine.SceneManagement.SceneManager.LoadScene(destino);
     }
 
     private IEnumerator IniciarPartidaSingleplayer()
