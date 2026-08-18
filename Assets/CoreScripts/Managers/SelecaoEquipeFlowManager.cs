@@ -55,7 +55,6 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     public class CaminhoTorreUIItem
     {
         public GameObject containerCaminho; // GameObject do Caminho (ex: Caminho1)
-        public TextMeshProUGUI textoNomeCaminho;
         public Button botaoSelecionarCaminho;
 
         [Tooltip("5 GameObjects/Ícones dos 5 Níveis de Upgrade (do Nível 1 à esquerda ao Nível 5 à direita)")]
@@ -703,17 +702,19 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
             if (spriteHabilidade != null)
             {
                 img.sprite = spriteHabilidade;
-                img.enabled = true;
-                img.color = Color.white;
             }
-            else
-            {
-                img.enabled = (img.sprite != null);
-            }
+            img.enabled = true;
+            img.raycastTarget = true;
         }
     }
 
-    private void ConfigurarHoverCaminhosTorreItem(CaminhoTorreUIItem item, int pathIndex, List<UpgradePath> paths, GameObject abaTooltip, TextMeshProUGUI textoNome, TextMeshProUGUI textoConteudo)
+    private void ConfigurarHoverCaminhosTorreItem(
+        CaminhoTorreUIItem item, 
+        int pathIndex, 
+        List<UpgradePath> paths, 
+        GameObject abaTooltip, 
+        TextMeshProUGUI textoNome, 
+        TextMeshProUGUI textoConteudo)
     {
         if (item == null) return;
 
@@ -724,7 +725,6 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         if (!temPath) return;
 
         var path = paths[pathIndex];
-        if (item.textoNomeCaminho != null) item.textoNomeCaminho.text = path.pathName;
 
         if (item.nivelIcons != null && item.nivelIcons.Length > 0 && path.upgradesInPath != null)
         {
@@ -748,46 +748,124 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                     }
                 }
 
-                string tituloNivel = $"{path.pathName} - Nível {nivelIndex + 1}";
-                if (up != null && !string.IsNullOrEmpty(up.upgradeName)) tituloNivel += $" ({up.upgradeName})";
+                string nomeDoNivel = (up != null && !string.IsNullOrEmpty(up.upgradeName))
+                    ? up.upgradeName
+                    : $"Nível {nivelIndex + 1}";
 
                 string descNivel = (up != null && !string.IsNullOrEmpty(up.description)) 
                     ? up.description 
                     : $"Upgrade de Nível {nivelIndex + 1} para o caminho {path.pathName}.";
 
-                ConfigurarTriggerHover(iconObj, tituloNivel, descNivel, abaTooltip, textoNome, textoConteudo);
+                string descGrande = (up != null) ? up.descricaoGrande : "";
+
+                ConfigurarTriggerHover(iconObj, nomeDoNivel, descNivel, descGrande, abaTooltip, textoNome, textoConteudo);
             }
         }
         else
         {
-            ConfigurarTriggerHover(item.containerCaminho, $"Caminho {pathIndex + 1}: {path.pathName}", "Caminho de upgrade da torre.", abaTooltip, textoNome, textoConteudo);
+            ConfigurarTriggerHover(item.containerCaminho, $"Caminho {pathIndex + 1}: {path.pathName}", "Caminho de upgrade da torre.", "", abaTooltip, textoNome, textoConteudo);
         }
     }
 
-    private void ConfigurarTriggerHover(GameObject targetObj, string nome, string descricao, GameObject abaTooltip, TextMeshProUGUI textoNome, TextMeshProUGUI textoConteudo)
+    private void ConfigurarTriggerHover(
+        GameObject targetObj, 
+        string nome, 
+        string descricao, 
+        string descricaoGrande,
+        GameObject abaTooltip, 
+        TextMeshProUGUI textoNome, 
+        TextMeshProUGUI textoConteudo)
     {
-        if (targetObj == null || abaTooltip == null || textoConteudo == null) return;
+        if (targetObj == null)
+        {
+            Debug.LogWarning("[SelecaoEquipeFlowManager] ConfigurarTriggerHover: targetObj é NULL.");
+            return;
+        }
+        if (abaTooltip == null)
+        {
+            Debug.LogWarning($"[SelecaoEquipeFlowManager] '{targetObj.name}': abaTooltip não está no Inspector.");
+            return;
+        }
+
+        // Garante raycast ativo nos gráficos do ícone para capturar o mouse
+        foreach (var g in targetObj.GetComponentsInChildren<Graphic>(true))
+            if (g != null) g.raycastTarget = true;
 
         var hover = targetObj.GetComponent<UIHoverHandler>();
         if (hover == null) hover = targetObj.AddComponent<UIHoverHandler>();
 
-        hover.onPointerEnterAction = () => {
-            if (textoNome != null)
+        hover.onPointerEnterAction = () =>
+        {
+            // Tenta usar referências diretas; se null, busca automaticamente dentro do painel
+            TextMeshProUGUI tmpNome = textoNome;
+            TextMeshProUGUI tmpDesc = textoConteudo;
+
+            if (tmpNome == null || tmpDesc == null)
             {
-                textoNome.text = nome;
-                textoConteudo.text = descricao;
+                var tmps = abaTooltip.GetComponentsInChildren<TextMeshProUGUI>(true);
+                if (tmps.Length >= 1 && tmpNome == null) tmpNome = tmps[0];
+                if (tmps.Length >= 2 && tmpDesc == null) tmpDesc = tmps[1];
             }
-            else
+
+            string textoDesc = !string.IsNullOrEmpty(descricaoGrande) ? descricaoGrande : descricao;
+
+            // 1º texto = nome da habilidade/upgrade
+            if (tmpNome != null)
             {
-                textoConteudo.text = $"<b>{nome}</b>\n\n{descricao}";
+                Transform t = tmpNome.transform;
+                while (t != null && t != abaTooltip.transform.parent)
+                {
+                    t.gameObject.SetActive(true);
+                    t = t.parent;
+                }
+                tmpNome.enabled = true;
+                if (tmpNome.color.a < 0.1f)
+                {
+                    Color c = tmpNome.color;
+                    c.a = 1f;
+                    tmpNome.color = c;
+                }
+                tmpNome.enableWordWrapping = true;
+                tmpNome.text = nome;
+                tmpNome.ForceMeshUpdate();
             }
+
+            // 2º texto = descricaoGrande se preenchida, senão description normal
+            if (tmpDesc != null)
+            {
+                Transform t = tmpDesc.transform;
+                while (t != null && t != abaTooltip.transform.parent)
+                {
+                    t.gameObject.SetActive(true);
+                    t = t.parent;
+                }
+                tmpDesc.enabled = true;
+                if (tmpDesc.color.a < 0.1f)
+                {
+                    Color c = tmpDesc.color;
+                    c.a = 1f;
+                    tmpDesc.color = c;
+                }
+                tmpDesc.enableWordWrapping = true;
+                tmpDesc.text = textoDesc;
+                tmpDesc.ForceMeshUpdate();
+            }
+
             abaTooltip.SetActive(true);
         };
 
-        hover.onPointerExitAction = () => {
+        hover.onPointerExitAction = () =>
+        {
             abaTooltip.SetActive(false);
         };
     }
+
+    private void ConfigurarTriggerHover(GameObject targetObj, string nome, string descricao, GameObject abaTooltip, TextMeshProUGUI textoNome, TextMeshProUGUI textoConteudo)
+    {
+        ConfigurarTriggerHover(targetObj, nome, descricao, "", abaTooltip, textoNome, textoConteudo);
+    }
+
+
 
     // ────────────────────────────────────────────────────
     // ESTÁGIO 3: CONFIRMAÇÃO FINAL DA EQUIPE

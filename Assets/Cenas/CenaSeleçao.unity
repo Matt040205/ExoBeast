@@ -428,10 +428,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 997181292}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 165, y: -34}
-  m_SizeDelta: {x: 58, y: 58}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &65449360
 MonoBehaviour:
@@ -1114,10 +1114,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 416127987}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 165, y: -34}
+  m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &147417972
 MonoBehaviour:
@@ -1359,9 +1359,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 335783163}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 40.24, y: 13.340001}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.13, y: 1.23}
 --- !u!114 &194752039
@@ -1434,9 +1434,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 947835715}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 78.34, y: 13.340001}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.13, y: 1.23}
 --- !u!114 &196089258
@@ -1656,7 +1656,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -2249,10 +2249,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 416127987}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 102, y: -97}
+  m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &301764507
 MonoBehaviour:
@@ -2554,7 +2554,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -2736,10 +2736,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 997181292}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 228, y: -97}
-  m_SizeDelta: {x: 58, y: 58}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &368229360
 MonoBehaviour:
@@ -3633,10 +3633,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 997181292}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 165, y: -97}
-  m_SizeDelta: {x: 58, y: 58}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &472797257
 MonoBehaviour:
@@ -3916,7 +3916,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -4459,7 +4459,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &601027253
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4476,8 +4476,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 294}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchoredPosition: {x: 0, y: -104.6737}
+  m_SizeDelta: {x: 200, y: 307.2034}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &601027254
 MonoBehaviour:
@@ -4499,7 +4499,18 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: New Text
+  m_text: 'a
+
+
+
+
+
+
+
+
+
+
+'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -4565,7 +4576,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: -277.12677}
+  m_margin: {x: 0, y: 0, z: 0, w: -0.49364516}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -4629,7 +4640,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -5059,10 +5070,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 416127987}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 165, y: -97}
+  m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &675106096
 MonoBehaviour:
@@ -5385,7 +5396,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -5557,10 +5568,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 416127987}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 39, y: -34}
+  m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &712590302
 MonoBehaviour:
@@ -5983,7 +5994,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -6060,10 +6071,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 416127987}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 39, y: -97}
+  m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &735022015
 MonoBehaviour:
@@ -6230,9 +6241,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 335783163}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 72.94, y: 13.340001}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.13, y: 1.23}
 --- !u!114 &739665759
@@ -6903,7 +6914,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -7062,9 +7073,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 947835715}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 7.54, y: 13.340001}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.13, y: 1.23}
 --- !u!114 &870878660
@@ -7387,7 +7398,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -7482,7 +7493,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -7893,7 +7904,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6669108912453409153, guid: 0313fd16933ad0546b8f1e5dce7831e2, type: 3}
       propertyPath: m_AnchorMax.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6669108912453409153, guid: 0313fd16933ad0546b8f1e5dce7831e2, type: 3}
       propertyPath: m_AnchorMin.x
@@ -7901,15 +7912,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6669108912453409153, guid: 0313fd16933ad0546b8f1e5dce7831e2, type: 3}
       propertyPath: m_AnchorMin.y
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6669108912453409153, guid: 0313fd16933ad0546b8f1e5dce7831e2, type: 3}
       propertyPath: m_SizeDelta.x
-      value: 0
+      value: 58
       objectReference: {fileID: 0}
     - target: {fileID: 6669108912453409153, guid: 0313fd16933ad0546b8f1e5dce7831e2, type: 3}
       propertyPath: m_SizeDelta.y
-      value: 0
+      value: 58
       objectReference: {fileID: 0}
     - target: {fileID: 6669108912453409153, guid: 0313fd16933ad0546b8f1e5dce7831e2, type: 3}
       propertyPath: m_LocalPosition.x
@@ -7941,11 +7952,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6669108912453409153, guid: 0313fd16933ad0546b8f1e5dce7831e2, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: 0
+      value: 228
       objectReference: {fileID: 0}
     - target: {fileID: 6669108912453409153, guid: 0313fd16933ad0546b8f1e5dce7831e2, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0
+      value: -97
       objectReference: {fileID: 0}
     - target: {fileID: 6669108912453409153, guid: 0313fd16933ad0546b8f1e5dce7831e2, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
@@ -8001,9 +8012,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 947835715}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 31.139997, y: 13.340001}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.13, y: 1.23}
 --- !u!114 &977656326
@@ -8559,16 +8570,15 @@ MonoBehaviour:
     abaDetalhesTorre: {fileID: 224595675}
     botaoSubAbaComandante: {fileID: 930197270}
     botaoSubAbaTorre: {fileID: 1053773028}
-    abaHoverTooltip: {fileID: 0}
-    textoHoverNome: {fileID: 0}
-    textoHoverConteudo: {fileID: 0}
+    abaHoverTooltip: {fileID: 1797198658}
+    textoHoverNome: {fileID: 1463091001}
+    textoHoverConteudo: {fileID: 601027254}
     iconPassiva: {fileID: 1908052630}
     iconHabilidade1: {fileID: 1648660622}
     iconHabilidade2: {fileID: 1616160711}
     iconUltimate: {fileID: 373347591}
     caminho1:
       containerCaminho: {fileID: 1692459765}
-      textoNomeCaminho: {fileID: 1463091001}
       botaoSelecionarCaminho: {fileID: 0}
       nivelIcons:
       - {fileID: 1579164308}
@@ -8578,7 +8588,6 @@ MonoBehaviour:
       - {fileID: 877719750}
     caminho2:
       containerCaminho: {fileID: 806213024}
-      textoNomeCaminho: {fileID: 1463091001}
       botaoSelecionarCaminho: {fileID: 0}
       nivelIcons:
       - {fileID: 706935384}
@@ -8588,7 +8597,6 @@ MonoBehaviour:
       - {fileID: 614953832}
     caminho3:
       containerCaminho: {fileID: 635410766}
-      textoNomeCaminho: {fileID: 1463091001}
       botaoSelecionarCaminho: {fileID: 0}
       nivelIcons:
       - {fileID: 1153064354}
@@ -8609,12 +8617,11 @@ MonoBehaviour:
     abaCaminhoTorre: {fileID: 1852686445}
     abaTorresEquipadas1_4: {fileID: 947835715}
     abaTorresEquipadas5_7: {fileID: 335783163}
-    abaHoverTooltip: {fileID: 0}
-    textoHoverNome: {fileID: 0}
-    textoHoverConteudo: {fileID: 0}
+    abaHoverTooltip: {fileID: 552725082}
+    textoHoverNome: {fileID: 1529389495}
+    textoHoverConteudo: {fileID: 1255206551}
     caminho1:
       containerCaminho: {fileID: 1904219909}
-      textoNomeCaminho: {fileID: 1529389495}
       botaoSelecionarCaminho: {fileID: 0}
       nivelIcons:
       - {fileID: 779416635}
@@ -8624,7 +8631,6 @@ MonoBehaviour:
       - {fileID: 77389718}
     caminho2:
       containerCaminho: {fileID: 863087256}
-      textoNomeCaminho: {fileID: 1529389495}
       botaoSelecionarCaminho: {fileID: 0}
       nivelIcons:
       - {fileID: 521174242}
@@ -8634,7 +8640,6 @@ MonoBehaviour:
       - {fileID: 486056598}
     caminho3:
       containerCaminho: {fileID: 1200760511}
-      textoNomeCaminho: {fileID: 1529389495}
       botaoSelecionarCaminho: {fileID: 0}
       nivelIcons:
       - {fileID: 390658080}
@@ -8965,9 +8970,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 335783163}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 7.54, y: 13.340001}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.13, y: 1.23}
 --- !u!114 &1146384225
@@ -9058,7 +9063,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -9838,10 +9843,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 416127987}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 228, y: -34}
+  m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1247746860
 MonoBehaviour:
@@ -9907,7 +9912,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1255206549}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 0, z: -0}
   m_LocalScale: {x: 4.088718, y: 2.538, z: 2.538}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -9915,8 +9920,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 294}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchoredPosition: {x: -0, y: -83.0434}
+  m_SizeDelta: {x: 200, y: 307.1143}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1255206551
 MonoBehaviour:
@@ -9938,7 +9943,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: New Text
+  m_text: 
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -10004,7 +10009,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: 0, w: -277.12677}
+  m_margin: {x: 0, y: 0, z: 0, w: -0.29303744}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -10068,7 +10073,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -10785,10 +10790,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 997181292}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 102, y: -34}
-  m_SizeDelta: {x: 58, y: 58}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1416755600
 MonoBehaviour:
@@ -11264,7 +11269,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1463090999}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.00001018}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 4.088718, y: 2.538, z: 2.538}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -11272,8 +11277,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -0.000014452, y: 445}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchoredPosition: {x: -0, y: 419.1}
+  m_SizeDelta: {x: 274.77, y: 62.429}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1463091001
 MonoBehaviour:
@@ -11295,7 +11300,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: New Text
+  m_text: Legado de nove caudas
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -11322,8 +11327,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 32
+  m_fontSizeBase: 32
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -11811,7 +11816,7 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1529389493}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.00001018}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 4.088718, y: 2.538, z: 2.538}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -11819,8 +11824,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: -0.000014452, y: 445}
-  m_SizeDelta: {x: 200, y: 50}
+  m_AnchoredPosition: {x: 0, y: 420}
+  m_SizeDelta: {x: 274.77, y: 62.431}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1529389495
 MonoBehaviour:
@@ -11842,7 +11847,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: New Text
+  m_text: Legado de nove caudas
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -11869,8 +11874,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 32
+  m_fontSizeBase: 32
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -12060,9 +12065,9 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 947835715}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 54.739998, y: 13.340001}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.13, y: 1.23}
 --- !u!114 &1569486975
@@ -12290,7 +12295,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -13622,7 +13627,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1811644849
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -13759,7 +13764,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -13915,10 +13920,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 997181292}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 39, y: -97}
-  m_SizeDelta: {x: 58, y: 58}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1837731715
 MonoBehaviour:
@@ -13990,10 +13995,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 997181292}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 228, y: -34}
-  m_SizeDelta: {x: 58, y: 58}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1839490071
 MonoBehaviour:
@@ -14083,7 +14088,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -14160,10 +14165,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 997181292}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 102, y: -97}
-  m_SizeDelta: {x: 58, y: 58}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1843873018
 MonoBehaviour:
@@ -14587,7 +14592,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!114 &1885609068
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15376,10 +15381,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 997181292}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 39, y: -34}
-  m_SizeDelta: {x: 58, y: 58}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1973784840
 MonoBehaviour:
@@ -15681,7 +15686,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a1723f687ba304549806b88a9afa249c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::UIHoverHandler
-  objetoParaAtivarNoHover: {fileID: 601027252}
+  objetoParaAtivarNoHover: {fileID: 1797198658}
   onHoverEnter:
     m_PersistentCalls:
       m_Calls: []
@@ -16045,10 +16050,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 416127987}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0, y: 1}
+  m_AnchorMax: {x: 0, y: 1}
+  m_AnchoredPosition: {x: 102, y: -34}
+  m_SizeDelta: {x: 58, y: 58}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &2109517239
 MonoBehaviour:

@@ -18,7 +18,8 @@ public class Upgrade : ScriptableObject
     [Header("Informacoes do Upgrade")]
     public string upgradeName;
     public Sprite icon;
-    [TextArea] public string description;
+    [TextArea(2, 5)] public string description;
+    [TextArea(4, 10)] public string descricaoGrande;
 
     [Header("Custos")]
     public int geoditeCost;
