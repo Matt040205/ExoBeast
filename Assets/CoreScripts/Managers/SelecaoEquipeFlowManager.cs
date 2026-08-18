@@ -973,7 +973,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
             var modeloComandante = Instantiate(_comandanteSelecionado.commanderPrefab, estagioConfirmacao.spawnComandanteFinal.position, estagioConfirmacao.spawnComandanteFinal.rotation);
             if (olharParaAlvo != null)
             {
-                modeloComandante.transform.LookAt(olharParaAlvo.position);
+                OlharParaAlvoApenasEmY(modeloComandante.transform, olharParaAlvo.position);
             }
             DesativarScriptsDeGameplay(modeloComandante);
             _modelosFinalInstanciados.Add(modeloComandante);
@@ -989,7 +989,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                 var modeloTorre = Instantiate(torre.towerPrefab, estagioConfirmacao.spawnTorresFinal[i].position, estagioConfirmacao.spawnTorresFinal[i].rotation);
                 if (olharParaAlvo != null)
                 {
-                    modeloTorre.transform.LookAt(olharParaAlvo.position);
+                    OlharParaAlvoApenasEmY(modeloTorre.transform, olharParaAlvo.position);
                 }
                 DesativarScriptsDeGameplay(modeloTorre);
                 _modelosFinalInstanciados.Add(modeloTorre);
@@ -1656,10 +1656,26 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
         if (olharParaAlvo != null)
         {
-            _modeloPreviewAtual.transform.LookAt(olharParaAlvo.position);
+            OlharParaAlvoApenasEmY(_modeloPreviewAtual.transform, olharParaAlvo.position);
         }
 
         DesativarScriptsDeGameplay(_modeloPreviewAtual);
+    }
+
+    /// <summary>
+    /// Rotaciona o transform apenas no eixo Y (gira na horizontal) sem alterar a inclinação X ou Z.
+    /// </summary>
+    private void OlharParaAlvoApenasEmY(Transform transformObj, Vector3 targetPos)
+    {
+        if (transformObj == null) return;
+
+        Vector3 direcao = targetPos - transformObj.position;
+        direcao.y = 0f;
+
+        if (direcao.sqrMagnitude > 0.001f)
+        {
+            transformObj.rotation = Quaternion.LookRotation(direcao);
+        }
     }
 
     private void DesativarScriptsDeGameplay(GameObject obj)

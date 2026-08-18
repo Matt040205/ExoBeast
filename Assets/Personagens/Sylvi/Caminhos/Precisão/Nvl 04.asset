@@ -10,14 +10,12 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 691f535880d49194eb92d2bdd093e5cc, type: 3}
-  m_Name: Nvl 01
+  m_Name: Nvl 04
   m_EditorClassIdentifier: 
-  upgradeName: Mais Dano
-  description: +1 de Dano Base
-  geoditeCost: 10
+  upgradeName: Olho da Coruja
+  icon: {fileID: 21300000, guid: 1f27a4125e5c7c142aee2ecfc0763023, type: 3}
+  description: HeadShots revelam inimigos por 5s
+  geoditeCost: 70
   darkEtherCost: 0
-  modifiers:
-  - statToModify: 0
-    modType: 0
-    value: 1
-  behaviorToUnlock: {fileID: 0}
+  modifiers: []
+  behaviorToUnlock: {fileID: 3305408850940735431, guid: de33219b463f6474e94c32b0f9048ee1, type: 3}
