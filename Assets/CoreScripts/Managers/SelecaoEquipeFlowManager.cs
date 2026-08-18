@@ -737,6 +737,17 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                 bool temUpgradeNivel = (nivelIndex < path.upgradesInPath.Count && path.upgradesInPath[nivelIndex] != null);
                 var up = temUpgradeNivel ? path.upgradesInPath[nivelIndex] : null;
 
+                if (up != null && up.icon != null)
+                {
+                    Image imgIcon = iconObj.GetComponent<Image>();
+                    if (imgIcon == null) imgIcon = iconObj.GetComponentInChildren<Image>(true);
+                    if (imgIcon != null)
+                    {
+                        imgIcon.sprite = up.icon;
+                        imgIcon.enabled = true;
+                    }
+                }
+
                 string tituloNivel = $"{path.pathName} - Nível {nivelIndex + 1}";
                 if (up != null && !string.IsNullOrEmpty(up.upgradeName)) tituloNivel += $" ({up.upgradeName})";
 

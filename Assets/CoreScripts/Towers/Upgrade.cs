@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using System.Collections.Generic;
 
 public enum StatType { Damage, AttackSpeed, Range, Armor, CritChance, CritDamage, ArmorPenetration }
@@ -17,6 +17,7 @@ public class Upgrade : ScriptableObject
 {
     [Header("Informacoes do Upgrade")]
     public string upgradeName;
+    public Sprite icon;
     [TextArea] public string description;
 
     [Header("Custos")]
