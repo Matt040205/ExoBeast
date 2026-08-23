@@ -947,12 +947,6 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
             4,
             totalMembros >= 1);
 
-        AtualizarContainerPersonagensResumo(
-            estagioConfirmacao.abaResumoEquipe5_7,
-            null,
-            0,
-            false);
-
         AtualizarPaineisJogadoresRemotosConfirmacao(membros, localUid, totalMembros);
     }
 
@@ -964,10 +958,16 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
         if (canvas == null) return;
 
+        Transform painelJogador4 = EncontrarFilhoDireto(canvas, "Jogador4");
+        bool usarSlotTorres2ComoJogador4 = painelJogador4 == null && estagioConfirmacao.abaResumoEquipe5_7 != null;
+
         for (int numeroJogador = 2; numeroJogador <= 4; numeroJogador++)
         {
-            Transform painel = EncontrarFilhoDireto(canvas, $"Jogador{numeroJogador}");
-            bool mostrarPainel = numeroJogador <= totalMembros;
+            Transform painel = numeroJogador == 4
+                ? painelJogador4
+                : EncontrarFilhoDireto(canvas, $"Jogador{numeroJogador}");
+
+            bool mostrarPainel = painel != null && numeroJogador <= totalMembros;
 
             AtualizarContainerPersonagensResumo(
                 painel,
@@ -975,6 +975,14 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                 4,
                 mostrarPainel);
         }
+
+        AtualizarContainerPersonagensResumo(
+            estagioConfirmacao.abaResumoEquipe5_7,
+            usarSlotTorres2ComoJogador4 && totalMembros >= 4
+                ? ObterPersonagensResumoMembro(membros, 3, localUid)
+                : null,
+            4,
+            usarSlotTorres2ComoJogador4 && totalMembros >= 4);
     }
 
     private Transform EncontrarFilhoDireto(Transform parent, string nome)
