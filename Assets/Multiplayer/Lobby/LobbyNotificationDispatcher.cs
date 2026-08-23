@@ -156,6 +156,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             bool oldReady = member.isReady;
             string oldDisplayName = member.displayName;
             int oldCharacterIndex = member.selectedCharacterIndex;
+            string oldTowerIndexes = LobbyManager.EncodeSelectionIndexes(member.selectedTowerIndexes);
 
             // A1 audit: try/finally garante release mesmo se CopyMemberAttributeByKey
             // lancar exceptionalmente. Antes, o Release() podia ficar inalcancavel.
@@ -194,6 +195,17 @@ namespace ExoBeasts.Multiplayer.Lobby
                         member.selectedCharacterIndex = charIdx;
                 }
 
+                var towerOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
+                {
+                    TargetUserId = info.TargetUserId,
+                    AttrKey = MemberAttributes.TOWER_INDEXES,
+                };
+                if (details.CopyMemberAttributeByKey(ref towerOpts, out var towerAttr) == Result.Success && towerAttr.HasValue)
+                {
+                    string towerVal = towerAttr.Value.Data?.Value.AsUtf8 ?? "";
+                    member.selectedTowerIndexes = LobbyManager.DecodeSelectionIndexes(towerVal);
+                }
+
                 // [SYNC-FIX] Verificar se a partida já começou (proativo)
                 ProcessLobbyAttributes(details);
             }
@@ -206,9 +218,10 @@ namespace ExoBeasts.Multiplayer.Lobby
             // displayName chega assíncrono (SetMemberAttribute após join) — deve re-renderizar.
             if (member.isReady != oldReady ||
                 member.displayName != oldDisplayName ||
-                member.selectedCharacterIndex != oldCharacterIndex)
+                member.selectedCharacterIndex != oldCharacterIndex ||
+                LobbyManager.EncodeSelectionIndexes(member.selectedTowerIndexes) != oldTowerIndexes)
             {
-                Debug.Log($"[LobbyNotificationDispatcher] Membro atualizado: {userId} | isReady={member.isReady} | nome={member.displayName} | char={member.selectedCharacterIndex}");
+                Debug.Log($"[LobbyNotificationDispatcher] Membro atualizado: {userId} | isReady={member.isReady} | nome={member.displayName} | char={member.selectedCharacterIndex} | towers={LobbyManager.EncodeSelectionIndexes(member.selectedTowerIndexes)}");
                 _lobbyManager.InvokeOnMemberUpdated(member);
             }
         }

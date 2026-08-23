@@ -147,11 +147,53 @@ namespace ExoBeasts.Multiplayer.Lobby
                 if (string.IsNullOrEmpty(displayName))
                     displayName = isHost ? "Host" : (userId.Length > 8 ? $"Jogador_{userId.Substring(0, 8)}" : userId);
 
-                if (!_members.Exists(m => m.productUserId == userId))
-                    _members.Add(new LobbyMember(userId, displayName, host: isHost));
+                LobbyMember member = _members.Find(m => m.productUserId == userId);
+                if (member == null)
+                {
+                    member = new LobbyMember(userId, displayName, host: isHost);
+                    _members.Add(member);
+                }
+                else
+                {
+                    member.displayName = displayName;
+                    member.isHost = isHost;
+                }
+
+                ApplyMemberAttributesFromDetails(details, memberId, member);
             }
 
             Debug.Log($"[LobbyMembershipService] Membros carregados da sala: {_members.Count}");
+        }
+
+        private static void ApplyMemberAttributesFromDetails(LobbyDetails details, ProductUserId memberId, LobbyMember member)
+        {
+            if (details == null || memberId == null || member == null)
+                return;
+
+            string readyValue = ReadMemberAttribute(details, memberId, MemberAttributes.IS_READY);
+            if (!string.IsNullOrEmpty(readyValue))
+                bool.TryParse(readyValue, out member.isReady);
+
+            string characterValue = ReadMemberAttribute(details, memberId, MemberAttributes.CHARACTER_INDEX);
+            if (int.TryParse(characterValue, out int characterIndex))
+                member.selectedCharacterIndex = characterIndex;
+
+            string towerValue = ReadMemberAttribute(details, memberId, MemberAttributes.TOWER_INDEXES);
+            member.selectedTowerIndexes = LobbyManager.DecodeSelectionIndexes(towerValue);
+        }
+
+        private static string ReadMemberAttribute(LobbyDetails details, ProductUserId memberId, string attrKey)
+        {
+            var attrOpts = new LobbyDetailsCopyMemberAttributeByKeyOptions
+            {
+                TargetUserId = memberId,
+                AttrKey = attrKey,
+            };
+
+            if (details.CopyMemberAttributeByKey(ref attrOpts, out var attr) == Result.Success && attr.HasValue)
+                return attr.Value.Data?.Value.AsUtf8 ?? "";
+
+            return "";
         }
 
         public string ReadMemberDisplayName(string lobbyId, string userId)

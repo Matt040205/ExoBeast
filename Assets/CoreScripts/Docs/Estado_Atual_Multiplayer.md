@@ -25,6 +25,7 @@ o que mudou em relacao aos docs antigos e quais nomes devem ser tratados como at
 - `EscolherPersonagem.unity` fica como asset legado/historico e nao deve ser usada em novos fluxos, build settings canonicos ou testes de validacao.
 - `SelecaoEquipeFlowManager` e a interface ativa da selecao nova; ele preserva o contrato multiplayer de comandante autoritativo via `CharacterChoiceCache`, `LobbyManager.SelectCharacter`, `PartySlotLayout` e ready por membro do lobby.
 - No multiplayer, cada jogador continua limitado aos slots de `PartySlotLayout`: primeiro slot local e comandante; slots restantes sao torres daquele jogador.
+- A selecao de torres tambem e sincronizada por membro do lobby via atributo `MemberAttributes.TOWER_INDEXES`; o canvas de confirmacao usa os membros reais da sala e oculta slots vazios.
 - `AbaDeOutrosJogadores` dentro da `CenaSeleçao` e o painel oficial para status multiplayer, lista de membros e botao de pronto durante a selecao.
 - O host so inicia `CenaMapaNOVO` pela selecao quando todos os membros estao prontos e todos os clients conectados possuem escolha autoritativa em `CharacterChoiceCache`.
 

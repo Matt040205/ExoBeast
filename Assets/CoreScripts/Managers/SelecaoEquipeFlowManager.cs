@@ -433,7 +433,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         SalvarSelecaoLocalNoGameData();
         PopularGridComandante(); // Atualiza a opacidade do comandante no grid!
 
-        RegistrarEscolhaComandanteRede(_comandanteSelecionado);
+        RegistrarSelecaoLocalRede();
         AtualizarEstadoProntoEInicio();
 
         Debug.Log($"[SelecaoEquipeFlowManager] Comandante confirmado: {_comandanteSelecionado.name}.");
@@ -655,6 +655,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         {
             _torresEquipadas.Add(_torreVisualizacaoTorres);
             SalvarSelecaoLocalNoGameData();
+            RegistrarSelecaoLocalRede();
             AtualizarAbaTorresEquipadas();
             PopularGridTorres(); // Atualiza o grid de torres para desabilitar a torre recém-equipada!
             AtualizarEstadoProntoEInicio();
@@ -924,8 +925,154 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
     private void AtualizarAbaResumoEquipeUI()
     {
+        if (GameModeManager.CurrentMode == GameMode.Multiplayer && LobbyManager.HasInstance)
+        {
+            AtualizarAbaResumoEquipeMultiplayer();
+            return;
+        }
+
         AtualizarContainerSlotsTorres(estagioConfirmacao.abaResumoEquipe1_4, 0, 4, false);
         AtualizarContainerSlotsTorres(estagioConfirmacao.abaResumoEquipe5_7, 4, 3, false);
+    }
+
+    private void AtualizarAbaResumoEquipeMultiplayer()
+    {
+        List<LobbyMember> membros = LobbyManager.Instance.GetOrderedMembers();
+        string localUid = ExoBeasts.Multiplayer.Auth.SessionManager.Instance?.GetUserId() ?? "";
+        int totalMembros = membros == null ? 0 : Mathf.Min(membros.Count, 4);
+
+        AtualizarContainerPersonagensResumo(
+            estagioConfirmacao.abaResumoEquipe1_4,
+            ObterPersonagensResumoMembro(membros, 0, localUid),
+            4,
+            totalMembros >= 1);
+
+        AtualizarContainerPersonagensResumo(
+            estagioConfirmacao.abaResumoEquipe5_7,
+            null,
+            0,
+            false);
+
+        AtualizarPaineisJogadoresRemotosConfirmacao(membros, localUid, totalMembros);
+    }
+
+    private void AtualizarPaineisJogadoresRemotosConfirmacao(List<LobbyMember> membros, string localUid, int totalMembros)
+    {
+        Transform canvas = estagioConfirmacao.canvasConfirmacao != null
+            ? estagioConfirmacao.canvasConfirmacao.transform
+            : null;
+
+        if (canvas == null) return;
+
+        for (int numeroJogador = 2; numeroJogador <= 4; numeroJogador++)
+        {
+            Transform painel = EncontrarFilhoDireto(canvas, $"Jogador{numeroJogador}");
+            bool mostrarPainel = numeroJogador <= totalMembros;
+
+            AtualizarContainerPersonagensResumo(
+                painel,
+                mostrarPainel ? ObterPersonagensResumoMembro(membros, numeroJogador - 1, localUid) : null,
+                4,
+                mostrarPainel);
+        }
+    }
+
+    private Transform EncontrarFilhoDireto(Transform parent, string nome)
+    {
+        if (parent == null || string.IsNullOrEmpty(nome))
+            return null;
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform child = parent.GetChild(i);
+            if (child != null && child.name == nome)
+                return child;
+        }
+
+        return null;
+    }
+
+    private List<CharacterBase> ObterPersonagensResumoMembro(List<LobbyMember> membros, int indiceMembro, string localUid)
+    {
+        var resultado = new List<CharacterBase>();
+        if (membros == null || indiceMembro < 0 || indiceMembro >= membros.Count)
+            return resultado;
+
+        LobbyMember membro = membros[indiceMembro];
+        bool membroLocal = !string.IsNullOrEmpty(localUid) && membro.productUserId == localUid;
+
+        CharacterBase comandante = membroLocal && _comandanteSelecionado != null
+            ? _comandanteSelecionado
+            : ObterPersonagemPorIndiceBiblioteca(membro.selectedCharacterIndex);
+
+        if (comandante != null)
+            resultado.Add(comandante);
+
+        if (membroLocal)
+        {
+            for (int i = 0; i < _torresEquipadas.Count; i++)
+            {
+                if (_torresEquipadas[i] != null)
+                    resultado.Add(_torresEquipadas[i]);
+            }
+        }
+        else if (membro.selectedTowerIndexes != null)
+        {
+            for (int i = 0; i < membro.selectedTowerIndexes.Count; i++)
+            {
+                CharacterBase torre = ObterPersonagemPorIndiceBiblioteca(membro.selectedTowerIndexes[i]);
+                if (torre != null)
+                    resultado.Add(torre);
+            }
+        }
+
+        return resultado;
+    }
+
+    private void AtualizarContainerPersonagensResumo(Transform container, IReadOnlyList<CharacterBase> personagens, int maxCount, bool mostrarContainer = true)
+    {
+        if (container == null) return;
+        container.gameObject.SetActive(mostrarContainer);
+        if (!mostrarContainer) return;
+
+        int childCount = container.childCount;
+        if (childCount > 0)
+        {
+            for (int i = 0; i < childCount; i++)
+            {
+                Transform filho = container.GetChild(i);
+                bool temPersonagem = personagens != null && i < personagens.Count && i < maxCount && personagens[i] != null;
+                filho.gameObject.SetActive(temPersonagem);
+
+                Button btn = filho.GetComponent<Button>();
+                if (btn == null) btn = filho.GetComponentInChildren<Button>(true);
+                if (btn != null) btn.onClick.RemoveAllListeners();
+
+                if (temPersonagem)
+                    DefinirImagemNoCard(filho.gameObject, personagens[i].characterIcon);
+                else
+                    LimparImagemDoCard(filho.gameObject);
+            }
+            return;
+        }
+
+        if (slotTorreEquipadaPrefab == null && cardPrefab == null)
+            return;
+
+        LimparContainer(container);
+        int quantidade = personagens == null ? 0 : Mathf.Min(personagens.Count, maxCount);
+        for (int i = 0; i < quantidade; i++)
+        {
+            CharacterBase personagem = personagens[i];
+            if (personagem == null) continue;
+
+            GameObject slotObj = (slotTorreEquipadaPrefab != null)
+                ? Instantiate(slotTorreEquipadaPrefab, container)
+                : Instantiate(cardPrefab, container);
+
+            if (slotObj != null)
+                DefinirImagemNoCard(slotObj, personagem.characterIcon);
+        }
     }
 
     private void AtualizarContainerSlotsTorres(Transform container, int startIndex, int maxCountInContainer, bool permitirRemover)
@@ -959,6 +1106,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                                 {
                                     _torresEquipadas.RemoveAt(indexParaRemover);
                                     SalvarSelecaoLocalNoGameData();
+                                    RegistrarSelecaoLocalRede();
                                     AtualizarAbaTorresEquipadas();
                                     PopularGridTorres(); // Atualiza o grid para re-habilitar a torre removida
                                     AtualizarEstadoProntoEInicio();
@@ -970,6 +1118,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                 else
                 {
                     LimparImagemDoCard(filho.gameObject);
+                    filho.gameObject.SetActive(permitirRemover);
 
                     Button btn = filho.GetComponent<Button>();
                     if (btn == null) btn = filho.GetComponentInChildren<Button>(true);
@@ -1010,6 +1159,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
                                 {
                                     _torresEquipadas.RemoveAt(indexParaRemover);
                                     SalvarSelecaoLocalNoGameData();
+                                    RegistrarSelecaoLocalRede();
                                     AtualizarAbaTorresEquipadas();
                                     PopularGridTorres(); // Atualiza o grid para re-habilitar a torre removida
                                     AtualizarEstadoProntoEInicio();
@@ -1085,7 +1235,7 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         // Persiste toda a seleção no GameDataManager (ícone do comandante fica acessível em EscolherCaminho)
         SalvarSelecaoLocalNoGameData();
 
-        RegistrarEscolhaComandanteRede(_comandanteSelecionado);
+        RegistrarSelecaoLocalRede();
 
         if (BuildManager.Instance != null && GameDataManager.Instance != null)
         {
@@ -1252,6 +1402,65 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         imagens[0].color = Color.white;
     }
 
+    private int ObterIndiceBibliotecaPersonagem(CharacterBase personagem, bool adicionarSeAusente)
+    {
+        if (personagem == null || GameDataManager.Instance == null)
+            return -1;
+
+        if (GameDataManager.Instance.bibliotecaOriginalPersonagens == null)
+            GameDataManager.Instance.bibliotecaOriginalPersonagens = new List<CharacterBase>();
+
+        string cleanName = personagem.name.Replace("(Clone)", "").Trim();
+        var bibData = GameDataManager.Instance.bibliotecaOriginalPersonagens;
+        int indexBib = bibData.FindIndex(item => item != null && item.name.Replace("(Clone)", "").Trim() == cleanName);
+
+        if (indexBib < 0 && adicionarSeAusente)
+        {
+            bibData.Add(personagem);
+            indexBib = bibData.Count - 1;
+        }
+
+        return indexBib;
+    }
+
+    private CharacterBase ObterPersonagemPorIndiceBiblioteca(int index)
+    {
+        if (index < 0 || GameDataManager.Instance == null)
+            return null;
+
+        GameDataManager.Instance.GarantirBibliotecaOriginal();
+        List<CharacterBase> biblioteca = GameDataManager.Instance.bibliotecaOriginalPersonagens;
+        if (biblioteca == null || index >= biblioteca.Count)
+            return null;
+
+        return biblioteca[index];
+    }
+
+    private List<int> ObterIndicesTorresEquipadasRede()
+    {
+        var indices = new List<int>();
+        for (int i = 0; i < _torresEquipadas.Count; i++)
+        {
+            int index = ObterIndiceBibliotecaPersonagem(_torresEquipadas[i], true);
+            if (index >= 0)
+                indices.Add(index);
+        }
+
+        return indices;
+    }
+
+    private void RegistrarSelecaoLocalRede()
+    {
+        if (GameModeManager.CurrentMode != GameMode.Multiplayer || !LobbyManager.HasInstance)
+            return;
+
+        if (_comandanteSelecionado != null)
+            RegistrarEscolhaComandanteRede(_comandanteSelecionado);
+
+        LobbyManager.Instance.SelectTowers(ObterIndicesTorresEquipadasRede());
+        AtualizarAbaResumoEquipeUI();
+    }
+
     private void RegistrarEscolhaComandanteRede(CharacterBase c)
     {
         if (c == null) return;
@@ -1259,16 +1468,8 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
         if (GameDataManager.Instance != null)
         {
-            if (GameDataManager.Instance.bibliotecaOriginalPersonagens == null)
-                GameDataManager.Instance.bibliotecaOriginalPersonagens = new List<CharacterBase>();
-
-            var bibData = GameDataManager.Instance.bibliotecaOriginalPersonagens;
-            int indexBib = bibData.FindIndex(item => item != null && item.name.Replace("(Clone)", "") == cleanName);
-            if (indexBib < 0)
-            {
-                bibData.Add(c);
-                indexBib = bibData.Count - 1;
-            }
+            int indexBib = ObterIndiceBibliotecaPersonagem(c, true);
+            if (indexBib < 0) return;
 
             var nm = NetworkManager.Singleton;
             if (LobbyManager.Instance != null)
@@ -1361,15 +1562,21 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
         RectTransform panelRect = multiplayerUi.painelOutrosJogadores.GetComponent<RectTransform>();
         if (panelRect != null)
         {
+            panelRect.localRotation = Quaternion.identity;
+            panelRect.localScale = Vector3.one;
             panelRect.anchorMin = new Vector2(0.02f, 0.55f);
             panelRect.anchorMax = new Vector2(0.28f, 0.95f);
+            panelRect.anchoredPosition = Vector2.zero;
             panelRect.offsetMin = Vector2.zero;
             panelRect.offsetMax = Vector2.zero;
         }
 
         Image panelImage = multiplayerUi.painelOutrosJogadores.GetComponent<Image>();
         if (panelImage != null)
+        {
             panelImage.color = new Color(0.04f, 0.06f, 0.08f, 0.76f);
+            panelImage.raycastTarget = false;
+        }
 
         VerticalLayoutGroup layout = multiplayerUi.painelOutrosJogadores.GetComponent<VerticalLayoutGroup>();
         if (layout == null)
@@ -1669,8 +1876,11 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
 
         _isReady = ready;
 
-        if (notifyLobby && GameModeManager.CurrentMode == GameMode.Multiplayer && LobbyManager.Instance != null)
+        if (notifyLobby && GameModeManager.CurrentMode == GameMode.Multiplayer && LobbyManager.HasInstance)
+        {
+            RegistrarSelecaoLocalRede();
             LobbyManager.Instance.SetReady(ready);
+        }
 
         AtualizarEstadoProntoEInicio();
     }
@@ -1678,6 +1888,8 @@ public class SelecaoEquipeFlowManager : MonoBehaviour
     private void OnLobbyMemberChanged(LobbyMember _)
     {
         CalcularSlotsPermitidos();
+        if (estagioConfirmacao.canvasConfirmacao != null && estagioConfirmacao.canvasConfirmacao.activeSelf)
+            AtualizarAbaResumoEquipeUI();
         AtualizarEstadoProntoEInicio();
     }
 

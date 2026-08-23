@@ -47,6 +47,7 @@ namespace ExoBeasts.Multiplayer.Lobby
         public string productUserId;
         public string displayName;
         public int selectedCharacterIndex = -1;
+        public List<int> selectedTowerIndexes = new List<int>();
         public bool isReady;
         public bool isHost;
 
@@ -55,6 +56,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             productUserId = "";
             displayName = "Player";
             selectedCharacterIndex = -1;
+            selectedTowerIndexes = new List<int>();
             isReady = false;
             isHost = false;
         }
@@ -64,6 +66,7 @@ namespace ExoBeasts.Multiplayer.Lobby
             productUserId = userId;
             displayName = name;
             selectedCharacterIndex = -1;
+            selectedTowerIndexes = new List<int>();
             isReady = false;
             isHost = host;
         }
@@ -127,6 +130,7 @@ namespace ExoBeasts.Multiplayer.Lobby
     {
         public const string DISPLAY_NAME = "DISPLAY_NAME";
         public const string CHARACTER_INDEX = "CHARACTER_INDEX";
+        public const string TOWER_INDEXES = "TOWER_INDEXES";
         public const string IS_READY = "IS_READY";
         public const string IS_HOST = "IS_HOST";
     }

@@ -859,6 +859,59 @@ namespace ExoBeasts.Multiplayer.Lobby
             SetMemberAttribute(MemberAttributes.CHARACTER_INDEX, characterIndex.ToString());
         }
 
+        public void SelectTowers(IReadOnlyList<int> towerIndexes)
+        {
+            string myUid = SessionManager.Instance?.GetUserId();
+            if (!string.IsNullOrEmpty(myUid))
+            {
+                var me = _membershipService.FindMutableMember(myUid);
+                if (me != null)
+                {
+                    me.selectedTowerIndexes.Clear();
+                    if (towerIndexes != null)
+                    {
+                        for (int i = 0; i < towerIndexes.Count; i++)
+                            me.selectedTowerIndexes.Add(towerIndexes[i]);
+                    }
+
+                    Debug.Log($"[LobbyManager] SelectTowers local: {EncodeSelectionIndexes(me.selectedTowerIndexes)} (uid={myUid})");
+                    OnMemberUpdated?.Invoke(me);
+                }
+            }
+
+            SetMemberAttribute(MemberAttributes.TOWER_INDEXES, EncodeSelectionIndexes(towerIndexes));
+        }
+
+        internal static string EncodeSelectionIndexes(IReadOnlyList<int> indexes)
+        {
+            if (indexes == null || indexes.Count == 0)
+                return "";
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            for (int i = 0; i < indexes.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append(indexes[i]);
+            }
+            return sb.ToString();
+        }
+
+        internal static List<int> DecodeSelectionIndexes(string value)
+        {
+            var result = new List<int>();
+            if (string.IsNullOrWhiteSpace(value))
+                return result;
+
+            string[] parts = value.Split(',');
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (int.TryParse(parts[i].Trim(), out int index))
+                    result.Add(index);
+            }
+
+            return result;
+        }
+
         /// <summary>
         /// Retorna o indice do personagem escolhido pelo jogador local,
         /// lendo do proprio slot em _members. Fallback: 0.
