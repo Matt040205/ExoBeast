@@ -145,6 +145,15 @@ public class PlayerHealthSystem : NetworkBehaviour
 
     public void TriggerDamageDealt(float damageAmount)
     {
+        if (IsServer &&
+            damageAmount > 0f &&
+            ObjectiveHealthSystem.Instance != null &&
+            ModificacaoRunState.IsActive(ModificacaoGameplayEffect.RouboDeVidaSincronizado))
+        {
+            float healPercent = ModificacaoRunState.GetValue(ModificacaoGameplayEffect.RouboDeVidaSincronizado, 0.03f);
+            ObjectiveHealthSystem.Instance.Heal(damageAmount * healPercent);
+        }
+
         OnDamageDealt?.Invoke(damageAmount);
     }
 

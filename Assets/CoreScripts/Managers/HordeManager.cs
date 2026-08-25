@@ -356,6 +356,12 @@ public class HordeManager : NetworkBehaviour
 
         WaveActive = false;
         Debug.Log($"[HordeManager] Horda {CurrentHorde} completada!");
+        if (ObjectiveHealthSystem.Instance != null &&
+            ModificacaoRunState.IsActive(ModificacaoGameplayEffect.SobrecargaDeNucleo))
+        {
+            ObjectiveHealthSystem.Instance.HealPercent(
+                ModificacaoRunState.GetValue(ModificacaoGameplayEffect.SobrecargaDeNucleo, 0.05f));
+        }
 
         if (CurrentHorde >= victoryHorde)
         {
@@ -392,6 +398,9 @@ public class HordeManager : NetworkBehaviour
         {
             prepTime = customWaves[waveArrayIndex].prepTime;
         }
+
+        if (ModificacaoRunState.IsActive(ModificacaoGameplayEffect.AvancoImplacavel))
+            prepTime = 0f;
 
         Debug.Log($"[HordeManager] {titulo}: {listaInimigos} | Preparacao: {prepTime}s");
 
@@ -475,6 +484,63 @@ public class HordeManager : NetworkBehaviour
                 }
             }
         }
+
+        ApplyRunModifiersToGeneratedWave();
+    }
+
+    private void ApplyRunModifiersToGeneratedWave()
+    {
+        if (!ModificacaoRunState.IsActive(ModificacaoGameplayEffect.EnxameMassivo) ||
+            preGeneratedWaveList == null ||
+            preGeneratedWaveList.Count == 0)
+        {
+            return;
+        }
+
+        EnemyDataSO basicEnemy = FindBasicEnemyForSwarm();
+        if (basicEnemy == null)
+            return;
+
+        int multiplier = Mathf.Max(1, Mathf.RoundToInt(ModificacaoRunState.GetValue(ModificacaoGameplayEffect.EnxameMassivo, 5f)));
+        List<(EnemyDataSO enemy, int pathIndex, float spawnDelay)> adjusted = new List<(EnemyDataSO, int, float)>(preGeneratedWaveList.Count * multiplier);
+
+        foreach (var entry in preGeneratedWaveList)
+        {
+            EnemyDataSO enemy = IsHeavyEnemy(entry.enemy) ? basicEnemy : entry.enemy;
+            for (int i = 0; i < multiplier; i++)
+                adjusted.Add((enemy, entry.pathIndex, entry.spawnDelay));
+        }
+
+        preGeneratedWaveList = adjusted;
+    }
+
+    private EnemyDataSO FindBasicEnemyForSwarm()
+    {
+        if (enemyTypes != null)
+        {
+            foreach (EnemyDataSO enemy in enemyTypes)
+            {
+                if (enemy != null && !IsHeavyEnemy(enemy))
+                    return enemy;
+            }
+        }
+
+        foreach (var entry in preGeneratedWaveList)
+        {
+            if (entry.enemy != null && !IsHeavyEnemy(entry.enemy))
+                return entry.enemy;
+        }
+
+        return null;
+    }
+
+    private static bool IsHeavyEnemy(EnemyDataSO enemy)
+    {
+        if (enemy == null)
+            return false;
+
+        string name = enemy.name;
+        return !string.IsNullOrEmpty(name) && name.ToLowerInvariant().Contains("monstro");
     }
 
     private string BuildAnnouncementText(List<(EnemyDataSO enemy, int pathIndex, float spawnDelay)> lista)

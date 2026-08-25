@@ -263,6 +263,7 @@ public class TowerController : MonoBehaviour
         if (!HasCombatAuthority()) return;
         if (IsDestroyed) return;
         if (isMaterializing) return;
+        if (BuildManager.Instance != null && BuildManager.Instance.IsTowerSilenced(this)) return;
         if (targetEnemy == null) return;
         if (!IsTargetAllowedByMovementLeash(targetEnemy))
         {
@@ -285,6 +286,7 @@ public class TowerController : MonoBehaviour
     {
         if (!HasCombatAuthority()) return;
         if (isMaterializing) return;
+        if (BuildManager.Instance != null && BuildManager.Instance.IsTowerSilenced(this)) return;
         if (targetEnemy == null) return;
         if (!IsTargetAllowedByMovementLeash(targetEnemy))
         {
@@ -400,7 +402,12 @@ public class TowerController : MonoBehaviour
         NetworkGameplayResolver.TryResolveAttackerFromBuilding(this, out attackerClientId, out attackerHealth);
 
         // Torres marcam IsFromTower = true para poder quebrar escudos de inimigos
-        DamageContext damageContext = new DamageContext(attackerClientId, isCritical, DamageFeedbackMode.AllObservers, isFromTower: true);
+        DamageContext damageContext = new DamageContext(
+            attackerClientId,
+            isCritical,
+            DamageFeedbackMode.AllObservers,
+            isFromTower: true,
+            sourcePosition: transform.position);
 
         bool enemyDied = healthSystem.ApplyAuthoritativeDamage(
             damageToDeal,
@@ -776,7 +783,12 @@ public class TowerController : MonoBehaviour
         NetworkGameplayResolver.TryResolveAttackerFromBuilding(this, out attackerClientId, out attackerHealth);
 
         // Torres marcam IsFromTower = true para poder quebrar escudos de inimigos
-        DamageContext damageContext = new DamageContext(attackerClientId, isCritical, DamageFeedbackMode.AllObservers, isFromTower: true);
+        DamageContext damageContext = new DamageContext(
+            attackerClientId,
+            isCritical,
+            DamageFeedbackMode.AllObservers,
+            isFromTower: true,
+            sourcePosition: transform.position);
 
         bool enemyDied = target.ApplyAuthoritativeDamage(
             damageToDeal,

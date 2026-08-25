@@ -233,8 +233,8 @@ public class UpgradePanelUI : MonoBehaviour
         if (!isMaxLevelForPath)
         {
             Upgrade nextUpgrade = path.upgradesInPath[currentLevel];
-            int geoditeCost = nextUpgrade.geoditeCost;
-            int darkEtherCost = nextUpgrade.darkEtherCost;
+            int geoditeCost = ModificacaoRunState.ApplyUpgradeCost(nextUpgrade.geoditeCost);
+            int darkEtherCost = ModificacaoRunState.ApplyUpgradeCost(nextUpgrade.darkEtherCost);
 
             string costString = "";
             List<string> costs = new List<string>();
@@ -315,8 +315,8 @@ public class UpgradePanelUI : MonoBehaviour
         }
 
         Upgrade nextUpgrade = path.upgradesInPath[currentLevel];
-        int geoditeCost = nextUpgrade.geoditeCost;
-        int darkEtherCost = nextUpgrade.darkEtherCost;
+        int geoditeCost = ModificacaoRunState.ApplyUpgradeCost(nextUpgrade.geoditeCost);
+        int darkEtherCost = ModificacaoRunState.ApplyUpgradeCost(nextUpgrade.darkEtherCost);
 
         if (CurrencyManager.Instance.HasEnoughCurrency(geoditeCost, CurrencyType.Geodites) &&
             CurrencyManager.Instance.HasEnoughCurrency(darkEtherCost, CurrencyType.DarkEther))

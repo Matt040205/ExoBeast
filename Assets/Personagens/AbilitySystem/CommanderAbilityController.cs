@@ -247,7 +247,8 @@ public class CommanderAbilityController : NetworkBehaviour
             if (IsAbilityCooldownDeferred(abilityToUse))
                 return;
 
-            abilityCooldowns[abilityToUse] = abilityToUse.cooldown;
+            abilityCooldowns[abilityToUse] = GetModifiedCooldown(abilityToUse);
+            GrantInfiniteAmmoAfterAbility();
             ActivateAbilityVisualClientRpc(abilityIndex);
         }
     }
@@ -277,7 +278,7 @@ public class CommanderAbilityController : NetworkBehaviour
         if (ability == null)
             return;
 
-        abilityCooldowns[ability] = ability.cooldown;
+        abilityCooldowns[ability] = GetModifiedCooldown(ability);
 
         // VFX Global para a habilidade Aqui Não (todos os clientes veem)
         if (ability is HabilidadeAquiNao aquiNaoAbility && aquiNaoAbility.slashVfxPrefab != null)
@@ -511,7 +512,8 @@ public class CommanderAbilityController : NetworkBehaviour
             // CacadoraNoturnaLogic (Coruja) ja dispara trigger de animacao em OnNetworkSpawn.
             // Antes: 1 ClientRpc broadcast por ult ativada (3 pacotes inuteis em lobby 4-player).
             // Agora: visual fica a cargo do logic spawnado pela ult — sem RPC vazio.
-            abilityCooldowns[characterData.ultimate] = characterData.ultimate.cooldown;
+            abilityCooldowns[characterData.ultimate] = GetModifiedCooldown(characterData.ultimate);
+            GrantInfiniteAmmoAfterAbility();
             netUltimateCharge.Value = 0f;
             _pendingPassiveCharge = 0f;
         }
@@ -556,9 +558,10 @@ public class CommanderAbilityController : NetworkBehaviour
 
     public float GetRemainingCooldownPercent(Ability ability)
     {
-        if (ability == null || !abilityCooldowns.ContainsKey(ability) || ability.cooldown <= 0)
+        float cooldown = GetModifiedCooldown(ability);
+        if (ability == null || !abilityCooldowns.ContainsKey(ability) || cooldown <= 0)
             return 0f;
-        return Mathf.Clamp01(abilityCooldowns[ability] / ability.cooldown);
+        return Mathf.Clamp01(abilityCooldowns[ability] / cooldown);
     }
 
     public void ReduceAllAbilityCooldowns(float reductionAmount)
@@ -631,12 +634,12 @@ public class CommanderAbilityController : NetworkBehaviour
         if (ability == null)
             return;
 
-        abilityCooldowns[ability] = ability.cooldown;
+        abilityCooldowns[ability] = GetModifiedCooldown(ability);
         deferredCooldownAbilities.Remove(ability);
 
         int abilityIndex = ResolveAbilityIndex(ability);
         if (CanSendCooldownSync(abilityIndex))
-            SetAbilityCooldownClientRpc(abilityIndex, ability.cooldown);
+            SetAbilityCooldownClientRpc(abilityIndex, GetModifiedCooldown(ability));
     }
 
     public bool TryGetLastAbilityAim(out Vector3 origin, out Vector3 direction)
@@ -671,6 +674,21 @@ public class CommanderAbilityController : NetworkBehaviour
     private bool IsAbilityCooldownDeferred(Ability ability)
     {
         return ability != null && deferredCooldownAbilities.Contains(ability);
+    }
+
+    private float GetModifiedCooldown(Ability ability)
+    {
+        return ability != null ? ModificacaoRunState.ApplyAbilityCooldown(ability.cooldown) : 0f;
+    }
+
+    private void GrantInfiniteAmmoAfterAbility()
+    {
+        if (!ModificacaoRunState.IsActive(ModificacaoGameplayEffect.MunicaoInfinitaTemporaria))
+            return;
+
+        PlayerShooting shooting = GetComponent<PlayerShooting>();
+        if (shooting != null)
+            shooting.GrantInfiniteAmmo(ModificacaoRunState.GetValue(ModificacaoGameplayEffect.MunicaoInfinitaTemporaria, 3f));
     }
 
     private bool CanSendCooldownSync(int abilityIndex)

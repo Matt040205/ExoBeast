@@ -14,9 +14,11 @@ namespace ExoBeasts.Multiplayer.Sync
         private ulong attackerClientId;
         private float damage;
         private bool isCritical;
+        private bool isSilverBullet;
         private float armorPenetration;
         private bool isEmpoweredSkill;
         private float explosionRadius;
+        private Vector3 sourcePosition;
 
         // Grace period: mesma proteção do ProjectileVisual.
         private float spawnTime;
@@ -39,6 +41,7 @@ namespace ExoBeasts.Multiplayer.Sync
             ulong attackerId,
             float projectileDamage,
             bool projectileCrit,
+            bool projectileSilverBullet,
             float projectileArmorPenetration,
             Vector3 direction,
             float speed,
@@ -50,12 +53,14 @@ namespace ExoBeasts.Multiplayer.Sync
             attackerClientId = attackerId;
             damage = projectileDamage;
             isCritical = projectileCrit;
+            isSilverBullet = projectileSilverBullet;
             armorPenetration = projectileArmorPenetration;
             isEmpoweredSkill = empoweredSkill;
             explosionRadius = empoweredExplosionRadius;
             hasHit = false;
             spawnTime = Time.time;
             ownerRoot = shooting != null ? shooting.transform : null;
+            sourcePosition = ownerRoot != null ? ownerRoot.position : transform.position;
 
             SuppressPresentation();
 
@@ -113,7 +118,7 @@ namespace ExoBeasts.Multiplayer.Sync
                 if (enemy == null || !processedEnemies.Add(enemy))
                     continue;
 
-                if (enemy.ApplyDamageServer(damage, armorPenetration, isCritical, attackerClientId, out float confirmedDamage))
+                if (enemy.ApplyDamageServer(damage, armorPenetration, isCritical, attackerClientId, out float confirmedDamage, isSilverBullet, isAreaDamage: true, sourcePosition: transform.position))
                     totalDamage += confirmedDamage;
             }
 
@@ -126,7 +131,7 @@ namespace ExoBeasts.Multiplayer.Sync
             if (enemy == null)
                 return 0f;
 
-            return enemy.ApplyDamageServer(damage, armorPenetration, isCritical, attackerClientId, out float confirmedDamage)
+            return enemy.ApplyDamageServer(damage, armorPenetration, isCritical, attackerClientId, out float confirmedDamage, isSilverBullet, isAreaDamage: false, sourcePosition: sourcePosition)
                 ? confirmedDamage
                 : 0f;
         }

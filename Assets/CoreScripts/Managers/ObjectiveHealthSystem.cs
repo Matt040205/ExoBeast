@@ -21,6 +21,7 @@ public class ObjectiveHealthSystem : NetworkBehaviour
     public string somBaseAtacada = AudioEventIds.BaseHitLight;
 
     private bool isDead;
+    private bool secondChanceUsed;
     private float localHealth;
     private bool isNetworkDriven;
     private Coroutine initialSyncRepublishCoroutine;
@@ -50,7 +51,7 @@ public class ObjectiveHealthSystem : NetworkBehaviour
         if (!ngoActive)
         {
             isNetworkDriven = false;
-            localHealth = Mathf.Max(maxHealth, 1f);
+            localHealth = GetInitialHealth();
             PublishHealthSnapshot();
         }
         else if (NetworkObject != null && NetworkObject.IsSpawned)
@@ -73,9 +74,10 @@ public class ObjectiveHealthSystem : NetworkBehaviour
             return;
 
         isDead = false;
+        secondChanceUsed = false;
         isNetworkDriven = true;
         if (IsServer)
-            currentHealth.Value = maxHealth;
+            currentHealth.Value = GetInitialHealth();
 
         localHealth = Mathf.Clamp(currentHealth.Value, 0f, maxHealth);
         currentHealth.OnValueChanged += OnCurrentHealthChanged;
@@ -115,7 +117,12 @@ public class ObjectiveHealthSystem : NetworkBehaviour
             currentHealth.Value = Mathf.Max(currentHealth.Value - damage, 0f);
 
             if (currentHealth.Value <= 0f)
+            {
+                if (TryConsumeSecondChance())
+                    return;
+
                 Die();
+            }
         }
         else
         {
@@ -129,8 +136,70 @@ public class ObjectiveHealthSystem : NetworkBehaviour
             }
 
             if (localHealth <= 0f)
+            {
+                if (TryConsumeSecondChance())
+                    return;
+
                 Die();
+            }
         }
+    }
+
+    public void Heal(float amount)
+    {
+        if (amount <= 0f || isDead)
+            return;
+
+        if (isNetworkDriven)
+        {
+            if (!IsServer)
+                return;
+
+            currentHealth.Value = Mathf.Min(currentHealth.Value + amount, maxHealth);
+        }
+        else
+        {
+            localHealth = Mathf.Min(localHealth + amount, maxHealth);
+            PublishHealthSnapshot();
+        }
+    }
+
+    public void HealPercent(float percent)
+    {
+        Heal(maxHealth * Mathf.Max(0f, percent));
+    }
+
+    private float GetInitialHealth()
+    {
+        float multiplier = ModificacaoRunState.IsActive(ModificacaoGameplayEffect.NucleoFragil)
+            ? ModificacaoRunState.GetValue(ModificacaoGameplayEffect.NucleoFragil, 0.9f)
+            : 1f;
+
+        return Mathf.Clamp(maxHealth * multiplier, 1f, maxHealth);
+    }
+
+    private bool TryConsumeSecondChance()
+    {
+        if (secondChanceUsed || !ModificacaoRunState.IsActive(ModificacaoGameplayEffect.SegundaChance))
+            return false;
+
+        secondChanceUsed = true;
+        float restorePercent = ModificacaoRunState.GetValue(ModificacaoGameplayEffect.SegundaChance, 0.5f);
+
+        if (isNetworkDriven)
+            currentHealth.Value = Mathf.Clamp(maxHealth * restorePercent, 1f, maxHealth);
+        else
+            localHealth = Mathf.Clamp(maxHealth * restorePercent, 1f, maxHealth);
+
+        EnemyHealthSystem[] enemies = FindObjectsByType<EnemyHealthSystem>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        foreach (EnemyHealthSystem enemy in enemies)
+        {
+            if (enemy != null && !enemy.isDead)
+                enemy.ApplyAuthoritativeDamage(float.MaxValue, 0f, false, 0);
+        }
+
+        PublishHealthSnapshot();
+        return true;
     }
 
     private void OnCurrentHealthChanged(float oldValue, float newValue)

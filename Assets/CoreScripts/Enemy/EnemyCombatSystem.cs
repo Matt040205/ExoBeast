@@ -123,7 +123,8 @@ public class EnemyCombatSystem : NetworkBehaviour
         PlayAttackAnimationClientRpc();
 
         // Calcula o tempo de recarga com base na velocidade de ataque
-        float cooldown = enemyData.attackSpeed > 0f ? 1f / enemyData.attackSpeed : 1f;
+        float attackSpeed = enemyData.attackSpeed;
+        float cooldown = attackSpeed > 0f ? 1f / attackSpeed : 1f;
         nextAttackTime = Time.time + cooldown;
 
         // O dano ocorrerá via AnimationEvent_ApplyDamage().

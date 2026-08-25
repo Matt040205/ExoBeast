@@ -60,6 +60,8 @@ public class EnemyController : MonoBehaviour
     private Coroutine tauntCoroutine;
     private Coroutine aiTickCoroutine;
     private Vector3 lastDestinationSet = Vector3.positiveInfinity;
+    private Vector3 originalScale;
+    private Coroutine runModifierCoroutine;
 
     private Vector3 lastTickPosition;
     private int stuckTickCount;
@@ -78,6 +80,7 @@ public class EnemyController : MonoBehaviour
         combatSystem = GetComponent<EnemyCombatSystem>();
         statusController = GetComponent<EnemyStatusController>();
         networkedEnemy = GetComponent<ExoBeasts.Multiplayer.Sync.NetworkedEnemy>();
+        originalScale = transform.localScale;
 
         if (statusController == null)
             statusController = gameObject.AddComponent<EnemyStatusController>();
@@ -106,6 +109,7 @@ public class EnemyController : MonoBehaviour
 
         EnemyEvents.OnEnemySpawned?.Invoke(pathIndex + 1);
         statusController.ResetState();
+        ApplyRunModifierScale();
 
         if (healthSystem != null)
             healthSystem.InitializeHealth(level);
@@ -125,10 +129,45 @@ public class EnemyController : MonoBehaviour
         if (aiTickCoroutine != null)
             StopCoroutine(aiTickCoroutine);
 
+        if (runModifierCoroutine != null)
+            StopCoroutine(runModifierCoroutine);
+
+        runModifierCoroutine = StartCoroutine(RunModifierRoutine());
+
         if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsServer)
         {
             aiTickCoroutine = StartCoroutine(AI_TickRoutine());
         }
+    }
+
+    private void ApplyRunModifierScale()
+    {
+        float scaleMultiplier = 1f;
+
+        if (ModificacaoRunState.IsActive(ModificacaoGameplayEffect.AlvosMinusculos))
+            scaleMultiplier *= ModificacaoRunState.GetValue(ModificacaoGameplayEffect.AlvosMinusculos, 0.5f);
+
+        if (ModificacaoRunState.IsActive(ModificacaoGameplayEffect.Gigantismo))
+            scaleMultiplier *= ModificacaoRunState.GetValue(ModificacaoGameplayEffect.Gigantismo, 3f);
+
+        transform.localScale = originalScale * scaleMultiplier;
+    }
+
+    private IEnumerator RunModifierRoutine()
+    {
+        while (!IsDead)
+        {
+            if (healthSystem != null && ModificacaoRunState.IsActive(ModificacaoGameplayEffect.FrenesiMortal))
+            {
+                float drainPerSecond = ModificacaoRunState.GetSecondaryValue(ModificacaoGameplayEffect.FrenesiMortal, 1f);
+                if (drainPerSecond > 0f)
+                    healthSystem.ApplyAuthoritativeDamage(drainPerSecond, 0f, false, 0);
+            }
+
+            yield return new WaitForSeconds(1f);
+        }
+
+        runModifierCoroutine = null;
     }
 
     private void Update()

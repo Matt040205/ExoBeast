@@ -613,6 +613,7 @@ public class CaminhoManager : MonoBehaviour
         }
 
         Debug.Log($"[CaminhoManager] Carregando cena: {nomeCena}");
+        ModificacaoRunState.SetActive(_modPositivaSorteada, _modNegativaSorteada);
 
         // Registra o comandante no CharacterChoiceCache ANTES de StartHost
         // para garantir que o GameSetupManager spawne o personagem correto.

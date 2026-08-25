@@ -41,10 +41,29 @@ namespace ExoBeasts.Multiplayer.Sync
             ApplyDamageServer(damage, armorPen, damageContext, attackerHealth, out _);
         }
 
-        public bool ApplyDamageServer(float damage, float armorPen, bool isCrit, ulong attackerId, out float finalDamage)
+        public bool ApplyDamageServer(
+            float damage,
+            float armorPen,
+            bool isCrit,
+            ulong attackerId,
+            out float finalDamage,
+            bool isSilverBullet = false,
+            bool isAreaDamage = false,
+            Vector3? sourcePosition = null)
         {
-            DamageContext damageContext = new DamageContext(attackerId, isCrit, DamageFeedbackMode.InstigatorOnly);
-            return ApplyDamageServer(damage, armorPen, damageContext, null, out finalDamage);
+            PlayerHealthSystem attackerHealth = NetworkGameplayResolver.ResolvePlayerHealth(attackerId);
+            Vector3? resolvedSourcePosition = sourcePosition;
+            if (!resolvedSourcePosition.HasValue && attackerHealth != null)
+                resolvedSourcePosition = attackerHealth.transform.position;
+
+            DamageContext damageContext = new DamageContext(
+                attackerId,
+                isCrit,
+                DamageFeedbackMode.InstigatorOnly,
+                isSilverBullet: isSilverBullet,
+                isAreaDamage: isAreaDamage,
+                sourcePosition: resolvedSourcePosition);
+            return ApplyDamageServer(damage, armorPen, damageContext, attackerHealth, out finalDamage);
         }
 
         public bool ApplyDamageServer(

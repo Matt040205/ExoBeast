@@ -171,8 +171,8 @@ namespace ExoBeasts.Multiplayer.Sync
                 return;
 
             Upgrade nextUpgrade = path.upgradesInPath[currentLevel];
-            int geoditeCost = nextUpgrade.geoditeCost;
-            int darkEtherCost = nextUpgrade.darkEtherCost;
+            int geoditeCost = ModificacaoRunState.ApplyUpgradeCost(nextUpgrade.geoditeCost);
+            int darkEtherCost = ModificacaoRunState.ApplyUpgradeCost(nextUpgrade.darkEtherCost);
 
             if (CurrencyManager.Instance == null ||
                 !CurrencyManager.Instance.HasEnoughCurrency(geoditeCost, CurrencyType.Geodites) ||

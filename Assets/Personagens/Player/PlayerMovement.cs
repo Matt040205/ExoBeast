@@ -441,6 +441,7 @@ public class PlayerMovement : NetworkBehaviour
 
         float finalSpeed = currentSpeed;
         if (healthSystem != null) finalSpeed *= healthSystem.speedMultiplier.Value;
+        finalSpeed = ModificacaoRunState.ApplyPlayerMoveSpeedMultiplier(finalSpeed);
 
         if (direction.sqrMagnitude > 0.01f)
         {

@@ -54,6 +54,9 @@ public class EnemyStatusController : MonoBehaviour
 
     public void ApplySlow(float percentage, float duration)
     {
+        if (ModificacaoRunState.RollsChance(ModificacaoGameplayEffect.BlindagemLeve))
+            return;
+
         if (slowCoroutine != null)
             StopCoroutine(slowCoroutine);
 
@@ -62,6 +65,9 @@ public class EnemyStatusController : MonoBehaviour
 
     public void SetPersistentSlow(float percentage)
     {
+        if (ModificacaoRunState.RollsChance(ModificacaoGameplayEffect.BlindagemLeve))
+            return;
+
         if (slowCoroutine != null)
             StopCoroutine(slowCoroutine);
 
@@ -80,6 +86,9 @@ public class EnemyStatusController : MonoBehaviour
 
     public void ApplyStun(float duration)
     {
+        if (ModificacaoRunState.RollsChance(ModificacaoGameplayEffect.BlindagemLeve))
+            return;
+
         if (stunCoroutine != null)
             StopCoroutine(stunCoroutine);
 

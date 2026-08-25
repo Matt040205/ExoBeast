@@ -44,8 +44,8 @@ public class EnemyDataSO : ScriptableObject
     [Range(0f, 1f)]
     public float etherDropChance = 0.1f;
 
-    public float GetHealth(int level) => Mathf.Round(baseHP * (1f + ((level - 1) * 0.15f)));
-    public float GetDamage(int level) => baseATQ + ((level - 1) * atqPerLevel);
-    public float GetMoveSpeed(int level) => moveSpeed + ((level - 1) * speedPerLevel);
+    public float GetHealth(int level) => Mathf.Round(ModificacaoRunState.ApplyEnemyHealth(baseHP * (1f + ((level - 1) * 0.15f))));
+    public float GetDamage(int level) => ModificacaoRunState.ApplyEnemyDamage(baseATQ + ((level - 1) * atqPerLevel));
+    public float GetMoveSpeed(int level) => ModificacaoRunState.ApplyEnemyMoveSpeed(moveSpeed + ((level - 1) * speedPerLevel));
     public float GetArmor(int level) => Mathf.Clamp01(baseArmor + ((level - 1) * armorPerLevel));
 }

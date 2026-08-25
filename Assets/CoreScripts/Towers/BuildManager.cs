@@ -77,6 +77,8 @@ public class BuildManager : NetworkBehaviour
     private Dictionary<int, int> syncedTrapCounts;
     private readonly List<TowerController> activeTowersRegistry = new List<TowerController>(32);
     private readonly List<NetworkedBuilding> activeBuildingsRegistry = new List<NetworkedBuilding>(32);
+    private readonly HashSet<TowerController> silencedTowers = new HashSet<TowerController>();
+    private Coroutine radioSilenceRoutine;
 
     private void Awake()
     {
@@ -88,7 +90,18 @@ public class BuildManager : NetworkBehaviour
         Instance = this;
         isBuildingMode = false;
         originalFogState = RenderSettings.fog;
+        ApplyVisibilityRunModifier();
         DisableCompetingScenePlayerInput();
+    }
+
+    private void ApplyVisibilityRunModifier()
+    {
+        if (!ModificacaoRunState.IsActive(ModificacaoGameplayEffect.VisibilidadeReduzida))
+            return;
+
+        RenderSettings.fog = true;
+        RenderSettings.fogDensity = ModificacaoRunState.GetValue(ModificacaoGameplayEffect.VisibilidadeReduzida, 0.015f);
+        originalFogState = true;
     }
 
     public override void OnNetworkSpawn()
@@ -108,6 +121,12 @@ public class BuildManager : NetworkBehaviour
         // Sem isso, clientes remotos só recebem SetAvailableTowers após a primeira
         // construção (via NotifyBuildingPlacedClientRpc), deixando os tooltips vazios.
         StartCoroutine(InitBuildUIWhenReady());
+        TryStartRadioSilenceRoutine();
+    }
+
+    private void Start()
+    {
+        TryStartRadioSilenceRoutine();
     }
 
     private IEnumerator SyncHostTrapCountsAfterSceneSettled()
@@ -134,7 +153,9 @@ public class BuildManager : NetworkBehaviour
 
         activeTowersRegistry.Clear();
         activeBuildingsRegistry.Clear();
+        silencedTowers.Clear();
         syncedTrapCounts = null;
+        StopRadioSilenceRoutine();
         base.OnNetworkDespawn();
     }
 
@@ -173,7 +194,7 @@ public class BuildManager : NetworkBehaviour
 
         ClearSelection();
         selectedBuildablePrefab = towerData.towerPrefab;
-        selectedBuildableCost = towerData.cost;
+        selectedBuildableCost = ModificacaoRunState.ApplyTowerPlacementCost(towerData.cost);
         selectedBuildableData = towerData;
     }
 
@@ -431,7 +452,7 @@ public class BuildManager : NetworkBehaviour
 
         if (buildableData is TrapDataSO trapData)
         {
-            return CurrencyManager.Instance.HasEnoughCurrency(trapData.geoditeCost, CurrencyType.Geodites) &&
+            return CurrencyManager.Instance.HasEnoughCurrency(selectedBuildableCost, CurrencyType.Geodites) &&
                    CurrencyManager.Instance.HasEnoughCurrency(trapData.darkEtherCost, CurrencyType.DarkEther);
         }
 
@@ -646,6 +667,9 @@ public class BuildManager : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     private void RequestPlaceBuildingServerRpc(int characterIndex, Vector3 pos, int cost, ServerRpcParams rpcParams = default)
     {
+        if (ModificacaoRunState.IsActive(ModificacaoGameplayEffect.EconomiaHacker))
+            cost = 0;
+
         if (!CurrencyManager.Instance.HasEnoughCurrency(cost, CurrencyType.Geodites)) return;
 
         var biblioteca = GameDataManager.Instance?.bibliotecaOriginalPersonagens;
@@ -736,6 +760,74 @@ public class BuildManager : NetworkBehaviour
     public IReadOnlyList<TowerController> GetActiveTowers() => activeTowersRegistry;
 
     public IReadOnlyList<NetworkedBuilding> GetActiveBuildings() => activeBuildingsRegistry;
+
+    public bool IsTowerSilenced(TowerController tower)
+    {
+        return tower != null && silencedTowers.Contains(tower);
+    }
+
+    private void TryStartRadioSilenceRoutine()
+    {
+        if (radioSilenceRoutine != null ||
+            !ModificacaoRunState.IsActive(ModificacaoGameplayEffect.SilencioDeRadio) ||
+            !HasRunModifierAuthority())
+        {
+            return;
+        }
+
+        radioSilenceRoutine = StartCoroutine(RadioSilenceRoutine());
+    }
+
+    private void StopRadioSilenceRoutine()
+    {
+        if (radioSilenceRoutine == null)
+            return;
+
+        StopCoroutine(radioSilenceRoutine);
+        radioSilenceRoutine = null;
+    }
+
+    private IEnumerator RadioSilenceRoutine()
+    {
+        while (ModificacaoRunState.IsActive(ModificacaoGameplayEffect.SilencioDeRadio))
+        {
+            float interval = ModificacaoRunState.GetValue(ModificacaoGameplayEffect.SilencioDeRadio, 45f);
+            float duration = ModificacaoRunState.GetSecondaryValue(ModificacaoGameplayEffect.SilencioDeRadio, 4f);
+            yield return new WaitForSeconds(Mathf.Max(0.1f, interval));
+
+            TowerController target = PickRandomActiveTower();
+            if (target != null)
+                StartCoroutine(SilenceTowerRoutine(target, duration));
+        }
+
+        radioSilenceRoutine = null;
+    }
+
+    private IEnumerator SilenceTowerRoutine(TowerController tower, float duration)
+    {
+        if (tower == null)
+            yield break;
+
+        silencedTowers.Add(tower);
+        yield return new WaitForSeconds(Mathf.Max(0.1f, duration));
+        silencedTowers.Remove(tower);
+    }
+
+    private TowerController PickRandomActiveTower()
+    {
+        activeTowersRegistry.RemoveAll(tower => tower == null || tower.IsDestroyed);
+        if (activeTowersRegistry.Count == 0)
+            return null;
+
+        return activeTowersRegistry[Random.Range(0, activeTowersRegistry.Count)];
+    }
+
+    private bool HasRunModifierAuthority()
+    {
+        return NetworkManager.Singleton == null ||
+               !NetworkManager.Singleton.IsListening ||
+               IsServer;
+    }
 
     public void RegisterTower(TowerController tower)
     {
@@ -1237,6 +1329,9 @@ public class BuildManager : NetworkBehaviour
     private int GetAuthoritativeTrapCost(TrapDataSO trapData)
     {
         if (trapData == null) return 0;
+        if (ModificacaoRunState.IsActive(ModificacaoGameplayEffect.EconomiaHacker))
+            return 0;
+
         int cost = trapData.geoditeCost;
         if (trapData.trapName.Contains("Broca") || trapData.name.Contains("Broca"))
         {

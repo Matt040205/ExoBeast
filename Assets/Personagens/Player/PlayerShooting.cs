@@ -47,6 +47,7 @@ public class PlayerShooting : NetworkBehaviour
     [Header("Raycast Settings")]
     public float maxDistance = 100f;
     public LayerMask hitLayers;
+    [SerializeField] private float shotSpreadAngle = 0f;
 
     [Header("Estado")]
     public int currentAmmo;
@@ -68,6 +69,7 @@ public class PlayerShooting : NetworkBehaviour
     private float nextShotDamageBonus = 1f;
     private float nextShotAreaBonus = 1f;
     private bool fireInputHeld;
+    private float infiniteAmmoUntil = -1f;
 
     public override void OnNetworkSpawn()
     {
@@ -199,7 +201,7 @@ public class PlayerShooting : NetworkBehaviour
         if (!fireInputHeld || Time.time < nextShotTime)
             return;
 
-        if (currentAmmo > 0)
+        if (currentAmmo > 0 || HasInfiniteAmmoActive())
         {
             Shoot();
             if (characterData != null && characterData.fireMode != FireMode.FullAuto)
@@ -257,7 +259,8 @@ public class PlayerShooting : NetworkBehaviour
 
         float attackSpeed = characterData != null && characterData.attackSpeed > 0f ? characterData.attackSpeed : 1f;
         nextShotTime = Time.time + (1f / attackSpeed);
-        currentAmmo--;
+        if (!HasInfiniteAmmoActive())
+            currentAmmo--;
         ConsumeNextShotBonusLocal();
 
         if (currentAmmo <= 0)
@@ -279,25 +282,29 @@ public class PlayerShooting : NetworkBehaviour
         if (combatManager != null && combatManager.netCombatType.Value != CombatType.Ranged)
             return;
 
+        bool isFirstShotOfMagazine = currentAmmo == maxAmmo;
+
         if (!IsOwner)
         {
-            if (isReloading || currentAmmo <= 0 || Time.time < nextShotTime)
+            bool hasInfiniteAmmo = HasInfiniteAmmoActive();
+            if (isReloading || (!hasInfiniteAmmo && currentAmmo <= 0) || Time.time < nextShotTime)
                 return;
 
             float attackSpeed = characterData != null && characterData.attackSpeed > 0f ? characterData.attackSpeed : 1f;
             nextShotTime = Time.time + (1f / attackSpeed);
-            currentAmmo--;
+            if (!hasInfiniteAmmo)
+                currentAmmo--;
         }
 
         direction.Normalize();
 
-        float damage = CalculateAuthoritativeDamage(out bool isCritical, out float areaRadius);
+        float damage = CalculateAuthoritativeDamage(isFirstShotOfMagazine, out bool isCritical, out float areaRadius, out bool isSilverBullet);
         float armorPenetration = characterData != null ? characterData.armorPenetration : 0f;
 
-        SpawnServerProjectile(origin, direction, damage, isCritical, armorPenetration, areaRadius > 0f, areaRadius, rpcParams.Receive.SenderClientId);
+        SpawnServerProjectile(origin, direction, damage, isCritical, isSilverBullet, armorPenetration, areaRadius > 0f, areaRadius, rpcParams.Receive.SenderClientId);
         ShootVisualClientRpc(origin, direction);
 
-        if (!IsOwner && currentAmmo <= 0 && !isReloading)
+        if (!IsOwner && currentAmmo <= 0 && !isReloading && !HasInfiniteAmmoActive())
             ReloadClientRpc();
     }
 
@@ -362,7 +369,7 @@ public class PlayerShooting : NetworkBehaviour
             ExoAudioService.PlayOneShot3D(eventToPlay, emissionPosition);
     }
 
-    private float CalculateAuthoritativeDamage(out bool isCritical, out float areaRadius)
+    private float CalculateAuthoritativeDamage(bool isFirstShotOfMagazine, out bool isCritical, out float areaRadius, out bool isSilverBullet)
     {
         float baseDamage = characterData != null ? characterData.damage : 10f;
         if (BuildManager.Instance != null)
@@ -372,13 +379,19 @@ public class PlayerShooting : NetworkBehaviour
 
         float finalDamage = baseDamage;
         isCritical = false;
+        isSilverBullet = false;
         areaRadius = 0f;
 
-        if (characterData != null && Random.value <= characterData.critChance)
+        float critChance = characterData != null ? ModificacaoRunState.ApplyPlayerCritChance(characterData.critChance) : 0f;
+        if (characterData != null && Random.value <= critChance)
         {
             finalDamage *= characterData.critDamage;
             isCritical = true;
         }
+
+        isSilverBullet =
+            ModificacaoRunState.IsActive(ModificacaoGameplayEffect.BalaDePrata) &&
+            isFirstShotOfMagazine;
 
         if (playerHealth != null)
             finalDamage *= playerHealth.damageMultiplier.Value;
@@ -389,6 +402,8 @@ public class PlayerShooting : NetworkBehaviour
             areaRadius = nextShotAreaBonus;
             ConsumeNextShotBonusLocal();
         }
+
+        areaRadius = ModificacaoRunState.Multiply(areaRadius, ModificacaoGameplayEffect.OndasDeChoque);
 
         return finalDamage;
     }
@@ -444,6 +459,7 @@ public class PlayerShooting : NetworkBehaviour
         Vector3 direction,
         float damage,
         bool isCritical,
+        bool isSilverBullet,
         float armorPenetration,
         bool empoweredShot,
         float explosionRadius,
@@ -470,6 +486,7 @@ public class PlayerShooting : NetworkBehaviour
             attackerClientId,
             damage,
             isCritical,
+            isSilverBullet,
             armorPenetration,
             direction,
             projectileSpeed,
@@ -515,6 +532,7 @@ public class PlayerShooting : NetworkBehaviour
             return;
 
         float reloadSpeed = characterData != null && characterData.reloadSpeed > 0f ? characterData.reloadSpeed : 2f;
+        reloadSpeed = ModificacaoRunState.ApplyPlayerReloadTime(reloadSpeed);
         float multiplier = 3.0f / reloadSpeed;
 
         if (universalAnimator != null)
@@ -630,7 +648,21 @@ public class PlayerShooting : NetworkBehaviour
         if (shotDirection.sqrMagnitude <= 0.0001f)
             return GetFallbackShotDirection();
 
-        return shotDirection.normalized;
+        return ApplyShotSpread(shotDirection.normalized);
+    }
+
+    private Vector3 ApplyShotSpread(Vector3 direction)
+    {
+        float spread = ModificacaoRunState.ApplyPlayerShotSpread(shotSpreadAngle);
+        if (spread <= 0f)
+            return direction;
+
+        Quaternion spreadRotation = Quaternion.Euler(
+            UnityEngine.Random.Range(-spread, spread),
+            UnityEngine.Random.Range(-spread, spread),
+            0f);
+
+        return (spreadRotation * direction).normalized;
     }
 
     public float GetRemainingReloadTime()
@@ -639,7 +671,18 @@ public class PlayerShooting : NetworkBehaviour
             return 0f;
 
         float reloadSpeed = characterData != null ? characterData.reloadSpeed : 2f;
+        reloadSpeed = ModificacaoRunState.ApplyPlayerReloadTime(reloadSpeed);
         return reloadSpeed - (Time.time - reloadStartTime);
+    }
+
+    public void GrantInfiniteAmmo(float duration)
+    {
+        infiniteAmmoUntil = Mathf.Max(infiniteAmmoUntil, Time.time + Mathf.Max(0f, duration));
+    }
+
+    private bool HasInfiniteAmmoActive()
+    {
+        return Time.time < infiniteAmmoUntil;
     }
 
     public void RequestExplosionVfx(Vector3 position, float radius)

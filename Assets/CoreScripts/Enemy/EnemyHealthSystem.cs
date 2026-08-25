@@ -37,6 +37,7 @@ public class EnemyHealthSystem : MonoBehaviour
     [Header("Status Atual (Servidor Autoritativo)")]
     public float currentHealth;
     public bool isDead;
+    private float maxRuntimeHealth;
 
     private float baseArmor;
     private float currentArmorModifier = 0f;
@@ -58,6 +59,7 @@ public class EnemyHealthSystem : MonoBehaviour
     private EnemyController enemyController;
     private NetworkedEnemy networkedEnemy;
     private bool isMarked = false;
+    private bool tacticalShieldActive = false;
     private Coroutine vulnerabilityCoroutine;
 
     void Awake()
@@ -78,6 +80,7 @@ public class EnemyHealthSystem : MonoBehaviour
         currentHealth = EnemyMultiplayerScaling.ApplyHealthScaling(
             enemyData.GetHealth(level),
             connectedPlayerCount);
+        maxRuntimeHealth = currentHealth;
         baseArmor = enemyData.GetArmor(level);
         currentArmorModifier = 0f;
         armorShredStacks = 0;
@@ -85,16 +88,22 @@ public class EnemyHealthSystem : MonoBehaviour
         markedDamageMultiplier = 1f;
         vulnerabilityMultiplier = 1f;
 
+        bool startsWithRunTacticalShield = ModificacaoRunState.RollsChance(ModificacaoGameplayEffect.ReforcosTaticos);
+        tacticalShieldActive = startsWithRunTacticalShield;
+
         // Inicializa o Escudo
-        if (startWithShield)
+        if (startWithShield || startsWithRunTacticalShield)
         {
-            currentShield = maxShield;
+            currentShield = startsWithRunTacticalShield
+                ? Mathf.Max(maxShield, currentHealth * ModificacaoRunState.GetSecondaryValue(ModificacaoGameplayEffect.ReforcosTaticos, 0.25f))
+                : maxShield;
             hasShield = true;
         }
         else
         {
             currentShield = 0f;
             hasShield = false;
+            tacticalShieldActive = false;
         }
         SetShieldVisual(hasShield);
 
@@ -161,7 +170,10 @@ public class EnemyHealthSystem : MonoBehaviour
         bool result = TakeDamageDetailed(damage, armorPenetration, damageContext, out finalDamageApplied);
 
         if (finalDamageApplied > 0f && attackerHealth != null)
+        {
+            ApplyReflectedDamageIfNeeded(damageContext, attackerHealth, finalDamageApplied);
             attackerHealth.TriggerDamageDealt(finalDamageApplied);
+        }
 
         return result;
     }
@@ -181,7 +193,7 @@ public class EnemyHealthSystem : MonoBehaviour
 
         // === SISTEMA DE ESCUDO ===
         // Se o inimigo tem escudo e o dano NAO veio de uma Torre, bloqueia completamente
-        if (hasShield && !damageContext.IsFromTower)
+        if (hasShield && !damageContext.IsFromTower && !CanBypassTacticalShield(damageContext))
         {
             // Mostra popup "Imune" para o jogador que atirou
             if (networkedEnemy != null)
@@ -206,6 +218,7 @@ public class EnemyHealthSystem : MonoBehaviour
             {
                 currentShield = 0f;
                 hasShield = false;
+                tacticalShieldActive = false;
                 SetShieldVisual(false);
 
                 if (networkedEnemy != null)
@@ -236,10 +249,21 @@ public class EnemyHealthSystem : MonoBehaviour
         float finalDamage = damageWithMark * (1.0f - Mathf.Clamp01(effectiveArmor / 100f));
         if (finalDamage < 0) finalDamage = 0;
 
+        if (damageContext.IsSilverBullet && !IsBossLikeEnemy())
+            finalDamage = currentHealth;
+
         // Garante no mínimo 1 de dano se o dano original for maior que zero
         if (damage > 0f && finalDamage < 1f)
         {
             finalDamage = 1f;
+        }
+
+        if (finalDamage > 0f &&
+            ModificacaoRunState.IsActive(ModificacaoGameplayEffect.Execucao) &&
+            maxRuntimeHealth > 0f &&
+            currentHealth <= maxRuntimeHealth * ModificacaoRunState.GetValue(ModificacaoGameplayEffect.Execucao, 0.1f))
+        {
+            finalDamage = currentHealth;
         }
 
         finalDamageApplied = finalDamage;
@@ -559,10 +583,13 @@ public class EnemyHealthSystem : MonoBehaviour
 
         if (CurrencyManager.Instance != null && enemyData != null && (networkedEnemy == null || networkedEnemy.IsServer))
         {
-            CurrencyManager.Instance.AddCurrency(enemyData.geoditasOnDeath, CurrencyType.Geodites);
+            CurrencyManager.Instance.AddCurrency(ModificacaoRunState.ApplyGeoditeReward(enemyData.geoditasOnDeath), CurrencyType.Geodites);
             if (Random.value <= enemyData.etherDropChance)
                 CurrencyManager.Instance.AddCurrency(1, CurrencyType.DarkEther);
         }
+
+        if (ModificacaoRunState.IsActive(ModificacaoGameplayEffect.ProtocoloKamikaze))
+            ExplodeOnDeath();
 
         if (enemyController != null) enemyController.HandleDeath();
 
@@ -571,6 +598,78 @@ public class EnemyHealthSystem : MonoBehaviour
             GlobalVFXPool.GetVFX(deathVfxPrefab, transform.position, transform.rotation, 4f);
             TriggerDeathDissolve();
         }
+    }
+
+    private void ExplodeOnDeath()
+    {
+        float radius = ModificacaoRunState.GetValue(ModificacaoGameplayEffect.ProtocoloKamikaze, 4f);
+        float damage = ModificacaoRunState.GetSecondaryValue(ModificacaoGameplayEffect.ProtocoloKamikaze, 10f);
+        Collider[] hits = Physics.OverlapSphere(transform.position, radius);
+
+        foreach (Collider hit in hits)
+        {
+            PlayerHealthSystem player = hit.GetComponentInParent<PlayerHealthSystem>();
+            if (player != null)
+            {
+                player.TakeDamage(damage, transform, false);
+                continue;
+            }
+
+            TowerController tower = hit.GetComponentInParent<TowerController>();
+            if (tower != null)
+                tower.TakeDamage(damage);
+        }
+    }
+
+    private bool CanBypassTacticalShield(DamageContext damageContext)
+    {
+        if (!tacticalShieldActive ||
+            !ModificacaoRunState.IsActive(ModificacaoGameplayEffect.ReforcosTaticos) ||
+            damageContext.IsAreaDamage ||
+            !damageContext.HasSourcePosition)
+        {
+            return false;
+        }
+
+        Vector3 toSource = damageContext.SourcePosition - transform.position;
+        toSource.y = 0f;
+        if (toSource.sqrMagnitude <= 0.0001f)
+            return false;
+
+        Vector3 forward = transform.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude <= 0.0001f)
+            return false;
+
+        float frontDot = Vector3.Dot(forward.normalized, toSource.normalized);
+        return frontDot <= 0.35f;
+    }
+
+    private void ApplyReflectedDamageIfNeeded(DamageContext damageContext, PlayerHealthSystem attackerHealth, float finalDamageApplied)
+    {
+        if (!ModificacaoRunState.IsActive(ModificacaoGameplayEffect.DanoRefletido) ||
+            damageContext.IsFromTower ||
+            damageContext.IsAreaDamage ||
+            !IsBossLikeEnemy())
+        {
+            return;
+        }
+
+        float reflectedPercent = ModificacaoRunState.GetValue(ModificacaoGameplayEffect.DanoRefletido, 0.05f);
+        float reflectedDamage = finalDamageApplied * Mathf.Max(0f, reflectedPercent);
+        if (reflectedDamage > 0f)
+            attackerHealth.TakeDamage(reflectedDamage, transform, false);
+    }
+
+    private bool IsBossLikeEnemy()
+    {
+        if (enemyData == null)
+            return false;
+
+        string dataName = enemyData.name;
+        string displayName = enemyData.nomeExibicao;
+        return (!string.IsNullOrEmpty(dataName) && dataName.ToLowerInvariant().Contains("monstro")) ||
+               (!string.IsNullOrEmpty(displayName) && displayName.ToLowerInvariant().Contains("monstro"));
     }
 
     /// <summary>
