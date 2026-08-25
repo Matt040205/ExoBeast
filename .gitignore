@@ -111,3 +111,12 @@ Assets/Resources/EOSConfig_Main.asset.meta
 # Arquivos temporarios do Claude
 tmpclaude-*
 Assets/StreamingAssets/EOSCredentials.json.meta
+
+# Exo Bridge: pacotes exportados pelo Blender e snapshots locais antes de uma
+# promocao. O addon, o schema e os testes ficam versionados em Tools/ e
+# Assets/Editor; somente os artefatos de trabalho ficam fora do Git.
+Assets/ExoBridge/Incoming/
+Assets/ExoBridge/Backups/
+
+# Cache local do addon Blender; o ZIP instalavel em Tools/Blender/ExoBridge/dist e versionado.
+Tools/Blender/ExoBridge/__pycache__/

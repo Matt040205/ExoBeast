@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEditor;
+using System;
+using System.Collections.Generic;
 
 public enum ExoEntityType { Personagem, Monstro, Edificio }
 
@@ -74,4 +76,50 @@ public class ExoPrefabProfile : ScriptableObject
     public Vector3 enemyAttackPointLocalPosition = new Vector3(0f, 0.8f, 1f);
     public LayerMask enemyPlayerLayer;
     public LayerMask enemyTowerLayer;
+
+    [Header("Exo Bridge - Materiais")]
+    [Tooltip("Bindings explicitos entre slots exportados pelo Blender e slots de Renderer no prefab. A ponte nao converte nodes do Blender; ela cria materiais ToonExobeasts a partir das texturas declaradas no pacote.")]
+    public List<ExoMaterialSlotBinding> materialSlotBindings = new List<ExoMaterialSlotBinding>();
+
+    [Header("Exo Bridge - Animacoes")]
+    [Tooltip("Cada Action exportada precisa apontar para o clip-base que sera sobrescrito em um AnimatorOverrideController existente. A ponte nunca cria uma maquina de estados.")]
+    public List<ExoAnimationBinding> animationBindings = new List<ExoAnimationBinding>();
+
+    public ExoMaterialSlotBinding FindMaterialBinding(string sourceSlot)
+    {
+        return materialSlotBindings?.Find(binding => binding != null
+            && string.Equals(binding.sourceSlot, sourceSlot, StringComparison.Ordinal));
+    }
+
+    public ExoAnimationBinding FindAnimationBinding(string actionName)
+    {
+        return animationBindings?.Find(binding => binding != null
+            && string.Equals(binding.actionName, actionName, StringComparison.Ordinal));
+    }
+}
+
+[Serializable]
+public sealed class ExoMaterialSlotBinding
+{
+    [Tooltip("Nome exato do slot material no manifesto do Blender.")]
+    public string sourceSlot;
+
+    [Tooltip("Caminho do Renderer relativo a raiz do FBX exportado. Use . quando o Renderer estiver na raiz. A ponte nao aplica um slot por tentativa em todos os Renderers.")]
+    public string rendererPath;
+
+    [Tooltip("Indice do material a substituir no Renderer declarado. Valores negativos nao sao aceitos pela ponte.")]
+    public int rendererMaterialIndex;
+
+    [Tooltip("Nome estavel do material ToonExobeasts gerado para este slot. Vazio usa o nome do slot.")]
+    public string outputMaterialName;
+}
+
+[Serializable]
+public sealed class ExoAnimationBinding
+{
+    [Tooltip("Nome exato da Action no manifesto do Blender.")]
+    public string actionName;
+
+    [Tooltip("Clip-base ja existente no AnimatorOverrideController. A ponte o sobrescreve; nunca cria estados.")]
+    public AnimationClip targetClip;
 }

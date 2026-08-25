@@ -27,6 +27,29 @@ public sealed class ImportAssetsStep : IExoBuildStep
     public void Execute(ExoBuildContext context)
     {
         string destModelPath = ExoPathResolver.Normalize(Path.Combine(context.ModelosFolder, ExoNaming.ModelFileName(context.FbxFileName)));
+
+        if (context.AssetsAlreadyPromoted)
+        {
+            if (!string.Equals(context.SourceFbxPath, destModelPath, System.StringComparison.OrdinalIgnoreCase)
+                || (!context.DryRun && !File.Exists(destModelPath)))
+            {
+                context.Report.Error(
+                    "Ponte Exo Bridge esperava o FBX promovido em \"" + destModelPath + "\", mas ele nao foi encontrado.",
+                    context.Nome);
+                return;
+            }
+
+            context.DestFbxPath = destModelPath;
+            if (context.DryRun)
+                context.Report.Info("[DryRun] Exo Bridge promoveria o FBX para \"" + destModelPath + "\" sem mover o pacote de evidencia.", context.Nome);
+            string promotedTexturePath = ExoPathResolver.Normalize(Path.Combine(context.TexturasFolder, ExoNaming.TextureFileName(context.FbxFileName)));
+            if (File.Exists(promotedTexturePath))
+                context.DestTexturePath = promotedTexturePath;
+
+            context.Report.Info("FBX e texturas ja foram promovidos pelo Exo Bridge; ImportAssets nao movera o pacote de evidencia.", context.Nome);
+            return;
+        }
+
         if (!MoveAsset(context, context.SourceFbxPath, destModelPath, context.ModelosFolder, "FBX"))
             return;
         context.DestFbxPath = destModelPath;

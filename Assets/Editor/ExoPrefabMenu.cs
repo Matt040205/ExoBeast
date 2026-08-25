@@ -69,6 +69,31 @@ public class ExoPrefabMenu
         ExoBuildReport report = new ExoBuildReport();
         ExoBuildContext context = new ExoBuildContext(categoria, nome, sourcePath, dryRun, report);
 
+        return RunPipeline(context);
+    }
+
+    /// <summary>
+    /// Entrada exclusiva do Exo Bridge para um FBX que ja foi promovido por
+    /// copia para o caminho canonico. Preserva o contrato do menu manual:
+    /// ele continua usando Selection e movendo o FBX selecionado.
+    /// </summary>
+    internal static ExoBuildReport RunPipelineForPromotedAsset(string categoria, string nome, string promotedFbxPath, bool dryRun)
+    {
+        ExoBuildReport report = new ExoBuildReport();
+        ExoBuildContext context = new ExoBuildContext(
+            categoria,
+            nome,
+            promotedFbxPath,
+            dryRun,
+            report,
+            assetsAlreadyPromoted: true);
+
+        return RunPipeline(context);
+    }
+
+    private static ExoBuildReport RunPipeline(ExoBuildContext context)
+    {
+
         ExoBuildPipeline pipeline = new ExoBuildPipeline()
             .Add(new ResolvePathsStep())
             .Add(new ImportAssetsStep())
@@ -80,8 +105,8 @@ public class ExoPrefabMenu
 
         pipeline.Run(context);
 
-        DumpReport(report);
-        return report;
+        DumpReport(context.Report);
+        return context.Report;
     }
 
     /// <summary>

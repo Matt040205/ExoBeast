@@ -75,7 +75,10 @@ public sealed class AnimatorStep : IExoBuildStep
             return;
         }
 
-        MoveLooseAnimationFiles(context);
+        if (!context.AssetsAlreadyPromoted)
+            MoveLooseAnimationFiles(context);
+        else
+            context.Report.Info("Animacoes ja foram promovidas pelo Exo Bridge; AnimatorStep nao movera arquivos do pacote.", context.Nome);
 
         string controllerFileName = ExoNaming.AnimatorControllerFileName(context.Nome);
         string controllerPath = ExoPathResolver.Normalize(Path.Combine(context.AnimacaoFolder, controllerFileName));

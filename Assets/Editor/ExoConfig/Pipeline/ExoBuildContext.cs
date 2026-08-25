@@ -43,6 +43,13 @@ public sealed class ExoBuildContext
     /// <summary>Se true, nenhum step grava no disco (nem move asset, nem cria pasta, nem cria/atualiza material ou prefab) - so popula Report com o que faria.</summary>
     public bool DryRun { get; }
 
+    /// <summary>
+    /// True somente para a ponte Blender. Nesse modo os arquivos ja foram
+    /// promovidos por copia para os caminhos canonicos e os steps de
+    /// importacao nao podem mover ou apagar o pacote de evidencia.
+    /// </summary>
+    public bool AssetsAlreadyPromoted { get; }
+
     /// <summary>Relatorio estruturado acumulado por todos os steps - nunca Debug.*, ver ExoBuildReport (Core).</summary>
     public ExoBuildReport Report { get; }
 
@@ -100,7 +107,7 @@ public sealed class ExoBuildContext
     /// </summary>
     public IReadOnlyList<string> BuiltPrefabPaths { get; set; } = new List<string>();
 
-    public ExoBuildContext(string categoriaRaw, string nome, string sourceFbxPath, bool dryRun, ExoBuildReport report = null)
+    public ExoBuildContext(string categoriaRaw, string nome, string sourceFbxPath, bool dryRun, ExoBuildReport report = null, bool assetsAlreadyPromoted = false)
     {
         CategoriaRaw = categoriaRaw;
         Nome = nome;
@@ -109,5 +116,6 @@ public sealed class ExoBuildContext
         SourceFolderPath = ExoPathResolver.Normalize(Path.GetDirectoryName(sourceFbxPath));
         DryRun = dryRun;
         Report = report ?? new ExoBuildReport();
+        AssetsAlreadyPromoted = assetsAlreadyPromoted;
     }
 }

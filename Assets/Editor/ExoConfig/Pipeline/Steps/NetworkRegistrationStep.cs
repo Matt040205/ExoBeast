@@ -56,6 +56,11 @@ public sealed class NetworkRegistrationStep : IExoBuildStep
 
         if (context.DryRun)
         {
+            if (AssetDatabase.LoadAssetAtPath<NetworkPrefabsList>(NetworkPrefabsListPath) == null)
+            {
+                context.Report.Error("NetworkPrefabsList nao encontrado em \"" + NetworkPrefabsListPath + "\"; promocao seria bloqueada.", context.Nome);
+                return;
+            }
             context.Report.Info(
                 "[DryRun] Prefab(s) de \"" + context.Nome + "\" seriam registrados em \"" + NetworkPrefabsListPath + "\" (se ainda nao estiverem).",
                 context.Nome);
